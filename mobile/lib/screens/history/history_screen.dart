@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../models/signal.dart';
 import '../../providers/signal_provider.dart';
 import '../../widgets/cards/signal_card.dart';
 import '../../widgets/typography/section_title.dart';
@@ -13,7 +12,7 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  SignalStatus? _filterStatus;
+  String? _filterStatus;
 
   @override
   Widget build(BuildContext context) {
@@ -25,7 +24,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     final filtered = _filterStatus == null
         ? history
-        : history.where((s) => s.status == _filterStatus).toList();
+        : history.where((s) => s.status.toUpperCase() == _filterStatus).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -118,17 +117,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
         children: [
           _buildFilterChip('All', null),
           const SizedBox(width: 8),
-          _buildFilterChip('Won', SignalStatus.won),
+          _buildFilterChip('Won', 'WON'),
           const SizedBox(width: 8),
-          _buildFilterChip('Lost', SignalStatus.lost),
+          _buildFilterChip('Lost', 'LOST'),
           const SizedBox(width: 8),
-          _buildFilterChip('Cancelled', SignalStatus.cancelled),
+          _buildFilterChip('Cancelled', 'CANCELLED'),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, SignalStatus? status) {
+  Widget _buildFilterChip(String label, String? status) {
     final isSelected = _filterStatus == status;
     return GestureDetector(
       onTap: () => setState(() => _filterStatus = status),

@@ -1,17 +1,35 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
-import '../../providers/signal_provider.dart';
+import '../../models/signal.dart';
+import '../../services/api/api_service.dart';
 import '../../widgets/cards/signal_card.dart';
 import '../../widgets/typography/section_title.dart';
 
-class SignalsScreen extends StatelessWidget {
+class SignalsScreen extends StatefulWidget {
   const SignalsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final provider = SignalProvider();
-    final activeSignals = provider.activeSignals;
+  State<SignalsScreen> createState() => _SignalsScreenState();
+}
 
+class _SignalsScreenState extends State<SignalsScreen> {
+  late Future<SignalListResponse> _signalsFuture;
+  final ApiService _apiService = ApiService();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchSignals();
+  }
+
+  void _fetchSignals() {
+    setState(() {
+      _signalsFuture = _apiService.getSignals();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Live Signals'),
@@ -49,41 +67,84 @@ class SignalsScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: activeSignals.isEmpty
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.signal_wifi_off, size: 64, color: AppColors.textTertiary),
-                  SizedBox(height: 16),
-                  Text(
-                    'No active signals right now.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
-                  ),
-                  SizedBox(height: 8),
-                  Text(
-                    'Check back during active market sessions.',
-                    style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
-                  ),
-                ],
+      body: FutureBuilder<SignalListResponse>(
+        future: _signalsFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: AppColors.error),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Failed to load signals',
+                      style: TextStyle(color: AppColors.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      snapshot.error.toString().replaceAll('Exception: ', ''),
+                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: _fetchSignals,
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
               ),
-            )
-          : ListView(
+            );
+          } else if (snapshot.hasData) {
+            final allSignals = snapshot.data!.signals;
+            if (allSignals.isEmpty) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.signal_wifi_off, size: 64, color: AppColors.textTertiary),
+                    SizedBox(height: 16),
+                    Text(
+                      'No signals right now.',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                    ),
+                    SizedBox(height: 8),
+                    Text(
+                      'Check back during active market sessions.',
+                      style: TextStyle(color: AppColors.textTertiary, fontSize: 13),
+                    ),
+                  ],
+                ),
+              );
+            }
+            
+            final activeSignals = allSignals.where((s) => s.status == 'ACTIVE').toList();
+            
+            return ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 SectionTitle(
-                  title: '${activeSignals.length} Active Signal${activeSignals.length > 1 ? 's' : ''}',
+                  title: '${activeSignals.length} Active Signal${activeSignals.length != 1 ? 's' : ''}',
                   subtitle: 'Updated live during market hours',
                 ),
                 const SizedBox(height: 16),
-                ...activeSignals.map((signal) => Padding(
+                ...allSignals.map((signal) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
                       child: SignalCard(signal: signal),
                     )),
                 const SizedBox(height: 8),
                 _buildDisclaimer(),
               ],
-            ),
+            );
+          }
+          return const SizedBox.shrink();
+        },
+      ),
     );
   }
 

@@ -1,38 +1,105 @@
-
 class Signal {
-  final String id;
-  final String pair;
-  final String direction; // 'BUY' or 'SELL'
-  final double entryPrice;
+  final int id;
+  final String symbol;
+  final String action;
+  final double entry;
   final double takeProfit;
   final double stopLoss;
+  final int confidence;
   final String timeframe;
-  final double confidence; // 0.0 to 1.0
+  final String status;
+  final String analysis;
   final DateTime timestamp;
-  final SignalStatus status;
-  final String? notes;
+  final String strategyId;
+  final String strategyName;
+  final String strategyVersion;
+  final int dataAgeSeconds;
 
   const Signal({
     required this.id,
-    required this.pair,
-    required this.direction,
-    required this.entryPrice,
+    required this.symbol,
+    required this.action,
+    required this.entry,
     required this.takeProfit,
     required this.stopLoss,
-    required this.timeframe,
     required this.confidence,
-    required this.timestamp,
+    required this.timeframe,
     required this.status,
-    this.notes,
+    required this.analysis,
+    required this.timestamp,
+    required this.strategyId,
+    required this.strategyName,
+    required this.strategyVersion,
+    required this.dataAgeSeconds,
   });
 
-  bool get isBuy => direction == 'BUY';
+  factory Signal.fromJson(Map<String, dynamic> json) {
+    return Signal(
+      id: json['id'] as int,
+      symbol: json['symbol'] as String,
+      action: json['action'] as String,
+      entry: (json['entry'] as num).toDouble(),
+      takeProfit: (json['takeProfit'] as num).toDouble(),
+      stopLoss: (json['stopLoss'] as num).toDouble(),
+      confidence: json['confidence'] as int,
+      timeframe: json['timeframe'] as String,
+      status: json['status'] as String,
+      analysis: json['analysis'] as String,
+      timestamp: DateTime.parse(json['timestamp'] as String).toLocal(),
+      strategyId: json['strategyId'] as String? ?? '',
+      strategyName: json['strategyName'] as String? ?? '',
+      strategyVersion: json['strategyVersion'] as String? ?? '',
+      dataAgeSeconds: json['dataAgeSeconds'] as int? ?? 0,
+    );
+  }
 
-  double get riskRewardRatio {
-    final risk = (entryPrice - stopLoss).abs();
-    final reward = (takeProfit - entryPrice).abs();
-    return risk == 0 ? 0 : reward / risk;
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'symbol': symbol,
+      'action': action,
+      'entry': entry,
+      'takeProfit': takeProfit,
+      'stopLoss': stopLoss,
+      'confidence': confidence,
+      'timeframe': timeframe,
+      'status': status,
+      'analysis': analysis,
+      'timestamp': timestamp.toUtc().toIso8601String(),
+      'strategyId': strategyId,
+      'strategyName': strategyName,
+      'strategyVersion': strategyVersion,
+      'dataAgeSeconds': dataAgeSeconds,
+    };
   }
 }
 
-enum SignalStatus { active, won, lost, cancelled }
+class SignalListResponse {
+  final List<Signal> signals;
+  final DateTime lastUpdated;
+  final int dataAgeSeconds;
+
+  const SignalListResponse({
+    required this.signals,
+    required this.lastUpdated,
+    required this.dataAgeSeconds,
+  });
+
+  factory SignalListResponse.fromJson(Map<String, dynamic> json) {
+    return SignalListResponse(
+      signals: (json['signals'] as List<dynamic>)
+          .map((e) => Signal.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      lastUpdated: DateTime.parse(json['lastUpdated'] as String).toLocal(),
+      dataAgeSeconds: json['dataAgeSeconds'] as int? ?? 0,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'signals': signals.map((e) => e.toJson()).toList(),
+      'lastUpdated': lastUpdated.toUtc().toIso8601String(),
+      'dataAgeSeconds': dataAgeSeconds,
+    };
+  }
+}

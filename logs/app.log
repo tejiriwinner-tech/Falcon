@@ -1,0 +1,3 @@
+2026-07-13 14:45:45,171 - asyncio - DEBUG - Using selector: SelectSelector
+2026-07-13 14:46:21,007 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/decision-engine
+2026-07-13 14:46:21,077 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/decision-engine - Status: 200 - Time: 0.0696s
