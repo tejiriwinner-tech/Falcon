@@ -56,6 +56,7 @@ class TradeJournalRecord(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     signal_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    strategy_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
     direction: Mapped[str] = mapped_column(String(8), nullable=False)
     entry_price: Mapped[float] = mapped_column(Float, nullable=False)

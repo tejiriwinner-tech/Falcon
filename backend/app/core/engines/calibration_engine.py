@@ -54,11 +54,18 @@ class CalibrationEngine:
         all_validation_scores: List[float] = []
         all_risk_confidences: List[float] = []
         all_execution_scores: List[float] = []
+        all_market_confidences: List[float] = []
         mission_ids: List[str] = []
 
         for mission in missions:
             artifacts = repository.get_mission_artifacts(mission.id)
             mission_ids.append(mission.id)
+
+            market_state = artifacts.get("marketState")
+            if market_state is not None:
+                all_market_confidences.append(
+                    float(market_state.overallMarketConfidence)
+                )
 
             for d in artifacts.get("decisions", []):
                 conf = getattr(d, "decisionConfidence", None)
@@ -86,25 +93,28 @@ class CalibrationEngine:
         # ── Compute per-metric averages (with fallback defaults) ──────
         avg_decision_conf = (
             sum(all_decision_confidences) / len(all_decision_confidences)
-            if all_decision_confidences else 80.0
+            if all_decision_confidences else 0.0
         )
         avg_val_score = (
             sum(all_validation_scores) / len(all_validation_scores)
-            if all_validation_scores else 78.0
+            if all_validation_scores else 0.0
         )
         avg_risk_conf = (
             sum(all_risk_confidences) / len(all_risk_confidences)
-            if all_risk_confidences else 72.0
+            if all_risk_confidences else 0.0
         )
         avg_exec_score = (
             sum(all_execution_scores) / len(all_execution_scores)
-            if all_execution_scores else 82.0
+            if all_execution_scores else 0.0
         )
 
         # Derived approximations for components not tracked directly
         avg_outcome_score = min(avg_decision_conf * 1.01, 100.0)
         strategy_stability = min(avg_val_score * 0.97, 100.0)
-        market_agreement = 75.0  # Deterministic mock
+        market_agreement = (
+            sum(all_market_confidences) / len(all_market_confidences)
+            if all_market_confidences else 0.0
+        )
         learning_confidence = min(avg_decision_conf * 0.95, 100.0)
 
         # ── Weighted calibration score ────────────────────────────────

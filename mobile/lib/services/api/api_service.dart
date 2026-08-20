@@ -234,7 +234,7 @@ class ApiService {
 
 
   Future<StrategyItem> getStrategyById(String id) async {
-    return _get<StrategyItem>('/strategies/$id$id', StrategyItem.fromJson);
+    return _get<StrategyItem>('/strategies/$id', StrategyItem.fromJson);
   }
 
 
@@ -286,7 +286,7 @@ class ApiService {
 
 
   Future<MissionReport> getMission(String id) async {
-    return _get<MissionReport>('/repository/missions/$id$id', MissionReport.fromJson);
+    return _get<MissionReport>('/repository/missions/$id', MissionReport.fromJson);
   }
 
   Future<Map<String, dynamic>> getMissionArtifacts(String missionId) async {

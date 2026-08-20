@@ -5,6 +5,48 @@ from app.schemas.strategy import (
     StrategyHealth, RiskLevel, StrategyPerformance, StrategyScore,
     MarketSnapshot, StrategyValidationCheck, StrategyValidation
 )
+from app.core.strategy_metrics import (
+    EMPTY_PERFORMANCE,
+    latest_validation_by_strategy,
+    last_used_by_strategy,
+    performance_by_strategy,
+)
+
+
+def _empty_score() -> StrategyScore:
+    return StrategyScore(
+        historicalScore=0,
+        currentMarketScore=0,
+        overallScore=0,
+        historicalPerformance=0,
+        currentMarketFit=0,
+        currentNewsScore=0,
+        sessionMatch=0,
+        riskRating=RiskLevel.MEDIUM,
+    )
+
+
+def _empty_validation() -> StrategyValidation:
+    return StrategyValidation(
+        score=0,
+        aiConfidence=0,
+        validationDurationSeconds=0.0,
+        failedChecks=[],
+        checks=[],
+        marketSnapshot=MarketSnapshot(
+            trend="unknown",
+            volatility="unknown",
+            liquidity="unknown",
+            news="unknown",
+            session="unknown",
+            spread=0.0,
+            atr=0.0,
+            rsi=0.0,
+            ema200="unknown",
+            adx=0.0,
+        ),
+    )
+
 
 class StrategyEngine:
     def __init__(self):
@@ -12,10 +54,48 @@ class StrategyEngine:
         self._strategies = self._init_strategies()
 
     def get_strategies(self) -> List[StrategyItem]:
-        return self._strategies
+        """Strategy definitions with performance and validation from stored data."""
+        performance = performance_by_strategy()
+        validations = latest_validation_by_strategy()
+        last_used = last_used_by_strategy()
+
+        strategies: List[StrategyItem] = []
+        for definition in self._strategies:
+            strategy = definition.model_copy(deep=True)
+            strategy.performance = performance.get(
+                strategy.id, EMPTY_PERFORMANCE.model_copy()
+            )
+            validation = validations.get(strategy.id)
+            if validation is not None:
+                strategy.latestValidation = validation
+            strategy.lastUsed = last_used.get(strategy.id, strategy.lastUsed)
+            strategy.strategyScore = self._score(strategy)
+            strategies.append(strategy)
+        return strategies
+
+    def _score(self, strategy: StrategyItem) -> StrategyScore:
+        historical = round(strategy.performance.winRate)
+        current = strategy.latestValidation.score
+        return StrategyScore(
+            historicalScore=historical,
+            currentMarketScore=current,
+            overallScore=round((historical + current) / 2),
+            historicalPerformance=historical,
+            currentMarketFit=current,
+            currentNewsScore=strategy.latestValidation.aiConfidence,
+            sessionMatch=current,
+            riskRating=strategy.riskLevel,
+        )
 
     def get_strategy_by_id(self, strategy_id: str) -> Optional[StrategyItem]:
+        """Definition only; use :meth:`get_strategies` for stored metrics."""
         for s in self._strategies:
+            if s.id == strategy_id:
+                return s
+        return None
+
+    def get_enriched_strategy(self, strategy_id: str) -> Optional[StrategyItem]:
+        for s in self.get_strategies():
             if s.id == strategy_id:
                 return s
         return None
@@ -37,10 +117,7 @@ class StrategyEngine:
             riskLevel=RiskLevel.MEDIUM,
             status=StrategyStatus.ACTIVE,
             health=StrategyHealth.EXCELLENT,
-            performance=StrategyPerformance(
-                totalTrades=152, wins=128, losses=21, breakeven=3,
-                winRate=84.2, averageRiskReward=2.4, averageConfidence=88.0, totalProfitLoss=2450.50
-            ),
+            performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=["High momentum", "Strong trend confirmation", "High historical accuracy"],
             weaknesses=["Poor during ranging markets", "Avoid before major news"],
             entryChecklist=["Trend confirmed", "Breakout candle closed", "Volume increasing", "News clear"],
@@ -68,28 +145,8 @@ class StrategyEngine:
             readyForExecution=True,
             reviewNotes="Removed RSI filter. Added EMA 200 confirmation. Reduced SL from 25 to 18 pips.",
             dependencies=["Trend Bias", "Market Session Engine", "News Filter", "Volatility Filter"],
-            strategyScore=StrategyScore(
-                historicalScore=93, currentMarketScore=81, overallScore=88,
-                historicalPerformance=84, currentMarketFit=92, currentNewsScore=100,
-                sessionMatch=100, riskRating=RiskLevel.LOW
-            ),
-            latestValidation=StrategyValidation(
-                score=96,
-                aiConfidence=91,
-                validationDurationSeconds=0.34,
-                failedChecks=[],
-                checks=[
-                    StrategyValidationCheck(name="Trend Alignment", passed=True, value="Bullish"),
-                    StrategyValidationCheck(name="Volume Check", passed=True, value="Above 20-day Average"),
-                    StrategyValidationCheck(name="News Safety", passed=True, value="No impact news"),
-                    StrategyValidationCheck(name="EMA 200 Position", passed=True, value="Above EMA 200")
-                ],
-                marketSnapshot=MarketSnapshot(
-                    trend="Bullish", volatility="Moderate", liquidity="Excellent",
-                    news="Low", session="London Open", spread=0.3, atr=18.0,
-                    rsi=61.0, ema200="Above", adx=28.0
-                )
-            )
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
         )
 
         # 2. Gold Trend Continuation
@@ -106,10 +163,7 @@ class StrategyEngine:
             riskLevel=RiskLevel.MEDIUM,
             status=StrategyStatus.ACTIVE,
             health=StrategyHealth.GOOD,
-            performance=StrategyPerformance(
-                totalTrades=98, wins=74, losses=20, breakeven=4,
-                winRate=75.5, averageRiskReward=2.1, averageConfidence=82.0, totalProfitLoss=1250.00
-            ),
+            performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=["Rides major moves", "Clear stop loss placement"],
             weaknesses=["Drawdown during consolidation"],
             entryChecklist=["Structural pullbacks complete", "Engulfing candle formed"],
@@ -137,26 +191,8 @@ class StrategyEngine:
             readyForExecution=True,
             reviewNotes="Updated default stop-loss buffer.",
             dependencies=["Trend Bias", "Volatility Filter"],
-            strategyScore=StrategyScore(
-                historicalScore=88, currentMarketScore=85, overallScore=86,
-                historicalPerformance=75, currentMarketFit=88, currentNewsScore=95,
-                sessionMatch=90, riskRating=RiskLevel.MEDIUM
-            ),
-            latestValidation=StrategyValidation(
-                score=90,
-                aiConfidence=85,
-                validationDurationSeconds=0.25,
-                failedChecks=[],
-                checks=[
-                    StrategyValidationCheck(name="Trend Alignment", passed=True, value="Bullish"),
-                    StrategyValidationCheck(name="EMA 20/50 Cross", passed=True, value="Bullish Alignment")
-                ],
-                marketSnapshot=MarketSnapshot(
-                    trend="Bullish", volatility="Moderate", liquidity="Excellent",
-                    news="Low", session="London Open", spread=0.3, atr=18.0,
-                    rsi=61.0, ema200="Above", adx=28.0
-                )
-            )
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
         )
 
         # 3. Support & Resistance Bounce
@@ -173,10 +209,7 @@ class StrategyEngine:
             riskLevel=RiskLevel.LOW,
             status=StrategyStatus.TESTING,
             health=StrategyHealth.WATCHLIST,
-            performance=StrategyPerformance(
-                totalTrades=45, wins=31, losses=12, breakeven=2,
-                winRate=68.9, averageRiskReward=1.9, averageConfidence=75.0, totalProfitLoss=620.00
-            ),
+            performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=["High reliability during slow markets"],
             weaknesses=["Fails during breakouts"],
             entryChecklist=["Level rejection candle", "Oversold/Overbought RSI"],
@@ -204,26 +237,8 @@ class StrategyEngine:
             readyForExecution=False,
             reviewNotes="Currently in testing mode. Adjusting level sensitivity.",
             dependencies=["Market Session Engine", "Volatility Filter"],
-            strategyScore=StrategyScore(
-                historicalScore=78, currentMarketScore=50, overallScore=64,
-                historicalPerformance=68, currentMarketFit=60, currentNewsScore=80,
-                sessionMatch=50, riskRating=RiskLevel.LOW
-            ),
-            latestValidation=StrategyValidation(
-                score=65,
-                aiConfidence=70,
-                validationDurationSeconds=0.18,
-                failedChecks=["Incorrect Session (currently London)"],
-                checks=[
-                    StrategyValidationCheck(name="Trend Alignment", passed=True, value="Ranging"),
-                    StrategyValidationCheck(name="Session Fit", passed=False, value="London (Prefer Asian)")
-                ],
-                marketSnapshot=MarketSnapshot(
-                    trend="Bullish", volatility="Moderate", liquidity="Excellent",
-                    news="Low", session="London Open", spread=0.3, atr=18.0,
-                    rsi=61.0, ema200="Above", adx=28.0
-                )
-            )
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
         )
 
         # 4. London Momentum
@@ -240,10 +255,7 @@ class StrategyEngine:
             riskLevel=RiskLevel.HIGH,
             status=StrategyStatus.ACTIVE,
             health=StrategyHealth.EXCELLENT,
-            performance=StrategyPerformance(
-                totalTrades=210, wins=165, losses=35, breakeven=10,
-                winRate=78.6, averageRiskReward=2.0, averageConfidence=85.0, totalProfitLoss=3400.00
-            ),
+            performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=["Quick returns", "High volume"],
             weaknesses=["High commission costs", "Slippage risks"],
             entryChecklist=["High volume candle", "MACD bullish crossover"],
@@ -271,26 +283,8 @@ class StrategyEngine:
             readyForExecution=True,
             reviewNotes="Slightly reduced leverage recommendations.",
             dependencies=["Market Session Engine", "Volatility Filter"],
-            strategyScore=StrategyScore(
-                historicalScore=92, currentMarketScore=88, overallScore=90,
-                historicalPerformance=78, currentMarketFit=90, currentNewsScore=100,
-                sessionMatch=100, riskRating=RiskLevel.MEDIUM
-            ),
-            latestValidation=StrategyValidation(
-                score=95,
-                aiConfidence=90,
-                validationDurationSeconds=0.28,
-                failedChecks=[],
-                checks=[
-                    StrategyValidationCheck(name="Session Active", passed=True, value="London Open"),
-                    StrategyValidationCheck(name="Volume Check", passed=True, value="High")
-                ],
-                marketSnapshot=MarketSnapshot(
-                    trend="Bullish", volatility="Moderate", liquidity="Excellent",
-                    news="Low", session="London Open", spread=0.3, atr=18.0,
-                    rsi=61.0, ema200="Above", adx=28.0
-                )
-            )
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
         )
 
         # 5. GBP/USD Pullback Entry
@@ -307,10 +301,7 @@ class StrategyEngine:
             riskLevel=RiskLevel.MEDIUM,
             status=StrategyStatus.PAUSED,
             health=StrategyHealth.POOR,
-            performance=StrategyPerformance(
-                totalTrades=80, wins=42, losses=35, breakeven=3,
-                winRate=52.5, averageRiskReward=1.5, averageConfidence=70.0, totalProfitLoss=-250.00
-            ),
+            performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=["Low risk exposure"],
             weaknesses=["High failure rate during market reversals"],
             entryChecklist=["Price touches support level", "Stochastic cross"],
@@ -338,26 +329,8 @@ class StrategyEngine:
             readyForExecution=False,
             reviewNotes="Paused due to continuous poor performance in choppy markets.",
             dependencies=["Trend Bias"],
-            strategyScore=StrategyScore(
-                historicalScore=55, currentMarketScore=40, overallScore=47,
-                historicalPerformance=52, currentMarketFit=45, currentNewsScore=60,
-                sessionMatch=80, riskRating=RiskLevel.HIGH
-            ),
-            latestValidation=StrategyValidation(
-                score=45,
-                aiConfidence=50,
-                validationDurationSeconds=0.15,
-                failedChecks=["Strategy Status is PAUSED", "Volume below threshold"],
-                checks=[
-                    StrategyValidationCheck(name="Status Active", passed=False, value="Paused"),
-                    StrategyValidationCheck(name="Volume Check", passed=False, value="Low")
-                ],
-                marketSnapshot=MarketSnapshot(
-                    trend="Bullish", volatility="Moderate", liquidity="Excellent",
-                    news="Low", session="London Open", spread=0.3, atr=18.0,
-                    rsi=61.0, ema200="Above", adx=28.0
-                )
-            )
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
         )
 
         # 6. European Breakout
@@ -374,10 +347,7 @@ class StrategyEngine:
             riskLevel=RiskLevel.MEDIUM,
             status=StrategyStatus.ACTIVE,
             health=StrategyHealth.GOOD,
-            performance=StrategyPerformance(
-                totalTrades=120, wins=92, losses=25, breakeven=3,
-                winRate=76.6, averageRiskReward=2.0, averageConfidence=80.0, totalProfitLoss=1800.00
-            ),
+            performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=["Definite zones", "Objective entry rules"],
             weaknesses=["False breakouts"],
             entryChecklist=["Frankfurt high/low breakout", "Volume confirmation"],
@@ -405,26 +375,8 @@ class StrategyEngine:
             readyForExecution=True,
             reviewNotes="Upgraded logic to ignore initial wick breakouts.",
             dependencies=["Market Session Engine", "Volatility Filter"],
-            strategyScore=StrategyScore(
-                historicalScore=85, currentMarketScore=80, overallScore=82,
-                historicalPerformance=76, currentMarketFit=82, currentNewsScore=90,
-                sessionMatch=90, riskRating=RiskLevel.LOW
-            ),
-            latestValidation=StrategyValidation(
-                score=88,
-                aiConfidence=82,
-                validationDurationSeconds=0.30,
-                failedChecks=[],
-                checks=[
-                    StrategyValidationCheck(name="Session Fit", passed=True, value="Frankfurt/London"),
-                    StrategyValidationCheck(name="Volume spike", passed=True, value="Yes")
-                ],
-                marketSnapshot=MarketSnapshot(
-                    trend="Bullish", volatility="Moderate", liquidity="Excellent",
-                    news="Low", session="London Open", spread=0.3, atr=18.0,
-                    rsi=61.0, ema200="Above", adx=28.0
-                )
-            )
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
         )
 
         # 7. EUR/USD Trend Continuation
@@ -441,10 +393,7 @@ class StrategyEngine:
             riskLevel=RiskLevel.LOW,
             status=StrategyStatus.DEPRECATED,
             health=StrategyHealth.GOOD,
-            performance=StrategyPerformance(
-                totalTrades=30, wins=22, losses=7, breakeven=1,
-                winRate=73.3, averageRiskReward=3.0, averageConfidence=78.0, totalProfitLoss=800.00
-            ),
+            performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=["Highly profitable", "Low screen time required"],
             weaknesses=["Extremely slow trades"],
             entryChecklist=["Higher Highs / Lower Lows on Daily", "Pullback to 20 EMA"],
@@ -472,25 +421,11 @@ class StrategyEngine:
             readyForExecution=False,
             reviewNotes="Deprecated in favor of Multi-Timeframe Trend tracking engine.",
             dependencies=["Trend Bias"],
-            strategyScore=StrategyScore(
-                historicalScore=80, currentMarketScore=70, overallScore=75,
-                historicalPerformance=73, currentMarketFit=75, currentNewsScore=85,
-                sessionMatch=80, riskRating=RiskLevel.LOW
-            ),
-            latestValidation=StrategyValidation(
-                score=70,
-                aiConfidence=72,
-                validationDurationSeconds=0.22,
-                failedChecks=["Strategy Status is DEPRECATED"],
-                checks=[
-                    StrategyValidationCheck(name="Status Active", passed=False, value="Deprecated")
-                ],
-                marketSnapshot=MarketSnapshot(
-                    trend="Bullish", volatility="Moderate", liquidity="Excellent",
-                    news="Low", session="London Open", spread=0.3, atr=18.0,
-                    rsi=61.0, ema200="Above", adx=28.0
-                )
-            )
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
         )
 
-        return [s1, s2, s3, s4, s5, s6, s7]
+        strategies = [s1, s2, s3, s4, s5, s6, s7]
+        for strategy in strategies:
+            strategy.strategyScore.riskRating = strategy.riskLevel
+        return strategies

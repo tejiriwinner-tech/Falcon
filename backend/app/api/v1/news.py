@@ -1,9 +1,7 @@
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Query
 
-from app.core.services.economic_calendar_service import economic_calendar_service
-from app.schemas.news import NewsListResponse, NewsItem
+from app.core.services.news_service import build_news_response
+from app.schemas.news import NewsListResponse
 
 router = APIRouter()
 
@@ -18,24 +16,6 @@ def get_news(
 
     Without ``FMP_API_KEY`` the calendar is empty rather than illustrative.
     """
-    now = datetime.now(timezone.utc)
-    events = economic_calendar_service.get_events(
+    return build_news_response(
         lookback_hours=lookbackHours, lookahead_hours=lookaheadHours
-    )
-    return NewsListResponse(
-        events=[
-            NewsItem(
-                id=index,
-                currency=event.currency,
-                title=event.title,
-                impact=event.impact,
-                time=event.eventTime,
-                forecast=event.forecast or None,
-                previous=event.previous or None,
-                actual=event.actual,
-                status="Released" if event.actual is not None else "Upcoming",
-            )
-            for index, event in enumerate(events, start=1)
-        ],
-        lastUpdated=now,
     )

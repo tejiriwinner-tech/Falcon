@@ -19,8 +19,10 @@ from app.schemas.market_quote import MarketQuote
 from app.schemas.mission_report import MissionSummary
 from app.schemas.provider_models import ProviderSummary, ProviderStatus, ProviderHealthDetail
 from app.schemas.health import HealthResponse
-from app.schemas.signal import SignalListResponse, SignalItem
-from app.schemas.news import NewsListResponse, NewsItem
+from app.core.services.news_service import build_news_response
+from app.core.services.performance_analytics_service import build_performance_analytics
+from app.core.repository.trade_journal_repository import trade_journal_repository
+from app.core.services.signal_service import signal_service
 from app.schemas.decision_engine import RiskAssessment as DERiskAssessment, ExecutionReadiness as DEExecutionReadiness
 from app.schemas.strategy import StrategyValidation, StrategyValidationCheck, MarketSnapshot
 from app.schemas.runtime import RuntimeMetrics, RuntimeSummary
@@ -116,27 +118,12 @@ class DashboardService:
             systemHealth=health_data
         )
         
-        # Mock Signals (as originally in /api/v1/signals)
+        # Signals projected from stored mission artifacts
         now = datetime.now(timezone.utc)
-        signals = SignalListResponse(
-            signals=[
-                SignalItem(
-                    id=1, symbol="XAU/USD", action="BUY", entry=2350.50, takeProfit=2400.00, stopLoss=2300.00,
-                    confidence=88, timeframe="M15", status="ACTIVE", analysis="Strong momentum on the M15 chart indicating breakout continuation.",
-                    timestamp=now, strategyId="strat-001", strategyName="London Breakout", strategyVersion="2.3", dataAgeSeconds=2
-                )
-            ],
-            lastUpdated=now,
-            dataAgeSeconds=2
-        )
-        
-        # Mock News (as originally in /api/v1/news)
-        news = NewsListResponse(
-            events=[
-                NewsItem(id=1, currency="USD", title="CPI", impact="High", time=now, forecast="0.3%", previous="0.2%", actual=None, status="Upcoming")
-            ],
-            lastUpdated=now
-        )
+        signals = signal_service.build_signals()
+
+        # Economic calendar from the stored FMP events
+        news = build_news_response()
         
         # Decision Engine (Bridging logic from router)
         strategy = self.strategy_engine.get_strategy_by_id("strat-001")
@@ -189,7 +176,19 @@ class DashboardService:
         latest_decision_str = decision_resp.recommendation.value if decision_resp else "WAIT"
 
         # ── 6. Combine all into DashboardResponse ─────────────────────
-        analytics_summary = AnalyticsSummary(tradingScore=72, winRate=58.5, totalTrades=0, netProfit=0.0, lastUpdated=now)
+        analytics = build_performance_analytics()
+        closed_trades = [
+            trade for trade in trade_journal_repository.list_trades()
+            if trade.result in ("WIN", "LOSS", "BREAKEVEN")
+        ]
+        wins = sum(1 for trade in closed_trades if trade.result == "WIN")
+        analytics_summary = AnalyticsSummary(
+            tradingScore=analytics.tradingScore,
+            winRate=round(wins / len(closed_trades) * 100, 2) if closed_trades else 0.0,
+            totalTrades=len(closed_trades),
+            netProfit=analytics.netProfit,
+            lastUpdated=now,
+        )
         
         pipeline_health = avg_health if all_missions else 100.0
         total_artifacts = repo_stats.totalCandidates + repo_stats.totalValidations + repo_stats.totalRiskAssessments + repo_stats.totalExecutionReadiness + repo_stats.totalDecisions
@@ -197,7 +196,7 @@ class DashboardService:
         summary = DashboardSummary(
             providerStatus=provider_status_str, pipelineHealth=pipeline_health, repositoryHealth=repo_stats.repositoryHealth,
             activeProviders=provider_summary.online, connectedProvider=connected_provider, watchedSymbols=WATCHLIST,
-            totalStrategies=6, totalSignals=repo_stats.totalCandidates, totalMissions=repo_stats.totalMissions,
+            totalStrategies=len(self.strategy_engine.get_strategies()), totalSignals=repo_stats.totalCandidates, totalMissions=repo_stats.totalMissions,
             totalArchivedArtifacts=total_artifacts, latestDecision=latest_decision_str, lastRefresh=now, engineVersion=ENGINE_VERSION
         )
 

@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 class TradeJournalBase(BaseModel):
     signalId: Optional[int] = None
+    strategyId: Optional[str] = None
     symbol: str
     direction: str
     entryPrice: float

@@ -153,17 +153,7 @@ class StrategyIntelligenceEngine:
                 0.10 * consistency_score
             )
 
-            # Enforce exact target values for specific mock strategies if present to match target benchmark specifications:
-            if "London Breakout" in strat.name:
-                overall_score = 95.0
-            elif "Gold Trend" in strat.name:
-                overall_score = 92.0
-            elif "European Breakout" in strat.name:
-                overall_score = 78.0
-            elif "London Momentum" in strat.name:
-                overall_score = 61.0
-            else:
-                overall_score = round(max(0.0, min(100.0, weighted_score)), 1)
+            overall_score = round(max(0.0, min(100.0, weighted_score)), 1)
 
             # Assign Health Classification based on score thresholds
             # 95-100 -> EXCELLENT
