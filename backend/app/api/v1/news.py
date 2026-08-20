@@ -1,46 +1,41 @@
-from fastapi import APIRouter
 from datetime import datetime, timezone
+
+from fastapi import APIRouter, Query
+
+from app.core.services.economic_calendar_service import economic_calendar_service
 from app.schemas.news import NewsListResponse, NewsItem
 
 router = APIRouter()
 
+
 @router.get("", response_model=NewsListResponse)
-def get_news():
+def get_news(
+    lookbackHours: int = Query(24, ge=0, le=720),
+    lookaheadHours: int = Query(168, ge=0, le=720),
+):
+    """
+    Returns the stored economic calendar from Financial Modeling Prep.
+
+    Without ``FMP_API_KEY`` the calendar is empty rather than illustrative.
+    """
+    now = datetime.now(timezone.utc)
+    events = economic_calendar_service.get_events(
+        lookback_hours=lookbackHours, lookahead_hours=lookaheadHours
+    )
     return NewsListResponse(
         events=[
             NewsItem(
-                id=1,
-                currency="USD",
-                title="CPI",
-                impact="High",
-                time=datetime.now(timezone.utc),
-                forecast="0.3%",
-                previous="0.2%",
-                actual=None,
-                status="Upcoming"
-            ),
-            NewsItem(
-                id=2,
-                currency="GBP",
-                title="Retail Sales",
-                impact="Medium",
-                time=datetime.now(timezone.utc),
-                forecast="1.0%",
-                previous="0.8%",
-                actual=None,
-                status="Upcoming"
-            ),
-            NewsItem(
-                id=3,
-                currency="EUR",
-                title="ECB Press Conference",
-                impact="Low",
-                time=datetime.now(timezone.utc),
-                forecast=None,
-                previous=None,
-                actual=None,
-                status="Upcoming"
+                id=index,
+                currency=event.currency,
+                title=event.title,
+                impact=event.impact,
+                time=event.eventTime,
+                forecast=event.forecast or None,
+                previous=event.previous or None,
+                actual=event.actual,
+                status="Released" if event.actual is not None else "Upcoming",
             )
+            for index, event in enumerate(events, start=1)
         ],
-        lastUpdated=datetime.now(timezone.utc)
+        lastUpdated=now,
     )

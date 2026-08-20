@@ -2,7 +2,16 @@
 
 from datetime import datetime
 
-from sqlalchemy import BigInteger, DateTime, Float, Integer, String, Index, Text
+from sqlalchemy import (
+    BigInteger,
+    DateTime,
+    Float,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import JSON
@@ -83,3 +92,56 @@ class RepositoryMetaRecord(Base):
     last_mission_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+
+
+class PriceBarRecord(Base):
+    __tablename__ = "price_history"
+    __table_args__ = (
+        UniqueConstraint(
+            "symbol",
+            "timeframe",
+            "bar_time",
+            name="uq_price_history_symbol_timeframe_bar_time",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
+    bar_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    open: Mapped[float] = mapped_column(Float, nullable=False)
+    high: Mapped[float] = mapped_column(Float, nullable=False)
+    low: Mapped[float] = mapped_column(Float, nullable=False)
+    close: Mapped[float] = mapped_column(Float, nullable=False)
+    volume: Mapped[float | None] = mapped_column(Float, nullable=True)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    stored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+Index("ix_price_history_symbol_timeframe", PriceBarRecord.symbol, PriceBarRecord.timeframe)
+
+
+class EconomicEventRecord(Base):
+    __tablename__ = "economic_events"
+    __table_args__ = (
+        UniqueConstraint(
+            "event_time",
+            "currency",
+            "title",
+            name="uq_economic_events_time_currency_title",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    currency: Mapped[str] = mapped_column(String(8), nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    impact: Mapped[str] = mapped_column(String(16), nullable=False)
+    forecast: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    previous: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    actual: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    provider: Mapped[str] = mapped_column(String(32), nullable=False)
+    stored_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+Index("ix_economic_events_event_time", EconomicEventRecord.event_time)

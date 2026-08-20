@@ -10,7 +10,9 @@ from app.core.engines.validation_engine import ValidationEngine
 from app.core.engines.risk_engine import RiskEngine
 from app.core.engines.execution_readiness_engine import ExecutionReadinessEngine
 from app.core.engines.decision_engine import DecisionEngine
+from app.core.engines.market_state_engine import FALCON_WATCHLIST
 from app.core.repository.mission_repository import mission_repository
+from app.core.services.market_history_service import market_history_service
 
 from app.schemas.mission_report import (
     MissionReport,
@@ -55,6 +57,8 @@ class PipelineOrchestrator:
         Returns an immutable MissionReport that is the single source of
         truth for all downstream consumers.
         """
+        market_history_service.refresh_watchlist(FALCON_WATCHLIST)
+
         mission_number = mission_repository.next_mission_number()
         mission_id = f"mission-{mission_number:03d}"
 

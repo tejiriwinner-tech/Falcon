@@ -13,7 +13,7 @@ ARCHITECTURAL RULES:
 - Downstream engines remain provider-agnostic
 - MissionRepository is never touched
 """
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 
 from app.schemas.market_state import (
@@ -21,11 +21,13 @@ from app.schemas.market_state import (
     MarketPrice,
     Indicator,
     MarketNews,
-    EconomicEvent,
     MarketSentiment,
 )
 from app.schemas.market_quote import MarketQuote, QuoteStatus, MarketStatus
 from app.core.providers import provider_manager
+from app.core.providers.calendar_provider import calendar_provider
+from app.core.services.economic_calendar_service import economic_calendar_service
+from app.core.services.market_history_service import compute_rsi, market_history_service
 from app.core.config.provider_settings import CACHE_TTL_SECONDS
 from app.core.events.event_bus import event_bus, MarketStateUpdated
 
@@ -41,6 +43,11 @@ FALCON_WATCHLIST: List[str] = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "NAS100",
 # Phase 4.3: simple deterministic classification from changePercent.
 # Positive ≥ TREND_THRESHOLD → Bullish; ≤ -TREND_THRESHOLD → Bearish; else Neutral.
 _TREND_THRESHOLD_PCT: float = 0.05   # 0.05% meaningful change
+
+# Bars compared when classifying volatility from stored history
+_VOLATILITY_LOOKBACK: int = 20
+
+_MAGNITUDE_SUFFIXES: Dict[str, float] = {"K": 1e3, "M": 1e6, "B": 1e9, "T": 1e12}
 
 
 def _derive_session(utc_hour: int) -> str:
@@ -61,6 +68,122 @@ def _derive_session(utc_hour: int) -> str:
         return "New York Close"
     else:
         return "Transition"
+
+
+def _news_from_released_events() -> List[MarketNews]:
+    """Turns economic releases from the last day into news items.
+
+    Only events whose ``actual`` figure has been published are reported; the
+    sentiment compares the release against its forecast.
+    """
+    items: List[MarketNews] = []
+    for event in economic_calendar_service.get_events(lookback_hours=24, lookahead_hours=0):
+        if event.actual is None:
+            continue
+        items.append(
+            MarketNews(
+                title=f"{event.title} ({event.currency}) actual {event.actual}",
+                currency=event.currency,
+                impact=event.impact,
+                sentiment=_release_sentiment(event.actual, event.forecast),
+                publishedAt=event.eventTime,
+                expiresAt=event.eventTime + timedelta(hours=24),
+                provider=event.provider,
+            )
+        )
+    return items
+
+
+def _release_sentiment(actual: str, forecast: str) -> str:
+    """Compares a release against its forecast where both are numeric."""
+    actual_value = _numeric(actual)
+    forecast_value = _numeric(forecast)
+    if actual_value is None or forecast_value is None:
+        return "Neutral"
+    if actual_value > forecast_value:
+        return "Bullish"
+    if actual_value < forecast_value:
+        return "Bearish"
+    return "Neutral"
+
+
+def _numeric(raw: Optional[str]) -> Optional[float]:
+    if raw is None:
+        return None
+    cleaned = raw.strip().replace("%", "").replace(",", "")
+    multiplier = 1.0
+    if cleaned[-1:].upper() in _MAGNITUDE_SUFFIXES:
+        multiplier = _MAGNITUDE_SUFFIXES[cleaned[-1].upper()]
+        cleaned = cleaned[:-1]
+    try:
+        return float(cleaned) * multiplier
+    except ValueError:
+        return None
+
+
+def _sentiment_from_indicators(indicators: Dict[str, List[Indicator]]) -> MarketSentiment:
+    """Derives a market-wide sentiment reading from the computed RSI values."""
+    rsi_values = [
+        indicator.value
+        for series in indicators.values()
+        for indicator in series
+        if indicator.name == "RSI"
+    ]
+    if not rsi_values:
+        return MarketSentiment(
+            sentiment="Unknown",
+            fearGreedIndex=0,
+            institutionalBias="Unknown",
+            retailPositioning="Unknown",
+            volumeProfileSummary="No stored price history",
+            provider="Falcon Sentiment Intelligence",
+        )
+    average = sum(rsi_values) / len(rsi_values)
+    if average >= 60:
+        label, bias, positioning = "Greedy", "Bullish", "Short"
+    elif average <= 40:
+        label, bias, positioning = "Fearful", "Bearish", "Long"
+    else:
+        label, bias, positioning = "Neutral", "Neutral", "Balanced"
+    return MarketSentiment(
+        sentiment=label,
+        fearGreedIndex=int(round(average)),
+        institutionalBias=bias,
+        retailPositioning=positioning,
+        volumeProfileSummary=f"Average RSI {average:.1f} across {len(rsi_values)} symbols",
+        provider="Falcon Sentiment Intelligence",
+    )
+
+
+def _volatility_from_history(symbols: List[str]) -> str:
+    """Classifies volatility from the recent true range of stored bars."""
+    ratios: List[float] = []
+    for symbol in symbols:
+        bars = market_history_service.get_bars(symbol, limit=_VOLATILITY_LOOKBACK)
+        if len(bars) < _VOLATILITY_LOOKBACK:
+            continue
+        ranges = [bar.high - bar.low for bar in bars]
+        average_range = sum(ranges) / len(ranges)
+        if average_range == 0:
+            continue
+        ratios.append(ranges[-1] / average_range)
+    if not ratios:
+        return "Unknown"
+    ratio = sum(ratios) / len(ratios)
+    if ratio >= 1.5:
+        return "High"
+    if ratio <= 0.6:
+        return "Low"
+    return "Moderate"
+
+
+def _rsi_signal(rsi: float) -> str:
+    """Deterministic RSI interpretation."""
+    if rsi >= 70:
+        return "OVERBOUGHT"
+    if rsi <= 30:
+        return "OVERSOLD"
+    return "NEUTRAL"
 
 
 def _derive_trend(change_pct: float) -> str:
@@ -183,44 +306,26 @@ class MarketStateEngine:
         session = _derive_session(now.hour)
 
         # ── Build static intelligence layers (unchanged from Phase 4.2) ───────
-        # Technical indicators: still deterministic for Phase 4.3
-        indicators = {
-            sym: [
-                Indicator(name="RSI", value=54.2, signal="NEUTRAL", provider="Falcon Technical Engine")
+        # Technical indicators computed from stored price history; symbols without
+        # enough history are reported with no indicators rather than a fabricated value.
+        indicators: Dict[str, List[Indicator]] = {}
+        for sym in symbols:
+            closes = [bar.close for bar in market_history_service.get_bars(sym)]
+            rsi = compute_rsi(closes)
+            if rsi is None:
+                indicators[sym] = []
+                continue
+            indicators[sym] = [
+                Indicator(
+                    name="RSI",
+                    value=rsi,
+                    signal=_rsi_signal(rsi),
+                    provider="Falcon Technical Engine",
+                )
             ]
-            for sym in symbols
-        }
-        news = [
-            MarketNews(
-                title="Fed Signals Caution on Rate Cuts",
-                currency="USD",
-                impact="High",
-                sentiment="Bearish",
-                publishedAt=now,
-                expiresAt=now,
-                provider="Falcon News Intelligence",
-            )
-        ]
-        calendar = [
-            EconomicEvent(
-                title="US Non-Farm Payrolls",
-                currency="USD",
-                impact="High",
-                eventTime=now,
-                countdownMinutes=120,
-                forecast="180K",
-                previous="175K",
-                provider="Falcon Economic Intelligence",
-            )
-        ]
-        sentiment = MarketSentiment(
-            sentiment="Greedy",
-            fearGreedIndex=68,
-            institutionalBias="Bullish",
-            retailPositioning="Short",
-            volumeProfileSummary="High Buying Volume",
-            provider="Falcon Sentiment Intelligence",
-        )
+        calendar = calendar_provider.get_upcoming_events()
+        news = _news_from_released_events()
+        sentiment = _sentiment_from_indicators(indicators)
 
         state = MarketState(
             prices=prices,
@@ -229,7 +334,7 @@ class MarketStateEngine:
             calendar=calendar,
             sentiment=sentiment,
             trend=trend,
-            volatility="Moderate",
+            volatility=_volatility_from_history(symbols),
             liquidity="Good",
             spread=round(live_spread, 5),
             session=session,
