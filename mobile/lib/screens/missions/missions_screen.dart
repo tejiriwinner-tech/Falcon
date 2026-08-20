@@ -15,6 +15,7 @@ class MissionsScreen extends StatefulWidget {
 class _MissionsScreenState extends State<MissionsScreen> {
   final ApiService _apiService = ApiService();
   late Future<MissionReportListResponse> _missionsFuture;
+  bool _isRunning = false;
 
   @override
   void initState() {
@@ -33,6 +34,25 @@ class _MissionsScreenState extends State<MissionsScreen> {
     try {
       await _missionsFuture;
     } catch (_) {}
+  }
+
+  Future<void> _runMission() async {
+    setState(() => _isRunning = true);
+    String? error;
+    try {
+      await _apiService.runMission();
+    } catch (e) {
+      error = e.toString().replaceAll('Exception: ', '');
+    }
+    if (!mounted) return;
+    setState(() => _isRunning = false);
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Mission failed: $error')),
+      );
+      return;
+    }
+    _fetchMissions();
   }
 
   Color _getStatusColor(MissionStatus status) {
@@ -60,6 +80,17 @@ class _MissionsScreenState extends State<MissionsScreen> {
       appBar: AppBar(
         title: const Text('Falcon Mission Center'),
         actions: [
+          IconButton(
+            icon: _isRunning
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.play_arrow),
+            tooltip: 'Run mission',
+            onPressed: _isRunning ? null : _runMission,
+          ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _fetchMissions,
@@ -131,7 +162,9 @@ class _MissionsScreenState extends State<MissionsScreen> {
                       const AppCard(
                         child: Padding(
                           padding: EdgeInsets.all(16.0),
-                          child: Text('No missions recorded yet.'),
+                          child: Text(
+                            'No missions recorded yet. Run a mission to execute the pipeline.',
+                          ),
                         ),
                       )
                     else

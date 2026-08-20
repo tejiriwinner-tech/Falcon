@@ -416,7 +416,9 @@ class _RuntimeScreenState extends State<RuntimeScreen> {
     return Colors.grey;
   }
 
-  String _formatTime(DateTime dt) {
-    return DateFormat('HH:mm:ss').format(dt);
+  String _formatTime(String isoTimestamp) {
+    final parsed = DateTime.tryParse(isoTimestamp);
+    if (parsed == null) return isoTimestamp;
+    return DateFormat('HH:mm:ss').format(parsed.toLocal());
   }
 }

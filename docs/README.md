@@ -25,7 +25,32 @@ The user manually places trades on their preferred trading platform.
 ### Prerequisites
 - Python 3.10+
 - Flutter SDK (>=3.0.0)
-- PostgreSQL
+- A Supabase project (PostgreSQL)
+
+### Database (Supabase)
+Falcon stores missions and their artifacts (market states, candidates, validations,
+risk assessments, execution readiness, decisions) in Supabase Postgres.
+
+1. Copy `backend/.env.example` to `backend/.env` and set `DATABASE_URL` to the
+   Supabase connection URI (Project Settings → Database → Connection string → URI).
+   Leaving it empty falls back to in-memory storage, which is lost on restart.
+2. Apply migrations from the `backend/` directory:
+   ```bash
+   alembic upgrade head
+   ```
+   Migrations live in `database/migrations/`; create new ones with
+   `alembic revision --autogenerate -m "description"`.
+
+Running the intelligence pipeline is an explicit action: `POST /api/v1/missions/run`
+stores a new mission, while all `GET` endpoints (including `/missions` and
+`/dashboard`) only read what is already stored. Mission numbers are allocated by
+the database sequence `mission_number_seq`, so concurrent runs never collide.
+
+The trade journal is stored in the same database: `POST /api/v1/trade-journal`
+logs an entry, `PATCH /api/v1/trade-journal/{id}` closes it, and
+`GET /api/v1/performance-analytics` derives every figure (equity curve,
+streaks, scores, calendar) from those records — an empty journal returns zeroed
+statistics. Equity is measured against `STARTING_EQUITY` (default `10000`).
 
 ### How to run backend
 1. Navigate to the `backend/` directory:

@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
 
 from app.core.orchestrator.pipeline_orchestrator import PipelineOrchestrator
+from app.core.repository.mission_repository import mission_repository
 from app.schemas.mission_report import (
     MissionReport,
     MissionReportListResponse,
@@ -14,23 +15,23 @@ router = APIRouter()
 # Module-level orchestrator so the mission counter persists across requests
 _orchestrator = PipelineOrchestrator()
 
-# In-memory store of completed missions (per process lifetime)
-_mission_store: list[MissionReport] = []
-
 
 @router.get("/missions", response_model=MissionReportListResponse)
 def get_missions():
     """
-    Runs the Pipeline Orchestrator once, stores the resulting MissionReport,
-    and returns the full list of missions with an aggregate summary.
+    Returns every stored mission with an aggregate summary.
 
-    This is the single entry point for downstream consumers that need the
-    complete intelligence pipeline executed end-to-end.
+    Read-only: POST /missions/run executes the intelligence pipeline.
     """
-    report = _orchestrator.run_pipeline()
-    _mission_store.append(report)
+    return _build_list_response(mission_repository.get_all_missions())
 
-    return _build_list_response(_mission_store)
+
+@router.post("/missions/run", response_model=MissionReport, status_code=201)
+def run_mission():
+    """
+    Runs the Pipeline Orchestrator once and returns the stored MissionReport.
+    """
+    return _orchestrator.run_pipeline()
 
 
 @router.get("/missions/{mission_id}", response_model=MissionReport)
@@ -39,10 +40,10 @@ def get_mission_by_id(mission_id: str):
     Returns a single MissionReport by its deterministic ID (e.g. mission-001).
     The orchestrator is NOT re-run for this endpoint.
     """
-    for mission in _mission_store:
-        if mission.id == mission_id:
-            return mission
-    raise HTTPException(status_code=404, detail=f"Mission '{mission_id}' not found")
+    mission = mission_repository.get_mission(mission_id)
+    if mission is None:
+        raise HTTPException(status_code=404, detail=f"Mission '{mission_id}' not found")
+    return mission
 
 
 # ---------------------------------------------------------------------------

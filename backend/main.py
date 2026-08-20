@@ -5,7 +5,9 @@ from app.middleware.logging_middleware import LoggingMiddleware
 from app.core.exceptions import add_exception_handlers
 from app.api.v1.api import api_router
 from app.core.providers.provider_recovery_manager import provider_recovery_manager
+from app.core.repository.mission_repository import mission_repository
 from fastapi.middleware.cors import CORSMiddleware
+import logging
 
 # Initialize centralized logging
 setup_logging()
@@ -38,6 +40,8 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 @app.on_event("startup")
 async def startup_event():
     """Initialize recovery manager on startup."""
+    storage = "Postgres (Supabase)" if mission_repository.persistent else "in-memory (no DATABASE_URL)"
+    logging.getLogger(__name__).info("Mission repository storage: %s", storage)
     provider_recovery_manager.start()
 
 

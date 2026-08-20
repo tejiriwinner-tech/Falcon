@@ -106,6 +106,89 @@ class TradeJournalItem {
   }
 }
 
+class TradeJournalDraft {
+  final String symbol;
+  final String direction;
+  final double entryPrice;
+  final double stopLoss;
+  final double takeProfit;
+  final String timeframe;
+  final String marketSession;
+  final DateTime tradeDate;
+  final double riskReward;
+  final int confidence;
+  final String reasonForEntry;
+  final String? notes;
+
+  TradeJournalDraft({
+    required this.symbol,
+    required this.direction,
+    required this.entryPrice,
+    required this.stopLoss,
+    required this.takeProfit,
+    required this.timeframe,
+    required this.marketSession,
+    required this.tradeDate,
+    this.riskReward = 0,
+    this.confidence = 0,
+    required this.reasonForEntry,
+    this.notes,
+  });
+
+  Map<String, dynamic> toJson() {
+    return {
+      'symbol': symbol,
+      'direction': direction,
+      'entryPrice': entryPrice,
+      'stopLoss': stopLoss,
+      'takeProfit': takeProfit,
+      'timeframe': timeframe,
+      'marketSession': marketSession,
+      'tradeDate': tradeDate.toUtc().toIso8601String(),
+      'status': 'OPEN',
+      'result': 'OPEN',
+      'riskReward': riskReward,
+      'confidence': confidence,
+      'reasonForEntry': reasonForEntry,
+      'notes': notes,
+    };
+  }
+}
+
+class TradeJournalClose {
+  final double exitPrice;
+  final double profitLoss;
+  final DateTime closeDate;
+  final String? reasonForExit;
+  final String? lessonLearned;
+
+  TradeJournalClose({
+    required this.exitPrice,
+    required this.profitLoss,
+    required this.closeDate,
+    this.reasonForExit,
+    this.lessonLearned,
+  });
+
+  String get result {
+    if (profitLoss > 0) return 'WIN';
+    if (profitLoss < 0) return 'LOSS';
+    return 'BREAKEVEN';
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'exitPrice': exitPrice,
+      'profitLoss': profitLoss,
+      'closeDate': closeDate.toUtc().toIso8601String(),
+      'status': 'CLOSED',
+      'result': result,
+      'reasonForExit': reasonForExit,
+      'lessonLearned': lessonLearned,
+    };
+  }
+}
+
 class TradeJournalListResponse {
   final List<TradeJournalItem> trades;
   final DateTime lastUpdated;
