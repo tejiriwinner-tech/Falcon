@@ -77,6 +77,14 @@ _PROVIDER_SYMBOL_MAP: Dict[str, Dict[str, str]] = {
         "BTCUSD": "BTC-USD",
         "ETHUSD": "ETH-USD",
     },
+    "alpha_vantage": {
+        "XAUUSD": "XAU/USD",
+        "GBPUSD": "GBP/USD",
+        "EURUSD": "EUR/USD",
+        "USDJPY": "USD/JPY",
+        "BTCUSD": "BTC/USD",
+        "ETHUSD": "ETH/USD",
+    },
     "mock_price": {
         "XAUUSD": "XAUUSD",
         "GBPUSD": "GBPUSD",

@@ -7,24 +7,32 @@ Events are injected by monkey-patching _print_event on TwelveDataProvider
 and by registering a hook in ProviderManager via subclassing.
 No intelligence logic is modified.
 """
+from app.core.config import settings
 from app.core.providers.cache import market_cache
 from app.core.providers.symbol_mapper import symbol_mapper
 from app.core.providers.provider_registry import provider_registry
 from app.core.providers.provider_manager import ProviderManager
 from app.core.providers.twelve_data_provider import TwelveDataProvider
 from app.core.providers.yahoo_finance_provider import YahooFinanceProvider
+from app.core.providers.alpha_vantage_provider import AlphaVantageProvider
 from app.core.providers.mock_price_provider import FalconMockPriceProvider
 from app.core.providers.provider_analytics import provider_analytics
 
 # ── Instantiate providers ──────────────────────────────────────────────────────
 _twelve_data_provider = TwelveDataProvider()
 _yahoo_finance_provider = YahooFinanceProvider()
-_mock_provider = FalconMockPriceProvider()
+_alpha_vantage_provider = AlphaVantageProvider()
 
 # ── Register providers in priority order ──────────────────────────────────────
 provider_registry.register(_twelve_data_provider, priority=1)
 provider_registry.register(_yahoo_finance_provider, priority=2)
-provider_registry.register(_mock_provider, priority=3)
+provider_registry.register(_alpha_vantage_provider, priority=3)
+
+# The synthetic price provider is opt-in: with ENABLE_MOCK_PROVIDER unset the
+# pipeline reports missing data instead of serving fabricated quotes.
+if settings.ENABLE_MOCK_PROVIDER:
+    _mock_provider = FalconMockPriceProvider()
+    provider_registry.register(_mock_provider, priority=4)
 
 # ── Wire analytics — register all providers ───────────────────────────────────
 for _p in provider_registry.all_providers():

@@ -1,47 +1,34 @@
 from abc import ABC, abstractmethod
 from typing import List
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from app.schemas.market_state import EconomicEvent
 from app.core.events.event_bus import event_bus, CalendarUpdated
+from app.core.services.economic_calendar_service import economic_calendar_service
 
 class CalendarProvider(ABC):
     @abstractmethod
     def get_upcoming_events(self) -> List[EconomicEvent]:
         pass
 
-class MockCalendarProvider(CalendarProvider):
+class FMPCalendarProvider(CalendarProvider):
+    """Economic calendar backed by Financial Modeling Prep and stored history."""
+
     def __init__(self):
-        self.provider_name = "MockCalendarProvider"
+        self.provider_name = "FinancialModelingPrep"
         self._last_refresh = datetime.now(timezone.utc)
-        self.is_online = True
-        self.latency_ms = 40
+        self.latency_ms = 0
+
+    @property
+    def is_online(self) -> bool:
+        return economic_calendar_service.configured
 
     def get_upcoming_events(self) -> List[EconomicEvent]:
-        now = datetime.now(timezone.utc)
-        self._last_refresh = now
-        
-        events = [
-            EconomicEvent(
-                title="Non-Farm Employment Change",
-                currency="USD",
-                impact="High",
-                eventTime=now + timedelta(minutes=120),
-                countdownMinutes=120,
-                forecast="180K",
-                previous="175K",
-                provider=self.provider_name
-            ),
-            EconomicEvent(
-                title="Core CPI m/m",
-                currency="USD",
-                impact="High",
-                eventTime=now + timedelta(hours=24),
-                countdownMinutes=1440,
-                forecast="0.3%",
-                previous="0.4%",
-                provider=self.provider_name
-            )
-        ]
-        
+        started = datetime.now(timezone.utc)
+        events = economic_calendar_service.get_events()
+        self._last_refresh = datetime.now(timezone.utc)
+        self.latency_ms = int((self._last_refresh - started).total_seconds() * 1000)
         event_bus.publish(CalendarUpdated(provider=self.provider_name))
         return events
+
+
+calendar_provider: CalendarProvider = FMPCalendarProvider()

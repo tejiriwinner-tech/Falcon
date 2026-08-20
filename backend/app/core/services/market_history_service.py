@@ -1,0 +1,318 @@
+"""Historical OHLC bars pulled from Twelve Data (Alpha Vantage fallback) and stored.
+
+Falcon builds its own price history instead of re-querying rate-limited APIs: bars
+are upserted into ``price_history`` and every consumer (indicators, volatility,
+learning engines) reads them back from storage.
+"""
+
+import threading
+import time
+from dataclasses import dataclass
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Tuple
+
+import requests
+from sqlalchemy import select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+
+from app.core.config import settings
+from app.core.config.provider_settings import REQUEST_TIMEOUT_SECONDS
+from app.core.database import PriceBarRecord, database_enabled, get_session
+from app.core.providers.symbol_mapper import symbol_mapper
+
+TWELVE_DATA_PROVIDER = "TwelveData"
+ALPHA_VANTAGE_PROVIDER = "AlphaVantage"
+
+_ALPHA_INTERVAL = {"1h": "60min", "4h": "60min", "30min": "30min", "15min": "15min"}
+_ALPHA_FX_PAIRS = {
+    "EURUSD": ("EUR", "USD"),
+    "GBPUSD": ("GBP", "USD"),
+    "USDJPY": ("USD", "JPY"),
+    "XAUUSD": ("XAU", "USD"),
+}
+
+
+@dataclass(frozen=True)
+class PriceBar:
+    symbol: str
+    timeframe: str
+    bar_time: datetime
+    open: float
+    high: float
+    low: float
+    close: float
+    volume: Optional[float]
+    provider: str
+
+
+def _parse_bar_time(raw: str) -> Optional[datetime]:
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
+        except ValueError:
+            continue
+    return None
+
+
+def _to_float(value: Any) -> Optional[float]:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+class MarketHistoryService:
+    """Fetches, stores and serves historical bars."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._memory: Dict[Tuple[str, str, datetime], PriceBar] = {}
+        self._last_refresh: Dict[Tuple[str, str], float] = {}
+        self.last_error: Optional[str] = None
+
+    # ------------------------------------------------------------------
+    # Providers
+    # ------------------------------------------------------------------
+
+    def _fetch_twelve_data(self, symbol: str, timeframe: str, limit: int) -> List[PriceBar]:
+        if not settings.TWELVEDATA_API_KEY:
+            return []
+        params = {
+            "symbol": symbol_mapper.to_provider_symbol(symbol, "twelve_data"),
+            "interval": timeframe,
+            "outputsize": limit,
+            "apikey": settings.TWELVEDATA_API_KEY,
+        }
+        try:
+            response = requests.get(
+                f"{settings.TWELVEDATA_BASE_URL.rstrip('/')}/time_series",
+                params=params,
+                timeout=REQUEST_TIMEOUT_SECONDS,
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (requests.RequestException, ValueError) as exc:
+            self.last_error = f"TwelveData {type(exc).__name__}: {exc}"
+            return []
+        values = payload.get("values") if isinstance(payload, dict) else None
+        if not isinstance(values, list):
+            self.last_error = f"TwelveData error: {payload.get('message', 'no values')}" if isinstance(payload, dict) else "TwelveData: bad payload"
+            return []
+        bars: List[PriceBar] = []
+        for row in values:
+            bar_time = _parse_bar_time(str(row.get("datetime", "")))
+            close = _to_float(row.get("close"))
+            if bar_time is None or close is None:
+                continue
+            bars.append(
+                PriceBar(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    bar_time=bar_time,
+                    open=_to_float(row.get("open")) or close,
+                    high=_to_float(row.get("high")) or close,
+                    low=_to_float(row.get("low")) or close,
+                    close=close,
+                    volume=_to_float(row.get("volume")),
+                    provider=TWELVE_DATA_PROVIDER,
+                )
+            )
+        return bars
+
+    def _fetch_alpha_vantage(self, symbol: str, timeframe: str, limit: int) -> List[PriceBar]:
+        if not settings.ALPHA_VANTAGE_API_KEY:
+            return []
+        pair = _ALPHA_FX_PAIRS.get(symbol)
+        if pair is None:
+            self.last_error = f"AlphaVantage: {symbol} is not a supported FX pair"
+            return []
+        from_symbol, to_symbol = pair
+        interval = _ALPHA_INTERVAL.get(timeframe)
+        params: Dict[str, Any] = {
+            "from_symbol": from_symbol,
+            "to_symbol": to_symbol,
+            "apikey": settings.ALPHA_VANTAGE_API_KEY,
+            "outputsize": "compact" if limit <= 100 else "full",
+        }
+        if interval is None:
+            params["function"] = "FX_DAILY"
+            series_key = "Time Series FX (Daily)"
+        else:
+            params["function"] = "FX_INTRADAY"
+            params["interval"] = interval
+            series_key = f"Time Series FX ({interval})"
+        try:
+            response = requests.get(
+                settings.ALPHA_BASE_URL, params=params, timeout=REQUEST_TIMEOUT_SECONDS
+            )
+            response.raise_for_status()
+            payload = response.json()
+        except (requests.RequestException, ValueError) as exc:
+            self.last_error = f"AlphaVantage {type(exc).__name__}: {exc}"
+            return []
+        series = payload.get(series_key) if isinstance(payload, dict) else None
+        if not isinstance(series, dict):
+            note = ""
+            if isinstance(payload, dict):
+                note = str(payload.get("Note") or payload.get("Error Message") or "")
+            self.last_error = f"AlphaVantage: {note or 'no series returned'}"
+            return []
+        bars: List[PriceBar] = []
+        for raw_time, row in series.items():
+            bar_time = _parse_bar_time(str(raw_time))
+            close = _to_float(row.get("4. close"))
+            if bar_time is None or close is None:
+                continue
+            bars.append(
+                PriceBar(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    bar_time=bar_time,
+                    open=_to_float(row.get("1. open")) or close,
+                    high=_to_float(row.get("2. high")) or close,
+                    low=_to_float(row.get("3. low")) or close,
+                    close=close,
+                    volume=None,
+                    provider=ALPHA_VANTAGE_PROVIDER,
+                )
+            )
+        return sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
+
+    # ------------------------------------------------------------------
+    # Storage
+    # ------------------------------------------------------------------
+
+    def store_bars(self, bars: List[PriceBar]) -> int:
+        if not bars:
+            return 0
+        stored_at = datetime.now(timezone.utc)
+        if not database_enabled():
+            with self._lock:
+                for bar in bars:
+                    self._memory[(bar.symbol, bar.timeframe, bar.bar_time)] = bar
+            return len(bars)
+        rows = [
+            {
+                "symbol": bar.symbol,
+                "timeframe": bar.timeframe,
+                "bar_time": bar.bar_time,
+                "open": bar.open,
+                "high": bar.high,
+                "low": bar.low,
+                "close": bar.close,
+                "volume": bar.volume,
+                "provider": bar.provider,
+                "stored_at": stored_at,
+            }
+            for bar in bars
+        ]
+        statement = pg_insert(PriceBarRecord).values(rows)
+        statement = statement.on_conflict_do_update(
+            constraint="uq_price_history_symbol_timeframe_bar_time",
+            set_={
+                "open": statement.excluded.open,
+                "high": statement.excluded.high,
+                "low": statement.excluded.low,
+                "close": statement.excluded.close,
+                "volume": statement.excluded.volume,
+                "provider": statement.excluded.provider,
+                "stored_at": statement.excluded.stored_at,
+            },
+        )
+        with get_session() as session, session.begin():
+            session.execute(statement)
+        return len(rows)
+
+    def get_bars(self, symbol: str, timeframe: Optional[str] = None, limit: int = 200) -> List[PriceBar]:
+        """Returns stored bars oldest-first."""
+        timeframe = timeframe or settings.HISTORY_TIMEFRAME
+        if not database_enabled():
+            with self._lock:
+                bars = [
+                    bar
+                    for (sym, tf, _), bar in self._memory.items()
+                    if sym == symbol and tf == timeframe
+                ]
+            return sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
+        with get_session() as session:
+            records = session.scalars(
+                select(PriceBarRecord)
+                .where(PriceBarRecord.symbol == symbol)
+                .where(PriceBarRecord.timeframe == timeframe)
+                .order_by(PriceBarRecord.bar_time.desc())
+                .limit(limit)
+            ).all()
+        return [
+            PriceBar(
+                symbol=record.symbol,
+                timeframe=record.timeframe,
+                bar_time=record.bar_time,
+                open=record.open,
+                high=record.high,
+                low=record.low,
+                close=record.close,
+                volume=record.volume,
+                provider=record.provider,
+            )
+            for record in reversed(records)
+        ]
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
+    def refresh_symbol(
+        self, symbol: str, timeframe: Optional[str] = None, force: bool = False
+    ) -> int:
+        """Pulls the latest bars for one symbol and stores them.
+
+        Refreshes are throttled per symbol so a busy pipeline cannot exhaust the
+        provider quota.
+        """
+        timeframe = timeframe or settings.HISTORY_TIMEFRAME
+        limit = settings.HISTORY_BAR_LIMIT
+        key = (symbol, timeframe)
+        with self._lock:
+            last = self._last_refresh.get(key)
+            if not force and last is not None and time.monotonic() - last < settings.HISTORY_REFRESH_SECONDS:
+                return 0
+            self._last_refresh[key] = time.monotonic()
+        bars = self._fetch_twelve_data(symbol, timeframe, limit)
+        if not bars:
+            bars = self._fetch_alpha_vantage(symbol, timeframe, limit)
+        if bars:
+            self.last_error = None
+        return self.store_bars(bars)
+
+    def refresh_watchlist(
+        self, symbols: List[str], timeframe: Optional[str] = None, force: bool = False
+    ) -> Dict[str, int]:
+        return {symbol: self.refresh_symbol(symbol, timeframe, force) for symbol in symbols}
+
+
+def compute_rsi(closes: List[float], period: int = 14) -> Optional[float]:
+    """Wilder's RSI over the supplied closes, or None when history is too short."""
+    if len(closes) <= period:
+        return None
+    gains = 0.0
+    losses = 0.0
+    deltas = [closes[i] - closes[i - 1] for i in range(1, len(closes))]
+    for delta in deltas[:period]:
+        if delta >= 0:
+            gains += delta
+        else:
+            losses -= delta
+    avg_gain = gains / period
+    avg_loss = losses / period
+    for delta in deltas[period:]:
+        gain = delta if delta > 0 else 0.0
+        loss = -delta if delta < 0 else 0.0
+        avg_gain = (avg_gain * (period - 1) + gain) / period
+        avg_loss = (avg_loss * (period - 1) + loss) / period
+    if avg_loss == 0:
+        return 100.0
+    rs = avg_gain / avg_loss
+    return round(100 - (100 / (1 + rs)), 2)
+
+
+market_history_service = MarketHistoryService()

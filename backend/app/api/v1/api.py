@@ -10,6 +10,7 @@ from app.api.v1 import performance_analytics
 from app.api.v1 import decision_engine
 from app.api.v1 import strategies
 from app.routers import markets
+from app.api.v1 import market_data
 from app.api.v1 import market_state
 from app.api.v1 import signal_candidates
 from app.api.v1 import validation_results
@@ -41,6 +42,7 @@ api_router.include_router(trade_journal.router, tags=["trade_journal"])
 api_router.include_router(trade_intelligence.router, tags=["trade_intelligence"])
 api_router.include_router(performance_analytics.router, tags=["performance_analytics"])
 api_router.include_router(decision_engine.router, tags=["decision_engine"])
+api_router.include_router(market_data.router, tags=["market_data"])
 api_router.include_router(market_state.router, tags=["market_state"])
 api_router.include_router(signal_candidates.router, tags=["signal_candidates"])
 api_router.include_router(validation_results.router, tags=["validation_results"])
