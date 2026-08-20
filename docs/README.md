@@ -25,7 +25,21 @@ The user manually places trades on their preferred trading platform.
 ### Prerequisites
 - Python 3.10+
 - Flutter SDK (>=3.0.0)
-- PostgreSQL
+- A Supabase project (PostgreSQL)
+
+### Database (Supabase)
+Falcon stores missions and their artifacts (market states, candidates, validations,
+risk assessments, execution readiness, decisions) in Supabase Postgres.
+
+1. Copy `backend/.env.example` to `backend/.env` and set `DATABASE_URL` to the
+   Supabase connection URI (Project Settings → Database → Connection string → URI).
+   Leaving it empty falls back to in-memory storage, which is lost on restart.
+2. Apply migrations from the `backend/` directory:
+   ```bash
+   alembic upgrade head
+   ```
+   Migrations live in `database/migrations/`; create new ones with
+   `alembic revision --autogenerate -m "description"`.
 
 ### How to run backend
 1. Navigate to the `backend/` directory:

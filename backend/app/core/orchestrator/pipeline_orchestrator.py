@@ -1,7 +1,7 @@
 import json
 import time
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from app.core.engines.market_state_engine import MarketStateEngine
 from app.core.engines.strategy_engine import StrategyEngine
@@ -49,8 +49,8 @@ class PipelineOrchestrator:
         self._execution_engine = ExecutionReadinessEngine()
         self._decision_engine = DecisionEngine()
 
-        # Monotonic mission counter (per process lifetime)
-        self._mission_counter: int = 0
+        # Monotonic mission counter, seeded from persisted missions on first run
+        self._mission_counter: Optional[int] = None
 
     def run_pipeline(self) -> MissionReport:
         """Execute the complete Falcon intelligence pipeline exactly once.
@@ -58,6 +58,8 @@ class PipelineOrchestrator:
         Returns an immutable MissionReport that is the single source of
         truth for all downstream consumers.
         """
+        if self._mission_counter is None:
+            self._mission_counter = mission_repository.count_missions()
         self._mission_counter += 1
         mission_number = self._mission_counter
         mission_id = f"mission-{mission_number:03d}"
