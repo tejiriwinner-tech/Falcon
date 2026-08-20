@@ -34,4 +34,7 @@ class Settings:
     DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "5"))
     DB_CONNECT_TIMEOUT: int = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
 
+    # Account equity the trade journal analytics are measured against
+    STARTING_EQUITY: float = float(os.getenv("STARTING_EQUITY", "10000"))
+
 settings = Settings()

@@ -10,11 +10,13 @@ Two interchangeable backends are provided:
 """
 
 import copy
+import threading
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar
 
 from pydantic import BaseModel
-from sqlalchemy import delete, func, select
+from sqlalchemy import cast, delete, func, select, text
+from sqlalchemy.dialects.postgresql import BIGINT
 
 from app.core.database.models import (
     MissionArtifactRecord,
@@ -49,6 +51,7 @@ ARTIFACT_MODELS: Dict[str, Type[BaseModel]] = {
 }
 
 META_ROW_ID = 1
+MISSION_NUMBER_SEQUENCE = "mission_number_seq"
 
 
 class InMemoryMissionStorage:
@@ -58,6 +61,8 @@ class InMemoryMissionStorage:
         self.reset()
 
     def reset(self) -> None:
+        self._number_lock = threading.Lock()
+        self._mission_number = 0
         self._started_at: datetime = datetime.now(timezone.utc)
         self._last_mission_at: Optional[datetime] = None
         self._missions: Dict[str, MissionReport] = {}
@@ -100,6 +105,11 @@ class InMemoryMissionStorage:
 
     def count_missions(self) -> int:
         return len(self._missions)
+
+    def next_mission_number(self) -> int:
+        with self._number_lock:
+            self._mission_number = max(self._mission_number, len(self._missions)) + 1
+            return self._mission_number
 
     def count_artifacts(self) -> Dict[str, int]:
         counts: Dict[str, int] = {artifact_type: 0 for artifact_type in ARTIFACT_MODELS}
@@ -196,6 +206,14 @@ class DatabaseMissionStorage:
         with get_session() as session:
             return int(session.scalar(select(func.count()).select_from(MissionRecord)) or 0)
 
+    def next_mission_number(self) -> int:
+        """Allocates a mission number atomically so concurrent runs stay unique."""
+        with get_session() as session, session.begin():
+            _ensure_mission_sequence(session)
+            return int(
+                session.scalar(text(f"SELECT nextval('{MISSION_NUMBER_SEQUENCE}')"))
+            )
+
     def count_artifacts(self) -> Dict[str, int]:
         counts: Dict[str, int] = {artifact_type: 0 for artifact_type in ARTIFACT_MODELS}
         with get_session() as session:
@@ -223,11 +241,37 @@ class DatabaseMissionStorage:
             session.execute(delete(MissionRecord))
             meta = _get_or_create_meta(session, datetime.now(timezone.utc))
             meta.last_mission_at = None
+            _ensure_mission_sequence(session)
+            session.execute(
+                text(f"SELECT setval('{MISSION_NUMBER_SEQUENCE}', 1, false)")
+            )
 
     def _meta(self) -> tuple[datetime, Optional[datetime]]:
         with get_session() as session, session.begin():
             meta = _get_or_create_meta(session, datetime.now(timezone.utc))
             return meta.started_at, meta.last_mission_at
+
+
+def _ensure_mission_sequence(session: Any) -> None:
+    """Creates the mission number sequence for databases predating migration 0002."""
+    session.execute(
+        text(f"CREATE SEQUENCE IF NOT EXISTS {MISSION_NUMBER_SEQUENCE} AS BIGINT START 1")
+    )
+    highest = session.scalar(
+        select(
+            func.max(
+                cast(func.substring(MissionRecord.id, "mission-([0-9]+)$"), BIGINT)
+            )
+        ).where(MissionRecord.id.op("~")("^mission-[0-9]+$"))
+    )
+    current = session.scalar(
+        text(f"SELECT last_value, is_called FROM {MISSION_NUMBER_SEQUENCE}")
+    )
+    if highest is not None and int(highest) >= int(current or 0):
+        session.execute(
+            text(f"SELECT setval('{MISSION_NUMBER_SEQUENCE}', :value, true)"),
+            {"value": int(highest)},
+        )
 
 
 def _get_or_create_meta(session: Any, now: datetime) -> RepositoryMetaRecord:

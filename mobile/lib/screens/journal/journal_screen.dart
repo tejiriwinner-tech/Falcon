@@ -30,6 +30,45 @@ class _JournalScreenState extends State<JournalScreen> {
     });
   }
 
+  void _notify(String message) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _addTrade() async {
+    final draft = await showDialog<TradeJournalDraft>(
+      context: context,
+      builder: (context) => const _NewTradeDialog(),
+    );
+    if (draft == null) return;
+    try {
+      await _apiService.createTradeJournal(draft);
+    } catch (e) {
+      if (!mounted) return;
+      _notify('Could not save trade: ${e.toString().replaceAll('Exception: ', '')}');
+      return;
+    }
+    if (!mounted) return;
+    _fetchJournal();
+  }
+
+  Future<void> _closeTrade(TradeJournalItem trade) async {
+    final close = await showDialog<TradeJournalClose>(
+      context: context,
+      builder: (context) => _CloseTradeDialog(trade: trade),
+    );
+    if (close == null) return;
+    try {
+      await _apiService.closeTradeJournal(trade.id, close);
+    } catch (e) {
+      if (!mounted) return;
+      _notify('Could not close trade: ${e.toString().replaceAll('Exception: ', '')}');
+      return;
+    }
+    if (!mounted) return;
+    _fetchJournal();
+  }
+
   Future<void> _handleRefresh() async {
     _fetchJournal();
     try {
@@ -42,6 +81,11 @@ class _JournalScreenState extends State<JournalScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trade Journal'),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addTrade,
+        tooltip: 'Log trade',
+        child: const Icon(Icons.add),
       ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
@@ -92,7 +136,7 @@ class _JournalScreenState extends State<JournalScreen> {
               if (trades.isEmpty) {
                 return const Center(
                   child: Text(
-                    'No journal entries found.',
+                    'No journal entries yet. Log a trade to start tracking.',
                     style: TextStyle(color: AppColors.textSecondary),
                   ),
                 );
@@ -198,6 +242,17 @@ class _JournalScreenState extends State<JournalScreen> {
               ),
             ],
           ),
+          if (trade.status.toUpperCase() != 'CLOSED') ...[
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: () => _closeTrade(trade),
+                icon: const Icon(Icons.flag_outlined, size: 18),
+                label: const Text('Close trade'),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -226,4 +281,194 @@ class _JournalScreenState extends State<JournalScreen> {
       ],
     );
   }
+}
+
+class _NewTradeDialog extends StatefulWidget {
+  const _NewTradeDialog();
+
+  @override
+  State<_NewTradeDialog> createState() => _NewTradeDialogState();
+}
+
+class _NewTradeDialogState extends State<_NewTradeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _symbol = TextEditingController(text: 'XAU/USD');
+  final _entryPrice = TextEditingController();
+  final _stopLoss = TextEditingController();
+  final _takeProfit = TextEditingController();
+  final _timeframe = TextEditingController(text: 'H1');
+  final _marketSession = TextEditingController(text: 'London');
+  final _confidence = TextEditingController(text: '70');
+  final _reason = TextEditingController();
+  String _direction = 'BUY';
+
+  @override
+  void dispose() {
+    _symbol.dispose();
+    _entryPrice.dispose();
+    _stopLoss.dispose();
+    _takeProfit.dispose();
+    _timeframe.dispose();
+    _marketSession.dispose();
+    _confidence.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
+
+  double get _riskReward {
+    final entry = double.tryParse(_entryPrice.text);
+    final stop = double.tryParse(_stopLoss.text);
+    final target = double.tryParse(_takeProfit.text);
+    if (entry == null || stop == null || target == null) return 0;
+    final risk = (entry - stop).abs();
+    return risk == 0 ? 0 : double.parse(((target - entry).abs() / risk).toStringAsFixed(2));
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.of(context).pop(
+      TradeJournalDraft(
+        symbol: _symbol.text.trim(),
+        direction: _direction,
+        entryPrice: double.parse(_entryPrice.text),
+        stopLoss: double.parse(_stopLoss.text),
+        takeProfit: double.parse(_takeProfit.text),
+        timeframe: _timeframe.text.trim(),
+        marketSession: _marketSession.text.trim(),
+        tradeDate: DateTime.now(),
+        riskReward: _riskReward,
+        confidence: int.tryParse(_confidence.text) ?? 0,
+        reasonForEntry: _reason.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Log trade'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _textField(_symbol, 'Symbol'),
+              DropdownButtonFormField<String>(
+                initialValue: _direction,
+                decoration: const InputDecoration(labelText: 'Direction'),
+                items: const [
+                  DropdownMenuItem(value: 'BUY', child: Text('BUY')),
+                  DropdownMenuItem(value: 'SELL', child: Text('SELL')),
+                ],
+                onChanged: (value) => setState(() => _direction = value ?? 'BUY'),
+              ),
+              _textField(_entryPrice, 'Entry price', numeric: true),
+              _textField(_stopLoss, 'Stop loss', numeric: true),
+              _textField(_takeProfit, 'Take profit', numeric: true),
+              _textField(_timeframe, 'Timeframe'),
+              _textField(_marketSession, 'Market session'),
+              _textField(_confidence, 'Confidence (0-100)', numeric: true),
+              _textField(_reason, 'Reason for entry'),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(onPressed: _submit, child: const Text('Save')),
+      ],
+    );
+  }
+}
+
+class _CloseTradeDialog extends StatefulWidget {
+  const _CloseTradeDialog({required this.trade});
+
+  final TradeJournalItem trade;
+
+  @override
+  State<_CloseTradeDialog> createState() => _CloseTradeDialogState();
+}
+
+class _CloseTradeDialogState extends State<_CloseTradeDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _exitPrice = TextEditingController();
+  final _profitLoss = TextEditingController();
+  final _reasonForExit = TextEditingController();
+  final _lesson = TextEditingController();
+
+  @override
+  void dispose() {
+    _exitPrice.dispose();
+    _profitLoss.dispose();
+    _reasonForExit.dispose();
+    _lesson.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (!_formKey.currentState!.validate()) return;
+    Navigator.of(context).pop(
+      TradeJournalClose(
+        exitPrice: double.parse(_exitPrice.text),
+        profitLoss: double.parse(_profitLoss.text),
+        closeDate: DateTime.now(),
+        reasonForExit: _reasonForExit.text.trim().isEmpty ? null : _reasonForExit.text.trim(),
+        lessonLearned: _lesson.text.trim().isEmpty ? null : _lesson.text.trim(),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text('Close ${widget.trade.symbol}'),
+      content: SingleChildScrollView(
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _textField(_exitPrice, 'Exit price', numeric: true),
+              _textField(_profitLoss, 'Profit / loss', numeric: true),
+              _textField(_reasonForExit, 'Reason for exit', required: false),
+              _textField(_lesson, 'Lesson learned', required: false),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(onPressed: _submit, child: const Text('Close trade')),
+      ],
+    );
+  }
+}
+
+Widget _textField(
+  TextEditingController controller,
+  String label, {
+  bool numeric = false,
+  bool required = true,
+}) {
+  return TextFormField(
+    controller: controller,
+    decoration: InputDecoration(labelText: label),
+    keyboardType: numeric
+        ? const TextInputType.numberWithOptions(decimal: true, signed: true)
+        : TextInputType.text,
+    validator: (value) {
+      final text = value?.trim() ?? '';
+      if (text.isEmpty) return required ? 'Required' : null;
+      if (numeric && double.tryParse(text) == null) return 'Enter a number';
+      return null;
+    },
+  );
 }

@@ -43,7 +43,14 @@ risk assessments, execution readiness, decisions) in Supabase Postgres.
 
 Running the intelligence pipeline is an explicit action: `POST /api/v1/missions/run`
 stores a new mission, while all `GET` endpoints (including `/missions` and
-`/dashboard`) only read what is already stored.
+`/dashboard`) only read what is already stored. Mission numbers are allocated by
+the database sequence `mission_number_seq`, so concurrent runs never collide.
+
+The trade journal is stored in the same database: `POST /api/v1/trade-journal`
+logs an entry, `PATCH /api/v1/trade-journal/{id}` closes it, and
+`GET /api/v1/performance-analytics` derives every figure (equity curve,
+streaks, scores, calendar) from those records — an empty journal returns zeroed
+statistics. Equity is measured against `STARTING_EQUITY` (default `10000`).
 
 ### How to run backend
 1. Navigate to the `backend/` directory:

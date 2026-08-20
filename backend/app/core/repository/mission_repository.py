@@ -76,6 +76,10 @@ class MissionRepository:
     def count_missions(self) -> int:
         return self._storage.count_missions()
 
+    def next_mission_number(self) -> int:
+        """Atomically allocates the next mission number."""
+        return self._storage.next_mission_number()
+
     def save_market_state(self, mission_id: str, market_state: MarketState) -> None:
         self._storage.save_artifacts(mission_id, MARKET_STATE, [market_state])
 

@@ -49,19 +49,13 @@ class PipelineOrchestrator:
         self._execution_engine = ExecutionReadinessEngine()
         self._decision_engine = DecisionEngine()
 
-        # Monotonic mission counter, seeded from persisted missions on first run
-        self._mission_counter: Optional[int] = None
-
     def run_pipeline(self) -> MissionReport:
         """Execute the complete Falcon intelligence pipeline exactly once.
 
         Returns an immutable MissionReport that is the single source of
         truth for all downstream consumers.
         """
-        if self._mission_counter is None:
-            self._mission_counter = mission_repository.count_missions()
-        self._mission_counter += 1
-        mission_number = self._mission_counter
+        mission_number = mission_repository.next_mission_number()
         mission_id = f"mission-{mission_number:03d}"
 
         pipeline_start = time.time()

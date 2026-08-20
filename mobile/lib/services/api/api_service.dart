@@ -83,6 +83,44 @@ class ApiService {
     }
   }
 
+  Future<T> _send<T>(
+    String method,
+    String endpoint,
+    T Function(Map<String, dynamic>) fromJson, {
+    Map<String, dynamic>? body,
+  }) async {
+    final url = '$baseUrl$endpoint';
+    print("Calling: $method $url");
+    try {
+      final uri = Uri.parse(url);
+      final headers = {'Content-Type': 'application/json'};
+      final encoded = body == null ? null : jsonEncode(body);
+      final request = method == 'PATCH'
+          ? http.patch(uri, headers: headers, body: encoded)
+          : http.post(uri, headers: headers, body: encoded);
+      final response =
+          await request.timeout(const Duration(seconds: timeoutSeconds));
+
+      print("Status Code: ${response.statusCode}");
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return fromJson(jsonDecode(response.body) as Map<String, dynamic>);
+      }
+      throw Exception('Server error: ${response.statusCode} - ${response.reasonPhrase} for $url');
+    } on http.ClientException catch (e) {
+      print("ClientException ($url): $e");
+      throw Exception('Network connection failed. Please check your connection to the server.');
+    } on TimeoutException catch (e) {
+      print("TimeoutException ($url): $e");
+      throw Exception('Request timed out after $timeoutSeconds seconds. Server is unreachable.');
+    } on FormatException catch (e) {
+      print("FormatException ($url): $e");
+      throw Exception('Invalid data received from server.');
+    } catch (e) {
+      print("Unexpected Error ($url): $e");
+      throw Exception('An unexpected error occurred: $e');
+    }
+  }
+
   Future<List<T>> _getList<T>(String endpoint, T Function(Map<String, dynamic>) fromJson) async {
     final url = '$baseUrl$endpoint';
     print("Calling: $url");
@@ -151,8 +189,27 @@ class ApiService {
   }
 
 
-  Future<TradeJournalItem> createTradeJournal(TradeJournalItem item) async {
-    return _get<TradeJournalItem>('/trade-journal', TradeJournalItem.fromJson);
+  /// Stores a new journal entry; the server assigns its id and timestamps.
+  Future<TradeJournalItem> createTradeJournal(TradeJournalDraft draft) async {
+    return _send<TradeJournalItem>(
+      'POST',
+      '/trade-journal',
+      TradeJournalItem.fromJson,
+      body: draft.toJson(),
+    );
+  }
+
+  /// Closes an open journal entry with its exit price and outcome.
+  Future<TradeJournalItem> closeTradeJournal(
+    int tradeId,
+    TradeJournalClose close,
+  ) async {
+    return _send<TradeJournalItem>(
+      'PATCH',
+      '/trade-journal/$tradeId',
+      TradeJournalItem.fromJson,
+      body: close.toJson(),
+    );
   }
 
 
@@ -214,29 +271,7 @@ class ApiService {
   /// Executes the intelligence pipeline once and returns the stored mission.
   /// Reading /missions never runs the pipeline.
   Future<MissionReport> runMission() async {
-    final url = '$baseUrl/missions/run';
-    print("Calling: $url");
-    try {
-      final response = await http
-          .post(Uri.parse(url))
-          .timeout(const Duration(seconds: timeoutSeconds));
-
-      print("Status Code: ${response.statusCode}");
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        return MissionReport.fromJson(
-            jsonDecode(response.body) as Map<String, dynamic>);
-      }
-      throw Exception('Server error: ${response.statusCode} - ${response.reasonPhrase} for $url');
-    } on http.ClientException catch (e) {
-      print("ClientException ($url): $e");
-      throw Exception('Network connection failed. Please check your connection to the server.');
-    } on TimeoutException catch (e) {
-      print("TimeoutException ($url): $e");
-      throw Exception('Request timed out after $timeoutSeconds seconds. Server is unreachable.');
-    } catch (e) {
-      print("Unexpected Error ($url): $e");
-      throw Exception('An unexpected error occurred: $e');
-    }
+    return _send<MissionReport>('POST', '/missions/run', MissionReport.fromJson);
   }
 
 
