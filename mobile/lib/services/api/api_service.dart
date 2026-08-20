@@ -211,6 +211,35 @@ class ApiService {
   }
 
 
+  /// Executes the intelligence pipeline once and returns the stored mission.
+  /// Reading /missions never runs the pipeline.
+  Future<MissionReport> runMission() async {
+    final url = '$baseUrl/missions/run';
+    print("Calling: $url");
+    try {
+      final response = await http
+          .post(Uri.parse(url))
+          .timeout(const Duration(seconds: timeoutSeconds));
+
+      print("Status Code: ${response.statusCode}");
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        return MissionReport.fromJson(
+            jsonDecode(response.body) as Map<String, dynamic>);
+      }
+      throw Exception('Server error: ${response.statusCode} - ${response.reasonPhrase} for $url');
+    } on http.ClientException catch (e) {
+      print("ClientException ($url): $e");
+      throw Exception('Network connection failed. Please check your connection to the server.');
+    } on TimeoutException catch (e) {
+      print("TimeoutException ($url): $e");
+      throw Exception('Request timed out after $timeoutSeconds seconds. Server is unreachable.');
+    } catch (e) {
+      print("Unexpected Error ($url): $e");
+      throw Exception('An unexpected error occurred: $e');
+    }
+  }
+
+
   Future<RepositoryStatistics> getRepositoryStatistics() async {
     return _get<RepositoryStatistics>('/repository/statistics', RepositoryStatistics.fromJson);
   }

@@ -70,6 +70,9 @@ class MissionRepository:
     def get_all_missions(self) -> List[MissionReport]:
         return self._storage.get_all_missions()
 
+    def get_latest_mission(self) -> Optional[MissionReport]:
+        return self._storage.get_latest_mission()
+
     def count_missions(self) -> int:
         return self._storage.count_missions()
 

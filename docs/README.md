@@ -41,6 +41,10 @@ risk assessments, execution readiness, decisions) in Supabase Postgres.
    Migrations live in `database/migrations/`; create new ones with
    `alembic revision --autogenerate -m "description"`.
 
+Running the intelligence pipeline is an explicit action: `POST /api/v1/missions/run`
+stores a new mission, while all `GET` endpoints (including `/missions` and
+`/dashboard`) only read what is already stored.
+
 ### How to run backend
 1. Navigate to the `backend/` directory:
    ```bash

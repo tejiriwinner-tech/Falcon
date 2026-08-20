@@ -19,15 +19,19 @@ _orchestrator = PipelineOrchestrator()
 @router.get("/missions", response_model=MissionReportListResponse)
 def get_missions():
     """
-    Runs the Pipeline Orchestrator once, stores the resulting MissionReport,
-    and returns the full list of missions with an aggregate summary.
+    Returns every stored mission with an aggregate summary.
 
-    This is the single entry point for downstream consumers that need the
-    complete intelligence pipeline executed end-to-end.
+    Read-only: POST /missions/run executes the intelligence pipeline.
     """
-    _orchestrator.run_pipeline()
-
     return _build_list_response(mission_repository.get_all_missions())
+
+
+@router.post("/missions/run", response_model=MissionReport, status_code=201)
+def run_mission():
+    """
+    Runs the Pipeline Orchestrator once and returns the stored MissionReport.
+    """
+    return _orchestrator.run_pipeline()
 
 
 @router.get("/missions/{mission_id}", response_model=MissionReport)

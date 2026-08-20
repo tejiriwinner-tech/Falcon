@@ -40,8 +40,11 @@ class DashboardService:
         self.strategy_engine = StrategyEngine()
 
     def get_dashboard(self) -> DashboardResponse:
-        # ── 1. Run Intelligence Pipeline exactly ONCE ────────────────
-        mission_report = self.orchestrator.run_pipeline()
+        # ── 1. Reuse the last stored mission, running the pipeline only
+        #      when the repository is still empty ─────────────────────
+        mission_report = (
+            mission_repository.get_latest_mission() or self.orchestrator.run_pipeline()
+        )
         artifacts = mission_repository.get_mission_artifacts(mission_report.id)
         
         market_state = artifacts.get("marketState")

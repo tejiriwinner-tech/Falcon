@@ -89,6 +89,11 @@ class InMemoryMissionStorage:
     def get_all_missions(self) -> List[MissionReport]:
         return [copy.deepcopy(mission) for mission in self._missions.values()]
 
+    def get_latest_mission(self) -> Optional[MissionReport]:
+        if not self._missions:
+            return None
+        return copy.deepcopy(next(reversed(self._missions.values())))
+
     def get_artifacts(self, mission_id: str, artifact_type: str) -> List[BaseModel]:
         stored = self._artifacts.get(mission_id, {}).get(artifact_type, [])
         return [copy.deepcopy(artifact) for artifact in stored]
@@ -166,6 +171,13 @@ class DatabaseMissionStorage:
                 select(MissionRecord).order_by(MissionRecord.stored_at)
             ).all()
             return [MissionReport.model_validate(record.payload) for record in records]
+
+    def get_latest_mission(self) -> Optional[MissionReport]:
+        with get_session() as session:
+            record = session.scalars(
+                select(MissionRecord).order_by(MissionRecord.stored_at.desc()).limit(1)
+            ).first()
+            return MissionReport.model_validate(record.payload) if record else None
 
     def get_artifacts(self, mission_id: str, artifact_type: str) -> List[BaseModel]:
         model = ARTIFACT_MODELS[artifact_type]
