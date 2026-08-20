@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
+import '../../models/strategy_model.dart';
 import '../../models/trade_journal.dart';
 import '../../services/api/api_service.dart';
 import '../../widgets/cards/app_card.dart';
@@ -301,6 +302,16 @@ class _NewTradeDialogState extends State<_NewTradeDialog> {
   final _confidence = TextEditingController(text: '70');
   final _reason = TextEditingController();
   String _direction = 'BUY';
+  String? _strategyId;
+  List<StrategyItem> _strategies = [];
+
+  @override
+  void initState() {
+    super.initState();
+    ApiService().getStrategies().then((response) {
+      if (mounted) setState(() => _strategies = response.strategies);
+    }).catchError((_) {});
+  }
 
   @override
   void dispose() {
@@ -328,6 +339,7 @@ class _NewTradeDialogState extends State<_NewTradeDialog> {
     if (!_formKey.currentState!.validate()) return;
     Navigator.of(context).pop(
       TradeJournalDraft(
+        strategyId: _strategyId,
         symbol: _symbol.text.trim(),
         direction: _direction,
         entryPrice: double.parse(_entryPrice.text),
@@ -354,6 +366,24 @@ class _NewTradeDialogState extends State<_NewTradeDialog> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _textField(_symbol, 'Symbol'),
+              if (_strategies.isNotEmpty)
+                DropdownButtonFormField<String?>(
+                  initialValue: _strategyId,
+                  decoration: const InputDecoration(labelText: 'Strategy'),
+                  items: [
+                    const DropdownMenuItem<String?>(
+                      value: null,
+                      child: Text('No strategy'),
+                    ),
+                    ..._strategies.map(
+                      (strategy) => DropdownMenuItem<String?>(
+                        value: strategy.id,
+                        child: Text(strategy.name),
+                      ),
+                    ),
+                  ],
+                  onChanged: (value) => setState(() => _strategyId = value),
+                ),
               DropdownButtonFormField<String>(
                 initialValue: _direction,
                 decoration: const InputDecoration(labelText: 'Direction'),

@@ -1,6 +1,7 @@
 class TradeJournalItem {
   final int id;
   final int? signalId;
+  final String? strategyId;
   final String symbol;
   final String direction;
   final double entryPrice;
@@ -26,6 +27,7 @@ class TradeJournalItem {
   TradeJournalItem({
     required this.id,
     this.signalId,
+    this.strategyId,
     required this.symbol,
     required this.direction,
     required this.entryPrice,
@@ -53,6 +55,7 @@ class TradeJournalItem {
     return TradeJournalItem(
       id: json['id'] as int,
       signalId: json['signalId'] as int?,
+      strategyId: json['strategyId'] as String?,
       symbol: json['symbol'] as String,
       direction: json['direction'] as String,
       entryPrice: (json['entryPrice'] as num).toDouble(),
@@ -81,6 +84,7 @@ class TradeJournalItem {
     return {
       'id': id,
       'signalId': signalId,
+      'strategyId': strategyId,
       'symbol': symbol,
       'direction': direction,
       'entryPrice': entryPrice,
@@ -107,6 +111,7 @@ class TradeJournalItem {
 }
 
 class TradeJournalDraft {
+  final String? strategyId;
   final String symbol;
   final String direction;
   final double entryPrice;
@@ -121,6 +126,7 @@ class TradeJournalDraft {
   final String? notes;
 
   TradeJournalDraft({
+    this.strategyId,
     required this.symbol,
     required this.direction,
     required this.entryPrice,
@@ -137,6 +143,7 @@ class TradeJournalDraft {
 
   Map<String, dynamic> toJson() {
     return {
+      'strategyId': strategyId,
       'symbol': symbol,
       'direction': direction,
       'entryPrice': entryPrice,

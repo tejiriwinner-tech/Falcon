@@ -22,7 +22,7 @@ def get_strategy(strategy_id: str):
     """
     Get a specific strategy by ID.
     """
-    strategy = strategy_engine.get_strategy_by_id(strategy_id)
+    strategy = strategy_engine.get_enriched_strategy(strategy_id)
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
     return strategy

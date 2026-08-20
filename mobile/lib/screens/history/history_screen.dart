@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../core/constants/app_colors.dart';
-import '../../providers/signal_provider.dart';
-import '../../widgets/cards/signal_card.dart';
+import '../../models/trade_journal.dart';
+import '../../services/api/api_service.dart';
+import '../../widgets/cards/app_card.dart';
+import '../../widgets/chips/status_chip.dart';
+import '../../widgets/loading/placeholder_card.dart';
 import '../../widgets/typography/section_title.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -12,54 +16,173 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  String? _filterStatus;
+  final ApiService _apiService = ApiService();
+  late Future<TradeJournalListResponse> _journalFuture;
+  String? _filterResult;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchHistory();
+  }
+
+  void _fetchHistory() {
+    setState(() {
+      _journalFuture = _apiService.getTradeJournal();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final provider = SignalProvider();
-    final history = provider.historySignals;
-    final wonCount = provider.wonSignals;
-    final lostCount = provider.lostSignals;
-    final winRate = provider.winRate;
-
-    final filtered = _filterStatus == null
-        ? history
-        : history.where((s) => s.status.toUpperCase() == _filterStatus).toList();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('Trade History'),
+        actions: [
+          IconButton(
+            onPressed: _fetchHistory,
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: FutureBuilder<TradeJournalListResponse>(
+        future: _journalFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: PlaceholderCard(),
+            );
+          }
+          if (snapshot.hasError) {
+            return _buildError(snapshot.error.toString());
+          }
+
+          final trades = snapshot.data?.trades ?? [];
+          final closed = trades
+              .where((trade) => trade.status.toUpperCase() == 'CLOSED')
+              .toList();
+          final won =
+              closed.where((trade) => trade.result.toUpperCase() == 'WIN').length;
+          final lost =
+              closed.where((trade) => trade.result.toUpperCase() == 'LOSS').length;
+          final winRate = closed.isEmpty ? 0.0 : won / closed.length;
+
+          final filtered = _filterResult == null
+              ? trades
+              : trades
+                  .where((trade) => trade.result.toUpperCase() == _filterResult)
+                  .toList();
+
+          return RefreshIndicator(
+            onRefresh: () async => _fetchHistory(),
+            child: ListView(
+              padding: const EdgeInsets.all(16),
+              children: [
+                _buildStatsRow(won, lost, winRate),
+                const SizedBox(height: 24),
+                const SectionTitle(title: 'Trade Log'),
+                const SizedBox(height: 12),
+                _buildFilterRow(),
+                const SizedBox(height: 16),
+                if (filtered.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 40),
+                    child: Center(
+                      child: Text(
+                        'No trades recorded yet.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    ),
+                  )
+                else
+                  ...filtered.map(
+                    (trade) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: _buildTradeCard(trade),
+                    ),
+                  ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildError(String message) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Could not load trade history.\n$message',
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _fetchHistory,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTradeCard(TradeJournalItem trade) {
+    final isProfit = trade.profitLoss >= 0;
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Stats Summary
-          _buildStatsRow(wonCount, lostCount, winRate),
-          const SizedBox(height: 24),
-
-          // Filter Row
-          const SectionTitle(title: 'Signal Log'),
-          const SizedBox(height: 12),
-          _buildFilterRow(),
-          const SizedBox(height: 16),
-
-          // Signal list
-          if (filtered.isEmpty)
-            const Padding(
-              padding: EdgeInsets.only(top: 40),
-              child: Center(
-                child: Text(
-                  'No signals match this filter.',
-                  style: TextStyle(color: AppColors.textSecondary),
+          Row(
+            children: [
+              Text(
+                '${trade.symbol}  ${trade.direction}',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
                 ),
               ),
-            )
-          else
-            ...filtered.map((signal) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: SignalCard(signal: signal),
-                )),
-          const SizedBox(height: 24),
+              const Spacer(),
+              StatusChip(
+                status: trade.result,
+                type: StatusChipType.journalResult,
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Entry ${trade.entryPrice}'
+            '${trade.exitPrice != null ? '  ·  Exit ${trade.exitPrice}' : ''}'
+            '  ·  ${trade.timeframe}  ·  ${trade.marketSession}',
+            style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              Text(
+                DateFormat('dd MMM yyyy HH:mm').format(trade.tradeDate.toLocal()),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textTertiary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '${isProfit ? '+' : ''}${trade.profitLoss.toStringAsFixed(2)}',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: isProfit ? AppColors.success : AppColors.error,
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
@@ -117,20 +240,22 @@ class _HistoryScreenState extends State<HistoryScreen> {
         children: [
           _buildFilterChip('All', null),
           const SizedBox(width: 8),
-          _buildFilterChip('Won', 'WON'),
+          _buildFilterChip('Won', 'WIN'),
           const SizedBox(width: 8),
-          _buildFilterChip('Lost', 'LOST'),
+          _buildFilterChip('Lost', 'LOSS'),
           const SizedBox(width: 8),
-          _buildFilterChip('Cancelled', 'CANCELLED'),
+          _buildFilterChip('Breakeven', 'BREAKEVEN'),
+          const SizedBox(width: 8),
+          _buildFilterChip('Open', 'OPEN'),
         ],
       ),
     );
   }
 
-  Widget _buildFilterChip(String label, String? status) {
-    final isSelected = _filterStatus == status;
+  Widget _buildFilterChip(String label, String? result) {
+    final isSelected = _filterResult == result;
     return GestureDetector(
-      onTap: () => setState(() => _filterStatus = status),
+      onTap: () => setState(() => _filterResult = result),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),

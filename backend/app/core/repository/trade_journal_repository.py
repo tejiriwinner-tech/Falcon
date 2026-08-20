@@ -21,6 +21,7 @@ from app.schemas.trade_journal import (
 
 _COLUMNS: Dict[str, str] = {
     "signalId": "signal_id",
+    "strategyId": "strategy_id",
     "symbol": "symbol",
     "direction": "direction",
     "entryPrice": "entry_price",

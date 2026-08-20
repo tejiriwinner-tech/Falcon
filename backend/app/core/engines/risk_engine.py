@@ -138,16 +138,7 @@ class RiskEngine:
                 isBlocking=False
             ))
         
-        # Intentionally failing cand-004 on spread to simulate BLOCKED status in mock data
-        if candidate.id == "cand-004":
-             reasons.append(RiskReason(
-                title="Maximum Loss Limit Projected",
-                description="Candidate stop loss parameters project unacceptable capital risk.",
-                severity=RiskSeverity.CRITICAL,
-                isBlocking=True
-            ))
-             is_blocking_overall = True
-             risk_level = RiskLevel.HIGH
+
 
         if validation.status.value == "FAILED":
             reasons.append(RiskReason(
