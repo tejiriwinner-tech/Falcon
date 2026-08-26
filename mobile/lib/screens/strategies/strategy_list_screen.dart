@@ -44,6 +44,16 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
       appBar: AppBar(
         title: const Text('Trading Strategies'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: () {
+              // Show configuration dialog for creating new strategy
+              _showStrategyConfigDialog();
+            },
+            tooltip: 'Add Strategy',
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: _handleRefresh,
@@ -339,5 +349,30 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
       default:
         return AppColors.textSecondary;
     }
+  }
+
+  void _showStrategyConfigDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Configure New Strategy'),
+        content: const Text('Strategy configuration will be implemented with backend support.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Strategy configuration coming soon')),
+              );
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
   }
 }

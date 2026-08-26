@@ -13,19 +13,19 @@ from app.core.providers.symbol_mapper import symbol_mapper
 from app.core.providers.provider_registry import provider_registry
 from app.core.providers.provider_manager import ProviderManager
 from app.core.providers.twelve_data_provider import TwelveDataProvider
-from app.core.providers.yahoo_finance_provider import YahooFinanceProvider
+from app.core.providers.fmp_provider import FmpProvider
 from app.core.providers.alpha_vantage_provider import AlphaVantageProvider
 from app.core.providers.mock_price_provider import FalconMockPriceProvider
 from app.core.providers.provider_analytics import provider_analytics
 
 # ── Instantiate providers ──────────────────────────────────────────────────────
 _twelve_data_provider = TwelveDataProvider()
-_yahoo_finance_provider = YahooFinanceProvider()
+_fmp_provider = FmpProvider()
 _alpha_vantage_provider = AlphaVantageProvider()
 
 # ── Register providers in priority order ──────────────────────────────────────
 provider_registry.register(_twelve_data_provider, priority=1)
-provider_registry.register(_yahoo_finance_provider, priority=2)
+provider_registry.register(_fmp_provider, priority=2)
 provider_registry.register(_alpha_vantage_provider, priority=3)
 
 # The synthetic price provider is opt-in: with ENABLE_MOCK_PROVIDER unset the

@@ -1,0 +1,766 @@
+[TwelveData] HTTP 404: {"code":404,"message":"**symbol** or **figi** parameter is missing or invalid. Please provide a valid symbol according to API documentation: https://twelvedata.com/docs#reference-data","status":"error
+[TwelveData] HTTP 404: {"code":404,"message":"**symbol** or **figi** parameter is missing or invalid. Please provide a valid symbol according to API documentation: https://twelvedata.com/docs#reference-data","status":"error
+[TwelveData] HTTP 429: {"code":429,"message":"You have run out of API credits for the current minute. 9 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier 
+[TwelveData] HTTP 429: {"code":429,"message":"You have run out of API credits for the current minute. 10 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier
+[TwelveData] HTTP 429: {"code":429,"message":"You have run out of API credits for the current minute. 11 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier
+[TwelveData] HTTP 429: {"code":429,"message":"You have run out of API credits for the current minute. 12 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier
+[TwelveData] HTTP 429: {"code":429,"message":"You have run out of API credits for the current minute. 14 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier
+[TwelveData] HTTP 429: {"code":429,"message":"You have run out of API credits for the current minute. 13 API credits were used, with the current limit being 8. Wait for the next minute or consider switching to a higher tier
+Failed to persist decision: (sqlite3.OperationalError) database is locked
+[SQL: INSERT INTO decision_records (decision_id, mission_id, engine_version, timestamp, processing_time_ms, instrument, timeframe, decision, confidence, entry_price, stop_loss, take_profit, risk_level, strategy_used, context_snapshot, result_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('66f12dba-8911-4e87-afc1-f72c86942e61', 'mission-438', '1.0.0', '2026-08-08 12:14:51.863434', 17, 'UNKNOWN', 'H1', 'BUY', 84.6, None, None, None, 'RiskLevel.MEDIUM', 'London Breakout', '{"candidateId": "cand-000065-1823", "missionId": "mission-438", "candidate": null, "validation": null, "risk": null, "readiness": null, "strategy": n ... (397 characters truncated) ...  70.0, "minimumRiskReward": 1.5, "avoidConditions": [], "marketCompatibility": [], "builtAt": "2026-08-08T12:14:51.859867Z", "contextVersion": "1.0"}', '{"recommendation": "BUY", "confidence": {"overall": 84.6, "evaluatorContribution": 70.0, "riskPenalty": 0.0, "validationBonus": 10.0, "readinessBonus ... (534 characters truncated) ... actors detected. Confidence breakdown \\u2014 Evaluators: 70.0, Risk penalty: -0.0, Validation bonus: +10.0, Readiness bonus: +4.6.", "warnings": []}')]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: database is locked
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\repositories\decision_repository.py", line 136, in save_decision
+    self.db.commit()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2035, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1316, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1290, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4353, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4488, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4449, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 465, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 641, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 94, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1234, in _emit_insert_statements
+    result = connection.execute(
+        statement,
+        params,
+        execution_options=execution_options,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1421, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) database is locked
+[SQL: INSERT INTO decision_records (decision_id, mission_id, engine_version, timestamp, processing_time_ms, instrument, timeframe, decision, confidence, entry_price, stop_loss, take_profit, risk_level, strategy_used, context_snapshot, result_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('66f12dba-8911-4e87-afc1-f72c86942e61', 'mission-438', '1.0.0', '2026-08-08 12:14:51.863434', 17, 'UNKNOWN', 'H1', 'BUY', 84.6, None, None, None, 'RiskLevel.MEDIUM', 'London Breakout', '{"candidateId": "cand-000065-1823", "missionId": "mission-438", "candidate": null, "validation": null, "risk": null, "readiness": null, "strategy": n ... (397 characters truncated) ...  70.0, "minimumRiskReward": 1.5, "avoidConditions": [], "marketCompatibility": [], "builtAt": "2026-08-08T12:14:51.859867Z", "contextVersion": "1.0"}', '{"recommendation": "BUY", "confidence": {"overall": 84.6, "evaluatorContribution": 70.0, "riskPenalty": 0.0, "validationBonus": 10.0, "readinessBonus ... (534 characters truncated) ... actors detected. Confidence breakdown \\u2014 Evaluators: 70.0, Risk penalty: -0.0, Validation bonus: +10.0, Readiness bonus: +4.6.", "warnings": []}')]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Failed to persist decision decision-000065-1841
+Failed to persist decision: (sqlite3.OperationalError) database is locked
+[SQL: INSERT INTO decision_records (decision_id, mission_id, engine_version, timestamp, processing_time_ms, instrument, timeframe, decision, confidence, entry_price, stop_loss, take_profit, risk_level, strategy_used, context_snapshot, result_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('51c6dddb-f773-4103-9f3d-7c38c21ac4f7', 'mission-449', '1.0.0', '2026-08-08 12:18:00.182897', 19, 'UNKNOWN', 'H1', 'BUY', 84.6, None, None, None, 'RiskLevel.MEDIUM', 'London Breakout', '{"candidateId": "cand-000109-0138", "missionId": "mission-449", "candidate": null, "validation": null, "risk": null, "readiness": null, "strategy": n ... (398 characters truncated) ...  70.0, "minimumRiskReward": 1.5, "avoidConditions": [], "marketCompatibility": [], "builtAt": "2026-08-08T12:18:00.180781Z", "contextVersion": "1.0"}', '{"recommendation": "BUY", "confidence": {"overall": 84.6, "evaluatorContribution": 70.0, "riskPenalty": 0.0, "validationBonus": 10.0, "readinessBonus ... (534 characters truncated) ... actors detected. Confidence breakdown \\u2014 Evaluators: 70.0, Risk penalty: -0.0, Validation bonus: +10.0, Readiness bonus: +4.6.", "warnings": []}')]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.OperationalError: database is locked
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\repositories\decision_repository.py", line 136, in save_decision
+    self.db.commit()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2035, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1316, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1290, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4353, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4488, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4449, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 465, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 641, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 94, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1234, in _emit_insert_statements
+    result = connection.execute(
+        statement,
+        params,
+        execution_options=execution_options,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1421, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.OperationalError: (sqlite3.OperationalError) database is locked
+[SQL: INSERT INTO decision_records (decision_id, mission_id, engine_version, timestamp, processing_time_ms, instrument, timeframe, decision, confidence, entry_price, stop_loss, take_profit, risk_level, strategy_used, context_snapshot, result_snapshot) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('51c6dddb-f773-4103-9f3d-7c38c21ac4f7', 'mission-449', '1.0.0', '2026-08-08 12:18:00.182897', 19, 'UNKNOWN', 'H1', 'BUY', 84.6, None, None, None, 'RiskLevel.MEDIUM', 'London Breakout', '{"candidateId": "cand-000109-0138", "missionId": "mission-449", "candidate": null, "validation": null, "risk": null, "readiness": null, "strategy": n ... (398 characters truncated) ...  70.0, "minimumRiskReward": 1.5, "avoidConditions": [], "marketCompatibility": [], "builtAt": "2026-08-08T12:18:00.180781Z", "contextVersion": "1.0"}', '{"recommendation": "BUY", "confidence": {"overall": 84.6, "evaluatorContribution": 70.0, "riskPenalty": 0.0, "validationBonus": 10.0, "readinessBonus ... (534 characters truncated) ... actors detected. Confidence breakdown \\u2014 Evaluators: 70.0, Risk penalty: -0.0, Validation bonus: +10.0, Readiness bonus: +4.6.", "warnings": []}')]
+(Background on this error at: https://sqlalche.me/e/20/e3q8)
+Failed to persist decision decision-000109-0160
+Failed to save market state: (sqlite3.IntegrityError) UNIQUE constraint failed: market_states.id
+[SQL: INSERT INTO market_states (id, mission_id, symbol, current_price, bid, ask, spread, timestamp, provider, trend, volatility, liquidity, session, market_open, market_sentiment_label, fear_greed_index, current_news_impact, upcoming_high_impact_news, data_age_seconds, overall_market_confidence, quote_status, freshness_seconds, primary_provider_id, primary_provider_name, watchlist_symbols, data_source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('market-1786191501', 'mission-450', 'XAUUSD', 4399.7, 4399.7, 4399.7, 0.0, '2026-08-08 12:18:21.117910', 'Yahoo Finance', 'Bullish', 'Moderate', 'Good', 'London-NY Overlap', 1, 'Greedy', 68, 'High', 1, 4, 50, 'STALE', 29.64, 'yahoo_finance', 'Yahoo Finance', '["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "NAS100", "US30"]', 'Falcon Intelligence Layer v2.1', '2026-08-08 12:18:30.680652')]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: market_states.id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\repositories\mission_repository.py", line 270, in save_market_state
+    self.db.commit()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2035, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1316, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1290, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4353, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4488, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4449, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 465, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 641, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 94, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1049, in _emit_insert_statements
+    result = connection.execute(
+        statement, multiparams, execution_options=execution_options
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1421, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: market_states.id
+[SQL: INSERT INTO market_states (id, mission_id, symbol, current_price, bid, ask, spread, timestamp, provider, trend, volatility, liquidity, session, market_open, market_sentiment_label, fear_greed_index, current_news_impact, upcoming_high_impact_news, data_age_seconds, overall_market_confidence, quote_status, freshness_seconds, primary_provider_id, primary_provider_name, watchlist_symbols, data_source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('market-1786191501', 'mission-450', 'XAUUSD', 4399.7, 4399.7, 4399.7, 0.0, '2026-08-08 12:18:21.117910', 'Yahoo Finance', 'Bullish', 'Moderate', 'Good', 'London-NY Overlap', 1, 'Greedy', 68, 'High', 1, 4, 50, 'STALE', 29.64, 'yahoo_finance', 'Yahoo Finance', '["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "NAS100", "US30"]', 'Falcon Intelligence Layer v2.1', '2026-08-08 12:18:30.680652')]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+all last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: market_states.id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\repositories\mission_repository.py", line 270, in save_market_state
+    self.db.commit()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2035, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1316, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1290, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4353, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4488, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4449, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 465, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 641, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 94, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1049, in _emit_insert_statements
+    result = connection.execute(
+        statement, multiparams, execution_options=execution_options
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1421, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: market_states.id
+[SQL: INSERT INTO market_states (id, mission_id, symbol, current_price, bid, ask, spread, timestamp, provider, trend, volatility, liquidity, session, market_open, market_sentiment_label, fear_greed_index, current_news_impact, upcoming_high_impact_news, data_age_seconds, overall_market_confidence, quote_status, freshness_seconds, primary_provider_id, primary_provider_name, watchlist_symbols, data_source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('market-1786191202', 'mission-435', 'EURUSD', 1.1562, 1.1562, 1.1562, 0.0, '2026-08-08 12:13:22.460312', 'Yahoo Finance', 'Bullish', 'Moderate', 'Good', 'London-NY Overlap', 1, 'Greedy', 68, 'High', 1, 0, 85, 'LIVE', 0.0, 'yahoo_finance', 'Yahoo Finance', '["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "NAS100", "US30"]', 'Falcon Intelligence Layer v2.1', '2026-08-08 12:13:29.256994')]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Failed to save market state: (sqlite3.IntegrityError) UNIQUE constraint failed: market_states.id
+[SQL: INSERT INTO market_states (id, mission_id, symbol, current_price, bid, ask, spread, timestamp, provider, trend, volatility, liquidity, session, market_open, market_sentiment_label, fear_greed_index, current_news_impact, upcoming_high_impact_news, data_age_seconds, overall_market_confidence, quote_status, freshness_seconds, primary_provider_id, primary_provider_name, watchlist_symbols, data_source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('market-1786191274', 'mission-441', 'EURUSD', 1.1562, 1.1562, 1.1562, 0.0, '2026-08-08 12:14:34.749178', 'Yahoo Finance', 'Bullish', 'Moderate', 'Good', 'London-NY Overlap', 1, 'Greedy', 68, 'High', 1, 0, 85, 'LIVE', 0.0, 'yahoo_finance', 'Yahoo Finance', '["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "NAS100", "US30"]', 'Falcon Intelligence Layer v2.1', '2026-08-08 12:14:42.790763')]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: market_states.id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\repositories\mission_repository.py", line 270, in save_market_state
+    self.db.commit()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2035, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1316, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1290, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4353, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4488, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4449, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 465, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 641, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 94, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1049, in _emit_insert_statements
+    result = connection.execute(
+        statement, multiparams, execution_options=execution_options
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1421, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: market_states.id
+[SQL: INSERT INTO market_states (id, mission_id, symbol, current_price, bid, ask, spread, timestamp, provider, trend, volatility, liquidity, session, market_open, market_sentiment_label, fear_greed_index, current_news_impact, upcoming_high_impact_news, data_age_seconds, overall_market_confidence, quote_status, freshness_seconds, primary_provider_id, primary_provider_name, watchlist_symbols, data_source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('market-1786191274', 'mission-441', 'EURUSD', 1.1562, 1.1562, 1.1562, 0.0, '2026-08-08 12:14:34.749178', 'Yahoo Finance', 'Bullish', 'Moderate', 'Good', 'London-NY Overlap', 1, 'Greedy', 68, 'High', 1, 0, 85, 'LIVE', 0.0, 'yahoo_finance', 'Yahoo Finance', '["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "NAS100", "US30"]', 'Falcon Intelligence Layer v2.1', '2026-08-08 12:14:42.790763')]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Failed to save market state: (sqlite3.IntegrityError) UNIQUE constraint failed: market_states.id
+[SQL: INSERT INTO market_states (id, mission_id, symbol, current_price, bid, ask, spread, timestamp, provider, trend, volatility, liquidity, session, market_open, market_sentiment_label, fear_greed_index, current_news_impact, upcoming_high_impact_news, data_age_seconds, overall_market_confidence, quote_status, freshness_seconds, primary_provider_id, primary_provider_name, watchlist_symbols, data_source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('market-1786191336', 'mission-447', 'GBPUSD', 1.3493, 1.3493, 1.3493, 0.0, '2026-08-08 12:15:36.610509', 'Yahoo Finance', 'Bullish', 'Moderate', 'Good', 'London-NY Overlap', 1, 'Greedy', 68, 'High', 1, 28, 50, 'STALE', 28.31, 'yahoo_finance', 'Yahoo Finance', '["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "NAS100", "US30"]', 'Falcon Intelligence Layer v2.1', '2026-08-08 12:15:43.903131')]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlite3.IntegrityError: UNIQUE constraint failed: market_states.id
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\repositories\mission_repository.py", line 270, in save_market_state
+    self.db.commit()
+    ~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 2035, in commit
+    trans.commit(_to_root=True)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "<string>", line 2, in commit
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1316, in commit
+    self._prepare_impl()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "<string>", line 2, in _prepare_impl
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 1290, in _prepare_impl
+    self.session.flush()
+    ~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4353, in flush
+    self._flush(objects)
+    ~~~~~~~~~~~^^^^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4488, in _flush
+    with util.safe_reraise():
+         ~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\util\langhelpers.py", line 122, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\session.py", line 4449, in _flush
+    flush_context.execute()
+    ~~~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 465, in execute
+    rec.execute(self)
+    ~~~~~~~~~~~^^^^^^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\unitofwork.py", line 641, in execute
+    util.preloaded.orm_persistence.save_obj(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self.mapper,
+        ^^^^^^^^^^^^
+        uow.states_for_mapper_hierarchy(self.mapper, False, False),
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        uow,
+        ^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 94, in save_obj
+    _emit_insert_statements(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        base_mapper,
+        ^^^^^^^^^^^^
+    ...<3 lines>...
+        insert,
+        ^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\orm\persistence.py", line 1049, in _emit_insert_statements
+    result = connection.execute(
+        statement, multiparams, execution_options=execution_options
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1421, in execute
+    return meth(
+        self,
+        distilled_parameters,
+        execution_options or NO_OPTIONS,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\sql\elements.py", line 526, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        self, distilled_params, execution_options
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1643, in _execute_clauseelement
+    ret = self._execute_context(
+        dialect,
+    ...<8 lines>...
+        cache_hit=cache_hit,
+    )
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1848, in _execute_context
+    return self._exec_single_context(
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^
+        dialect, context, statement, parameters
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1988, in _exec_single_context
+    self._handle_dbapi_exception(
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~^
+        e, str_statement, effective_parameters, cursor, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 2365, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\base.py", line 1969, in _exec_single_context
+    self.dialect.do_execute(
+    ~~~~~~~~~~~~~~~~~~~~~~~^
+        cursor, str_statement, effective_parameters, context
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\sqlalchemy\engine\default.py", line 952, in do_execute
+    cursor.execute(statement, parameters)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^
+sqlalchemy.exc.IntegrityError: (sqlite3.IntegrityError) UNIQUE constraint failed: market_states.id
+[SQL: INSERT INTO market_states (id, mission_id, symbol, current_price, bid, ask, spread, timestamp, provider, trend, volatility, liquidity, session, market_open, market_sentiment_label, fear_greed_index, current_news_impact, upcoming_high_impact_news, data_age_seconds, overall_market_confidence, quote_status, freshness_seconds, primary_provider_id, primary_provider_name, watchlist_symbols, data_source, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)]
+[parameters: ('market-1786191336', 'mission-447', 'GBPUSD', 1.3493, 1.3493, 1.3493, 0.0, '2026-08-08 12:15:36.610509', 'Yahoo Finance', 'Bullish', 'Moderate', 'Good', 'London-NY Overlap', 1, 'Greedy', 68, 'High', 1, 28, 50, 'STALE', 28.31, 'yahoo_finance', 'Yahoo Finance', '["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "NAS100", "US30"]', 'Falcon Intelligence Layer v2.1', '2026-08-08 12:15:43.903131')]
+(Background on this error at: https://sqlalche.me/e/20/gkpj)

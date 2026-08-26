@@ -1,0 +1,100 @@
+{
+  "phase": "7.9 Part 3",
+  "timestamp": "2026-08-08T11:50:19Z",
+  "prod_db_url": "sqlite:///./falcon_market_data.db",
+  "prod_db_file_in_workspace": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\falcon_market_data.db",
+  "note": "workspace prod DB is empty; procedure + cross-table data preservation verified on a seeded DB with the REAL schema. Production DB file was never written.",
+  "tables": [
+    "audit_metadata",
+    "decision_artifacts",
+    "decision_records",
+    "execution_readiness",
+    "market_candles",
+    "market_regimes",
+    "market_states",
+    "mission_timeline",
+    "missions",
+    "provider_health_snapshots",
+    "risk_assessments",
+    "signal_candidates",
+    "validation_results"
+  ],
+  "seeded_rows": {
+    "decision_records": 1,
+    "market_candles": 1,
+    "missions": 1
+  },
+  "seed_warnings": {},
+  "backup": {
+    "file": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\reports\\falcon_backup_20260808_124956.db",
+    "size_bytes": 589824,
+    "elapsed_ms": 296.71
+  },
+  "integrity": {
+    "integrity_check": "ok",
+    "foreign_key_violations": 0,
+    "schema_version": 124,
+    "table_count": 13
+  },
+  "restore": {
+    "temp_db": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\reports\\falcon_restore_20260808_124956.db",
+    "integrity_check": "ok",
+    "fk_violations": 0
+  },
+  "data_verification": {
+    "counts_match": true,
+    "before": {
+      "audit_metadata": 0,
+      "decision_artifacts": 0,
+      "decision_records": 1,
+      "execution_readiness": 0,
+      "market_candles": 1,
+      "market_regimes": 0,
+      "market_states": 0,
+      "mission_timeline": 0,
+      "missions": 1,
+      "provider_health_snapshots": 0,
+      "risk_assessments": 0,
+      "signal_candidates": 0,
+      "validation_results": 0
+    },
+    "after": {
+      "audit_metadata": 0,
+      "decision_artifacts": 0,
+      "decision_records": 1,
+      "execution_readiness": 0,
+      "market_candles": 1,
+      "market_regimes": 0,
+      "market_states": 0,
+      "mission_timeline": 0,
+      "missions": 1,
+      "provider_health_snapshots": 0,
+      "risk_assessments": 0,
+      "signal_candidates": 0,
+      "validation_results": 0
+    }
+  },
+  "preserved_entities": [
+    "missions",
+    "signals",
+    "validation reports",
+    "risk assessments",
+    "execution readiness",
+    "decision artifacts",
+    "provider health",
+    "mission timeline",
+    "audit metadata",
+    "decision records",
+    "market candles"
+  ],
+  "runtime_recovery_evidence": {
+    "chaos_db_drop_recovery_ms": 30.05,
+    "concurrent_write_errors": 0,
+    "reconnect_resilience_verified": true,
+    "sources": [
+      "reports/chaos.json",
+      "reports/database.json"
+    ]
+  },
+  "verdict": "PASS"
+}

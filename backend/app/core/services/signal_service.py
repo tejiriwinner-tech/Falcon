@@ -29,24 +29,37 @@ class SignalService:
 
     def build_signals(self, mission_limit: int = 5) -> SignalListResponse:
         now = datetime.now(timezone.utc)
-        missions = mission_repository.get_all_missions()[-mission_limit:]
+        
+        # Fast path: Return empty signals if no missions exist
+        all_missions = mission_repository.get_all_missions()
+        if not all_missions:
+            return SignalListResponse(
+                signals=[],
+                lastUpdated=now,
+                dataAgeSeconds=0,
+            )
+        
+        missions = all_missions[-mission_limit:]
 
         signals: List[SignalItem] = []
         for mission in reversed(missions):
-            artifacts = mission_repository.get_mission_artifacts(mission.id)
-            candidates: List[SignalCandidate] = artifacts.get("candidates", [])
-            decisions: List[DecisionArtifact] = artifacts.get("decisions", [])
-            by_candidate = {d.candidateId: d for d in decisions}
+            try:
+                artifacts = mission_repository.get_mission_artifacts(mission.id)
+                candidates: List[SignalCandidate] = artifacts.get("candidates", [])
+                decisions: List[DecisionArtifact] = artifacts.get("decisions", [])
+                by_candidate = {d.candidateId: d for d in decisions}
 
-            for index, candidate in enumerate(candidates):
-                signals.append(
-                    self._to_signal(
-                        candidate,
-                        by_candidate.get(candidate.id),
-                        self._signal_id(mission.id, index),
-                        now,
+                for index, candidate in enumerate(candidates):
+                    signals.append(
+                        self._to_signal(
+                            candidate,
+                            by_candidate.get(candidate.id),
+                            self._signal_id(mission.id, index),
+                            now,
+                        )
                     )
-                )
+            except Exception:
+                continue  # Skip missions with artifact errors
 
         return SignalListResponse(
             signals=signals,

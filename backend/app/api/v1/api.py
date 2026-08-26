@@ -27,6 +27,7 @@ from app.api.v1 import market_regimes
 from app.api.v1 import outcome_analysis
 from app.api.v1 import calibration
 from app.api.v1 import dashboard
+from app.api.v1 import intelligence
 from app.api.v1 import live_intelligence
 from app.api.v1 import runtime
 
@@ -59,6 +60,7 @@ api_router.include_router(market_regimes.router, tags=["market_regimes"])
 api_router.include_router(outcome_analysis.router, tags=["outcome_analysis"])
 api_router.include_router(calibration.router, tags=["calibration"])
 api_router.include_router(dashboard.router)
+api_router.include_router(intelligence.router, tags=["intelligence"])
 api_router.include_router(live_intelligence.router, tags=["live_intelligence"])
 api_router.include_router(runtime.router)
 

@@ -1,0 +1,747 @@
+{
+  "files": [
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\api\\test_scheduler_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\api\\test_signals_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_ai_decision_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_alpaca_provider_integration.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_analysis_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_confluence_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_dashboard_instruments.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_enrichment_real_providers.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_instrument_registry_startup.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_multi_timeframe_confluence_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_quote_enrichment_simple.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_risk_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_runtime_instruments_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_runtime_instruments_api_endpoint.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_runtime_timeline_enhancement.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_signal_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_signal_score_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_structure_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_tasks_95_910.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_trend_api.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\performance\\test_quote_enrichment_performance.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\services\\scheduler\\test_duplicate_detector.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\services\\scheduler\\test_expiration_service.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\services\\scheduler\\test_scheduler_statistics.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\services\\scheduler\\test_signal_dispatcher.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_ai_decision_engine.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_configuration.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_instrument_registry.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_provider_live.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_provider_registry.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_symbol_mapping.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpha_vantage_provider.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_backward_compat_integration.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_confidence_engine.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_confluence_engine.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_dashboard.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_dashboard_backward_compatibility.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_decision_context_builder.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_decision_evaluators.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_decision_generator.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_decision_repository.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_enriched_quote.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_enrichment_pipeline.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_indicator_engine.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_indicator_models.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_instrument_enums.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_instrument_models.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_instrument_registry.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_instrument_validator.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_market_candle.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_multi_timeframe_confluence_engine.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_risk_gate.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_risk_management_engine.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_runtime_instruments_schema.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_security_hardening.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_signal_generator.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_signal_scoring_engine.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_strategy_evaluators.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_structure_engine.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_structure_models.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_trend_engine.py",
+    "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_trend_models.py"
+  ],
+  "completed": [
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\api\\test_scheduler_api.py",
+      "returncode": 0,
+      "elapsed_s": 4.71,
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\api\\test_signals_api.py",
+      "returncode": 0,
+      "elapsed_s": 5.68,
+      "summary": {
+        "passed": 13,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_ai_decision_api.py",
+      "returncode": 0,
+      "elapsed_s": 36.36,
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_alpaca_provider_integration.py",
+      "returncode": 0,
+      "elapsed_s": 3.38,
+      "summary": {
+        "passed": 25,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_analysis_api.py",
+      "returncode": 0,
+      "elapsed_s": 38.58,
+      "summary": {
+        "passed": 6,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_confluence_api.py",
+      "returncode": 0,
+      "elapsed_s": 48.27,
+      "summary": {
+        "passed": 8,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_dashboard_instruments.py",
+      "returncode": 5,
+      "elapsed_s": 0.85,
+      "summary": {
+        "status": "UNKNOWN"
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_enrichment_real_providers.py",
+      "returncode": 0,
+      "elapsed_s": 1.78,
+      "summary": {
+        "passed": 17,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_instrument_registry_startup.py",
+      "returncode": 0,
+      "elapsed_s": 2.12,
+      "summary": {
+        "passed": 34,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_multi_timeframe_confluence_api.py",
+      "returncode": 0,
+      "elapsed_s": 49.49,
+      "summary": {
+        "passed": 6,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_quote_enrichment_simple.py",
+      "returncode": 0,
+      "elapsed_s": 2.02,
+      "summary": {
+        "passed": 5,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_risk_api.py",
+      "returncode": 0,
+      "elapsed_s": 127.04,
+      "summary": {
+        "passed": 8,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_runtime_instruments_api.py",
+      "returncode": 0,
+      "elapsed_s": 26.85,
+      "summary": {
+        "passed": 5,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_runtime_instruments_api_endpoint.py",
+      "returncode": 0,
+      "elapsed_s": 42.86,
+      "summary": {
+        "passed": 14,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_runtime_timeline_enhancement.py",
+      "returncode": 0,
+      "elapsed_s": 1.55,
+      "summary": {
+        "passed": 5,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_signal_api.py",
+      "returncode": 0,
+      "elapsed_s": 43.81,
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_signal_score_api.py",
+      "returncode": 0,
+      "elapsed_s": 30.67,
+      "summary": {
+        "passed": 6,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_structure_api.py",
+      "returncode": 0,
+      "elapsed_s": 39.94,
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_tasks_95_910.py",
+      "returncode": 0,
+      "elapsed_s": 2.11,
+      "summary": {
+        "passed": 5,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\integration\\test_trend_api.py",
+      "returncode": 0,
+      "elapsed_s": 43.6,
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\performance\\test_quote_enrichment_performance.py",
+      "returncode": 0,
+      "elapsed_s": 2.22,
+      "summary": {
+        "passed": 8,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\services\\scheduler\\test_duplicate_detector.py",
+      "returncode": 0,
+      "elapsed_s": 2.59,
+      "summary": {
+        "passed": 14,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\services\\scheduler\\test_expiration_service.py",
+      "returncode": 0,
+      "elapsed_s": 2.43,
+      "summary": {
+        "passed": 13,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\services\\scheduler\\test_scheduler_statistics.py",
+      "returncode": 0,
+      "elapsed_s": 2.42,
+      "summary": {
+        "passed": 20,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\services\\scheduler\\test_signal_dispatcher.py",
+      "returncode": 0,
+      "elapsed_s": 2.96,
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_ai_decision_engine.py",
+      "returncode": 0,
+      "elapsed_s": 1.27,
+      "summary": {
+        "passed": 15,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_configuration.py",
+      "returncode": 0,
+      "elapsed_s": 0.9,
+      "summary": {
+        "passed": 8,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_instrument_registry.py",
+      "returncode": 0,
+      "elapsed_s": 1.15,
+      "summary": {
+        "passed": 17,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_provider_live.py",
+      "returncode": 0,
+      "elapsed_s": 1.66,
+      "summary": {
+        "passed": 64,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_provider_registry.py",
+      "returncode": 0,
+      "elapsed_s": 1.35,
+      "summary": {
+        "passed": 8,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpaca_symbol_mapping.py",
+      "returncode": 0,
+      "elapsed_s": 1.3,
+      "summary": {
+        "passed": 16,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_backward_compat_integration.py",
+      "returncode": 0,
+      "elapsed_s": 1.06,
+      "summary": {
+        "passed": 12,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_confidence_engine.py",
+      "returncode": 0,
+      "elapsed_s": 1.17,
+      "summary": {
+        "passed": 16,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_confluence_engine.py",
+      "returncode": 0,
+      "elapsed_s": 3.06,
+      "summary": {
+        "passed": 20,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_dashboard.py",
+      "returncode": 0,
+      "elapsed_s": 4.85,
+      "summary": {
+        "passed": 24,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_dashboard_backward_compatibility.py",
+      "returncode": 0,
+      "elapsed_s": 1.44,
+      "summary": {
+        "passed": 28,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_decision_context_builder.py",
+      "returncode": 0,
+      "elapsed_s": 2.41,
+      "summary": {
+        "passed": 49,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_decision_evaluators.py",
+      "returncode": 0,
+      "elapsed_s": 2.06,
+      "summary": {
+        "passed": 20,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_decision_generator.py",
+      "returncode": 0,
+      "elapsed_s": 2.23,
+      "summary": {
+        "passed": 19,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_decision_repository.py",
+      "returncode": 0,
+      "elapsed_s": 3.5,
+      "summary": {
+        "passed": 24,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_enriched_quote.py",
+      "returncode": 0,
+      "elapsed_s": 1.98,
+      "summary": {
+        "passed": 44,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_enrichment_pipeline.py",
+      "returncode": 0,
+      "elapsed_s": 2.22,
+      "summary": {
+        "passed": 49,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_indicator_engine.py",
+      "returncode": 0,
+      "elapsed_s": 3.63,
+      "summary": {
+        "passed": 9,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_indicator_models.py",
+      "returncode": 0,
+      "elapsed_s": 1.97,
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_instrument_enums.py",
+      "returncode": 0,
+      "elapsed_s": 1.78,
+      "summary": {
+        "passed": 31,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_instrument_models.py",
+      "returncode": 0,
+      "elapsed_s": 2.21,
+      "summary": {
+        "passed": 53,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_instrument_registry.py",
+      "returncode": 0,
+      "elapsed_s": 1.36,
+      "summary": {
+        "passed": 37,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_instrument_validator.py",
+      "returncode": 0,
+      "elapsed_s": 1.39,
+      "summary": {
+        "passed": 36,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_market_candle.py",
+      "returncode": 0,
+      "elapsed_s": 2.06,
+      "summary": {
+        "passed": 3,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_multi_timeframe_confluence_engine.py",
+      "returncode": 0,
+      "elapsed_s": 2.83,
+      "summary": {
+        "passed": 12,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_risk_gate.py",
+      "returncode": 0,
+      "elapsed_s": 1.47,
+      "summary": {
+        "passed": 25,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_risk_management_engine.py",
+      "returncode": 0,
+      "elapsed_s": 1.78,
+      "summary": {
+        "passed": 38,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_runtime_instruments_schema.py",
+      "returncode": 0,
+      "elapsed_s": 1.51,
+      "summary": {
+        "passed": 26,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_security_hardening.py",
+      "returncode": 0,
+      "elapsed_s": 4.94,
+      "summary": {
+        "passed": 12,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_signal_generator.py",
+      "returncode": 0,
+      "elapsed_s": 1.3,
+      "summary": {
+        "passed": 15,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_signal_scoring_engine.py",
+      "returncode": 0,
+      "elapsed_s": 1.33,
+      "summary": {
+        "passed": 14,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_strategy_evaluators.py",
+      "returncode": 0,
+      "elapsed_s": 1.65,
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_structure_engine.py",
+      "returncode": 0,
+      "elapsed_s": 2.85,
+      "summary": {
+        "passed": 14,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_structure_models.py",
+      "returncode": 0,
+      "elapsed_s": 1.26,
+      "summary": {
+        "passed": 12,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_trend_engine.py",
+      "returncode": 0,
+      "elapsed_s": 2.69,
+      "summary": {
+        "passed": 13,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_trend_models.py",
+      "returncode": 0,
+      "elapsed_s": 1.31,
+      "summary": {
+        "passed": 7,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "C:\\Users\\ACER\\Documents\\SCHOOL WORKS\\Falcon\\backend\\tests\\unit\\test_alpha_vantage_provider.py",
+      "returncode": 0,
+      "elapsed_s": 2.52,
+      "summary": {
+        "passed": 24,
+        "failed": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  ]
+}

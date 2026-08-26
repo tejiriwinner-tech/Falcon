@@ -1,0 +1,120 @@
+{
+  "configuration": {
+    "api_key_exists": true,
+    "secret_key_exists": true,
+    "base_url_exists": true,
+    "base_url_correct": true,
+    "feature_flag_exists": true,
+    "feature_flag_default": true
+  },
+  "authentication": {
+    "authenticated": false,
+    "error": "Forbidden (403)",
+    "latency_ms": 1118.47
+  },
+  "symbol_translation": {
+    "translations": {
+      "XAUUSD": {
+        "canonical": "XAUUSD",
+        "alpaca": "XAU/USD",
+        "correct": true
+      },
+      "GBPUSD": {
+        "canonical": "GBPUSD",
+        "alpaca": "GBP/USD",
+        "correct": true
+      },
+      "EURUSD": {
+        "canonical": "EURUSD",
+        "alpaca": "EUR/USD",
+        "correct": true
+      },
+      "USDJPY": {
+        "canonical": "USDJPY",
+        "alpaca": "USD/JPY",
+        "correct": true
+      },
+      "NAS100": {
+        "canonical": "NAS100",
+        "alpaca": "^NDX",
+        "correct": true
+      },
+      "US30": {
+        "canonical": "US30",
+        "alpaca": "^DJI",
+        "correct": true
+      }
+    },
+    "all_correct": true
+  },
+  "market_data": {
+    "instruments": {
+      "XAUUSD": {
+        "success": false,
+        "error": "No data returned",
+        "latency_ms": 1071.39
+      },
+      "GBPUSD": {
+        "success": false,
+        "error": "No data returned",
+        "latency_ms": 1043.87
+      },
+      "EURUSD": {
+        "success": false,
+        "error": "No data returned",
+        "latency_ms": 1107.24
+      },
+      "USDJPY": {
+        "success": false,
+        "error": "No data returned",
+        "latency_ms": 0.01
+      },
+      "NAS100": {
+        "success": false,
+        "error": "No data returned",
+        "latency_ms": 0.0
+      },
+      "US30": {
+        "success": false,
+        "error": "No data returned",
+        "latency_ms": 0.0
+      }
+    },
+    "all_successful": false,
+    "total_latency_ms": 0,
+    "successful_count": 0,
+    "failed_count": 6,
+    "avg_latency_ms": 0
+  },
+  "circuit_breaker": {
+    "circuit_states": [
+      "OPEN",
+      "HALF_OPEN",
+      "CLOSED"
+    ],
+    "opens_correctly": true,
+    "half_opens_correctly": true,
+    "closes_correctly": true
+  },
+  "statistics": {
+    "success_count_correct": true,
+    "failure_count_correct": true,
+    "rate_limit_count_correct": true,
+    "avg_latency_correct": true,
+    "total_requests_correct": true
+  },
+  "feature_flag": {
+    "flag_exists": true,
+    "flag_defaults_to_false": true,
+    "provider_not_registered_when_disabled": true
+  },
+  "connectivity": "FAIL",
+  "regression": {
+    "phase7_tests": false,
+    "provider_tests": false,
+    "decision_tests": false,
+    "repository_tests": false,
+    "scheduler_tests": false,
+    "all_passed": false
+  }
+}

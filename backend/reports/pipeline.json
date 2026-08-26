@@ -1,0 +1,96 @@
+{
+  "phase": 2,
+  "phase_name": "Pipeline Stress Testing",
+  "timestamp": "2026-08-06T18:23:21Z",
+  "status": "PASS",
+  "total_missions_tested": 60,
+  "total_successes": 60,
+  "total_failures": 0,
+  "overall_success_rate_percent": 100.0,
+  "overall_avg_duration_ms": 5727.13,
+  "overall_max_duration_ms": 17615.47,
+  "memory_telemetry": {
+    "start_mb": 67.39,
+    "peak_mb": 79.32,
+    "after_gc_mb": 79.33,
+    "growth_percent": 17.7
+  },
+  "success_criteria": {
+    "mission_success_rate_gte_99": true,
+    "avg_pipeline_time_lt_1000ms": true,
+    "no_memory_leak": true,
+    "no_unhandled_exceptions": true,
+    "repository_success_100_percent": true
+  },
+  "batches": [
+    {
+      "batch_size": 10,
+      "success_rate_percent": 100.0,
+      "successes": 10,
+      "failures": 0,
+      "duration_seconds": 77.09,
+      "throughput_missions_per_sec": 0.13,
+      "latency_ms": {
+        "average": 7709.46,
+        "maximum": 17615.47,
+        "minimum": 4100.25
+      },
+      "subsystem_latency_ms": {
+        "provider_avg": 3083.78,
+        "repository_avg": 1541.89,
+        "database_avg": 1541.89
+      },
+      "memory_mb": {
+        "start": 67.39,
+        "end": 78.65,
+        "delta": 11.26
+      }
+    },
+    {
+      "batch_size": 20,
+      "success_rate_percent": 100.0,
+      "successes": 20,
+      "failures": 0,
+      "duration_seconds": 101.84,
+      "throughput_missions_per_sec": 0.2,
+      "latency_ms": {
+        "average": 5091.8,
+        "maximum": 5612.87,
+        "minimum": 4178.29
+      },
+      "subsystem_latency_ms": {
+        "provider_avg": 2036.72,
+        "repository_avg": 1018.36,
+        "database_avg": 1018.36
+      },
+      "memory_mb": {
+        "start": 78.65,
+        "end": 79.06,
+        "delta": 0.41
+      }
+    },
+    {
+      "batch_size": 30,
+      "success_rate_percent": 100.0,
+      "successes": 30,
+      "failures": 0,
+      "duration_seconds": 164.7,
+      "throughput_missions_per_sec": 0.18,
+      "latency_ms": {
+        "average": 5489.9,
+        "maximum": 8199.79,
+        "minimum": 4422.42
+      },
+      "subsystem_latency_ms": {
+        "provider_avg": 2195.96,
+        "repository_avg": 1097.98,
+        "database_avg": 1097.98
+      },
+      "memory_mb": {
+        "start": 79.06,
+        "end": 79.32,
+        "delta": 0.26
+      }
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "investigation": "Phase 7.9.1 Part 3 - Object Retention Investigation",
+  "timestamp": "2026-08-08T17:56:51Z",
+  "baseline": {
+    "total_objects": 91936,
+    "validator_instances": 1,
+    "validation_log_sizes": [
+      0
+    ],
+    "timeline_size": 3,
+    "total_dicts": 14154
+  },
+  "snapshots": [
+    {
+      "cycle": 1,
+      "total_objects": 102833,
+      "object_growth": 10897,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        6
+      ],
+      "timeline_size": 11,
+      "total_dicts": 15746,
+      "dict_growth": 1592
+    },
+    {
+      "cycle": 10,
+      "total_objects": 102885,
+      "object_growth": 10949,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        16
+      ],
+      "timeline_size": 75,
+      "total_dicts": 15748,
+      "dict_growth": 1594
+    },
+    {
+      "cycle": 25,
+      "total_objects": 103062,
+      "object_growth": 11126,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        34
+      ],
+      "timeline_size": 183,
+      "total_dicts": 15759,
+      "dict_growth": 1605
+    },
+    {
+      "cycle": 50,
+      "total_objects": 103292,
+      "object_growth": 11356,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        68
+      ],
+      "timeline_size": 367,
+      "total_dicts": 15759,
+      "dict_growth": 1605
+    },
+    {
+      "cycle": 75,
+      "total_objects": 103472,
+      "object_growth": 11536,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        92
+      ],
+      "timeline_size": 500,
+      "total_dicts": 15760,
+      "dict_growth": 1606
+    },
+    {
+      "cycle": 100,
+      "total_objects": 103519,
+      "object_growth": 11583,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        118
+      ],
+      "timeline_size": 500,
+      "total_dicts": 15761,
+      "dict_growth": 1607
+    }
+  ],
+  "final_analysis": {
+    "validator_instances": 1,
+    "validation_log_sizes": [
+      118
+    ],
+    "timeline_size": 500
+  }
+}

@@ -1,0 +1,428 @@
+{
+  "phase": 10,
+  "phase_name": "Code Health Inspection",
+  "timestamp": "2026-08-06T18:52:55Z",
+  "status": "PASS",
+  "scanned_files": 223,
+  "scanned_lines": 35295,
+  "total_findings": 59,
+  "runtime_impacting_count": 0,
+  "success_criteria": {
+    "zero_runtime_impacting_code_debt": true
+  },
+  "findings": [
+    {
+      "file": "app\\services\\confluence\\confluence_service.py",
+      "line_number": 104,
+      "category": "TODO",
+      "code_snippet": "news_events=None,  # TODO: Implement news integration",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\services\\confluence\\confluence_service.py",
+      "line_number": 105,
+      "category": "TODO",
+      "code_snippet": "economic_calendar=None  # TODO: Implement calendar integration",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\services\\risk\\risk_repository.py",
+      "line_number": 89,
+      "category": "print_statement",
+      "code_snippet": "print(f\"Error saving risk assessment: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\services\\risk\\risk_repository.py",
+      "line_number": 108,
+      "category": "print_statement",
+      "code_snippet": "print(f\"Error getting risk assessment: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\services\\risk\\risk_repository.py",
+      "line_number": 150,
+      "category": "print_statement",
+      "code_snippet": "print(f\"Error listing risk assessments: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\services\\risk\\risk_repository.py",
+      "line_number": 201,
+      "category": "print_statement",
+      "code_snippet": "print(f\"Error getting statistics: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\services\\signals\\signal_repository.py",
+      "line_number": 91,
+      "category": "print_statement",
+      "code_snippet": "print(f\"Error saving signal: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\services\\signals\\signal_repository.py",
+      "line_number": 109,
+      "category": "print_statement",
+      "code_snippet": "print(f\"Error getting signal: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\services\\signals\\signal_repository.py",
+      "line_number": 146,
+      "category": "print_statement",
+      "code_snippet": "print(f\"Error listing signals: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\services\\signals\\signal_repository.py",
+      "line_number": 196,
+      "category": "print_statement",
+      "code_snippet": "print(f\"Error getting statistics: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\analytics\\adaptive_strategy_optimizer.py",
+      "line_number": 399,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\analytics\\performance_analytics_engine.py",
+      "line_number": 363,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\analytics\\strategy_intelligence_engine.py",
+      "line_number": 330,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\config\\database_init.py",
+      "line_number": 12,
+      "category": "print_statement",
+      "code_snippet": "print(\"Creating database tables...\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\config\\database_init.py",
+      "line_number": 14,
+      "category": "print_statement",
+      "code_snippet": "print(\"Database tables created successfully.\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\calibration_engine.py",
+      "line_number": 296,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\decision_engine.py",
+      "line_number": 437,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\execution_readiness_engine.py",
+      "line_number": 445,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\learning_insight_engine.py",
+      "line_number": 482,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\market_regime_engine.py",
+      "line_number": 184,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\outcome_analysis_engine.py",
+      "line_number": 201,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\risk_engine.py",
+      "line_number": 245,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\signal_generation_engine.py",
+      "line_number": 308,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\validation_engine.py",
+      "line_number": 207,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\orchestrator\\pipeline_orchestrator.py",
+      "line_number": 369,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\orchestrator\\pipeline_orchestrator.py",
+      "line_number": 387,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\orchestrator\\pipeline_orchestrator.py",
+      "line_number": 402,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 345,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {_json.dumps(payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 532,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] WARNING: API key or secret not configured. Set ALPACA_API_KEY and ALP",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 610,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] HTTP {response.status_code} error: {response.text[:200]}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 623,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] JSON parsing error: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 644,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Missing rate data in response: {data}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 657,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Missing bid/ask in rate data: {rate_data}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 673,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Error parsing forex API response: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 687,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Missing quote data in response: {data}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 699,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Missing bid/ask in quote data: {quote_data}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 716,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Error parsing stock API response: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 759,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Request error: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\alpaca_provider.py",
+      "line_number": 768,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Unexpected error: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\finnhub_provider.py",
+      "line_number": 358,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {_json.dumps(payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\finnhub_provider.py",
+      "line_number": 552,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] WARNING: API key not configured. Set FINNHUB_API_KEY environment vari",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\finnhub_provider.py",
+      "line_number": 627,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] HTTP {response.status_code} error: {response.text[:200]}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\finnhub_provider.py",
+      "line_number": 641,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] JSON parsing error: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\finnhub_provider.py",
+      "line_number": 656,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Missing USD rate in response: {data}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\finnhub_provider.py",
+      "line_number": 716,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Error parsing API response: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\finnhub_provider.py",
+      "line_number": 733,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Request error: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\finnhub_provider.py",
+      "line_number": 742,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Unexpected error: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\provider_manager.py",
+      "line_number": 434,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\provider_recovery_manager.py",
+      "line_number": 210,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[RecoveryManager] Error in scheduler: {e}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\provider_registry.py",
+      "line_number": 127,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\quote_validator.py",
+      "line_number": 74,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {json.dumps(event_payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\twelve_data_provider.py",
+      "line_number": 235,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[EVENT BUS] {_json.dumps(payload)}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\twelve_data_provider.py",
+      "line_number": 333,
+      "category": "print_statement",
+      "code_snippet": "print(",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\twelve_data_provider.py",
+      "line_number": 350,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Missing API key for live fetch.\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\twelve_data_provider.py",
+      "line_number": 365,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] HTTP {response.status_code}: {response.text[:200]}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\twelve_data_provider.py",
+      "line_number": 377,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] API Error: {msg}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\twelve_data_provider.py",
+      "line_number": 437,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Timeout fetching {canonical}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\providers\\twelve_data_provider.py",
+      "line_number": 444,
+      "category": "print_statement",
+      "code_snippet": "print(f\"[{self.PROVIDER_NAME}] Exception during fetch: {exc}\")",
+      "runtime_impacting": false
+    },
+    {
+      "file": "app\\core\\engines\\decision\\evaluators\\spread_evaluator.py",
+      "line_number": 30,
+      "category": "hardcoded_placeholder",
+      "code_snippet": "max_acceptable_spread = 2.0  # Just a placeholder arbitrary threshold",
+      "runtime_impacting": false
+    }
+  ]
+}

@@ -5,6 +5,16 @@ __pycache__/
 venv/
 backend/venv/
 .env
+backend/.env
+
+# Sensitive files and secrets
+*.key
+*.pem
+*.crt
+secrets/
+backend/secrets/
+backend/.env.local
+backend/.env.production
 
 # Flutter
 .dart_tool/

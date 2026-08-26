@@ -23,7 +23,7 @@ from app.core.providers.symbol_mapper import symbol_mapper
 TWELVE_DATA_PROVIDER = "TwelveData"
 ALPHA_VANTAGE_PROVIDER = "AlphaVantage"
 
-_ALPHA_INTERVAL = {"1h": "60min", "4h": "60min", "30min": "30min", "15min": "15min"}
+_ALPHA_INTERVAL = {"1h": "60min", "30min": "30min", "15min": "15min"}
 _ALPHA_FX_PAIRS = {
     "EURUSD": ("EUR", "USD"),
     "GBPUSD": ("GBP", "USD"),
@@ -135,8 +135,10 @@ class MarketHistoryService:
             "outputsize": "compact" if limit <= 100 else "full",
         }
         if interval is None:
-            params["function"] = "FX_DAILY"
-            series_key = "Time Series FX (Daily)"
+            # Unsupported timeframe for Alpha Vantage intraday (e.g., 4h)
+            # Alpha Vantage FX_INTRADAY does not support 4-hour intervals
+            self.last_error = f"AlphaVantage: {timeframe} not supported for intraday, skipping"
+            return []
         else:
             params["function"] = "FX_INTRADAY"
             params["interval"] = interval

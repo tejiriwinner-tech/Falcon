@@ -9,6 +9,7 @@ class DashboardController extends ChangeNotifier {
   DashboardResponse? _data;
   String? _error;
   bool _isLoading = true;
+  bool _isOffline = false;
   Timer? _timer;
 
   DashboardController({required ApiService apiService}) : _apiService = apiService;
@@ -16,11 +17,13 @@ class DashboardController extends ChangeNotifier {
   DashboardResponse? get data => _data;
   String? get error => _error;
   bool get isLoading => _isLoading;
+  bool get isOffline => _isOffline;
 
   void startPolling() {
     _fetchData();
     _timer?.cancel();
-    _timer = Timer.periodic(const Duration(seconds: 10), (_) => _fetchData());
+    // Increased polling interval to reduce API calls from 30s to 60s
+    _timer = Timer.periodic(const Duration(seconds: 60), (_) => _fetchData());
   }
 
   void stopPolling() {
@@ -28,18 +31,48 @@ class DashboardController extends ChangeNotifier {
     _timer = null;
   }
 
+  Future<void> refresh() async {
+    _isLoading = true;
+    notifyListeners();
+    await _fetchData();
+  }
+
   Future<void> _fetchData() async {
     try {
+      debugPrint("Fetching dashboard data...");
+      _isOffline = false;
       final newData = await _apiService.getDashboard();
       _data = newData;
       _error = null;
+      debugPrint("Dashboard data fetched successfully");
     } catch (e, stack) {
       debugPrint("================================");
-      debugPrint("DASHBOARD PARSE FAILURE");
+      debugPrint("DASHBOARD FETCH FAILURE");
       debugPrint(e.toString());
       debugPrint(stack.toString());
       debugPrint("================================");
-      _error = e.toString();
+      
+      // Check if we're using cached data (offline mode)
+      if (e.toString().contains("cache fallback") || e.toString().contains("cached data")) {
+        _isOffline = true;
+        _error = "Showing cached data - Network unavailable";
+        debugPrint("Using cached data - offline mode");
+      } else {
+        _isOffline = false;
+        // Provide user-friendly error messages
+        String errorMessage = "Failed to load dashboard";
+        if (e.toString().contains("Network connection failed")) {
+          errorMessage = "Network connection failed. Please check your internet connection.";
+        } else if (e.toString().contains("timed out")) {
+          errorMessage = "Request timed out. Server may be slow or unreachable.";
+        } else if (e.toString().contains("Server error")) {
+          errorMessage = "Server error occurred. Please try again later.";
+        } else {
+          errorMessage = "An unexpected error occurred. Please try again.";
+        }
+        
+        _error = errorMessage;
+      }
       // Keep old data on screen if there is an error during refresh
     } finally {
       if (_isLoading) {

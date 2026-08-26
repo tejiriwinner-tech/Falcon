@@ -1,0 +1,21 @@
+{
+  "success": true,
+  "data": {
+    "symbol": "XAUUSD",
+    "timeframe": "H1",
+    "decision": "BUY",
+    "confidence": 87.5,
+    "signalScore": 85.2,
+    "riskScore": 28.5,
+    "confluenceScore": 82.3,
+    "marketState": "BULLISH",
+    "trend": "BULLISH (STRONG)",
+    "entryQuality": "EXCELLENT",
+    "reasoning": "Strong bullish setup with 85% signal quality",
+    "entry": 2045.50,
+    "stop": 2038.75,
+    "target": 2058.00,
+    "riskReward": 2.85,
+    "timestamp": "2026-08-03T14:32:15.123456Z"
+  }
+}

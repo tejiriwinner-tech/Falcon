@@ -1,0 +1,15 @@
+  tests/integration/test_risk_api.py                      rc=0 {'passed': 8, 'failed': 0, 'errors': 0, 'skipped': 0}  (94.62s)
+  tests/integration/test_confluence_api.py                rc=0 {'passed': 8, 'failed': 0, 'errors': 0, 'skipped': 0}  (69.54s)
+  tests/integration/test_structure_api.py                 rc=0 {'passed': 7, 'failed': 0, 'errors': 0, 'skipped': 0}  (98.03s)
+  tests/integration/test_trend_api.py                     rc=0 {'passed': 7, 'failed': 0, 'errors': 0, 'skipped': 0}  (73.68s)
+  tests/integration/test_signal_api.py                    rc=0 {'passed': 7, 'failed': 0, 'errors': 0, 'skipped': 0}  (49.47s)
+  tests/integration/test_analysis_api.py                  rc=0 {'passed': 6, 'failed': 0, 'errors': 0, 'skipped': 0}  (68.85s)
+  tests/unit/test_security_hardening.py                   rc=0 {'passed': 12, 'failed': 0, 'errors': 0, 'skipped': 0}  (7.95s)
+  tests/services/scheduler/test_scheduler_statistics.py   rc=0 {'passed': 20, 'failed': 0, 'errors': 0, 'skipped': 0}  (6.62s)
+{
+  "passed": 75,
+  "failed": 0,
+  "errors": 0,
+  "skipped": 0
+}
+verdict: PASS -> C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\reports\phase79_regression.json

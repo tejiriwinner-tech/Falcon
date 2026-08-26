@@ -1,0 +1,118 @@
+{
+  "investigation": "Phase 7.9.1 Part 3 - Object Retention Investigation (Post-Fix)",
+  "timestamp": "2026-08-08T18:24:04Z",
+  "baseline": {
+    "total_objects": 91936,
+    "validator_instances": 1,
+    "validation_log_sizes": [
+      0
+    ],
+    "validation_log_maxlens": [
+      1000
+    ],
+    "timeline_size": 3,
+    "total_dicts": 14154
+  },
+  "snapshots": [
+    {
+      "cycle": 1,
+      "total_objects": 102819,
+      "object_growth": 10883,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        6
+      ],
+      "validation_log_maxlens": [
+        1000
+      ],
+      "timeline_size": 11,
+      "total_dicts": 15743,
+      "dict_growth": 1589
+    },
+    {
+      "cycle": 10,
+      "total_objects": 102901,
+      "object_growth": 10965,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        23
+      ],
+      "validation_log_maxlens": [
+        1000
+      ],
+      "timeline_size": 76,
+      "total_dicts": 15752,
+      "dict_growth": 1598
+    },
+    {
+      "cycle": 25,
+      "total_objects": 103034,
+      "object_growth": 11098,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        36
+      ],
+      "validation_log_maxlens": [
+        1000
+      ],
+      "timeline_size": 179,
+      "total_dicts": 15753,
+      "dict_growth": 1599
+    },
+    {
+      "cycle": 50,
+      "total_objects": 103274,
+      "object_growth": 11338,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        62
+      ],
+      "validation_log_maxlens": [
+        1000
+      ],
+      "timeline_size": 355,
+      "total_dicts": 15760,
+      "dict_growth": 1606
+    },
+    {
+      "cycle": 75,
+      "total_objects": 103468,
+      "object_growth": 11532,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        95
+      ],
+      "validation_log_maxlens": [
+        1000
+      ],
+      "timeline_size": 500,
+      "total_dicts": 15762,
+      "dict_growth": 1608
+    },
+    {
+      "cycle": 100,
+      "total_objects": 103515,
+      "object_growth": 11579,
+      "validator_instances": 1,
+      "validation_log_sizes": [
+        132
+      ],
+      "validation_log_maxlens": [
+        1000
+      ],
+      "timeline_size": 500,
+      "total_dicts": 15762,
+      "dict_growth": 1608
+    }
+  ],
+  "final_analysis": {
+    "validator_instances": 1,
+    "validation_log_sizes": [
+      132
+    ],
+    "validation_log_maxlens": [
+      1000
+    ],
+    "timeline_size": 500
+  }
+}

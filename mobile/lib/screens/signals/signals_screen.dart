@@ -15,17 +15,57 @@ class SignalsScreen extends StatefulWidget {
 class _SignalsScreenState extends State<SignalsScreen> {
   late Future<SignalListResponse> _signalsFuture;
   final ApiService _apiService = ApiService();
+  final ScrollController _scrollController = ScrollController();
+  int _currentPage = 1;
+  final int _pageSize = 20;
+  bool _isLoadingMore = false;
+  List<Signal> _allSignals = [];
 
   @override
   void initState() {
     super.initState();
     _fetchSignals();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200 && !_isLoadingMore) {
+      _loadMoreSignals();
+    }
   }
 
   void _fetchSignals() {
     setState(() {
+      _currentPage = 1;
+      _allSignals = [];
       _signalsFuture = _apiService.getSignals();
     });
+  }
+
+  Future<void> _loadMoreSignals() async {
+    if (_isLoadingMore) return;
+    setState(() {
+      _isLoadingMore = true;
+    });
+
+    try {
+      final newSignals = await _apiService.getSignals();
+      setState(() {
+        _allSignals.addAll(newSignals.signals);
+        _currentPage++;
+        _isLoadingMore = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoadingMore = false;
+      });
+    }
   }
 
   @override
@@ -102,6 +142,8 @@ class _SignalsScreenState extends State<SignalsScreen> {
             );
           } else if (snapshot.hasData) {
             final allSignals = snapshot.data!.signals;
+            _allSignals = allSignals; // Store for pagination
+            
             if (allSignals.isEmpty) {
               return const Center(
                 child: Column(
@@ -125,18 +167,34 @@ class _SignalsScreenState extends State<SignalsScreen> {
             
             final activeSignals = allSignals.where((s) => s.status == 'ACTIVE').toList();
             
-            return ListView(
-              padding: const EdgeInsets.all(16),
+            return Column(
               children: [
                 SectionTitle(
                   title: '${activeSignals.length} Active Signal${activeSignals.length != 1 ? 's' : ''}',
                   subtitle: 'Updated live during market hours',
                 ),
                 const SizedBox(height: 16),
-                ...allSignals.map((signal) => Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: SignalCard(signal: signal),
-                    )),
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _allSignals.length + (_isLoadingMore ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      if (index == _allSignals.length) {
+                        return const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(16),
+                            child: CircularProgressIndicator(),
+                          ),
+                        );
+                      }
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: SignalCard(signal: _allSignals[index]),
+                      );
+                    },
+                  ),
+                ),
                 const SizedBox(height: 8),
                 _buildDisclaimer(),
               ],

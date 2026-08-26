@@ -1,0 +1,180 @@
+============================= test session starts =============================
+platform win32 -- Python 3.13.7, pytest-9.1.1, pluggy-1.6.0 -- C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Scripts\python.exe
+rootdir: C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend
+plugins: anyio-4.14.1
+collecting ... collected 11 items
+
+tests/integration/test_risk_api.py::TestRiskAPI::test_risk_evaluate_custom_account_balance PASSED [  9%]
+tests/integration/test_risk_api.py::TestRiskAPI::test_risk_evaluate_different_timeframes PASSED [ 18%]
+tests/integration/test_risk_api.py::TestRiskAPI::test_risk_evaluate_invalid_timeframe PASSED [ 27%]
+tests/integration/test_risk_api.py::TestRiskAPI::test_risk_evaluate_missing_symbol PASSED [ 36%]
+tests/integration/test_risk_api.py::TestRiskAPI::test_risk_evaluate_missing_timeframe PASSED [ 45%]
+tests/integration/test_risk_api.py::TestRiskAPI::test_risk_evaluate_success PASSED [ 54%]
+tests/integration/test_risk_api.py::TestRiskAPI::test_risk_statistics PASSED [ 63%]
+tests/integration/test_risk_api.py::TestRiskAPI::test_risk_statistics_after_evaluation PASSED [ 72%]
+tests/integration/test_confluence_api.py::TestConfluenceAPI::test_confluence_cache_behavior PASSED [ 81%]
+tests/integration/test_structure_api.py::TestStructureAPI::test_structure_cache_behavior PASSED [ 90%]
+tests/integration/test_trend_api.py::TestTrendAPI::test_trend_cache_behavior PASSED [100%]
+
+============================== warnings summary ===============================
+.venv\Lib\site-packages\fastapi\testclient.py:1
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+app\schemas\indicator_models.py:10
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\indicator_models.py:10: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class IndicatorResult(BaseModel):
+
+app\schemas\indicator_models.py:42
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\indicator_models.py:42: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class IndicatorResponse(BaseModel):
+
+app\schemas\indicator_models.py:125
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\indicator_models.py:125: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class IndicatorStatistics(BaseModel):
+
+app\schemas\trend_models.py:28
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\trend_models.py:28: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TrendResult(BaseModel):
+
+app\schemas\trend_models.py:90
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\trend_models.py:90: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TrendStatistics(BaseModel):
+
+app\schemas\market_structure_models.py:38
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\market_structure_models.py:38: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SwingPoint(BaseModel):
+
+app\schemas\market_structure_models.py:69
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\market_structure_models.py:69: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class StructureZone(BaseModel):
+
+app\schemas\market_structure_models.py:109
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\market_structure_models.py:109: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MarketStructureResult(BaseModel):
+
+app\schemas\market_structure_models.py:195
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\market_structure_models.py:195: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class StructureStatistics(BaseModel):
+
+app\schemas\confluence_models.py:19
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\confluence_models.py:19: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TimeframeAnalysis(BaseModel):
+
+app\schemas\confluence_models.py:95
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\confluence_models.py:95: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ConfluenceFactor(BaseModel):
+
+app\schemas\confluence_models.py:126
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\confluence_models.py:126: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TradeLevels(BaseModel):
+
+app\schemas\confluence_models.py:160
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\confluence_models.py:160: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SignalDecision(BaseModel):
+
+app\schemas\confluence_models.py:233
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\confluence_models.py:233: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MultiTimeframeConfluenceResult(BaseModel):
+
+app\schemas\confluence_models.py:290
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\confluence_models.py:290: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MultiTimeframeConfluenceStatistics(BaseModel):
+
+app\schemas\confluence_models.py:327
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\confluence_models.py:327: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ConfluenceStatistics(BaseModel):
+
+app\schemas\signal_score_models.py:38
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\signal_score_models.py:38: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SignalComponentScore(BaseModel):
+
+app\schemas\signal_score_models.py:70
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\signal_score_models.py:70: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SignalScoreResult(BaseModel):
+
+app\schemas\signal_score_models.py:125
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\signal_score_models.py:125: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SignalScoreStatistics(BaseModel):
+
+app\schemas\decision_models.py:21
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\decision_models.py:21: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AIDecisionResult(BaseModel):
+
+app\schemas\decision_models.py:86
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\decision_models.py:86: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AIDecisionStatistics(BaseModel):
+
+app\schemas\signal_models.py:27
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\signal_models.py:27: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TradeManagement(BaseModel):
+
+app\schemas\signal_models.py:56
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\signal_models.py:56: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TradeSetup(BaseModel):
+
+app\schemas\signal_models.py:145
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\signal_models.py:145: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SignalStatistics(BaseModel):
+
+app\schemas\signal_settings.py:8
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\signal_settings.py:8: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SignalSettings(BaseModel):
+
+app\schemas\risk_models.py:18
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\risk_models.py:18: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RiskAssessment(BaseModel):
+
+app\schemas\risk_models.py:82
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\risk_models.py:82: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RiskStatistics(BaseModel):
+
+app\core\config\database.py:28
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\core\config\database.py:28: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+app\schemas\ai_snapshot.py:75
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\ai_snapshot.py:75: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AISnapshot(BaseModel):
+
+app\schemas\evaluator_result.py:28
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\evaluator_result.py:28: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DecisionEvidence(BaseModel):
+
+app\schemas\evaluator_result.py:66
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\app\schemas\evaluator_result.py:66: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class EvaluatorResult(BaseModel):
+
+main.py:53
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\main.py:53: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("startup")
+
+.venv\Lib\site-packages\fastapi\applications.py:4675
+.venv\Lib\site-packages\fastapi\applications.py:4675
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\.venv\Lib\site-packages\fastapi\applications.py:4675: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    return self.router.on_event(event_type)  # ty: ignore[deprecated]
+
+main.py:72
+  C:\Users\ACER\Documents\SCHOOL WORKS\Falcon\backend\main.py:72: DeprecationWarning: 
+          on_event is deprecated, use lifespan event handlers instead.
+  
+          Read more about it in the
+          [FastAPI docs for Lifespan Events](https://fastapi.tiangolo.com/advanced/events/).
+          
+    @app.on_event("shutdown")
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+================= 11 passed, 36 warnings in 120.72s (0:02:00) =================
+
+
+RETURN CODE = 0

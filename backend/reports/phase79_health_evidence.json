@@ -1,0 +1,47 @@
+{
+  "phase": "7.9 Part 4",
+  "timestamp": "2026-08-08T11:21:12Z",
+  "production_startup_gate": {
+    "env": "production",
+    "debug_mode_default": false,
+    "api_key_loaded": true,
+    "startup_event_refuses_no_key": true,
+    "evidence": "main.py:56-59 raises RuntimeError('FALCON_API_KEY must be configured when ENVIRONMENT=production')"
+  },
+  "health_checks": [
+    {
+      "path": "/health",
+      "status": 404,
+      "latency_ms": 240.22,
+      "overall_healthy": null,
+      "engines": 0
+    },
+    {
+      "path": "/api/v1/health",
+      "status": 200,
+      "latency_ms": 358.92,
+      "overall_healthy": true,
+      "engines": 10
+    },
+    {
+      "path": "/api/v1/providers/health",
+      "status": 401,
+      "latency_ms": 15.83,
+      "overall_healthy": null,
+      "engines": 0
+    },
+    {
+      "path": "/api/v1/dashboard",
+      "auth": "none",
+      "status": 401,
+      "latency_ms": 18.99
+    },
+    {
+      "path": "/api/v1/dashboard",
+      "auth": "valid(dev-mask)",
+      "status": 200,
+      "latency_ms": 5122.61
+    }
+  ],
+  "verdict": "FAIL"
+}

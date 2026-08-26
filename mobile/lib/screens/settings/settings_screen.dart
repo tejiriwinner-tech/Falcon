@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/typography/section_title.dart';
+import '../../services/theme/theme_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -13,8 +14,23 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _pushNotifications = true;
   bool _signalAlerts = true;
   bool _newsAlerts = false;
-  bool _darkMode = true;
   String _selectedRisk = 'Medium';
+
+  @override
+  void initState() {
+    super.initState();
+    ThemeService().addListener(_onThemeChanged);
+  }
+
+  @override
+  void dispose() {
+    ThemeService().removeListener(_onThemeChanged);
+    super.dispose();
+  }
+
+  void _onThemeChanged() {
+    setState(() {});
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,8 +91,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: Icons.dark_mode_outlined,
               title: 'Dark Mode',
               subtitle: 'Always-on dark theme',
-              value: _darkMode,
-              onChanged: (v) => setState(() => _darkMode = v),
+              value: ThemeService().isDarkMode,
+              onChanged: (v) => ThemeService().toggleTheme(),
             ),
           ]),
           const SizedBox(height: 24),

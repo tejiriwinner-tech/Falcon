@@ -6,6 +6,7 @@ import '../../widgets/chips/status_chip.dart';
 import '../../widgets/loading/placeholder_card.dart';
 import '../../core/constants/app_colors.dart';
 import '../../services/api/api_service.dart';
+import '../../services/theme/theme_service.dart';
 import '../../models/health_status.dart';
 import '../../models/market_state.dart';
 import '../../models/signal.dart';
@@ -26,20 +27,25 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingObserver {
   late final DashboardController _controller;
 
-
   @override
   void initState() {
     super.initState();
     _controller = DashboardController(apiService: ApiService());
     _controller.startPolling();
     WidgetsBinding.instance.addObserver(this);
+    ThemeService().addListener(_onThemeChanged);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
+    ThemeService().removeListener(_onThemeChanged);
     super.dispose();
+  }
+
+  void _onThemeChanged() {
+    setState(() {});
   }
 
   @override
@@ -52,7 +58,24 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Future<void> _handleRefresh() async {
-    _controller.startPolling();
+    await _controller.refresh();
+  }
+
+  void _showNotifications() {
+    // Show notification panel - for now show a simple dialog
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Notifications'),
+        content: const Text('No new notifications at this time.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -62,8 +85,19 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         title: const Text('Falcon Dashboard'),
         actions: [
           IconButton(
+            icon: Icon(
+              ThemeService().isDarkMode
+                ? Icons.light_mode_outlined
+                : Icons.dark_mode_outlined,
+            ),
+            onPressed: () {
+              ThemeService().toggleTheme();
+            },
+            tooltip: ThemeService().isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode',
+          ),
+          IconButton(
             icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {},
+            onPressed: _showNotifications,
           ),
         ],
       ),
@@ -72,9 +106,61 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         builder: (context, _) {
           final dash = _controller.data;
           final isLoading = _controller.isLoading;
+          final controllerError = _controller.error;
+          final isOffline = _controller.isOffline;
 
           if (dash == null && isLoading) {
             return const Center(child: CircularProgressIndicator());
+          }
+
+          if (controllerError != null && dash == null) {
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: AppColors.error,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Error Loading Dashboard',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      controllerError,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: _handleRefresh,
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 24,
+                          vertical: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
           }
 
           return RefreshIndicator(
@@ -85,6 +171,67 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  // Offline indicator banner
+                  if (isOffline)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.cloud_off_rounded, color: AppColors.warning, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Offline Mode - Showing cached data',
+                              style: TextStyle(
+                                color: AppColors.warning,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _handleRefresh,
+                            child: const Text('Retry', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // Error banner (shown when there's an error but we have cached data)
+                  if (controllerError != null && !isOffline)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppColors.error.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 20),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              controllerError,
+                              style: TextStyle(
+                                color: AppColors.error,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          TextButton(
+                            onPressed: _handleRefresh,
+                            child: const Text('Retry', style: TextStyle(fontSize: 12)),
+                          ),
+                        ],
+                      ),
+                    ),
                   // ── Captain's Briefing (Decision Engine) ─────────────
                   if (dash?.decision == null)
                     const PlaceholderCard(height: 220)
@@ -128,7 +275,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
                   // ── Dashboard Summary ─────────────────────────────────
                   if (dash == null)
-                    const PlaceholderCard(height: 180)
+                    const PlaceholderCard(height: 180, isLoading: true)
                   else () {
                     final s = dash.summary;
                     final statusColor = s.providerStatus == 'ONLINE' ? AppColors.success : s.providerStatus == 'DEGRADED' ? AppColors.warning : AppColors.error;
@@ -177,8 +324,15 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                     subtitle: 'Live quotes via Provider Framework',
                   ),
                   const SizedBox(height: 16),
-                  if (dash == null || dash.marketQuotes.isEmpty)
-                    const PlaceholderCard(height: 180)
+                  if (dash == null)
+                    const PlaceholderCard(height: 180, isLoading: true)
+                  else if (dash.marketQuotes.isEmpty)
+                    const PlaceholderCard(
+                      height: 180, 
+                      isLoading: false,
+                      message: 'No market quotes available',
+                      icon: Icons.show_chart,
+                    )
                   else
                     LayoutBuilder(
                       builder: (ctx, constraints) {
@@ -799,7 +953,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
   Widget _buildBackendStatusCard(HealthStatus? health) {
     if (health == null) {
-      return const PlaceholderCard();
+      return const PlaceholderCard(height: 100, isLoading: true);
     }
     return _buildInfoCard(
       icon: Icons.check_circle_outline,
@@ -813,15 +967,15 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
   Widget _buildLatestSignalCard(SignalListResponse? signals) {
     if (signals == null) {
-      return const PlaceholderCard(height: 140);
+      return const PlaceholderCard(height: 140, isLoading: true);
     }
     final activeSignals = signals.signals.where((s) => s.status == 'ACTIVE').toList();
     if (activeSignals.isEmpty) {
-      return const AppCard(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text('No active signals available.'),
-        ),
+      return const PlaceholderCard(
+        height: 140,
+        isLoading: false,
+        message: 'No active signals available',
+        icon: Icons.signal_cellular_alt,
       );
     }
     final signal = activeSignals.first;
@@ -921,15 +1075,15 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
 
   Widget _buildUpcomingNewsCard(NewsListResponse? newsData) {
     if (newsData == null) {
-      return const PlaceholderCard(height: 120);
+      return const PlaceholderCard(height: 120, isLoading: true);
     }
     final events = newsData.events;
     if (events.isEmpty) {
-      return const AppCard(
-        child: Padding(
-          padding: EdgeInsets.all(16.0),
-          child: Text('No upcoming news available.'),
-        ),
+      return const PlaceholderCard(
+        height: 120,
+        isLoading: false,
+        message: 'No upcoming news available',
+        icon: Icons.article_outlined,
       );
     }
     final nextEvent = events.first;

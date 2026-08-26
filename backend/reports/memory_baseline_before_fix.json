@@ -1,0 +1,39 @@
+{
+  "phase": "7.9.1 - PART 1 BASELINE REPRODUCTION",
+  "timestamp": "2026-08-08T13:10:29Z",
+  "status": "FAIL - MEMORY LEAK CONFIRMED",
+  "evidence": {
+    "memory_start_mb": 68.79,
+    "memory_end_mb": 88.51,
+    "memory_growth_percent": 28.67,
+    "memory_peak_mb": 89.6,
+    "gc_objects_start": 93845,
+    "gc_objects_end": 105373,
+    "gc_growth_percent": 12.28,
+    "threads_start": 1,
+    "threads_end": 1,
+    "thread_growth": 0,
+    "cycles_completed": 100,
+    "errors_encountered": 0,
+    "duration_seconds": 561.75,
+    "tracemalloc_peak_mb": 5.15
+  },
+  "threshold_comparison": {
+    "memory_growth_threshold_percent": 25.0,
+    "actual_memory_growth_percent": 28.67,
+    "pass": false
+  },
+  "memory_snapshots": [
+    {"cycle": 10, "memory_mb": 87.71, "delta_mb": 18.92},
+    {"cycle": 20, "memory_mb": 87.9, "delta_mb": 19.11},
+    {"cycle": 30, "memory_mb": 87.95, "delta_mb": 19.16},
+    {"cycle": 40, "memory_mb": 88.27, "delta_mb": 19.48},
+    {"cycle": 50, "memory_mb": 89.21, "delta_mb": 20.42},
+    {"cycle": 60, "memory_mb": 88.74, "delta_mb": 19.95},
+    {"cycle": 70, "memory_mb": 89.57, "delta_mb": 20.78},
+    {"cycle": 80, "memory_mb": 89.6, "delta_mb": 20.81},
+    {"cycle": 90, "memory_mb": 88.46, "delta_mb": 19.67},
+    {"cycle": 100, "memory_mb": 88.47, "delta_mb": 19.68}
+  ],
+  "conclusion": "Memory leak reproducible. Growth pattern shows initial spike then plateau, but still exceeds 25% threshold. GC object growth correlates with memory growth. Proceeding to tracemalloc investigation."
+}

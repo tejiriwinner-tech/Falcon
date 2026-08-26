@@ -214,9 +214,9 @@ class ProviderRecoveryManager:
         """Attempt recovery for each OPEN provider with expired cooldown."""
         snapshots = provider_registry.get_all_snapshots()
         for snap in snapshots:
-            provider = snap.provider
             provider_id = snap.metadata.providerId
             provider_name = snap.metadata.providerName
+            provider = provider_registry.get(provider_id)
 
             # Check if provider's circuit is OPEN
             if not hasattr(provider, 'circuit_breaker_state'):

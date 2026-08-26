@@ -35,15 +35,44 @@ class SignalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: _directionColor.withValues(alpha: 0.25),
+    return GestureDetector(
+      onTap: () {
+        // Navigate to signal detail (would need to implement signal detail screen)
+        // For now, show a dialog
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('${signal.symbol} ${signal.action} Signal'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Entry: ${signal.entry}'),
+                Text('Take Profit: ${signal.takeProfit}'),
+                Text('Stop Loss: ${signal.stopLoss}'),
+                Text('Confidence: ${signal.confidence}%'),
+                const SizedBox(height: 8),
+                Text(signal.analysis),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: _directionColor.withValues(alpha: 0.25),
+          ),
         ),
-      ),
-      child: Column(
+        child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Header
@@ -198,6 +227,7 @@ class SignalCard extends StatelessWidget {
               ),
             ),
         ],
+      ),
       ),
     );
   }

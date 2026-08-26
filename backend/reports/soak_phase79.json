@@ -1,0 +1,81 @@
+{
+  "phase": 3,
+  "phase_name": "Long Runtime Stability & Resource Leak Test",
+  "timestamp": "2026-08-08T19:34:12Z",
+  "status": "FAIL",
+  "simulation_cycles": 100,
+  "missions_completed": 100,
+  "errors_encountered": 0,
+  "duration_seconds": 639.88,
+  "telemetry": {
+    "memory_start_mb": 68.69,
+    "memory_peak_mb": 89.89,
+    "memory_end_mb": 89.91,
+    "memory_growth_percent": 30.89,
+    "threads_start": 1,
+    "threads_end": 1,
+    "thread_growth": 0,
+    "gc_objects_start": 93845,
+    "gc_objects_end": 105399,
+    "gc_growth_percent": 12.31,
+    "tracemalloc_peak_mb": 5.17
+  },
+  "success_criteria": {
+    "ram_growth_lt_25_percent": false,
+    "zero_thread_leaks": true,
+    "zero_unhandled_exceptions": true,
+    "gc_object_count_stable": true
+  },
+  "memory_snapshots": [
+    {
+      "cycle": 10,
+      "memory_mb": 87.68,
+      "delta_mb": 18.99
+    },
+    {
+      "cycle": 20,
+      "memory_mb": 88.17,
+      "delta_mb": 19.48
+    },
+    {
+      "cycle": 30,
+      "memory_mb": 88.52,
+      "delta_mb": 19.83
+    },
+    {
+      "cycle": 40,
+      "memory_mb": 89.39,
+      "delta_mb": 20.7
+    },
+    {
+      "cycle": 50,
+      "memory_mb": 88.54,
+      "delta_mb": 19.85
+    },
+    {
+      "cycle": 60,
+      "memory_mb": 88.85,
+      "delta_mb": 20.16
+    },
+    {
+      "cycle": 70,
+      "memory_mb": 89.02,
+      "delta_mb": 20.33
+    },
+    {
+      "cycle": 80,
+      "memory_mb": 89.02,
+      "delta_mb": 20.33
+    },
+    {
+      "cycle": 90,
+      "memory_mb": 89.84,
+      "delta_mb": 21.15
+    },
+    {
+      "cycle": 100,
+      "memory_mb": 89.89,
+      "delta_mb": 21.2
+    }
+  ]
+}

@@ -4,7 +4,7 @@ import '../../models/runtime_models.dart';
 import '../../services/api/api_service.dart';
 
 class RuntimeScreen extends StatefulWidget {
-  const RuntimeScreen({Key? key}) : super(key: key);
+  const RuntimeScreen({super.key});
 
   @override
   State<RuntimeScreen> createState() => _RuntimeScreenState();
@@ -163,7 +163,7 @@ class _RuntimeScreenState extends State<RuntimeScreen> {
             .map(
               (p) => _buildProviderCard(p),
             )
-            .toList(),
+            ,
       ],
     );
   }
@@ -197,7 +197,7 @@ class _RuntimeScreenState extends State<RuntimeScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: statusColor.withOpacity(0.2),
+                        color: statusColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -216,7 +216,7 @@ class _RuntimeScreenState extends State<RuntimeScreen> {
                         vertical: 4,
                       ),
                       decoration: BoxDecoration(
-                        color: healthColor.withOpacity(0.2),
+                        color: healthColor.withValues(alpha: 0.2),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -319,7 +319,7 @@ class _RuntimeScreenState extends State<RuntimeScreen> {
         if (_events!.events.isEmpty)
           const Text('No events recorded yet')
         else
-          ..._events!.events.take(20).map((e) => _buildTimelineEntry(e)).toList(),
+          ..._events!.events.take(20).map((e) => _buildTimelineEntry(e)),
       ],
     );
   }
@@ -407,10 +407,12 @@ class _RuntimeScreenState extends State<RuntimeScreen> {
   }
 
   Color _eventTypeColor(String eventType) {
-    if (eventType.contains('Failed') || eventType.contains('Open'))
+    if (eventType.contains('Failed') || eventType.contains('Open')) {
       return Colors.red;
-    if (eventType.contains('Success') || eventType.contains('Closed'))
+    }
+    if (eventType.contains('Success') || eventType.contains('Closed')) {
       return Colors.green;
+    }
     if (eventType.contains('RateLimited')) return Colors.orange;
     if (eventType.contains('Hit')) return Colors.blue;
     return Colors.grey;

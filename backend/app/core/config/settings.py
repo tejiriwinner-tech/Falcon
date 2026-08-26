@@ -28,7 +28,7 @@ class Settings:
     TWELVEDATA_API_KEY: Optional[str] = os.getenv("TWELVEDATA_API_KEY")
 
     # Financial Modeling Prep — economic calendar
-    FMP_BASE_URL: str = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com/api")
+    FMP_BASE_URL: str = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com/stable")
     FMP_API_KEY: Optional[str] = os.getenv("FMP_API_KEY")
 
     # Alpha Vantage — quotes and historical bars
@@ -56,5 +56,26 @@ class Settings:
 
     # Account equity the trade journal analytics are measured against
     STARTING_EQUITY: float = float(os.getenv("STARTING_EQUITY", "10000"))
+
+    # Signal pipeline data source configuration
+    # When true: TrendService and IndicatorService read from price_history via MarketHistoryAdapter
+    # When false: TrendService and IndicatorService read from market_candles via HistoryService (legacy)
+    USE_PRICE_HISTORY_FOR_SIGNALS: bool = os.getenv("USE_PRICE_HISTORY_FOR_SIGNALS", "true").lower() == "true"
+
+    # Market Data Scheduler Configuration
+    # Watchlist of symbols to ingest for price_history
+    MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD")
+    
+    # Interval between market data ingestion cycles (seconds)
+    MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "300"))
+    
+    # Initial delay before first ingestion cycle (seconds)
+    INITIAL_BACKFILL_DELAY_SECONDS: int = int(os.getenv("INITIAL_BACKFILL_DELAY_SECONDS", "30"))
+
+    # Security Configuration (Phase 3)
+    FALCON_API_KEY: Optional[str] = os.getenv("FALCON_API_KEY")
+    CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "*")
+    CORS_ALLOW_CREDENTIALS: bool = os.getenv("CORS_ALLOW_CREDENTIALS", "False").lower() == "true"
+    RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "100"))
 
 settings = Settings()

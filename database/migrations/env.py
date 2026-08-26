@@ -9,6 +9,12 @@ from sqlalchemy import engine_from_config, pool
 BACKEND_DIR = Path(__file__).resolve().parents[2] / "backend"
 sys.path.insert(0, str(BACKEND_DIR))
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv(BACKEND_DIR / ".env")
+except ImportError:
+    pass
+
 from app.core.database.models import Base  # noqa: E402
 from app.core.database.session import normalize_database_url  # noqa: E402
 

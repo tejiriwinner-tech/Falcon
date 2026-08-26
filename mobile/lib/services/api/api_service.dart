@@ -30,6 +30,8 @@ import '../../models/provider_models.dart' hide LegacyMarketQuote;
 import 'package:flutter/foundation.dart';
 import '../../models/market_quote.dart';
 import '../../models/dashboard.dart';
+import '../../models/intelligence.dart';
+import '../cache/cache_service.dart';
 
 
 class ApiService {
@@ -41,14 +43,110 @@ class ApiService {
     }
 
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      return 'http://10.0.2.2:8000/api/v1';
+      // Use your PC's local network IP address for physical devices
+      // For emulator, use 10.0.2.2
+      // For physical device on WiFi, use your PC's WiFi IP
+      return 'http://10.211.23.84:8000/api/v1';
     }
     return 'http://127.0.0.1:8000/api/v1';
   }
-  static const int timeoutSeconds = 30;
+  static const int timeoutSeconds = 300; // Increased to 5 minutes for slow backend
+
+  // Simple in-memory cache to reduce server load
+  static final Map<String, dynamic> _cache = {};
+  static DateTime? _lastCacheTime;
+  static const Duration _cacheDuration = Duration(seconds: 60);
+
+  // Offline mode cache service
+  static final CacheService _cacheService = CacheService();
+  static bool _isOfflineMode = false;
+
+  // Request batching and debouncing
+  static final Map<String, Timer> _pendingRequests = {};
+  static final Map<String, List<Completer>> _batchedRequests = {};
+  static const Duration _debounceDelay = Duration(milliseconds: 300);
+
+  static Future<void> initCacheService() async {
+    await _cacheService.init();
+  }
+
+  static bool get isOfflineMode => _isOfflineMode;
+  static void setOfflineMode(bool value) {
+    _isOfflineMode = value;
+  }
+
+  // Debounced request method to reduce API call frequency
+  static Future<T> _debouncedGet<T>(
+    String endpoint,
+    T Function(Map<String, dynamic>) fromJson,
+  ) async {
+    final completer = Completer<T>();
+    
+    // Cancel existing pending request for same endpoint
+    _pendingRequests[endpoint]?.cancel();
+    
+    // Add to batch
+    if (!_batchedRequests.containsKey(endpoint)) {
+      _batchedRequests[endpoint] = [];
+    }
+    _batchedRequests[endpoint]!.add(completer);
+    
+    // Set debounce timer
+    _pendingRequests[endpoint] = Timer(_debounceDelay, () async {
+      final batchedCompleters = _batchedRequests[endpoint]!;
+      _batchedRequests.remove(endpoint);
+      _pendingRequests.remove(endpoint);
+      
+      // Make the actual request
+      try {
+        final result = await _get<T>(endpoint, fromJson);
+        for (final c in batchedCompleters) {
+          c.complete(result);
+        }
+      } catch (e) {
+        for (final c in batchedCompleters) {
+          c.completeError(e);
+        }
+      }
+    }));
+    
+    return completer.future;
+  }
 
   Future<T> _get<T>(String endpoint, T Function(Map<String, dynamic>) fromJson) async {
     final url = '$baseUrl$endpoint';
+    
+    // Check offline mode cache
+    if (_isOfflineMode) {
+      print("Offline mode: Checking cache for $endpoint");
+      Map<String, dynamic>? cachedData;
+      
+      if (endpoint == '/dashboard') {
+        cachedData = await _cacheService.getCachedDashboard();
+      } else if (endpoint == '/signals') {
+        cachedData = await _cacheService.getCachedSignals();
+      } else if (endpoint == '/news') {
+        cachedData = await _cacheService.getCachedNews();
+      }
+      
+      if (cachedData != null) {
+        print("Serving $endpoint from offline cache");
+        return fromJson(cachedData);
+      }
+      
+      throw Exception('No cached data available for $endpoint in offline mode');
+    }
+    
+    // Check cache for dashboard and other slow endpoints
+    final cacheableEndpoints = ['/dashboard', '/signals', '/trade-journal', '/strategies', '/learning-insights'];
+    if (cacheableEndpoints.contains(endpoint) && _cache.containsKey(endpoint)) {
+      final cacheAge = DateTime.now().difference(_lastCacheTime ?? DateTime.now());
+      if (cacheAge < _cacheDuration) {
+        print("Serving $endpoint from cache (age: ${cacheAge.inSeconds}s)");
+        return fromJson(_cache[endpoint] as Map<String, dynamic>);
+      }
+    }
+    
     print("Calling: $url");
     try {
       final response = await http
@@ -64,15 +162,71 @@ class ApiService {
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
+        
+        // Cache responses for cacheable endpoints using persistent cache
+        if (endpoint == '/dashboard') {
+          await _cacheService.cacheDashboard(data);
+        } else if (endpoint == '/signals') {
+          await _cacheService.cacheSignals(data);
+        } else if (endpoint == '/news') {
+          await _cacheService.cacheNews(data);
+        }
+        
+        // Also use in-memory cache for consistency
+        if (cacheableEndpoints.contains(endpoint)) {
+          _cache[endpoint] = data;
+          _lastCacheTime = DateTime.now();
+        }
+        
         return fromJson(data as Map<String, dynamic>);
       } else {
         throw Exception('Server error: ${response.statusCode} - ${response.reasonPhrase} for $url');
       }
     } on http.ClientException catch (e) {
       print("ClientException ($url): $e");
+      
+      // Fall back to cache on network error
+      if (cacheableEndpoints.contains(endpoint)) {
+        print("Network error, attempting cache fallback for $endpoint");
+        Map<String, dynamic>? cachedData;
+        
+        if (endpoint == '/dashboard') {
+          cachedData = await _cacheService.getCachedDashboard();
+        } else if (endpoint == '/signals') {
+          cachedData = await _cacheService.getCachedSignals();
+        } else if (endpoint == '/news') {
+          cachedData = await _cacheService.getCachedNews();
+        }
+        
+        if (cachedData != null) {
+          print("Serving $endpoint from cache fallback");
+          return fromJson(cachedData);
+        }
+      }
+      
       throw Exception('Network connection failed. Please check your connection to the server.');
     } on TimeoutException catch (e) {
       print("TimeoutException ($url): $e");
+      
+      // Fall back to cache on timeout
+      if (cacheableEndpoints.contains(endpoint)) {
+        print("Timeout, attempting cache fallback for $endpoint");
+        Map<String, dynamic>? cachedData;
+        
+        if (endpoint == '/dashboard') {
+          cachedData = await _cacheService.getCachedDashboard();
+        } else if (endpoint == '/signals') {
+          cachedData = await _cacheService.getCachedSignals();
+        } else if (endpoint == '/news') {
+          cachedData = await _cacheService.getCachedNews();
+        }
+        
+        if (cachedData != null) {
+          print("Serving $endpoint from cache fallback");
+          return fromJson(cachedData);
+        }
+      }
+      
       throw Exception('Request timed out after $timeoutSeconds seconds. Server is unreachable.');
     } on FormatException catch (e) {
       print("FormatException ($url): $e");
@@ -362,6 +516,12 @@ class ApiService {
 
   Future<DashboardResponse> getDashboard() async {
     return _get<DashboardResponse>('/dashboard', DashboardResponse.fromJson);
+  }
+
+
+  Future<IntelligenceResponse> getIntelligence(String symbol, String timeframe) async {
+    final url = '/intelligence?symbol=$symbol&timeframe=$timeframe';
+    return _get<IntelligenceResponse>(url, IntelligenceResponse.fromJson);
   }
 
   /// Phase 4.3 — Runs the full Falcon intelligence pipeline for one symbol.
