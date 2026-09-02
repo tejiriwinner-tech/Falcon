@@ -33,7 +33,7 @@ class Settings:
     
     # Twelve Data Configuration
     TWELVEDATA_BASE_URL: str = os.getenv("TWELVEDATA_BASE_URL", "https://api.twelvedata.com")
-    TWELVEDATA_API_KEY: Optional[str] = os.getenv("TWELVEDATA_API_KEY")
+    TWELVEDATA_API_KEY: Optional[str] = os.getenv("TWELVEDATA_API_KEY") or os.getenv("TWELVE_DATA_API_KEY")
 
     # Financial Modeling Prep — economic calendar
     FMP_BASE_URL: str = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com/stable")

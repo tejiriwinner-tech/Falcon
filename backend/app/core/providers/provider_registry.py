@@ -33,10 +33,12 @@ class ProviderRegistry:
                 raise AttributeError(f"Provider '{provider.__class__.__name__}' missing required attribute '{attr}'")
 
         provider.connect()
+        provider.priority = priority
         pid = provider.provider_id
         self._providers[pid] = provider
         if pid not in self._priority_list:
             self._priority_list.append(pid)
+        self._priority_list.sort(key=lambda x: getattr(self._providers.get(x), "priority", 100))
         self._heartbeat_log[pid] = datetime.now(timezone.utc)
         self._emit_event("ProviderRegistered", pid, provider.provider_name)
 

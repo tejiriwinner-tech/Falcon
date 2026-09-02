@@ -146,7 +146,7 @@ class FmpProvider(BaseProvider):
             provider_id="fmp",
             provider_name="Financial Modeling Prep",
             provider_type="LIVE",
-            priority=2,  # Secondary provider (after TwelveData priority 1)
+            priority=3,  # Priority 3 (after TwelveData priority 1 and AlphaVantage priority 2)
         )
         self.capabilities = [c.value if hasattr(c, "value") else str(c) for c in _CAPABILITIES]
 

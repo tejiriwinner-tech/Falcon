@@ -72,7 +72,12 @@ class TwelveDataProvider(BaseProvider):
             priority=1,
         )
         self.capabilities = [c.value if hasattr(c, "value") else str(c) for c in _CAPABILITIES]
-        self._api_key: Optional[str] = api_key or settings.TWELVEDATA_API_KEY
+        self._api_key: Optional[str] = (
+            api_key
+            or settings.TWELVEDATA_API_KEY
+            or os.getenv("TWELVE_DATA_API_KEY")
+            or os.getenv("TWELVEDATA_API_KEY")
+        )
         self._base_url: str = settings.TWELVEDATA_BASE_URL
         self._connected: bool = False
 

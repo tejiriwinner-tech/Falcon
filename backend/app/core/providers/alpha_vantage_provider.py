@@ -56,7 +56,7 @@ class AlphaVantageProvider(BaseProvider):
             provider_id="alpha_vantage",
             provider_name="Alpha Vantage",
             provider_type="LIVE",
-            priority=3,
+            priority=2,
         )
         self.capabilities = [c.value if hasattr(c, "value") else str(c) for c in _CAPABILITIES]
         self._api_key: Optional[str] = api_key or settings.ALPHA_VANTAGE_API_KEY
