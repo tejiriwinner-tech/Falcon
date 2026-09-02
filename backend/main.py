@@ -9,6 +9,8 @@ from app.api.v1.api import api_router
 from app.core.providers.provider_recovery_manager import provider_recovery_manager
 from app.core.repository.mission_repository import mission_repository
 from app.core.services.market_data_scheduler import market_data_scheduler
+from app.services.scheduler.scheduler_service import scheduler_service
+from app.services.scheduler.learning_scheduler_service import learning_scheduler_service
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
@@ -58,7 +60,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize recovery manager and market data scheduler on startup."""
+    """Initialize recovery manager, market data scheduler, and signal scheduler on startup."""
     storage = "Postgres (Supabase)" if mission_repository.persistent else "in-memory (no DATABASE_URL)"
     logging.getLogger(__name__).info("Mission repository storage: %s", storage)
     
@@ -69,10 +71,32 @@ async def startup_event():
     await market_data_scheduler.start()
     logging.getLogger(__name__).info("Market data scheduler started")
 
+    # Start automated signal market scheduler
+    try:
+        await scheduler_service.start()
+        logging.getLogger(__name__).info("Signal market scheduler started")
+    except Exception as e:
+        logging.getLogger(__name__).warning("Signal market scheduler start error: %s", e)
+
+    # Start automated learning cycle scheduler
+    try:
+        await learning_scheduler_service.start()
+        logging.getLogger(__name__).info("Autonomous learning scheduler started")
+    except Exception as e:
+        logging.getLogger(__name__).warning("Autonomous learning scheduler start error: %s", e)
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Stop recovery manager and market data scheduler on shutdown."""
+    """Stop all background schedulers and managers on shutdown."""
+    try:
+        await learning_scheduler_service.stop()
+    except Exception:
+        pass
+    try:
+        await scheduler_service.stop()
+    except Exception:
+        pass
     await market_data_scheduler.stop()
     provider_recovery_manager.stop()
 

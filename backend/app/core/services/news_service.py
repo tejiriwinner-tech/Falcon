@@ -12,54 +12,43 @@ from app.schemas.news import NewsItem, NewsListResponse
 def build_news_response(
     lookback_hours: int = 24, lookahead_hours: int = 168
 ) -> NewsListResponse:
-    # Return sample news for Phase 1.2 (economic calendar integration is complex)
+    """Build news response using real economic calendar data."""
     now = datetime.now(timezone.utc)
-    return NewsListResponse(
-        events=[
-            NewsItem(
-                id=1,
-                currency="USD",
-                title="Federal Reserve Interest Rate Decision",
-                impact="High",
-                time=now.replace(hour=14, minute=0),
-                forecast="5.25%",
-                previous="5.00%",
-                actual=None,
-                status="Upcoming"
-            ),
-            NewsItem(
-                id=2,
-                currency="EUR",
-                title="ECB Monetary Policy Statement",
-                impact="High",
-                time=now.replace(hour=12, minute=30),
-                forecast="4.00%",
-                previous="3.75%",
-                actual=None,
-                status="Upcoming"
-            ),
-            NewsItem(
-                id=3,
-                currency="GBP",
-                title="UK CPI inflation Rate",
-                impact="Medium",
-                time=now.replace(hour=9, minute=30),
-                forecast="2.5%",
-                previous="2.3%",
-                actual=None,
-                status="Upcoming"
-            ),
-            NewsItem(
-                id=4,
-                currency="JPY",
-                title="Bank of Japan Policy Meeting",
-                impact="Medium",
-                time=now.replace(hour=3, minute=0),
-                forecast="-0.10%",
-                previous="0.00%",
-                actual=None,
-                status="Upcoming"
+    
+    # Get real economic calendar events
+    try:
+        economic_events = economic_calendar_service.get_events(
+            lookback_hours=lookback_hours,
+            lookahead_hours=lookahead_hours
+        )
+        
+        # Convert EconomicEvent to NewsItem format
+        news_items = []
+        for event in economic_events:
+            news_items.append(
+                NewsItem(
+                    id=hash(f"{event.eventTime}_{event.title}_{event.currency}"),
+                    currency=event.currency,
+                    title=event.title,
+                    impact=event.impact,
+                    time=event.eventTime,
+                    forecast=event.forecast,
+                    previous=event.previous,
+                    actual=event.actual,
+                    status="Upcoming" if event.actual is None else "Released"
+                )
             )
-        ],
-        lastUpdated=now,
-    )
+        
+        return NewsListResponse(
+            events=news_items,
+            lastUpdated=now,
+        )
+    except Exception as e:
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Failed to fetch economic calendar: {e}")
+        # Return empty response on error
+        return NewsListResponse(
+            events=[],
+            lastUpdated=now,
+        )

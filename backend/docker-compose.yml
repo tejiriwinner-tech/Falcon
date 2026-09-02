@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  falcon-backend:
+    build: .
+    container_name: falcon-backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - TWELVEDATA_API_KEY=${TWELVEDATA_API_KEY}
+      - FMP_API_KEY=${FMP_API_KEY}
+      - ALPHA_VANTAGE_API_KEY=${ALPHA_VANTAGE_API_KEY}
+      - FALCON_API_KEY=${FALCON_API_KEY}
+      - CORS_ORIGINS=${CORS_ORIGINS:-*}
+      - RATE_LIMIT_PER_MINUTE=${RATE_LIMIT_PER_MINUTE:-100}
+    env_file:
+      - .env
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:8000/api/v1/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - falcon-network
+
+networks:
+  falcon-network:
+    driver: bridge

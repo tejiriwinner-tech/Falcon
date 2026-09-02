@@ -48,6 +48,16 @@ class MissionRepository:
         self._storage: Storage = (
             DatabaseMissionStorage() if database_enabled() else InMemoryMissionStorage()
         )
+        self._cached_missions: Optional[List[MissionReport]] = None
+        self._cached_missions_at: float = 0.0
+        self._cached_bulk_artifacts: Optional[Dict[str, Dict[str, Any]]] = None
+        self._cached_bulk_at: float = 0.0
+
+    def _invalidate_cache(self) -> None:
+        self._cached_missions = None
+        self._cached_missions_at = 0.0
+        self._cached_bulk_artifacts = None
+        self._cached_bulk_at = 0.0
 
     @property
     def persistent(self) -> bool:
@@ -62,13 +72,21 @@ class MissionRepository:
         return self._storage.last_mission_at
 
     def save_mission(self, mission: MissionReport) -> None:
+        self._invalidate_cache()
         self._storage.save_mission(mission)
 
     def get_mission(self, mission_id: str) -> Optional[MissionReport]:
         return self._storage.get_mission(mission_id)
 
     def get_all_missions(self) -> List[MissionReport]:
-        return self._storage.get_all_missions()
+        import time as _t
+        now = _t.monotonic()
+        if self._cached_missions is not None and (now - self._cached_missions_at) < 30.0:
+            return list(self._cached_missions)
+        missions = self._storage.get_all_missions()
+        self._cached_missions = missions
+        self._cached_missions_at = now
+        return missions
 
     def get_latest_mission(self) -> Optional[MissionReport]:
         return self._storage.get_latest_mission()
@@ -81,27 +99,45 @@ class MissionRepository:
         return self._storage.next_mission_number()
 
     def save_market_state(self, mission_id: str, market_state: MarketState) -> None:
+        self._invalidate_cache()
         self._storage.save_artifacts(mission_id, MARKET_STATE, [market_state])
 
     def save_candidates(self, mission_id: str, candidates: List[SignalCandidate]) -> None:
+        self._invalidate_cache()
         self._storage.save_artifacts(mission_id, CANDIDATE, candidates)
 
     def save_validations(self, mission_id: str, validations: List[ValidationResult]) -> None:
+        self._invalidate_cache()
         self._storage.save_artifacts(mission_id, VALIDATION, validations)
 
     def save_risk_assessments(self, mission_id: str, assessments: List[RiskAssessment]) -> None:
+        self._invalidate_cache()
         self._storage.save_artifacts(mission_id, RISK_ASSESSMENT, assessments)
 
     def save_execution_readiness(
         self, mission_id: str, readiness_items: List[ExecutionReadiness]
     ) -> None:
+        self._invalidate_cache()
         self._storage.save_artifacts(mission_id, EXECUTION_READINESS, readiness_items)
 
     def save_decisions(self, mission_id: str, decisions: List[DecisionArtifact]) -> None:
+        self._invalidate_cache()
         self._storage.save_artifacts(mission_id, DECISION, decisions)
 
     def get_mission_artifacts(self, mission_id: str) -> Dict[str, Any]:
         """Returns all immutable artifacts associated with a mission."""
+        if hasattr(self._storage, "get_all_mission_artifacts"):
+            grouped = self._storage.get_all_mission_artifacts(mission_id)
+            market_states = grouped.get(MARKET_STATE, [])
+            return {
+                "missionId": mission_id,
+                "marketState": market_states[0] if market_states else None,
+                "candidates": grouped.get(CANDIDATE, []),
+                "validations": grouped.get(VALIDATION, []),
+                "riskAssessments": grouped.get(RISK_ASSESSMENT, []),
+                "executionReadiness": grouped.get(EXECUTION_READINESS, []),
+                "decisions": grouped.get(DECISION, []),
+            }
         market_states = self._storage.get_artifacts(mission_id, MARKET_STATE)
         return {
             "missionId": mission_id,
@@ -112,6 +148,36 @@ class MissionRepository:
             "executionReadiness": self._storage.get_artifacts(mission_id, EXECUTION_READINESS),
             "decisions": self._storage.get_artifacts(mission_id, DECISION),
         }
+
+    def get_all_mission_artifacts_bulk(self, mission_ids: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
+        """Returns structured artifacts for multiple missions in a single bulk query."""
+        import time as _t
+        now = _t.monotonic()
+        if self._cached_bulk_artifacts is not None and (now - self._cached_bulk_at) < 60.0:
+            if mission_ids is None:
+                return dict(self._cached_bulk_artifacts)
+            return {mid: self._cached_bulk_artifacts[mid] for mid in mission_ids if mid in self._cached_bulk_artifacts}
+        if hasattr(self._storage, "get_all_artifacts_bulk"):
+            bulk = self._storage.get_all_artifacts_bulk(None)
+            result = {}
+            for mid, grouped in bulk.items():
+                market_states = grouped.get(MARKET_STATE, [])
+                result[mid] = {
+                    "missionId": mid,
+                    "marketState": market_states[0] if market_states else None,
+                    "candidates": grouped.get(CANDIDATE, []),
+                    "validations": grouped.get(VALIDATION, []),
+                    "riskAssessments": grouped.get(RISK_ASSESSMENT, []),
+                    "executionReadiness": grouped.get(EXECUTION_READINESS, []),
+                    "decisions": grouped.get(DECISION, []),
+                }
+            self._cached_bulk_artifacts = result
+            self._cached_bulk_at = now
+            if mission_ids is None:
+                return dict(result)
+            return {mid: result[mid] for mid in mission_ids if mid in result}
+        missions = self.get_all_missions() if mission_ids is None else [self.get_mission(m) for m in mission_ids]
+        return {m.id: self.get_mission_artifacts(m.id) for m in missions if m}
 
     def get_statistics(self) -> RepositoryStatistics:
         counts = self._storage.count_artifacts()

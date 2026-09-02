@@ -48,8 +48,11 @@ class AdaptiveStrategyOptimizer:
         start_time = time.time()
         now = datetime.now(timezone.utc)
 
-        strategies = self._strategy_engine.get_strategies()
-        missions = repository.get_all_missions()
+        all_missions = repository.get_all_missions()
+        missions = all_missions[-25:] if len(all_missions) > 25 else all_missions
+        mission_ids = [m.id for m in missions]
+        artifacts_by_mission = repository.get_all_mission_artifacts_bulk(mission_ids)
+        all_mission_artifacts = [artifacts_by_mission[m_id] for m_id in mission_ids if m_id in artifacts_by_mission]
 
         # Build strategy-keyed intelligence lookup (if provided)
         intel_map: Dict[str, Any] = {}
@@ -69,8 +72,7 @@ class AdaptiveStrategyOptimizer:
             strat_execution_items = []
             strat_decisions = []
 
-            for m in missions:
-                artifacts = repository.get_mission_artifacts(m.id)
+            for artifacts in all_mission_artifacts:
                 for cand in artifacts.get("candidates", []):
                     if cand.strategyId == strat.id:
                         strat_candidates.append(cand)

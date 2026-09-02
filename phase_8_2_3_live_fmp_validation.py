@@ -1,10 +1,10 @@
-﻿import sys
+import sys
 import json
 from pathlib import Path
 from datetime import datetime, timezone
 from typing import Any, Dict
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "backend"))
 
 from app.core.config import settings
 from app.core.providers.fmp_provider import FmpProvider
@@ -16,8 +16,9 @@ RESULTS: Dict[str, Any] = {
 }
 
 def check_env_security():
-    env_file = Path(__file__).resolve().parent.parent / ".env"
-    gitignore_file = Path(__file__).resolve().parent.parent.parent / ".gitignore"
+    root_dir = Path(__file__).resolve().parent
+    env_file = root_dir / "backend" / ".env"
+    gitignore_file = root_dir / ".gitignore"
     
     env_exists = env_file.exists()
     gitignore_content = gitignore_file.read_text(encoding="utf-8") if gitignore_file.exists() else ""
@@ -39,8 +40,8 @@ def test_live_fetch(fmp_provider, symbol):
     return {
         "symbol": symbol,
         "success": quote is not None,
-        "price": quote.get("price") if quote else None,
-        "provider": quote.get("provider") if quote else None,
+        "price": quote.get("lastPrice") if quote else None,
+        "provider": quote.get("providerName") if quote else None,
     }
 
 def main():
@@ -72,7 +73,7 @@ def main():
     print(f"{'=' * 80}")
     
     # Save report
-    report_path = Path(__file__).resolve().parent.parent.parent / "PHASE_8_2_3_FMP_LIVE_VALIDATION_REPORT.md"
+    report_path = Path(__file__).resolve().parent / "PHASE_8_2_3_FMP_LIVE_VALIDATION_REPORT.md"
     with open(report_path, 'w', encoding='utf-8') as f:
         f.write("# Phase 8.2.3 - Live FMP Validation\n\n")
         f.write(f"Generated: {RESULTS['report_generated_at']}\n\n")

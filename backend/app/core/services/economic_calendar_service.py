@@ -124,8 +124,10 @@ class EconomicCalendarService:
             "apikey": settings.FMP_API_KEY,
         }
         try:
+            base = settings.FMP_BASE_URL.rstrip('/')
+            endpoint = f"{base}/economic-calendar" if "stable" in base else f"{base}/v3/economic_calendar"
             response = requests.get(
-                f"{settings.FMP_BASE_URL.rstrip('/')}/v3/economic_calendar",
+                endpoint,
                 params=params,
                 timeout=REQUEST_TIMEOUT_SECONDS,
             )

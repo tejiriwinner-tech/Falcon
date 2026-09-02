@@ -66,7 +66,7 @@ def run_learning_cycle():
     # ── Stage 3: Generate Strategy Intelligence ────────────────────────────
     print("\n[Stage 3] Generating Strategy Intelligence...")
     try:
-        response = requests.get(f"{BASE_URL}/strategy-intelligence", timeout=60)
+        response = requests.get(f"{BASE_URL}/strategy-intelligence", timeout=120)
         if response.status_code == 200:
             intel_data = response.json()
             print(f"[SUCCESS] Generated {len(intel_data.get('reports', []))} strategy intelligence reports")
@@ -79,7 +79,7 @@ def run_learning_cycle():
     # ── Stage 4: Optimize Strategies ───────────────────────────────────────
     print("\n[Stage 4] Optimizing Strategies...")
     try:
-        response = requests.get(f"{BASE_URL}/strategy-optimizer", timeout=60)
+        response = requests.get(f"{BASE_URL}/strategy-optimizer", timeout=120)
         if response.status_code == 200:
             opt_data = response.json()
             summary = opt_data.get('summary', {})

@@ -5,10 +5,18 @@ Central configuration object consumed by main.py, health.py, logger.py, and all 
 
 
 import os
+from pathlib import Path
 from typing import Optional
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    # Look for .env in backend directory, current working dir, or parent dirs
+    _file_dir = Path(__file__).resolve()
+    for p in [_file_dir.parents[3] / ".env", _file_dir.parents[2] / ".env", Path.cwd() / ".env", Path.cwd() / "backend" / ".env"]:
+        if p.exists():
+            load_dotenv(p)
+            break
+    else:
+        load_dotenv()
 except ImportError:
     pass
 
@@ -64,7 +72,7 @@ class Settings:
 
     # Market Data Scheduler Configuration
     # Watchlist of symbols to ingest for price_history
-    MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD")
+    MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD,USDJPY")
     
     # Interval between market data ingestion cycles (seconds)
     MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "300"))

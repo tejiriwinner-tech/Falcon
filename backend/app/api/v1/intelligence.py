@@ -46,75 +46,87 @@ async def get_intelligence(
         # Validate and sanitize symbol input
         validated_symbol = InputValidator.validate_symbol(symbol)
         
-        # Return sample intelligence data for Phase 1.4
-        now = datetime.now(timezone.utc)
+        # Use real IntelligenceService to generate trading intelligence
+        intelligence_service = IntelligenceService(db)
         
-        # Generate symbol-specific intelligence
-        sample_data = {
-            'XAUUSD': {
-                'decision': 'BUY',
-                'confidence': 75.0,
-                'signalScore': 82.0,
-                'confluenceScore': 78.0,
-                'riskScore': 65.0,
-                'marketState': 'BULLISH_MOMENTUM',
-                'trend': 'BULLISH',
-                'entry': '4675.50',
-                'stop': 4668.00,
-                'target': 4690.50,
-                'reasoning': 'Strong bullish momentum detected with key support at 4670. RSI showing oversold bounce potential. Volume spike confirms institutional interest.'
-            },
-            'GBPUSD': {
-                'decision': 'SELL',
-                'confidence': 68.0,
-                'signalScore': 70.0,
-                'confluenceScore': 65.0,
-                'riskScore': 72.0,
-                'marketState': 'BEARISH_DIVERGENCE',
-                'trend': 'BEARISH',
-                'entry': '1.2750',
-                'stop': 1.2780,
-                'target': 1.2700,
-                'reasoning': 'Bearish divergence forming on 4H timeframe. Resistance at 1.2780 holding. GBP weakness due to UK economic concerns.'
-            },
-            'EURUSD': {
-                'decision': 'BUY',
-                'confidence': 72.0,
-                'signalScore': 75.0,
-                'confluenceScore': 70.0,
-                'riskScore': 68.0,
-                'marketState': 'CONSOLIDATION',
-                'trend': 'NEUTRAL',
-                'entry': '1.0850',
-                'stop': 1.0820,
-                'target': 1.0900,
-                'reasoning': 'Testing major support level at 1.0850. Positive momentum emerging. ECB policy supporting EUR strength.'
+        try:
+            decision = intelligence_service.get_intelligence(
+                symbol=validated_symbol,
+                timeframe=timeframe,
+                limit=200
+            )
+            
+            if not decision:
+                # If decision engine fails, return neutral response
+                now = datetime.now(timezone.utc)
+                return {
+                    'success': True,
+                    'data': {
+                        'symbol': validated_symbol,
+                        'timeframe': timeframe.value,
+                        'decision': 'WAIT',
+                        'confidence': 50.0,
+                        'signalScore': 50.0,
+                        'confluenceScore': 50.0,
+                        'riskScore': 50.0,
+                        'marketState': 'NEUTRAL',
+                        'trend': 'NEUTRAL',
+                        'entry': '0.0',
+                        'stop': 0.0,
+                        'target': 0.0,
+                        'reasoning': 'Insufficient data available for analysis. Ensure market data is available for this symbol.',
+                        'timestamp': now.isoformat()
+                    }
+                }
+            
+            # Convert IntelligenceDecision to API response format
+            now = datetime.now(timezone.utc)
+            entry_val = getattr(decision, 'entry_price', None) or getattr(decision, 'entry', None)
+            stop_val = getattr(decision, 'stop_loss', None) or getattr(decision, 'stop', None)
+            target_val = getattr(decision, 'take_profit', None) or getattr(decision, 'target', None)
+            return {
+                'success': True,
+                'data': {
+                    'symbol': validated_symbol,
+                    'timeframe': timeframe.value,
+                    'decision': decision.decision,
+                    'confidence': decision.confidence,
+                    'signalScore': decision.signal_score,
+                    'confluenceScore': decision.confluence_score,
+                    'riskScore': decision.risk_score,
+                    'marketState': decision.market_state,
+                    'trend': decision.trend,
+                    'entry': str(entry_val) if entry_val is not None else '0.0',
+                    'stop': str(stop_val) if stop_val is not None else '0.0',
+                    'target': str(target_val) if target_val is not None else '0.0',
+                    'reasoning': decision.reasoning,
+                    'timestamp': now.isoformat()
+                }
             }
-        }
         
-        data = sample_data.get(validated_symbol, {
-            'decision': 'WAIT',
-            'confidence': 50.0,
-            'signalScore': 50.0,
-            'confluenceScore': 50.0,
-            'riskScore': 50.0,
-            'marketState': 'NEUTRAL',
-            'trend': 'NEUTRAL',
-            'entry': '0.0',
-            'stop': 0.0,
-            'target': 0.0,
-            'reasoning': 'Limited data available for this symbol. Add to watchlist for monitoring.'
-        })
-        
-        return {
-            'success': True,
-            'data': {
-                'symbol': validated_symbol,
-                'timeframe': timeframe.value,
-                **data,
-                'timestamp': now.isoformat()
+        except Exception as e:
+            logger.error(f"Intelligence service error for {validated_symbol}: {str(e)}")
+            # Return neutral response on error
+            now = datetime.now(timezone.utc)
+            return {
+                'success': True,
+                'data': {
+                    'symbol': validated_symbol,
+                    'timeframe': timeframe.value,
+                    'decision': 'WAIT',
+                    'confidence': 50.0,
+                    'signalScore': 50.0,
+                    'confluenceScore': 50.0,
+                    'riskScore': 50.0,
+                    'marketState': 'NEUTRAL',
+                    'trend': 'NEUTRAL',
+                    'entry': '0.0',
+                    'stop': 0.0,
+                    'target': 0.0,
+                    'reasoning': f'Analysis failed: {str(e)}',
+                    'timestamp': now.isoformat()
+                }
             }
-        }
     
     except HTTPException:
         raise

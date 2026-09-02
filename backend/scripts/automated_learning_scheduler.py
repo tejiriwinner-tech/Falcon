@@ -45,13 +45,13 @@ class LearningScheduler:
             if result.stderr:
                 print(f"STDERR: {result.stderr}")
         except subprocess.TimeoutExpired:
-            print("❌ Learning cycle timed out")
+            print("Learning cycle timed out")
         except Exception as e:
-            print(f"❌ Learning cycle failed: {e}")
+            print(f"Learning cycle failed: {e}")
 
     def scheduler_loop(self):
         """Main scheduler loop."""
-        print(f"🚀 Learning Scheduler started (interval: {self.interval_minutes} minutes)")
+        print(f"Learning Scheduler started (interval: {self.interval_minutes} minutes)")
         print("Press Ctrl+C to stop")
 
         while self.running:
@@ -63,23 +63,23 @@ class LearningScheduler:
 
                 # Skip weekends (Saturday=5, Sunday=6)
                 if day >= 5:
-                    print(f"⏸️  Weekend detected, skipping cycle...")
+                    print(f"Weekend detected, skipping cycle...")
                     time.sleep(self.interval_minutes * 60)
                     continue
 
                 # Run learning cycle
-                print(f"\n🕐 {now.isoformat()} - Starting learning cycle...")
+                print(f"\n{now.isoformat()} - Starting learning cycle...")
                 self.run_cycle()
 
                 # Wait for next interval
-                print(f"⏳ Next cycle in {self.interval_minutes} minutes...")
+                print(f"Next cycle in {self.interval_minutes} minutes...")
                 time.sleep(self.interval_minutes * 60)
 
             except KeyboardInterrupt:
-                print("\n🛑 Scheduler stopped by user")
+                print("\nScheduler stopped by user")
                 break
             except Exception as e:
-                print(f"❌ Scheduler error: {e}")
+                print(f"Scheduler error: {e}")
                 time.sleep(60)  # Wait 1 minute before retry
 
     def start(self):
@@ -104,7 +104,7 @@ def main():
 
     # Handle graceful shutdown
     def signal_handler(sig, frame):
-        print("\n🛑 Stopping scheduler...")
+        print("\nStopping scheduler...")
         scheduler.stop()
         sys.exit(0)
 

@@ -43,10 +43,8 @@ class ApiService {
     }
 
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-      // Use your PC's local network IP address for physical devices
-      // For emulator, use 10.0.2.2
-      // For physical device on WiFi, use your PC's WiFi IP
-      return 'http://10.211.23.84:8000/api/v1';
+      // Use your PC's current local network IP address for physical devices
+      return 'http://10.125.252.84:8000/api/v1';
     }
     return 'http://127.0.0.1:8000/api/v1';
   }
@@ -97,9 +95,10 @@ class ApiService {
       _batchedRequests.remove(endpoint);
       _pendingRequests.remove(endpoint);
       
-      // Make the actual request
+      // Make the actual request using the static method
       try {
-        final result = await _get<T>(endpoint, fromJson);
+        final apiService = ApiService();
+        final result = await apiService._get<T>(endpoint, fromJson);
         for (final c in batchedCompleters) {
           c.complete(result);
         }
@@ -108,7 +107,7 @@ class ApiService {
           c.completeError(e);
         }
       }
-    }));
+    });
     
     return completer.future;
   }

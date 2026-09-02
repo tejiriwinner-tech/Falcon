@@ -103,6 +103,23 @@ class InMemoryMissionStorage:
         stored = self._artifacts.get(mission_id, {}).get(artifact_type, [])
         return [copy.deepcopy(artifact) for artifact in stored]
 
+    def get_all_mission_artifacts(self, mission_id: str) -> Dict[str, List[BaseModel]]:
+        m_artifacts = self._artifacts.get(mission_id, {})
+        return {
+            k: [copy.deepcopy(a) for a in m_artifacts.get(k, [])]
+            for k in ARTIFACT_MODELS
+        }
+
+    def get_all_artifacts_bulk(self, mission_ids: Optional[List[str]] = None) -> Dict[str, Dict[str, List[BaseModel]]]:
+        targets = mission_ids if mission_ids is not None else list(self._artifacts.keys())
+        return {
+            mid: {
+                k: [copy.deepcopy(a) for a in self._artifacts.get(mid, {}).get(k, [])]
+                for k in ARTIFACT_MODELS
+            }
+            for mid in targets
+        }
+
     def count_missions(self) -> int:
         return len(self._missions)
 
@@ -201,6 +218,42 @@ class DatabaseMissionStorage:
                 .order_by(MissionArtifactRecord.position)
             ).all()
             return [model.model_validate(record.payload) for record in records]
+
+    def get_all_mission_artifacts(self, mission_id: str) -> Dict[str, List[BaseModel]]:
+        result: Dict[str, List[BaseModel]] = {k: [] for k in ARTIFACT_MODELS}
+        with get_session() as session:
+            records = session.scalars(
+                select(MissionArtifactRecord)
+                .where(MissionArtifactRecord.mission_id == mission_id)
+                .order_by(MissionArtifactRecord.position)
+            ).all()
+            for record in records:
+                model = ARTIFACT_MODELS.get(record.artifact_type)
+                if model:
+                    try:
+                        result[record.artifact_type].append(model.model_validate(record.payload))
+                    except Exception:
+                        pass
+        return result
+
+    def get_all_artifacts_bulk(self, mission_ids: Optional[List[str]] = None) -> Dict[str, Dict[str, List[BaseModel]]]:
+        results: Dict[str, Dict[str, List[BaseModel]]] = {}
+        with get_session() as session:
+            stmt = select(MissionArtifactRecord).order_by(MissionArtifactRecord.mission_id, MissionArtifactRecord.position)
+            if mission_ids:
+                stmt = stmt.where(MissionArtifactRecord.mission_id.in_(mission_ids))
+            records = session.scalars(stmt).all()
+            for record in records:
+                mid = record.mission_id
+                if mid not in results:
+                    results[mid] = {k: [] for k in ARTIFACT_MODELS}
+                model = ARTIFACT_MODELS.get(record.artifact_type)
+                if model:
+                    try:
+                        results[mid][record.artifact_type].append(model.model_validate(record.payload))
+                    except Exception:
+                        pass
+        return results
 
     def count_missions(self) -> int:
         with get_session() as session:

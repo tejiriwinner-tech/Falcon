@@ -1,3 +1,267 @@
 2026-07-13 14:45:45,171 - asyncio - DEBUG - Using selector: SelectSelector
 2026-07-13 14:46:21,007 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/decision-engine
 2026-07-13 14:46:21,077 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/decision-engine - Status: 200 - Time: 0.0696s
+2026-09-01 19:26:20,460 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:26:20,526 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-09-01 19:26:20,548 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:26:20.548760+00:00"}
+2026-09-01 19:26:20,645 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.1193s
+2026-09-01 19:26:20,650 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-09-01 19:26:20,652 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:26:20,655 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/dashboard
+2026-09-01 19:26:20,938 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:26:22,348 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:26:22,352 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:26:23,863 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:26:23,868 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:26:25,358 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:26:25,362 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:26:25.362348+00:00"}
+2026-09-01 19:27:01,245 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-01 19:27:03,008 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/v3/economic_calendar?from=2026-09-01&to=2026-09-08&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 404 2
+2026-09-01 19:27:04,202 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/dashboard - Status: 200 - Time: 43.5473s
+2026-09-01 19:27:04,208 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/dashboard "HTTP/1.1 200 OK"
+2026-09-01 19:27:04,212 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:27:04,216 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/news
+2026-09-01 19:27:05,179 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/news - Status: 200 - Time: 0.9629s
+2026-09-01 19:27:05,182 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/news "HTTP/1.1 200 OK"
+2026-09-01 19:27:05,184 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:27:05,187 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 19:27:17,313 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:27:18,700 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:27:18,704 - app.api.v1.intelligence - ERROR - Intelligence service error for XAUUSD: 'IntelligenceDecision' object has no attribute 'entry'
+2026-09-01 19:27:18,706 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 13.5188s
+2026-09-01 19:27:18,900 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=XAUUSD "HTTP/1.1 200 OK"
+2026-09-01 19:30:50,308 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:30:50,312 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 19:31:03,493 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:31:06,410 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:31:06,416 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 16.1033s
+2026-09-01 19:31:06,651 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=XAUUSD "HTTP/1.1 200 OK"
+2026-09-01 19:31:35,551 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:31:35,555 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/missions/run
+2026-09-01 19:31:35,663 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:31:37,078 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /time_series?symbol=XAU%2FUSD&interval=1h&outputsize=500&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:31:45,175 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:31:46,835 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /time_series?symbol=GBP%2FUSD&interval=1h&outputsize=500&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:31:51,187 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:31:52,917 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /time_series?symbol=EUR%2FUSD&interval=1h&outputsize=500&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:31:56,646 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:31:58,027 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /time_series?symbol=USD%2FJPY&interval=1h&outputsize=500&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:32:03,020 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:32:04,549 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /time_series?symbol=NAS100&interval=1h&outputsize=500&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 404 None
+2026-09-01 19:32:04,554 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:32:06,104 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /time_series?symbol=DJI&interval=1h&outputsize=500&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 404 None
+2026-09-01 19:32:08,386 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:32:11,538 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:32:11,544 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:32:12,944 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:32:12,949 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:32:14,642 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:32:14,647 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:32:16,186 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=USD%2FJPY&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 19:32:16,191 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:32:18,942 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=NAS100&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 404 None
+2026-09-01 19:32:18,945 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:32:18.945769+00:00"}
+2026-09-01 19:32:18,946 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:32:18.946126+00:00"}
+2026-09-01 19:32:18,947 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-01 19:32:21,058 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=NAS100&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 402 215
+2026-09-01 19:32:21,058 - falcon.providers.fmp - ERROR - [Financial Modeling Prep] HTTP 402
+2026-09-01 19:32:21,060 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 19:32:22,601 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=DJI&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 404 None
+2026-09-01 19:32:22,604 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:32:22.604547+00:00"}
+2026-09-01 19:32:22,605 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:32:22.604946+00:00"}
+2026-09-01 19:32:22,965 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=US30&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 402 215
+2026-09-01 19:32:22,966 - falcon.providers.fmp - ERROR - [Financial Modeling Prep] HTTP 402
+2026-09-01 19:32:33,445 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-01 19:32:35,225 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/v3/economic_calendar?from=2026-09-01&to=2026-09-08&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 404 2
+2026-09-01 19:34:55,775 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:34:55.775549+00:00"}
+2026-09-01 19:34:55,776 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:34:55.776210+00:00"}
+2026-09-01 19:34:55,776 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:34:55.776811+00:00"}
+2026-09-01 19:34:55,777 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T18:34:55.777328+00:00"}
+2026-09-01 19:35:04,651 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/missions/run - Status: 201 - Time: 209.0961s
+2026-09-01 19:35:04,657 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/missions/run "HTTP/1.1 201 Created"
+2026-09-01 19:43:23,190 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:43:23,196 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/learning-insights
+2026-09-01 19:43:23,276 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/learning-insights - Status: 200 - Time: 0.0804s
+2026-09-01 19:43:23,281 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/learning-insights "HTTP/1.1 200 OK"
+2026-09-01 19:43:23,283 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:43:23,285 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-intelligence
+2026-09-01 19:55:07,990 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:55:07,995 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-intelligence
+2026-09-01 19:56:22,481 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-intelligence - Status: 200 - Time: 74.4863s
+2026-09-01 19:56:22,485 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-intelligence "HTTP/1.1 200 OK"
+2026-09-01 19:56:22,486 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 19:56:22,490 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-optimizer
+2026-09-01 20:01:05,256 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-optimizer - Status: 200 - Time: 282.7656s
+2026-09-01 20:01:05,262 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-optimizer "HTTP/1.1 200 OK"
+2026-09-01 20:01:50,500 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-intelligence - Status: 200 - Time: 1107.2143s
+2026-09-01 20:01:50,504 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-intelligence "HTTP/1.1 200 OK"
+2026-09-01 20:01:50,507 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:01:50,510 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-optimizer
+2026-09-01 20:03:45,036 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:03:45,043 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-intelligence
+2026-09-01 20:04:36,975 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-intelligence - Status: 200 - Time: 51.9323s
+2026-09-01 20:04:36,980 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-intelligence "HTTP/1.1 200 OK"
+2026-09-01 20:04:36,989 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:04:36,993 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-optimizer
+2026-09-01 20:05:26,019 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-optimizer - Status: 200 - Time: 49.0259s
+2026-09-01 20:05:26,023 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-optimizer "HTTP/1.1 200 OK"
+2026-09-01 20:06:24,138 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:06:24,143 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-intelligence
+2026-09-01 20:07:15,860 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-intelligence - Status: 200 - Time: 51.7174s
+2026-09-01 20:07:15,864 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-intelligence "HTTP/1.1 200 OK"
+2026-09-01 20:07:15,869 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:07:15,872 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-intelligence
+2026-09-01 20:08:06,911 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-intelligence - Status: 200 - Time: 51.0389s
+2026-09-01 20:08:06,914 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-intelligence "HTTP/1.1 200 OK"
+2026-09-01 20:08:06,917 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:08:06,919 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-optimizer
+2026-09-01 20:08:49,863 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-optimizer - Status: 200 - Time: 42.9439s
+2026-09-01 20:08:49,866 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-optimizer "HTTP/1.1 200 OK"
+2026-09-01 20:08:49,867 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:08:49,871 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-optimizer
+2026-09-01 20:09:39,611 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-optimizer - Status: 200 - Time: 49.7407s
+2026-09-01 20:09:39,614 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-optimizer "HTTP/1.1 200 OK"
+2026-09-01 20:09:59,717 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:09:59,720 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-intelligence
+2026-09-01 20:10:47,814 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-intelligence - Status: 200 - Time: 48.0938s
+2026-09-01 20:10:47,819 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-intelligence "HTTP/1.1 200 OK"
+2026-09-01 20:10:47,822 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:10:47,827 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-intelligence
+2026-09-01 20:11:15,419 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-intelligence - Status: 200 - Time: 27.5920s
+2026-09-01 20:11:15,425 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-intelligence "HTTP/1.1 200 OK"
+2026-09-01 20:11:15,428 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:11:15,431 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/strategy-optimizer
+2026-09-01 20:12:07,451 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-optimizer - Status: 200 - Time: 52.0200s
+2026-09-01 20:12:07,454 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-optimizer "HTTP/1.1 200 OK"
+2026-09-01 20:12:07,467 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:12:07,470 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/dashboard
+2026-09-01 20:12:07,503 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:12:10,898 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:12:10,903 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:12:13,426 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:12:13,431 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:12:14,852 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:12:14,858 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T19:12:14.858425+00:00"}
+2026-09-01 20:12:23,217 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-01 20:12:25,168 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/economic-calendar?from=2026-09-01&to=2026-09-08&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 402 177
+2026-09-01 20:12:25,964 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/dashboard - Status: 200 - Time: 18.4944s
+2026-09-01 20:12:25,968 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/dashboard "HTTP/1.1 200 OK"
+2026-09-01 20:19:51,558 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:19:51,566 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/dashboard
+2026-09-01 20:19:51,765 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:19:53,735 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:19:53,739 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:19:55,350 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:19:55,480 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:19:57,657 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:19:57,661 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T19:19:57.661403+00:00"}
+2026-09-01 20:20:12,517 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-01 20:20:14,720 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/economic-calendar?from=2026-09-01&to=2026-09-08&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 402 177
+2026-09-01 20:20:15,468 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/dashboard - Status: 200 - Time: 23.9018s
+2026-09-01 20:20:15,472 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/dashboard "HTTP/1.1 200 OK"
+2026-09-01 20:20:15,473 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:20:15,477 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/dashboard
+2026-09-01 20:20:15,479 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T19:20:15.479815+00:00"}
+2026-09-01 20:20:28,532 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/dashboard - Status: 200 - Time: 13.0549s
+2026-09-01 20:20:28,535 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/dashboard "HTTP/1.1 200 OK"
+2026-09-01 20:21:19,091 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/strategy-optimizer - Status: 200 - Time: 1168.5809s
+2026-09-01 20:21:19,095 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/strategy-optimizer "HTTP/1.1 200 OK"
+2026-09-01 20:23:32,761 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:23:32,764 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/dashboard
+2026-09-01 20:23:32,850 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:23:34,327 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:23:34,332 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:23:35,731 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:23:35,735 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:23:37,130 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:23:37,132 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T19:23:37.132581+00:00"}
+2026-09-01 20:23:45,831 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-01 20:23:47,681 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/economic-calendar?from=2026-09-01&to=2026-09-08&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 402 177
+2026-09-01 20:23:48,855 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/dashboard - Status: 200 - Time: 16.0911s
+2026-09-01 20:23:48,861 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/dashboard "HTTP/1.1 200 OK"
+2026-09-01 20:23:48,862 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:23:48,866 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/dashboard
+2026-09-01 20:23:48,870 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T19:23:48.870821+00:00"}
+2026-09-01 20:23:58,551 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/dashboard - Status: 200 - Time: 9.6845s
+2026-09-01 20:23:58,555 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/dashboard "HTTP/1.1 200 OK"
+2026-09-01 20:26:45,486 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:26:45,490 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/dashboard
+2026-09-01 20:26:45,584 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:26:47,507 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:26:47,519 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:26:50,150 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:26:50,157 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:26:51,700 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:26:51,703 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T19:26:51.703311+00:00"}
+2026-09-01 20:27:02,031 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-01 20:27:04,810 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/economic-calendar?from=2026-09-01&to=2026-09-08&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 402 177
+2026-09-01 20:27:05,551 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/dashboard - Status: 200 - Time: 20.0610s
+2026-09-01 20:27:05,555 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/dashboard "HTTP/1.1 200 OK"
+2026-09-01 20:27:05,557 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:27:05,560 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/dashboard
+2026-09-01 20:27:05,569 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T19:27:05.569145+00:00"}
+2026-09-01 20:27:12,315 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/dashboard - Status: 200 - Time: 6.7553s
+2026-09-01 20:27:12,318 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/dashboard "HTTP/1.1 200 OK"
+2026-09-01 20:40:01,324 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:40:01,327 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/dashboard
+2026-09-01 20:40:01,417 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:40:05,185 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:40:05,190 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:40:06,660 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:40:06,666 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:40:08,730 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:40:08,743 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:40:10,186 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=USD%2FJPY&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:40:10,191 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-01T19:40:10.191151+00:00"}
+2026-09-01 20:40:23,349 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-01 20:40:26,140 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/economic-calendar?from=2026-09-01&to=2026-09-08&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 402 177
+2026-09-01 20:40:26,959 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/dashboard - Status: 200 - Time: 25.6316s
+2026-09-01 20:40:26,962 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/dashboard "HTTP/1.1 200 OK"
+2026-09-01 20:40:46,558 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:40:46,561 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 20:41:00,300 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:41:04,351 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:41:04,358 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 17.7967s
+2026-09-01 20:41:04,553 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=XAUUSD "HTTP/1.1 200 OK"
+2026-09-01 20:41:04,554 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:41:04,557 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 20:41:11,406 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:41:13,320 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:41:13,324 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 8.7668s
+2026-09-01 20:41:13,523 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=GBPUSD "HTTP/1.1 200 OK"
+2026-09-01 20:41:13,526 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:41:13,529 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 20:41:22,256 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:41:24,136 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:41:24,140 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 10.6109s
+2026-09-01 20:41:24,348 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=EURUSD "HTTP/1.1 200 OK"
+2026-09-01 20:41:24,349 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:41:24,353 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 20:41:31,176 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:41:34,015 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=USD%2FJPY&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:41:34,019 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 9.6661s
+2026-09-01 20:41:34,245 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=USDJPY "HTTP/1.1 200 OK"
+2026-09-01 20:41:58,751 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:41:58,757 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 20:42:09,649 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:42:11,020 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:42:11,025 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 12.2675s
+2026-09-01 20:42:11,227 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=XAUUSD "HTTP/1.1 200 OK"
+2026-09-01 20:42:11,229 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:42:11,232 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 20:42:15,755 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:42:17,115 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:42:17,120 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 5.8884s
+2026-09-01 20:42:17,309 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=GBPUSD "HTTP/1.1 200 OK"
+2026-09-01 20:42:17,310 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:42:17,313 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 20:42:21,830 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:42:23,223 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:42:23,228 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 5.9149s
+2026-09-01 20:42:23,419 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=EURUSD "HTTP/1.1 200 OK"
+2026-09-01 20:42:23,420 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-01 20:42:23,423 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/intelligence
+2026-09-01 20:42:28,731 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-01 20:42:30,232 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=USD%2FJPY&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-01 20:42:30,236 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/intelligence - Status: 200 - Time: 6.8125s
+2026-09-01 20:42:30,441 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/intelligence?symbol=USDJPY "HTTP/1.1 200 OK"

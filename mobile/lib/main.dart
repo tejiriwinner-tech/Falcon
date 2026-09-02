@@ -49,17 +49,3 @@ class _FalconAppState extends State<FalconApp> {
     );
   }
 }
-
-class FalconApp extends StatelessWidget {
-  const FalconApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp.router(
-      title: 'Falcon',
-      theme: AppTheme.darkTheme,
-      routerConfig: AppRouter.router,
-      debugShowCheckedModeBanner: false,
-    );
-  }
-}

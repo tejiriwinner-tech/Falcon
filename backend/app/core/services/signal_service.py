@@ -109,5 +109,7 @@ class SignalService:
         mission_number = int(digits) if digits else 0
         return mission_number * 100 + index + 1
 
+    get_signals = build_signals
+
 
 signal_service = SignalService()

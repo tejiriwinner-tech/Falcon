@@ -6,10 +6,10 @@ class InputValidator:
     """Input validation and sanitization utilities."""
     
     # Common patterns
-    SYMBOL_PATTERN = re.compile(r'^[A-Z]{1,5}$')
+    SYMBOL_PATTERN = re.compile(r'^[A-Z]{1,6}$')  # Updated to allow 6 characters for XAUUSD
     SAFE_STRING_PATTERN = re.compile(r'^[a-zA-Z0-9\s\-_.,@:()]+$', re.UNICODE)
     SQL_INJECTION_PATTERN = re.compile(r'(\b(union|select|insert|update|delete|drop|alter|create|exec|execute)\b|\'|;|--|\/\*|\*\/)', re.IGNORECASE)
-    XSS_PATTERN = re.compile(r'<script|javascript:|on\w+\s*=', re.IGNORECASE)
+    XSS_PATTERN = re.compile(r'<script[^>]*>.*?</script>|javascript:|on\w+\s*=', re.IGNORECASE)
     
     @staticmethod
     def validate_symbol(symbol: str) -> str:
