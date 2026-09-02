@@ -13,6 +13,7 @@ from app.core.engines.decision_engine import DecisionEngine
 from app.core.engines.market_state_engine import FALCON_WATCHLIST
 from app.core.repository.mission_repository import mission_repository
 from app.core.services.market_history_service import market_history_service
+from app.services.alerts.telegram_alert_service import telegram_alert_service
 
 from app.schemas.mission_report import (
     MissionReport,
@@ -278,6 +279,9 @@ class PipelineOrchestrator:
         mission_repository.save_execution_readiness(mission_id, readiness_items)
         mission_repository.save_decisions(mission_id, decisions)
 
+        # ── Telegram Instant Trade Alerts ─────────────────────────────
+        telegram_alert_service.dispatch_pipeline_decisions(decisions, candidates, market_state)
+
         artifacts_stored = 1 + 1 + len(candidates) + len(validations) + len(assessments) + len(readiness_items) + len(decisions)
         self._emit_mission_archived(mission_id, artifacts_stored, pipeline_completed_at)
 
@@ -346,3 +350,6 @@ class PipelineOrchestrator:
             provider_health = 0.0
             warnings = [f"Provider registry unavailable: {exc}"]
         return providers_healthy, provider_health, warnings
+
+
+pipeline_orchestrator = PipelineOrchestrator()

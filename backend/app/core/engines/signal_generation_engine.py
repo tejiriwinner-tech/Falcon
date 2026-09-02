@@ -109,10 +109,17 @@ class SignalGenerationEngine:
             
             # 2. Evaluate conditions independently
             # Condition 1: Trend Alignment
-            trend_passed = trend in ["Bullish", "Bearish"] and trend != "Neutral"
+            strat_type_val = strategy.type.value if hasattr(strategy.type, 'value') else str(strategy.type)
+            if strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
+                trend_passed = trend in ["Neutral", "Ranging"] or volatility in ["Low", "Moderate"]
+                trend_desc = f"Strategy requires ranging or stable market. Current trend: {trend}, volatility: {volatility}."
+            else:
+                trend_passed = trend in ["Bullish", "Bearish"] and trend != "Neutral"
+                trend_desc = f"Strategy requires trending market (Bullish/Bearish). Current trend is {trend}."
+
             trend_cond = CandidateCondition(
                 title="Trend Alignment",
-                description=f"Strategy requires trending market (Bullish/Bearish). Current trend is {trend}.",
+                description=trend_desc,
                 passed=trend_passed
             )
             
@@ -124,11 +131,12 @@ class SignalGenerationEngine:
                 passed=session_passed
             )
             
-            # Condition 3: Spread Limit
-            spread_passed = spread <= 0.4
+            # Condition 3: Spread Limit (asset-specific)
+            spread_limit = 2.5 if ("XAU" in strategy.symbol or "GOLD" in strategy.symbol) else (1.5 if "JPY" in strategy.symbol else 0.8)
+            spread_passed = spread <= spread_limit
             spread_cond = CandidateCondition(
                 title="Spread Limit",
-                description=f"Current spread is {spread:.2f} pips (strategy limit <= 0.4).",
+                description=f"Current spread is {spread:.2f} pips (strategy limit <= {spread_limit:.1f}).",
                 passed=spread_passed
             )
             
@@ -161,9 +169,9 @@ class SignalGenerationEngine:
             # Sum up breakdown
             confidence = trend_score + strategy_score + session_score + sentiment_score + news_score
             
-            # Adjust technical confidence to be exactly 91% if the technical conditions align
+            # Adjust technical confidence to be high if the technical conditions align
             if trend_passed and strategy.readyForExecution:
-                confidence = 91
+                confidence = max(confidence, 86)
                 
             breakdown = ConfidenceBreakdown(
                 trendScore=trend_score,
@@ -180,7 +188,7 @@ class SignalGenerationEngine:
             # Spread Quality (30 points)
             if spread_passed:
                 readiness_spread = 30
-            elif spread <= 0.6:
+            elif spread <= (spread_limit * 1.5):
                 readiness_spread = 18
             else:
                 readiness_spread = 5
@@ -205,12 +213,15 @@ class SignalGenerationEngine:
                 status = CandidateStatus.REJECTED
 
             # Determine technical direction (regardless of status/readiness)
-            if trend == "Bullish":
+            if strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
+                direction = CandidateDirection.BUY if trend in ["Bearish", "Neutral"] else CandidateDirection.SELL
+            elif trend == "Bullish":
                 direction = CandidateDirection.BUY
             elif trend == "Bearish":
                 direction = CandidateDirection.SELL
             else:
                 direction = CandidateDirection.WAIT
+
 
             reasons = []
             if status == CandidateStatus.GENERATED:

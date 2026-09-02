@@ -59,7 +59,7 @@ class LearningSchedulerService:
 
     async def _execute_cycle(self) -> None:
         """Execute a complete 4-stage learning cycle asynchronously."""
-        from app.core.orchestration.orchestrator import pipeline_orchestrator
+        from app.core.orchestrator.pipeline_orchestrator import pipeline_orchestrator
         from app.core.analytics.learning_insights_engine import LearningInsightsEngine
         from app.core.analytics.strategy_intelligence_engine import StrategyIntelligenceEngine
         from app.core.analytics.adaptive_strategy_optimizer import AdaptiveStrategyOptimizer

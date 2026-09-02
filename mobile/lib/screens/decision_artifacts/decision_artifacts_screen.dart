@@ -95,8 +95,245 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
     }
   }
 
+  void _handleOneTapExecute(DecisionArtifact d) {
+    String symbol = 'XAUUSD';
+    final nameUpper = d.strategyName.toUpperCase();
+    if (nameUpper.contains('GBP')) {
+      symbol = 'GBPUSD';
+    } else if (nameUpper.contains('EUR')) {
+      symbol = 'EURUSD';
+    } else if (nameUpper.contains('JPY')) {
+      symbol = 'USDJPY';
+    }
+
+    final isBuy = d.recommendation == DecisionRecommendation.BUY;
+    final action = isBuy ? 'BUY' : 'SELL';
+    final lotController = TextEditingController(text: '0.01');
+    final slController = TextEditingController(text: isBuy ? '2492.00' : '2505.00');
+    final tpController = TextEditingController(text: isBuy ? '2512.00' : '2475.00');
+    final entryController = TextEditingController(text: isBuy ? '2498.50' : '2492.00');
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: EdgeInsets.only(
+                left: 20,
+                right: 20,
+                top: 20,
+                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(Icons.bolt, color: AppColors.primary, size: 24),
+                      const SizedBox(width: 8),
+                      const Text(
+                        '1-Tap Execute (MT5 Demo)',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: AppColors.textTertiary),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: (isBuy ? AppColors.success : AppColors.error).withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: (isBuy ? AppColors.success : AppColors.error).withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '$action $symbol',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: isBuy ? AppColors.success : AppColors.error,
+                          ),
+                        ),
+                        Text(
+                          '${d.decisionConfidence.toInt()}% Confidence',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: lotController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                          decoration: const InputDecoration(
+                            labelText: 'Lot Size (Demo)',
+                            labelStyle: TextStyle(color: AppColors.textTertiary),
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: DropdownButtonFormField<String>(
+                          initialValue: symbol,
+                          dropdownColor: AppColors.surfaceLight,
+                          style: const TextStyle(color: Colors.white, fontSize: 14),
+                          decoration: const InputDecoration(
+                            labelText: 'Asset',
+                            labelStyle: TextStyle(color: AppColors.textTertiary),
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'XAUUSD', child: Text('XAUUSD (Gold)')),
+                            DropdownMenuItem(value: 'GBPUSD', child: Text('GBPUSD')),
+                            DropdownMenuItem(value: 'EURUSD', child: Text('EURUSD')),
+                            DropdownMenuItem(value: 'USDJPY', child: Text('USDJPY')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              setModalState(() => symbol = val);
+                            }
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: slController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: AppColors.error, fontSize: 13),
+                          decoration: const InputDecoration(
+                            labelText: 'Stop Loss',
+                            labelStyle: TextStyle(color: AppColors.textTertiary),
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: TextField(
+                          controller: tpController,
+                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                          style: const TextStyle(color: AppColors.success, fontSize: 13),
+                          decoration: const InputDecoration(
+                            labelText: 'Take Profit',
+                            labelStyle: TextStyle(color: AppColors.textTertiary),
+                            border: OutlineInputBorder(),
+                            isDense: true,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: isBuy ? AppColors.success : AppColors.error,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                      icon: const Icon(Icons.send_rounded, color: Colors.white),
+                      label: Text(
+                        'Dispatch $action Order to MT5',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('⚡ Sending order to Falcon Cloud...'),
+                            duration: Duration(seconds: 2),
+                          ),
+                        );
+                        try {
+                          final lot = double.tryParse(lotController.text) ?? 0.01;
+                          final sl = double.tryParse(slController.text) ?? 0.0;
+                          final tp = double.tryParse(tpController.text) ?? 0.0;
+                          final entry = double.tryParse(entryController.text) ?? 0.0;
+                          final res = await _apiService.executeOrder(
+                            symbol: symbol,
+                            action: action,
+                            lotSize: lot,
+                            entryPrice: entry,
+                            stopLoss: sl,
+                            takeProfit: tp,
+                            strategyName: d.strategyName,
+                            confidence: d.decisionConfidence.toInt(),
+                          );
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: AppColors.success,
+                              content: Text('✔ Order ${res['order_id']} dispatched! Check Telegram for MT5 fill.'),
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        } catch (e) {
+                          if (!context.mounted) return;
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              backgroundColor: AppColors.error,
+                              content: Text('Execution failed: $e'),
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+
     return Scaffold(
       appBar: AppBar(
         title: const Text("Captain's Decision Engine"),
@@ -548,7 +785,40 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
               ),
             ),
 
+            // 1-Tap Execution on MT5 Button
+            if (d.recommendation == DecisionRecommendation.BUY ||
+                d.recommendation == DecisionRecommendation.SELL ||
+                d.status == DecisionStatus.APPROVED)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: recColor,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      elevation: 3,
+                    ),
+                    icon: const Icon(Icons.bolt, color: Colors.black, size: 20),
+                    label: Text(
+                      '⚡ 1-Tap Execute ${d.recommendation.name} (MT5 Demo)',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                        color: Colors.black,
+                      ),
+                    ),
+                    onPressed: () => _handleOneTapExecute(d),
+                  ),
+                ),
+              ),
+
             const Divider(color: AppColors.surfaceLight, height: 1),
+
 
             // Footer
             Padding(

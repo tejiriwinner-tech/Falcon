@@ -86,4 +86,11 @@ class Settings:
     CORS_ALLOW_CREDENTIALS: bool = os.getenv("CORS_ALLOW_CREDENTIALS", "False").lower() == "true"
     RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "100"))
 
+    # Telegram Instant Trade Alerts Configuration
+    TELEGRAM_BOT_TOKEN: Optional[str] = os.getenv("TELEGRAM_BOT_TOKEN")
+    TELEGRAM_CHAT_ID: Optional[str] = os.getenv("TELEGRAM_CHAT_ID")
+    TELEGRAM_ALERTS_ENABLED: bool = os.getenv("TELEGRAM_ALERTS_ENABLED", "True").lower() == "true"
+    TELEGRAM_MIN_CONFIDENCE: int = int(os.getenv("TELEGRAM_MIN_CONFIDENCE", "75"))
+
 settings = Settings()
+

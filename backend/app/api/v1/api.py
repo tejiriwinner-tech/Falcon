@@ -30,6 +30,8 @@ from app.api.v1 import dashboard
 from app.api.v1 import intelligence
 from app.api.v1 import live_intelligence
 from app.api.v1 import runtime
+from app.api.v1 import telegram_alerts
+from app.api.v1 import orders
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["health"])
@@ -63,6 +65,10 @@ api_router.include_router(dashboard.router)
 api_router.include_router(intelligence.router, tags=["intelligence"])
 api_router.include_router(live_intelligence.router, tags=["live_intelligence"])
 api_router.include_router(runtime.router)
+api_router.include_router(telegram_alerts.router)
+api_router.include_router(orders.router)
+
+
 
 
 
