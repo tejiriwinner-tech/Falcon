@@ -171,6 +171,13 @@ class FmpProvider(BaseProvider):
         self._cb_state: str = _CB_CLOSED
         self._cb_lock = threading.Lock()
 
+        # Daily budget and rate limiting protections
+        self._daily_budget: int = 200  # Hard cap below FMP 250 calls/day free limit
+        self._daily_date: str = ""
+        self._daily_calls: int = 0
+        self._last_call_ts: float = 0.0
+        self._quote_cache: Dict[str, tuple] = {}
+
         # Counters reset on circuit open/close
         self._consecutive_failures: int = 0
 
@@ -488,6 +495,32 @@ class FmpProvider(BaseProvider):
         """
         t0 = time.time()
 
+        canonical = symbol_mapper.normalize(symbol)
+        if canonical is None:
+            canonical = symbol.upper()
+
+        now_ts = time.time()
+        today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # Daily budget reset at 00:00 UTC
+        if self._daily_date != today_utc:
+            self._daily_date = today_utc
+            self._daily_calls = 0
+
+        # Check in-memory 60s cache first to protect FMP free API quota
+        cached = self._quote_cache.get(canonical)
+        if cached:
+            cached_time, cached_data = cached
+            if now_ts - cached_time < 60.0:
+                self._record_request(True, 1.0)
+                return cached_data
+
+        # Daily budget protection gate
+        if self._daily_calls >= self._daily_budget:
+            logger.warning(f"[{self.PROVIDER_NAME}] Daily budget of {self._daily_budget} calls reached for {today_utc}. Skipping fetch.")
+            self._record_request(False, 0.0)
+            return None
+
         # Pre-flight checks
         if not self._api_key:
             logger.warning(f"[{self.PROVIDER_NAME}] API key not configured")
@@ -501,10 +534,9 @@ class FmpProvider(BaseProvider):
             self._record_request(False, (time.time() - t0) * 1000)
             return None
 
-        # Symbol translation
-        canonical = symbol_mapper.normalize(symbol)
-        if canonical is None:
-            canonical = symbol.upper()
+        self._last_call_ts = time.time()
+        self._daily_calls += 1
+
         provider_ticker = symbol_mapper.to_provider_symbol(canonical, self.PROVIDER_ID)
 
         # API request — Phase 8.3.2: FMP Stable API uses /stable/quote with

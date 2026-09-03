@@ -13,7 +13,7 @@ logger = logging.getLogger("falcon.learning_scheduler")
 class LearningSchedulerService:
     """Embedded background runner for continuous Falcon learning cycles."""
 
-    def __init__(self, interval_seconds: int = 180):  # 3 minutes default for live background refreshes
+    def __init__(self, interval_seconds: int = 900):  # 15 minutes optimal institutional learning interval
         self.interval_seconds = interval_seconds
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
