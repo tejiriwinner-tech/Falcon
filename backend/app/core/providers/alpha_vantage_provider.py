@@ -64,6 +64,10 @@ class AlphaVantageProvider(BaseProvider):
         self._connected: bool = False
         self._session = requests.Session()
         self._quote_cache: Dict[str, tuple] = {}
+        self._daily_budget: int = 450  # Hard cap below Alpha Vantage free tier
+        self._daily_date: str = ""
+        self._daily_calls: int = 0
+        self._last_call_ts: float = 0.0
 
     @property
     def configured(self) -> bool:
@@ -85,18 +89,40 @@ class AlphaVantageProvider(BaseProvider):
         t0 = time.time()
         canonical = symbol_mapper.normalize(symbol) or symbol.upper()
         now_ts = time.time()
+        today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
-        # Check in-memory 30s cache first to protect Alpha Vantage rate limit
-        if canonical in self._quote_cache:
-            cached_time, cached_data = self._quote_cache[canonical]
-            if now_ts - cached_time < 30.0:
+        # Daily budget reset at 00:00 UTC
+        if self._daily_date != today_utc:
+            self._daily_date = today_utc
+            self._daily_calls = 0
+
+        # Check in-memory 60s cache first to protect Alpha Vantage rate limit
+        cached = self._quote_cache.get(canonical)
+        if cached:
+            cached_time, cached_data = cached
+            if now_ts - cached_time < 60.0:
                 self._record_request(True, 1.0)
                 return cached_data
+
+        # Daily budget protection gate
+        if self._daily_calls >= self._daily_budget:
+            logger.warning("[AlphaVantage] Daily budget of %s calls reached for %s. Skipping fetch.", self._daily_budget, today_utc)
+            self._record_request(False, 0.0)
+            return None
+
+        # Rate limiter gate: minimum 12.0 seconds between outbound requests (5 req/min free limit)
+        if (now_ts - self._last_call_ts) < 12.0:
+            if cached:
+                return cached[1]
+            return None
 
         pair = _FX_PAIRS.get(canonical)
         if not self._connected or not self.configured or pair is None:
             self._record_request(False, (time.time() - t0) * 1000)
             return None
+
+        self._last_call_ts = time.time()
+        self._daily_calls += 1
 
         from_currency, to_currency = pair
         params = {

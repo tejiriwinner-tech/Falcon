@@ -64,7 +64,6 @@ class ProviderManager:
 
         self._lock = threading.Lock()
         self._pending_requests: Dict[str, Future] = {}
-        self._last_known_quotes: Dict[str, MarketQuote] = {}
 
     # ──────────────────────────────────────────────────────────────────
     # Public API
@@ -219,44 +218,9 @@ class ProviderManager:
             )
 
             self._successful_requests += 1
-            self._last_known_quotes[canonical] = quote
             return MarketQuoteResponse(quote=quote)
 
-        # All providers failed / skipped — check last known good quote or baseline anchor
-        if canonical in self._last_known_quotes:
-            saved = self._last_known_quotes[canonical]
-            return MarketQuoteResponse(quote=saved)
-
-        # Safe baseline anchors for standard watchlist symbols to prevent UI empty states
-        _BASELINES = {
-            "EURUSD": (1.16135, 1.16140, 0.00005, 5),
-            "GBPUSD": (1.34120, 1.34130, 0.00010, 5),
-            "USDJPY": (155.450, 155.465, 0.015, 3),
-            "XAUUSD": (2654.50, 2654.85, 0.35, 2),
-            "NAS100": (20150.0, 20152.0, 2.0, 1),
-            "US30": (42850.0, 42854.0, 4.0, 1),
-            "BTCUSD": (63500.0, 63510.0, 10.0, 2),
-            "ETHUSD": (2550.0, 2551.0, 1.0, 2),
-        }
-        if canonical in _BASELINES:
-            b_bid, b_ask, b_spr, b_prec = _BASELINES[canonical]
-            b_mid = round((b_bid + b_ask) / 2.0, b_prec)
-            fallback_quote = MarketQuote(
-                symbol=canonical,
-                bidAsk=BidAsk(bid=b_bid, ask=b_ask, spread=b_spr),
-                lastPrice=b_mid,
-                change=0.0,
-                changePercent=0.0,
-                timestamp=datetime.now(timezone.utc),
-                providerId="falcon_fallback",
-                providerName="Falcon Feed",
-                quoteStatus=QuoteStatus.LIVE,
-                marketStatus=MarketStatus.OPEN,
-                freshnessSeconds=0.0,
-            )
-            self._last_known_quotes[canonical] = fallback_quote
-            return MarketQuoteResponse(quote=fallback_quote)
-
+        # All providers failed / skipped — return None (empty state as requested, zero mock data)
         self._failed_requests += 1
         return None
 

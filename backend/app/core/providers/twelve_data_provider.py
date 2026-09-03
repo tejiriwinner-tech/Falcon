@@ -93,6 +93,11 @@ class TwelveDataProvider(BaseProvider):
 
         # Whether the most recent failures were caused by 429s specifically
         self._last_failure_was_429: bool = False
+        self._quote_cache: Dict[str, Dict[str, Any]] = {}
+        self._daily_budget: int = 700  # Hard cap below TwelveData 800/day free limit
+        self._daily_date: str = ""
+        self._daily_calls: int = 0
+        self._last_call_ts: float = 0.0
 
         # ── Extended statistics ────────────────────────────────────────
         self._http_429_count: int = 0
@@ -329,6 +334,31 @@ class TwelveDataProvider(BaseProvider):
     def fetch(self, symbol: str, **kwargs) -> Optional[Dict[str, Any]]:
         t0 = time.time()
         canonical = symbol_mapper.normalize(symbol) or symbol.upper()
+        now_ts = time.time()
+        today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+        # Daily budget reset at 00:00 UTC
+        if self._daily_date != today_utc:
+            self._daily_date = today_utc
+            self._daily_calls = 0
+
+        # Check in-memory quote cache (60-second TTL to conserve free API calls)
+        cached = self._quote_cache.get(canonical)
+        if cached and (now_ts - cached["fetched_at"]) < 60.0:
+            return cached["data"]
+
+        # Daily budget protection gate — never exceed free tier limit
+        if self._daily_calls >= self._daily_budget:
+            print(f"[{self.PROVIDER_NAME}] Daily budget of {self._daily_budget} calls reached for {today_utc}. Skipping fetch to avoid over-limit.")
+            self._record_request(False, 0.0)
+            return None
+
+        # Rate limiter gate: minimum 7.5 seconds between outbound requests (8 req/min limit)
+        if (now_ts - self._last_call_ts) < 7.5:
+            # If rate limited, return cached if exists, or return None without sending HTTP
+            if cached:
+                return cached["data"]
+            return None
 
         # ── Circuit breaker gate ───────────────────────────────────────
         if self._cb_should_block():
@@ -357,6 +387,9 @@ class TwelveDataProvider(BaseProvider):
             self._record_request(False, (time.time() - t0) * 1000)
             self._last_failure_at = datetime.now(timezone.utc)
             return None
+
+        self._last_call_ts = time.time()
+        self._daily_calls += 1
 
         try:
             params = {"symbol": ticker, "apikey": self._api_key}
@@ -436,6 +469,7 @@ class TwelveDataProvider(BaseProvider):
             self._cb_record_success()
             self._record_request(True, latency)
             self._last_success_at = datetime.now(timezone.utc)
+            self._quote_cache[canonical] = {"data": result, "fetched_at": time.time()}
             return result
 
         except requests.Timeout:
