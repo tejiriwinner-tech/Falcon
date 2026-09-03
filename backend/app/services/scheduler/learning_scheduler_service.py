@@ -13,7 +13,7 @@ logger = logging.getLogger("falcon.learning_scheduler")
 class LearningSchedulerService:
     """Embedded background runner for continuous Falcon learning cycles."""
 
-    def __init__(self, interval_seconds: int = 900):  # 15 minutes default
+    def __init__(self, interval_seconds: int = 180):  # 3 minutes default for live background refreshes
         self.interval_seconds = interval_seconds
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
@@ -40,8 +40,8 @@ class LearningSchedulerService:
 
     async def _run_loop(self) -> None:
         """Main loop that executes learning cycles periodically."""
-        # Initial wait of 45 seconds to allow market data scheduler & cache to warm up
-        await asyncio.sleep(45)
+        # Initial wait of 15 seconds to allow market data scheduler & cache to warm up
+        await asyncio.sleep(15)
 
         while self.is_running:
             try:
