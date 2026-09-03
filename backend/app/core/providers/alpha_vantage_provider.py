@@ -63,6 +63,7 @@ class AlphaVantageProvider(BaseProvider):
         self._base_url: str = settings.ALPHA_BASE_URL
         self._connected: bool = False
         self._session = requests.Session()
+        self._quote_cache: Dict[str, tuple] = {}
 
     @property
     def configured(self) -> bool:
@@ -83,6 +84,15 @@ class AlphaVantageProvider(BaseProvider):
     def fetch(self, symbol: str, **kwargs) -> Optional[Dict[str, Any]]:
         t0 = time.time()
         canonical = symbol_mapper.normalize(symbol) or symbol.upper()
+        now_ts = time.time()
+
+        # Check in-memory 30s cache first to protect Alpha Vantage rate limit
+        if canonical in self._quote_cache:
+            cached_time, cached_data = self._quote_cache[canonical]
+            if now_ts - cached_time < 30.0:
+                self._record_request(True, 1.0)
+                return cached_data
+
         pair = _FX_PAIRS.get(canonical)
         if not self._connected or not self.configured or pair is None:
             self._record_request(False, (time.time() - t0) * 1000)
@@ -105,7 +115,7 @@ class AlphaVantageProvider(BaseProvider):
                 return None
             quote = response.json().get(_EXCHANGE_RATE_KEY)
             if not isinstance(quote, dict):
-                logger.warning("[AlphaVantage] Unexpected payload for %s", canonical)
+                logger.warning("[AlphaVantage] Unexpected payload for %s: %s", canonical, response.json())
                 self._record_request(False, latency)
                 return None
 
@@ -126,7 +136,7 @@ class AlphaVantageProvider(BaseProvider):
                 ts = datetime.now(timezone.utc).isoformat()
 
             self._record_request(True, latency)
-            return {
+            result = {
                 "symbol": canonical,
                 "providerTicker": f"{from_currency}/{to_currency}",
                 "bid": round(bid, 5),
@@ -142,6 +152,8 @@ class AlphaVantageProvider(BaseProvider):
                 "fresh": True,
                 "session": "Global",
             }
+            self._quote_cache[canonical] = (now_ts, result)
+            return result
         except (requests.RequestException, ValueError) as exc:
             logger.error("[AlphaVantage] Error fetching %s: %s", canonical, exc)
             self._record_request(False, (time.time() - t0) * 1000)
