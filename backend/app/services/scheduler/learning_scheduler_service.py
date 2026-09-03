@@ -60,7 +60,7 @@ class LearningSchedulerService:
     async def _execute_cycle(self) -> None:
         """Execute a complete 4-stage learning cycle asynchronously."""
         from app.core.orchestrator.pipeline_orchestrator import pipeline_orchestrator
-        from app.core.analytics.learning_insights_engine import LearningInsightsEngine
+        from app.core.engines.learning_insight_engine import LearningInsightEngine
         from app.core.analytics.strategy_intelligence_engine import StrategyIntelligenceEngine
         from app.core.analytics.adaptive_strategy_optimizer import AdaptiveStrategyOptimizer
         from app.core.repository.mission_repository import mission_repository
@@ -78,8 +78,8 @@ class LearningSchedulerService:
 
         # Stage 2: Learning Insights
         try:
-            insights_engine = LearningInsightsEngine()
-            insights = await asyncio.to_thread(insights_engine.generate_insights, mission_repository)
+            insights_engine = LearningInsightEngine()
+            insights = await asyncio.to_thread(insights_engine.generate_learning_insights, mission_repository)
             logger.info(f"[Stage 2] Generated {len(insights)} learning insights")
         except Exception as e:
             logger.warning(f"[Stage 2] Learning insights failed: {e}")

@@ -92,7 +92,9 @@ class RiskManagementEngine:
             reasons.append(f"RR acceptable ({trade_setup.riskRewardRatio:.2f})")
         
         # 2. Stop Loss Distance Validation
-        sl_valid, sl_distance = self._validate_stop_loss_distance(trade_setup.entryPrice, trade_setup.stopLoss)
+        sl_valid, sl_distance = self._validate_stop_loss_distance(
+            trade_setup.entryPrice, trade_setup.stopLoss, getattr(trade_setup, "symbol", "EURUSD")
+        )
         if not sl_valid:
             reasons.append(f"Stop loss distance exceeds maximum ({sl_distance:.2f} pips > {self.settings.maximum_stop_distance})")
             risk_score += 20
@@ -243,12 +245,20 @@ class RiskManagementEngine:
         else:
             return True, False
     
-    def _validate_stop_loss_distance(self, entry_price: float, stop_loss: float) -> tuple[bool, float]:
-        """Validate stop loss distance in pips."""
+    def _validate_stop_loss_distance(self, entry_price: float, stop_loss: float, symbol: str = "EURUSD") -> tuple[bool, float]:
+        """Validate stop loss distance in pips with asset-specific calculation."""
         distance = abs(entry_price - stop_loss)
-        # Convert to pips (simplified - assumes forex pairs)
-        pips = distance * 10000
-        return pips <= self.settings.maximum_stop_distance, pips
+        symbol_upper = str(symbol).upper().replace("/", "").replace("_", "")
+        if "XAU" in symbol_upper or "GOLD" in symbol_upper:
+            pips = distance * 10.0
+            max_sl = 300.0  # Gold allows up to 300 pips ($30)
+        elif "JPY" in symbol_upper:
+            pips = distance * 100.0
+            max_sl = 150.0  # JPY allows up to 150 pips (1.50 yen)
+        else:
+            pips = distance * 10000.0
+            max_sl = self.settings.maximum_stop_distance
+        return pips <= max_sl, pips
     
     def _validate_confidence(self, confidence: float) -> bool:
         """Validate signal confidence."""

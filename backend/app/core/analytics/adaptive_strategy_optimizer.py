@@ -61,6 +61,7 @@ class AdaptiveStrategyOptimizer:
                 intel_map[sr.strategyId] = sr
 
         reports: List[StrategyOptimizationReport] = []
+        strategies = self._strategy_engine.get_strategies()
 
         for idx, strat in enumerate(strategies, start=1):
             report_id = f"optimizer-{idx:03d}"

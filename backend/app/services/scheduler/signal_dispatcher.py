@@ -39,13 +39,45 @@ class SignalDispatcher:
                 f"(ID: {signal.signalId})"
             )
             
-            # Future channels will be added here:
-            # - WebSocket broadcast
-            # - Push notifications
-            # - Telegram bot
-            # - Discord webhook
-            # - Email alerts
-            
+            # Dispatch to Telegram if configured
+            type_str = str(getattr(signal, "signalType", "")).upper()
+            if "BUY" in type_str or "SELL" in type_str:
+                try:
+                    from app.services.alerts.telegram_alert_service import telegram_alert_service
+                    if telegram_alert_service.is_configured:
+                        action_emoji = "🟢" if "BUY" in type_str else "🔴"
+                        sym = str(signal.symbol).upper()
+                        if "XAU" in sym:
+                            fmt = ".2f"
+                        elif "JPY" in sym:
+                            fmt = ".3f"
+                        else:
+                            fmt = ".5f"
+                        
+                        entry_str = f"{signal.entryPrice:{fmt}}"
+                        sl_str = f"{signal.stopLoss:{fmt}}"
+                        tp1_str = f"{signal.takeProfit1:{fmt}}" if signal.takeProfit1 else "Open"
+                        
+                        msg = (
+                            f"🦅 <b>FALCON MARKET SIGNAL</b>\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"📊 <b>Asset:</b> <code>{signal.symbol}</code> ({signal.timeframe})\n"
+                            f"{action_emoji} <b>Direction:</b> <b>{type_str.replace('SIGNALTYPE.', '')}</b>\n"
+                            f"🎯 <b>Confidence:</b> <b>{signal.confidence:.0f}%</b>\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"💵 <b>Entry:</b> <code>{entry_str}</code>\n"
+                            f"🛑 <b>Stop Loss:</b> <code>{sl_str}</code>\n"
+                            f"🎯 <b>Take Profit:</b> <code>{tp1_str}</code>\n"
+                            f"⚖️ <b>Risk/Reward:</b> 1:{signal.riskRewardRatio:.2f}\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"📱 <b>Tap-to-Copy for MT5:</b>\n"
+                            f"• SL: <code>{sl_str}</code>\n"
+                            f"• TP: <code>{tp1_str}</code>\n"
+                        )
+                        telegram_alert_service.dispatch_raw_message(msg)
+                except Exception as ex:
+                    logger.warning(f"Telegram dispatch failed for {signal.signalId}: {ex}")
+
             self.dispatched_count += 1
             self.last_dispatch_time = datetime.now(timezone.utc)
             return True
