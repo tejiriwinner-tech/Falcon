@@ -173,6 +173,23 @@ class MarketScheduler:
                 logger.warning(f"Invalid timeframe: {timeframe}")
                 return result
             
+            from app.services.history.history_service import HistoryService
+            from app.core.providers.provider_manager import provider_manager
+
+            history_service = HistoryService(db)
+            candles = history_service.get_candles(symbol, tf, limit=200)
+
+            # Fetch real live market quote from TwelveData / AlphaVantage / FMP
+            live_price = None
+            try:
+                live_quote = provider_manager.get_quote(symbol)
+                if live_quote:
+                    live_price = float(live_quote.get("mid") or live_quote.get("lastPrice") or live_quote.get("ask") or 0.0)
+            except Exception:
+                pass
+            if not live_price and indicator_result:
+                live_price = indicator_result.bb_middle
+
             # Run Falcon pipeline
             trend_result = trend_service.calculate_trend(symbol, tf, limit=200)
             structure_result = structure_service.analyze_structure(symbol, tf, limit=200)
@@ -184,7 +201,7 @@ class MarketScheduler:
                 trend_result=trend_result,
                 structure_result=structure_result,
                 indicator_result=indicator_result,
-                current_price=indicator_result.bb_middle if indicator_result else None
+                current_price=live_price
             )
             
             ai_decision = ai_decision_engine.make_decision(
@@ -196,7 +213,7 @@ class MarketScheduler:
                 signal_score_result=signal_score_result
             )
             
-            # Generate signal using the intelligent signal generator
+            # Generate signal using the intelligent signal generator with real live price & pattern recognition
             trade_setup = self.signal_generator.generate_signal(
                 symbol=symbol,
                 timeframe=timeframe,
@@ -205,7 +222,8 @@ class MarketScheduler:
                 structure_result=structure_result,
                 indicator_result=indicator_result,
                 signal_score_result=signal_score_result,
-                current_price=indicator_result.bb_middle if indicator_result else None
+                current_price=live_price,
+                candles=candles
             )
             
             generation_time_ms = time.time() * 1000 - generation_start_ms

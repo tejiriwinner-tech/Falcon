@@ -5,7 +5,7 @@ Transforms AI decisions into complete institutional-quality trading setups.
 import time
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Optional, List
+from typing import Optional, List, Any, Dict
 from app.schemas.signal_models import (
     SignalType, SignalStatus, TradeSetup, SignalStatistics, TradeManagement
 )
@@ -15,6 +15,7 @@ from app.schemas.market_structure_models import MarketStructureResult
 from app.schemas.indicator_models import IndicatorResponse
 from app.schemas.signal_score_models import SignalScoreResult
 from app.schemas.signal_settings import SignalSettings
+from app.services.patterns.candlestick_pattern_engine import candlestick_pattern_engine, PatternBias
 
 
 class SignalGenerator:
@@ -57,7 +58,8 @@ class SignalGenerator:
         structure_result: Optional[MarketStructureResult] = None,
         indicator_result: Optional[IndicatorResponse] = None,
         signal_score_result: Optional[SignalScoreResult] = None,
-        current_price: Optional[float] = None
+        current_price: Optional[float] = None,
+        candles: Optional[List[Any]] = None
     ) -> TradeSetup:
         """
         Generate complete trade setup from AI decision.
@@ -71,6 +73,7 @@ class SignalGenerator:
             indicator_result: Indicator analysis result
             signal_score_result: Signal score result
             current_price: Current market price
+            candles: Historical & live candles for candlestick pattern recognition
             
         Returns:
             TradeSetup with complete trading recommendation
@@ -91,6 +94,30 @@ class SignalGenerator:
         
         # Determine signal type from AI decision
         signal_type = self._map_decision_to_signal_type(ai_decision.decision)
+
+        # ── Institutional Candlestick Pattern Recognition ────────────
+        detected_patterns = []
+        pattern_notes = []
+        if candles and len(candles) >= 2:
+            detected_patterns = candlestick_pattern_engine.analyze_patterns(
+                candles, symbol=symbol, timeframe=timeframe, current_live_price=current_price
+            )
+            for p in detected_patterns[:2]:
+                pattern_notes.append(f"{p.pattern_name} ({p.confidence:.0f}%)")
+
+        if detected_patterns:
+            top_p = detected_patterns[0]
+            if signal_type == SignalType.BUY and top_p.bias == PatternBias.BULLISH:
+                ai_decision.confidence = min(98.0, max(ai_decision.confidence, top_p.confidence))
+            elif signal_type == SignalType.SELL and top_p.bias == PatternBias.BEARISH:
+                ai_decision.confidence = min(98.0, max(ai_decision.confidence, top_p.confidence))
+            elif signal_type == SignalType.WAIT and top_p.confidence >= 85.0:
+                if top_p.bias == PatternBias.BULLISH:
+                    signal_type = SignalType.BUY
+                    ai_decision.confidence = top_p.confidence
+                elif top_p.bias == PatternBias.BEARISH:
+                    signal_type = SignalType.SELL
+                    ai_decision.confidence = top_p.confidence
         
         # Generate signal ID
         signal_id = self._generate_signal_id()
@@ -145,6 +172,11 @@ class SignalGenerator:
         else:
             self._wait_signals += 1
         
+        # Include candlestick pattern notes in reasoning
+        final_reasoning = ai_decision.reasoning
+        if pattern_notes:
+            final_reasoning = f"{final_reasoning} | Candlestick Trigger: {', '.join(pattern_notes)}"
+
         # Create result
         result = TradeSetup(
             signalId=signal_id,
@@ -162,7 +194,7 @@ class SignalGenerator:
             expectedHoldTime=expected_hold_time,
             status=SignalStatus.ACTIVE,
             decision=ai_decision.decision.value,
-            reasoning=ai_decision.reasoning,
+            reasoning=final_reasoning,
             warnings=ai_decision.warnings,
             tradeManagement=trade_management,
             generatedAt=datetime.now(timezone.utc),

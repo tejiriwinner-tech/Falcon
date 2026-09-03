@@ -58,21 +58,28 @@ class SignalDispatcher:
                         sl_str = f"{signal.stopLoss:{fmt}}"
                         tp1_str = f"{signal.takeProfit1:{fmt}}" if signal.takeProfit1 else "Open"
                         
+                        reason_line = ""
+                        if hasattr(signal, "reasoning") and signal.reasoning:
+                            reason_line = f"🧠 <b>Trigger:</b> {signal.reasoning}\n"
+                        
                         msg = (
-                            f"🦅 <b>FALCON MARKET SIGNAL</b>\n"
+                            f"🦅 <b>FALCON TRADE SIGNAL ALERT</b>\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"📊 <b>Asset:</b> <code>{signal.symbol}</code> ({signal.timeframe})\n"
-                            f"{action_emoji} <b>Direction:</b> <b>{type_str.replace('SIGNALTYPE.', '')}</b>\n"
+                            f"{action_emoji} <b>Direction:</b> <b>{type_str.replace('SIGNALTYPE.', '')} SETUP</b>\n"
                             f"🎯 <b>Confidence:</b> <b>{signal.confidence:.0f}%</b>\n"
+                            f"{reason_line}"
                             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"💵 <b>Entry:</b> <code>{entry_str}</code>\n"
+                            f"💵 <b>Entry (Live):</b> <code>{entry_str}</code>\n"
                             f"🛑 <b>Stop Loss:</b> <code>{sl_str}</code>\n"
                             f"🎯 <b>Take Profit:</b> <code>{tp1_str}</code>\n"
                             f"⚖️ <b>Risk/Reward:</b> 1:{signal.riskRewardRatio:.2f}\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"📱 <b>Tap-to-Copy for MT5:</b>\n"
+                            f"📱 <b>Tap-to-Copy for MT5 Mobile:</b>\n"
                             f"• SL: <code>{sl_str}</code>\n"
                             f"• TP: <code>{tp1_str}</code>\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"💡 <i>Tip: Tap any code block above to copy directly to MT5!</i>"
                         )
                         telegram_alert_service.dispatch_raw_message(msg)
                 except Exception as ex:
