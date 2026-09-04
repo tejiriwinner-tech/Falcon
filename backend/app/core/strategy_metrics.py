@@ -107,14 +107,28 @@ def latest_validation_by_strategy() -> Dict[str, StrategyValidation]:
     }
 
 
+_last_used_cache: Optional[Dict[str, Optional[str]]] = None
+_last_used_at: float = 0.0
+
+
 def last_used_by_strategy() -> Dict[str, Optional[str]]:
-    """Most recent candidate generation time per strategy across stored missions."""
+    """Most recent candidate generation time per strategy across recent stored missions."""
+    global _last_used_cache, _last_used_at
+    import time as _t
+    now = _t.monotonic()
+    if _last_used_cache is not None and (now - _last_used_at) < 30.0:
+        return dict(_last_used_cache)
+
     last_used: Dict[str, Optional[str]] = {}
-    for mission in mission_repository.get_all_missions():
-        for candidate in mission_repository.get_mission_artifacts(mission.id).get(
-            "candidates", []
-        ):
-            current = last_used.get(candidate.strategyId)
-            if current is None or candidate.generatedAt > current:
+    missions = mission_repository.get_all_missions()
+    # Check the most recent 15 missions in reverse to find the latest usage instantly
+    recent_missions = list(reversed(missions[-15:] if len(missions) > 15 else missions))
+    for mission in recent_missions:
+        artifacts = mission_repository.get_mission_artifacts(mission.id)
+        for candidate in artifacts.get("candidates", []):
+            if candidate.strategyId not in last_used:
                 last_used[candidate.strategyId] = candidate.generatedAt
+
+    _last_used_cache = last_used
+    _last_used_at = now
     return last_used
