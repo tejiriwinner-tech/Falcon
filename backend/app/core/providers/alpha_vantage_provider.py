@@ -64,10 +64,11 @@ class AlphaVantageProvider(BaseProvider):
         self._connected: bool = False
         self._session = requests.Session()
         self._quote_cache: Dict[str, tuple] = {}
-        self._daily_budget: int = 450  # Hard cap below Alpha Vantage free tier
+        self._daily_budget: int = 25  # Matches Alpha Vantage free key limit of 25 req/day
         self._daily_date: str = ""
         self._daily_calls: int = 0
         self._last_call_ts: float = 0.0
+        self._is_rate_limited: bool = False
 
     @property
     def configured(self) -> bool:
@@ -81,7 +82,7 @@ class AlphaVantageProvider(BaseProvider):
         self._connected = False
 
     def health_check(self) -> ProviderHealth:
-        if not self._connected or not self.configured:
+        if not self._connected or not self.configured or self._is_rate_limited:
             return ProviderHealth.CRITICAL
         return ProviderHealth.HEALTHY
 
@@ -95,6 +96,7 @@ class AlphaVantageProvider(BaseProvider):
         if self._daily_date != today_utc:
             self._daily_date = today_utc
             self._daily_calls = 0
+            self._is_rate_limited = False
 
         # Check in-memory 60s cache first to protect Alpha Vantage rate limit
         cached = self._quote_cache.get(canonical)
@@ -105,15 +107,9 @@ class AlphaVantageProvider(BaseProvider):
                 return cached_data
 
         # Daily budget protection gate
-        if self._daily_calls >= self._daily_budget:
+        if self._daily_calls >= self._daily_budget or self._is_rate_limited:
             logger.warning("[AlphaVantage] Daily budget of %s calls reached for %s. Skipping fetch.", self._daily_budget, today_utc)
             self._record_request(False, 0.0)
-            return None
-
-        # Rate limiter gate: minimum 12.0 seconds between outbound requests (5 req/min free limit)
-        if (now_ts - self._last_call_ts) < 12.0:
-            if cached:
-                return cached[1]
             return None
 
         pair = _FX_PAIRS.get(canonical)
@@ -139,9 +135,16 @@ class AlphaVantageProvider(BaseProvider):
             if response.status_code != 200:
                 self._record_request(False, latency)
                 return None
-            quote = response.json().get(_EXCHANGE_RATE_KEY)
+            res_json = response.json()
+            if "Information" in res_json or "Note" in res_json:
+                logger.warning("[AlphaVantage] Rate limit payload for %s: %s", canonical, res_json)
+                self._is_rate_limited = True
+                self._record_request(False, latency)
+                return None
+
+            quote = res_json.get(_EXCHANGE_RATE_KEY)
             if not isinstance(quote, dict):
-                logger.warning("[AlphaVantage] Unexpected payload for %s: %s", canonical, response.json())
+                logger.warning("[AlphaVantage] Unexpected payload for %s: %s", canonical, res_json)
                 self._record_request(False, latency)
                 return None
 
