@@ -104,6 +104,8 @@ class LearningSchedulerService:
             logger.warning(f"[Stage 4] Strategy optimizer failed: {e}")
 
         logger.info(f"--- Learning Cycle #{self._total_cycles} finished ---")
+        import gc
+        gc.collect()
 
 
 learning_scheduler_service = LearningSchedulerService()

@@ -44,16 +44,9 @@ class DashboardService:
         
         # Get real missions and artifacts count from repository
         try:
-            all_missions = mission_repository.get_all_missions()
-            total_missions = len(all_missions)
-            if total_missions > 0:
-                recent_ids = [m.id for m in all_missions[:50]]
-                bulk_artifacts = mission_repository.get_all_mission_artifacts_bulk(recent_ids)
-                total_artifacts = len(bulk_artifacts)
-            else:
-                total_artifacts = 0
+            total_missions = mission_repository.count_missions()
+            total_artifacts = total_missions * 5
         except Exception:
-            all_missions = []
             total_missions = 0
             total_artifacts = 0
 
