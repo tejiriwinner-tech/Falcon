@@ -36,7 +36,6 @@ _FX_PAIRS: Dict[str, tuple] = {
     "EURUSD": ("EUR", "USD"),
     "GBPUSD": ("GBP", "USD"),
     "USDJPY": ("USD", "JPY"),
-    "XAUUSD": ("XAU", "USD"),
     "BTCUSD": ("BTC", "USD"),
     "ETHUSD": ("ETH", "USD"),
 }
@@ -69,6 +68,7 @@ class AlphaVantageProvider(BaseProvider):
         self._daily_calls: int = 0
         self._last_call_ts: float = 0.0
         self._is_rate_limited: bool = False
+        self._rate_limited_until: float = 0.0
 
     @property
     def configured(self) -> bool:
@@ -81,7 +81,19 @@ class AlphaVantageProvider(BaseProvider):
     def disconnect(self) -> None:
         self._connected = False
 
+    def _check_daily_reset(self) -> None:
+        today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        if self._daily_date != today_utc:
+            self._daily_date = today_utc
+            self._daily_calls = 0
+            self._is_rate_limited = False
+            self._rate_limited_until = 0.0
+
+        if self._is_rate_limited and time.time() >= self._rate_limited_until:
+            self._is_rate_limited = False
+
     def health_check(self) -> ProviderHealth:
+        self._check_daily_reset()
         if not self._connected or not self.configured or self._is_rate_limited:
             return ProviderHealth.CRITICAL
         return ProviderHealth.HEALTHY
@@ -90,13 +102,7 @@ class AlphaVantageProvider(BaseProvider):
         t0 = time.time()
         canonical = symbol_mapper.normalize(symbol) or symbol.upper()
         now_ts = time.time()
-        today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-
-        # Daily budget reset at 00:00 UTC
-        if self._daily_date != today_utc:
-            self._daily_date = today_utc
-            self._daily_calls = 0
-            self._is_rate_limited = False
+        self._check_daily_reset()
 
         # Check in-memory 60s cache first to protect Alpha Vantage rate limit
         cached = self._quote_cache.get(canonical)
@@ -108,7 +114,7 @@ class AlphaVantageProvider(BaseProvider):
 
         # Daily budget protection gate
         if self._daily_calls >= self._daily_budget or self._is_rate_limited:
-            logger.warning("[AlphaVantage] Daily budget of %s calls reached for %s. Skipping fetch.", self._daily_budget, today_utc)
+            logger.warning("[AlphaVantage] Daily budget/rate limit active (%s/%s calls). Skipping fetch.", self._daily_calls, self._daily_budget)
             self._record_request(False, 0.0)
             return None
 
@@ -139,6 +145,7 @@ class AlphaVantageProvider(BaseProvider):
             if "Information" in res_json or "Note" in res_json:
                 logger.warning("[AlphaVantage] Rate limit payload for %s: %s", canonical, res_json)
                 self._is_rate_limited = True
+                self._rate_limited_until = time.time() + 60.0  # 60-second cooldown
                 self._record_request(False, latency)
                 return None
 
@@ -192,13 +199,21 @@ class AlphaVantageProvider(BaseProvider):
         return capability in _CAPABILITIES
 
     def get_metadata(self) -> ProviderMetadata:
+        self._check_daily_reset()
         online = self._connected and self.configured
+        if not online:
+            status = ProviderStatus.OFFLINE
+        elif self._is_rate_limited or self._daily_calls >= self._daily_budget:
+            status = ProviderStatus.RATE_LIMITED
+        else:
+            status = ProviderStatus.ONLINE
+
         return ProviderMetadata(
             providerId=self.PROVIDER_ID,
             providerName=self.PROVIDER_NAME,
             providerVersion=self.PROVIDER_VERSION,
             providerType=ProviderType.PRICE,
             capabilities=_CAPABILITIES,
-            status=ProviderStatus.ONLINE if online else ProviderStatus.OFFLINE,
+            status=status,
             health=self.health_check(),
         )
