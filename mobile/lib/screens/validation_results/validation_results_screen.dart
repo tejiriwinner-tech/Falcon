@@ -277,21 +277,25 @@ class _ValidationResultsScreenState extends State<ValidationResultsScreen> {
                     'Strategy: ',
                     style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      context.push('/strategies/${res.strategyId}');
-                    },
-                    child: Text(
-                      '${res.strategyName} v${res.strategyVersion}',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        decoration: TextDecoration.underline,
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        context.push('/strategies/${res.strategyId}');
+                      },
+                      child: Text(
+                        '${res.strategyName} v${res.strategyVersion}',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.underline,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Text(
                     'ID: ${res.candidateId}',
                     style: const TextStyle(
@@ -498,16 +502,20 @@ class _ValidationResultsScreenState extends State<ValidationResultsScreen> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      check.title,
-                      style: TextStyle(
-                        color: check.passed ? AppColors.textPrimary : AppColors.error,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                    Expanded(
+                      child: Text(
+                        check.title,
+                        style: TextStyle(
+                          color: check.passed ? AppColors.textPrimary : AppColors.error,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    if (check.mandatory)
+                    if (check.mandatory) ...[
+                      const SizedBox(width: 6),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(
@@ -524,7 +532,8 @@ class _ValidationResultsScreenState extends State<ValidationResultsScreen> {
                           ),
                         ),
                       ),
-                    const Spacer(),
+                    ],
+                    const SizedBox(width: 8),
                     Text(
                       'Score: ${check.scoreAwarded}/${check.weight}',
                       style: const TextStyle(

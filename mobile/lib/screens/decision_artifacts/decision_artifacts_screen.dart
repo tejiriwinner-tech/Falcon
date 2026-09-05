@@ -661,15 +661,14 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
                     style: const TextStyle(color: AppColors.textSecondary, fontSize: 11),
                   ),
                   const SizedBox(height: 8),
-                  Row(
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
                     children: [
                       _buildDetailItem('Holding', recDetails.expectedHolding),
-                      const SizedBox(width: 12),
                       _buildDetailItem('Mission', recDetails.missionStatus),
-                      if (recDetails.nextReviewIn != null) ...[
-                        const SizedBox(width: 12),
+                      if (recDetails.nextReviewIn != null)
                         _buildDetailItem('Review In', recDetails.nextReviewIn!),
-                      ],
                     ],
                   ),
                 ],
@@ -1081,8 +1080,9 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
             style: TextStyle(color: AppColors.textSecondary, fontSize: 10, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          Wrap(
+            spacing: 12,
+            runSpacing: 4,
             children: [
               Text('Trend: ${snap.trend}', style: const TextStyle(color: AppColors.textTertiary, fontSize: 9)),
               Text('Session: ${snap.session}', style: const TextStyle(color: AppColors.textTertiary, fontSize: 9)),

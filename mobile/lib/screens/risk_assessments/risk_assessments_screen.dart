@@ -276,15 +276,18 @@ class _RiskAssessmentsScreenState extends State<RiskAssessmentsScreen> {
                     'Candidate: ',
                     style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
                   ),
-                  Text(
-                    res.candidateId,
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                  Flexible(
+                    child: Text(
+                      res.candidateId,
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Text(
                     'Valid ID: ${res.validationId}',
                     style: const TextStyle(
@@ -633,12 +636,16 @@ class _RiskAssessmentsScreenState extends State<RiskAssessmentsScreen> {
               children: [
                 Row(
                   children: [
-                    Text(
-                      reason.title,
-                      style: TextStyle(
-                        color: iconColor,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 12,
+                    Expanded(
+                      child: Text(
+                        reason.title,
+                        style: TextStyle(
+                          color: iconColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const SizedBox(width: 8),

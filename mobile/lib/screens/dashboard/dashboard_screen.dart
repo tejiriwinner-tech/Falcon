@@ -895,9 +895,21 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
         children: [
           Icon(icon, size: 14, color: AppColors.textSecondary),
           const SizedBox(width: 8),
-          Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-          const Spacer(),
-          Text(value, style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w600)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(color: AppColors.textSecondary, fontSize: 12),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(color: AppColors.textPrimary, fontSize: 12, fontWeight: FontWeight.w600),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );
@@ -1704,30 +1716,37 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                   color: AppColors.textPrimary,
                 ),
               ),
-              GestureDetector(
-                onTap: () {
-                  context.push('/strategies/${data.strategyId}');
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-                  ),
-                  child: Row(
-                    children: [
-                      Text(
-                        '${data.strategyName} v${data.strategyVersion}',
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
+              const SizedBox(width: 8),
+              Flexible(
+                child: GestureDetector(
+                  onTap: () {
+                    context.push('/strategies/${data.strategyId}');
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: AppColors.primary.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Flexible(
+                          child: Text(
+                            '${data.strategyName} v${data.strategyVersion}',
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.primary,
+                            ),
+                          ),
                         ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.arrow_forward, size: 12, color: AppColors.primary),
-                    ],
+                        const SizedBox(width: 4),
+                        const Icon(Icons.arrow_forward, size: 12, color: AppColors.primary),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1820,10 +1839,14 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Text(
-                      engine.name,
-                      style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    Expanded(
+                      child: Text(
+                        engine.name,
+                        style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
+                    const SizedBox(width: 8),
                     Row(
                       children: [
                         Text(
@@ -2034,7 +2057,15 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Text(event.title, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+                          Expanded(
+                            child: Text(
+                              event.title,
+                              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
                           Text(event.formattedTime, style: const TextStyle(fontSize: 11, color: AppColors.textTertiary)),
                         ],
                       ),
@@ -2057,8 +2088,21 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: const TextStyle(fontSize: 12, color: AppColors.textTertiary)),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white)),
+          Expanded(
+            child: Text(
+              label,
+              style: const TextStyle(fontSize: 12, color: AppColors.textTertiary),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              value,
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
         ],
       ),
     );

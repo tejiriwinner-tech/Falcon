@@ -292,21 +292,25 @@ class _SignalCandidatesScreenState extends State<SignalCandidatesScreen> {
                     'Strategy: ',
                     style: TextStyle(color: AppColors.textTertiary, fontSize: 12),
                   ),
-                  GestureDetector(
-                    onTap: () {
-                      context.push('/strategies/${cand.strategyId}');
-                    },
-                    child: Text(
-                      '${cand.strategyName} v${cand.strategyVersion}',
-                      style: const TextStyle(
-                        color: AppColors.primary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        decoration: TextDecoration.underline,
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        context.push('/strategies/${cand.strategyId}');
+                      },
+                      child: Text(
+                        '${cand.strategyName} v${cand.strategyVersion}',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          decoration: TextDecoration.underline,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                     decoration: BoxDecoration(
@@ -668,11 +672,14 @@ class _SignalCandidatesScreenState extends State<SignalCandidatesScreen> {
                 children: [
                   Icon(Icons.timer_outlined, size: 12, color: AppColors.textTertiary),
                   const SizedBox(width: 4),
-                  Text(
-                    'Eval Duration: ${cand.evaluationDurationMs}ms',
-                    style: const TextStyle(color: AppColors.textTertiary, fontSize: 10),
+                  Expanded(
+                    child: Text(
+                      'Eval Duration: ${cand.evaluationDurationMs}ms',
+                      style: const TextStyle(color: AppColors.textTertiary, fontSize: 10),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
-                  const Spacer(),
+                  const SizedBox(width: 8),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [

@@ -261,20 +261,18 @@ class _MissionsScreenState extends State<MissionsScreen> {
           ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatItem('Total', summary.totalMissions.toString(), AppColors.textPrimary),
-              _buildStatItem('Success', summary.successful.toString(), AppColors.success),
-              _buildStatItem('Partial', summary.partialSuccess.toString(), AppColors.warning),
-              _buildStatItem('Failed', summary.failed.toString(), AppColors.error),
+              Expanded(child: _buildStatItem('Total', summary.totalMissions.toString(), AppColors.textPrimary)),
+              Expanded(child: _buildStatItem('Success', summary.successful.toString(), AppColors.success)),
+              Expanded(child: _buildStatItem('Partial', summary.partialSuccess.toString(), AppColors.warning)),
+              Expanded(child: _buildStatItem('Failed', summary.failed.toString(), AppColors.error)),
             ],
           ),
           const Divider(height: 24, color: AppColors.surfaceLight),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatItem('Avg Duration', '${summary.averageDurationMs.toStringAsFixed(1)} ms', AppColors.info),
-              _buildStatItem('Pipeline Health', '${summary.averagePipelineHealth.toStringAsFixed(1)}%', AppColors.success),
+              Expanded(child: _buildStatItem('Avg Duration', '${summary.averageDurationMs.toStringAsFixed(1)} ms', AppColors.info)),
+              Expanded(child: _buildStatItem('Pipeline Health', '${summary.averagePipelineHealth.toStringAsFixed(1)}%', AppColors.success)),
             ],
           ),
         ],
@@ -523,32 +521,37 @@ class _MissionCardState extends State<_MissionCard> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              const Icon(Icons.check_circle, color: AppColors.success, size: 16),
-                              const SizedBox(width: 6),
-                              Text(
-                                event.stage,
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                const Icon(Icons.check_circle, color: AppColors.success, size: 16),
+                                const SizedBox(width: 6),
+                                Text(
+                                  event.stage,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
                                 ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            'Artifact: ${event.artifactId}',
-                            style: const TextStyle(
-                              color: AppColors.textSecondary,
-                              fontSize: 12,
+                              ],
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Text(
+                              'Artifact: ${event.artifactId}',
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontSize: 12,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.end,
                         children: [

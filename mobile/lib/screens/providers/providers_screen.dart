@@ -334,8 +334,9 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
             ),
             if (snapshot.lastHeartbeat != null) ...[
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                runSpacing: 4,
                 children: [
                   Text(
                     'Last Heartbeat: ${DateFormat('HH:mm:ss').format(snapshot.lastHeartbeat!.toLocal())}',

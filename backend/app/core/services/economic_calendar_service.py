@@ -131,7 +131,10 @@ class EconomicCalendarService:
         # 1. Primary: Fair Economy / Forex Factory weekly JSON feed (Free, Unlimited, No key needed)
         ff_url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
         try:
-            headers = {"User-Agent": "Falcon/4.2 (https://falcon.trade; algorithmic trading platform)"}
+            headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+                "Accept": "application/json, text/plain, */*",
+            }
             resp = requests.get(ff_url, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
             if resp.status_code == 200:
                 payload = resp.json()
@@ -243,7 +246,7 @@ class EconomicCalendarService:
     # ------------------------------------------------------------------
 
     def refresh(self, force: bool = False) -> int:
-        """Pulls the calendar from FMP, honouring the cache window."""
+        """Pulls the calendar from Forex Factory / fallback, honouring the cache window."""
         with self._lock:
             fresh = (
                 self._last_fetch_monotonic is not None
@@ -252,11 +255,13 @@ class EconomicCalendarService:
             )
         if fresh and not force:
             return 0
-        events = self._fetch_remote()
-        stored = self._store(events)
-        with self._lock:
-            self._last_fetch_monotonic = time.monotonic()
-        return stored
+        try:
+            events = self._fetch_remote()
+            stored = self._store(events)
+            return stored
+        finally:
+            with self._lock:
+                self._last_fetch_monotonic = time.monotonic()
 
     def get_events(self, lookback_hours: int = 0, lookahead_hours: int = 168) -> List[EconomicEvent]:
         """Returns stored events as pipeline artifacts, refreshing when stale."""

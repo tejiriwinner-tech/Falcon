@@ -499,11 +499,20 @@ class _StrategyDetailScreenState extends State<StrategyDetailScreen> {
                   size: 16,
                 ),
                 const SizedBox(width: 8),
-                Text(check.name, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                const Spacer(),
-                Text(
-                  check.value,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                Expanded(
+                  child: Text(
+                    check.name,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    check.value,
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),

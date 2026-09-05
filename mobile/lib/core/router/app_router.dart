@@ -212,11 +212,13 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
         selectedItemColor: AppColors.primary,
         unselectedItemColor: AppColors.textTertiary,
         type: BottomNavigationBarType.fixed,
+        selectedFontSize: 10,
+        unselectedFontSize: 9,
         items: const [
           BottomNavigationBarItem(
             icon: Icon(Icons.dashboard_outlined),
             activeIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
+            label: 'Dash',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.show_chart_outlined),
@@ -236,12 +238,12 @@ class ScaffoldWithBottomNavBar extends StatelessWidget {
           BottomNavigationBarItem(
             icon: Icon(Icons.analytics_outlined),
             activeIcon: Icon(Icons.analytics),
-            label: 'Intelligence',
+            label: 'Intel',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.psychology_outlined),
             activeIcon: Icon(Icons.psychology),
-            label: 'Strategies',
+            label: 'Strategy',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.settings_outlined),

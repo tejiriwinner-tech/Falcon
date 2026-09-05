@@ -230,13 +230,17 @@ class _JournalScreenState extends State<JournalScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Date: ${dateFormat.format(trade.tradeDate.toLocal())}',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 12,
+              Expanded(
+                child: Text(
+                  'Date: ${dateFormat.format(trade.tradeDate.toLocal())}',
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
+              const SizedBox(width: 8),
               StatusChip(
                 status: trade.status,
                 type: StatusChipType.journalStatus,
