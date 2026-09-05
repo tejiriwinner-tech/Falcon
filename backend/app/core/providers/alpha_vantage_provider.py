@@ -94,8 +94,12 @@ class AlphaVantageProvider(BaseProvider):
 
     def health_check(self) -> ProviderHealth:
         self._check_daily_reset()
-        if not self._connected or not self.configured or self._is_rate_limited:
+        if not self.configured:
             return ProviderHealth.CRITICAL
+        if not self._connected:
+            self.connect()
+        if self._is_rate_limited or self._daily_calls >= self._daily_budget:
+            return ProviderHealth.WARNING
         return ProviderHealth.HEALTHY
 
     def fetch(self, symbol: str, **kwargs) -> Optional[Dict[str, Any]]:
@@ -200,6 +204,8 @@ class AlphaVantageProvider(BaseProvider):
 
     def get_metadata(self) -> ProviderMetadata:
         self._check_daily_reset()
+        if not self._connected and self.configured:
+            self.connect()
         online = self._connected and self.configured
         if not online:
             status = ProviderStatus.OFFLINE
