@@ -19,7 +19,11 @@ from app.core.config.provider_settings import REQUEST_TIMEOUT_SECONDS
 from app.core.database import EconomicEventRecord, database_enabled, get_session
 from app.schemas.market_state import EconomicEvent
 
-PROVIDER_NAME = "FinancialModelingPrep"
+import logging
+
+logger = logging.getLogger("falcon.services.economic_calendar")
+
+PROVIDER_NAME = "ForexFactory"
 
 _IMPACT_BY_FMP_IMPACT = {
     "high": "High",
@@ -65,6 +69,13 @@ def _as_text(value: Any) -> Optional[str]:
 
 
 def _parse_event_time(raw: str) -> Optional[datetime]:
+    if not raw:
+        return None
+    try:
+        dt = datetime.fromisoformat(raw)
+        return dt.astimezone(timezone.utc)
+    except (ValueError, TypeError):
+        pass
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
             return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
@@ -78,17 +89,20 @@ def _normalize(payload: List[Dict[str, Any]]) -> List[_StoredEvent]:
     for row in payload:
         event_time = _parse_event_time(str(row.get("date", "")))
         currency = str(row.get("country") or row.get("currency") or "").strip().upper()
-        title = str(row.get("event") or "").strip()
+        title = str(row.get("title") or row.get("event") or "").strip()
         if event_time is None or not title or not currency:
             continue
-        impact = _IMPACT_BY_FMP_IMPACT.get(str(row.get("impact", "")).lower(), "Low")
+        raw_impact = str(row.get("impact", "")).strip().lower()
+        impact = _IMPACT_BY_FMP_IMPACT.get(raw_impact, "Low")
+        if raw_impact in ("high", "medium", "low"):
+            impact = raw_impact.capitalize()
         events.append(
             _StoredEvent(
                 event_time=event_time,
                 currency=currency[:8],
                 title=title[:255],
                 impact=impact,
-                forecast=_as_text(row.get("estimate")),
+                forecast=_as_text(row.get("forecast") or row.get("estimate")),
                 previous=_as_text(row.get("previous")),
                 actual=_as_text(row.get("actual")),
             )
@@ -111,36 +125,49 @@ class EconomicCalendarService:
 
     @property
     def configured(self) -> bool:
-        return bool(settings.FMP_API_KEY)
+        return True
 
     def _fetch_remote(self) -> List[_StoredEvent]:
-        if not self.configured:
-            self.last_error = "FMP_API_KEY is not configured"
-            return []
-        now = datetime.now(timezone.utc)
-        params = {
-            "from": now.date().isoformat(),
-            "to": (now + timedelta(days=settings.CALENDAR_LOOKAHEAD_DAYS)).date().isoformat(),
-            "apikey": settings.FMP_API_KEY,
-        }
+        # 1. Primary: Fair Economy / Forex Factory weekly JSON feed (Free, Unlimited, No key needed)
+        ff_url = "https://nfs.faireconomy.media/ff_calendar_thisweek.json"
         try:
-            base = settings.FMP_BASE_URL.rstrip('/')
-            endpoint = f"{base}/economic-calendar" if "stable" in base else f"{base}/v3/economic_calendar"
-            response = requests.get(
-                endpoint,
-                params=params,
-                timeout=REQUEST_TIMEOUT_SECONDS,
-            )
-            response.raise_for_status()
-            payload = response.json()
-        except (requests.RequestException, ValueError) as exc:
-            self.last_error = f"{type(exc).__name__}: {exc}"
-            return []
-        if not isinstance(payload, list):
-            self.last_error = f"Unexpected calendar payload: {type(payload).__name__}"
-            return []
-        self.last_error = None
-        return _normalize(payload)
+            headers = {"User-Agent": "Falcon/4.2 (https://falcon.trade; algorithmic trading platform)"}
+            resp = requests.get(ff_url, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
+            if resp.status_code == 200:
+                payload = resp.json()
+                if isinstance(payload, list) and len(payload) > 0:
+                    self.last_error = None
+                    return _normalize(payload)
+        except Exception as exc:
+            logger.warning("[EconomicCalendar] FairEconomy feed unavailable: %s. Trying fallback.", exc)
+
+        # 2. Fallback: FMP if key is configured
+        if settings.FMP_API_KEY:
+            now = datetime.now(timezone.utc)
+            params = {
+                "from": now.date().isoformat(),
+                "to": (now + timedelta(days=settings.CALENDAR_LOOKAHEAD_DAYS)).date().isoformat(),
+                "apikey": settings.FMP_API_KEY,
+            }
+            try:
+                base = settings.FMP_BASE_URL.rstrip('/')
+                endpoint = f"{base}/economic-calendar" if "stable" in base else f"{base}/v3/economic_calendar"
+                response = requests.get(
+                    endpoint,
+                    params=params,
+                    timeout=REQUEST_TIMEOUT_SECONDS,
+                )
+                response.raise_for_status()
+                payload = response.json()
+                if isinstance(payload, list):
+                    self.last_error = None
+                    return _normalize(payload)
+            except Exception as exc:
+                self.last_error = f"{type(exc).__name__}: {exc}"
+                return []
+
+        self.last_error = "All calendar sources exhausted"
+        return []
 
     # ------------------------------------------------------------------
     # Storage

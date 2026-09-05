@@ -11,10 +11,10 @@ class CalendarProvider(ABC):
         pass
 
 class FMPCalendarProvider(CalendarProvider):
-    """Economic calendar backed by Financial Modeling Prep and stored history."""
+    """Economic calendar backed by Forex Factory / Fair Economy and stored history."""
 
     def __init__(self):
-        self.provider_name = "FinancialModelingPrep"
+        self.provider_name = "ForexFactory"
         self._last_refresh = datetime.now(timezone.utc)
         self.latency_ms = 0
 
