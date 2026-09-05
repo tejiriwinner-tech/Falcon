@@ -423,6 +423,11 @@ class ApiService {
     return _send<MissionReport>('POST', '/missions/run', MissionReport.fromJson);
   }
 
+  /// Purges old historical missions and associated artifacts from the database.
+  Future<Map<String, dynamic>> purgeMissions({int keepLatest = 10}) async {
+    return _send<Map<String, dynamic>>('POST', '/missions/purge?keep_latest=$keepLatest', (json) => json as Map<String, dynamic>);
+  }
+
 
   Future<RepositoryStatistics> getRepositoryStatistics() async {
     return _get<RepositoryStatistics>('/repository/statistics', RepositoryStatistics.fromJson);

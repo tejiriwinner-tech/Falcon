@@ -135,8 +135,19 @@ class InMemoryMissionStorage:
                 counts[artifact_type] = counts.get(artifact_type, 0) + len(artifacts)
         return counts
 
+    def prune_missions(self, keep_latest: int = 20) -> int:
+        if len(self._missions) <= keep_latest:
+            return 0
+        all_ids = list(self._missions.keys())
+        to_delete = all_ids[:-keep_latest]
+        for mid in to_delete:
+            self._missions.pop(mid, None)
+            self._artifacts.pop(mid, None)
+        return len(to_delete)
+
     def clear(self) -> None:
         self.reset()
+
 
 
 class DatabaseMissionStorage:
@@ -287,6 +298,27 @@ class DatabaseMissionStorage:
     @property
     def last_mission_at(self) -> Optional[datetime]:
         return self._meta()[1]
+
+    def prune_missions(self, keep_latest: int = 20) -> int:
+        with get_session() as session, session.begin():
+            keep_ids = list(session.scalars(
+                select(MissionRecord.id)
+                .order_by(MissionRecord.stored_at.desc())
+                .limit(keep_latest)
+            ).all())
+            if not keep_ids:
+                return 0
+            # Delete older artifacts
+            session.execute(
+                delete(MissionArtifactRecord)
+                .where(~MissionArtifactRecord.mission_id.in_(keep_ids))
+            )
+            # Delete older missions
+            result = session.execute(
+                delete(MissionRecord)
+                .where(~MissionRecord.id.in_(keep_ids))
+            )
+            return result.rowcount or 0
 
     def clear(self) -> None:
         with get_session() as session, session.begin():

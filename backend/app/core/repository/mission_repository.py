@@ -98,6 +98,12 @@ class MissionRepository:
         """Atomically allocates the next mission number."""
         return self._storage.next_mission_number()
 
+    def prune_missions(self, keep_latest: int = 20) -> int:
+        self._invalidate_cache()
+        if hasattr(self._storage, "prune_missions"):
+            return self._storage.prune_missions(keep_latest)
+        return 0
+
     def save_market_state(self, mission_id: str, market_state: MarketState) -> None:
         self._invalidate_cache()
         self._storage.save_artifacts(mission_id, MARKET_STATE, [market_state])

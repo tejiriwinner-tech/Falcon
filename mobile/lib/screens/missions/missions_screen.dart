@@ -55,6 +55,47 @@ class _MissionsScreenState extends State<MissionsScreen> {
     _fetchMissions();
   }
 
+  Future<void> _handlePurge() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clean Mission History'),
+        content: const Text(
+          'This will purge older historical missions and free up storage, keeping only the 10 most recent missions. Continue?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Clean Up'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      try {
+        await _apiService.purgeMissions(keepLatest: 10);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Successfully cleaned mission history!')),
+          );
+          _fetchMissions();
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Cleanup error: $e')),
+          );
+        }
+      }
+    }
+  }
+
   Color _getStatusColor(MissionStatus status) {
     switch (status) {
       case MissionStatus.SUCCESS:
@@ -80,6 +121,11 @@ class _MissionsScreenState extends State<MissionsScreen> {
       appBar: AppBar(
         title: const Text('Falcon Mission Center'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Clean old missions',
+            onPressed: _handlePurge,
+          ),
           IconButton(
             icon: _isRunning
                 ? const SizedBox(
@@ -168,7 +214,7 @@ class _MissionsScreenState extends State<MissionsScreen> {
                         ),
                       )
                     else
-                      ...response.missions.map((m) => Padding(
+                      ...response.missions.take(20).map((m) => Padding(
                             padding: const EdgeInsets.only(bottom: 16.0),
                             child: _MissionCard(
                               mission: m,
@@ -418,12 +464,16 @@ class _MissionCardState extends State<_MissionCard> {
                 ),
                 const SizedBox(height: 8),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildMetricCol('Pipeline Health', '${m.health.pipelineHealthPercentage}%'),
-                    _buildMetricCol('Provider Health', '${m.health.providerHealthPercentage}%'),
-                    _buildMetricCol('Healthy Engines', '${m.health.enginesHealthy}/6'),
-                    _buildMetricCol('Healthy Providers', '${m.health.providersHealthy}/4'),
+                    Expanded(child: _buildMetricCol('Pipeline Health', '${m.health.pipelineHealthPercentage}%')),
+                    Expanded(child: _buildMetricCol('Provider Health', '${m.health.providerHealthPercentage}%')),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    Expanded(child: _buildMetricCol('Healthy Engines', '${m.health.enginesHealthy}/6')),
+                    Expanded(child: _buildMetricCol('Healthy Providers', '${m.health.providersHealthy}/4')),
                   ],
                 ),
               ],
