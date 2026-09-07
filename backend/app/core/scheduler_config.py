@@ -27,8 +27,8 @@ class SchedulerConfig:
     DUPLICATE_ENTRY_TOLERANCE_PIPS: float = float(os.getenv("FALCON_DUPLICATE_ENTRY_TOLERANCE", "5.0"))
     DUPLICATE_TIME_WINDOW_MINUTES: int = int(os.getenv("FALCON_DUPLICATE_TIME_WINDOW", "30"))
     
-    # Markets to Monitor (Focused 4 Core Assets)
-    MARKETS: List[str] = os.getenv("FALCON_MARKETS", "XAUUSD,GBPUSD,EURUSD,USDJPY").split(",")
+    # Markets to Monitor (Focused 3 Primary Core Assets)
+    MARKETS: List[str] = os.getenv("FALCON_MARKETS", "XAUUSD,GBPUSD,EURUSD").split(",")
     
     # Timeframes to Monitor
     TIMEFRAMES: List[str] = os.getenv("FALCON_TIMEFRAMES", "H4,H1,M15,M5").split(",")

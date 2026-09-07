@@ -347,6 +347,14 @@ class TwelveDataProvider(BaseProvider):
         if cached and (now_ts - cached["fetched_at"]) < 60.0:
             return cached["data"]
 
+        # Session budget gate: in STANDBY mode (night or weekend), permit zero external network calls
+        from app.core.services.session_budget_manager import session_budget_manager
+        if not session_budget_manager.is_active():
+            # If recently cached data is available, serve it without outbound network request
+            if cached and (now_ts - cached["fetched_at"]) < 3600.0:
+                return cached["data"]
+            return None
+
         # Daily budget protection gate — never exceed free tier limit
         if self._daily_calls >= self._daily_budget:
             print(f"[{self.PROVIDER_NAME}] Daily budget of {self._daily_budget} calls reached for {today_utc}. Skipping fetch to avoid over-limit.")

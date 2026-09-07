@@ -11,6 +11,7 @@ from typing import List, Optional
 from sqlalchemy.orm import Session
 
 from app.core.scheduler_config import scheduler_config
+from app.core.services.session_budget_manager import session_budget_manager
 from app.services.scheduler.duplicate_detector import DuplicateDetector
 from app.services.scheduler.expiration_service import ExpirationService
 from app.services.scheduler.signal_dispatcher import SignalDispatcher
@@ -81,6 +82,26 @@ class MarketScheduler:
             }
             
             try:
+                # Check active trading session window
+                if not session_budget_manager.is_active():
+                    # Clean up expired signals during STANDBY
+                    if scheduler_config.AUTO_EXPIRE:
+                        existing_signals = self.repository.get_live_signals()
+                        expirable = self.expiration_service.find_expirable_signals(existing_signals)
+                        for signal in expirable:
+                            self.repository.expire_signal(signal.signalId)
+                            self.statistics.record_signal_expired()
+                        if expirable:
+                            logger.info(f"Expired {len(expirable)} signals during STANDBY")
+
+                    logger.info(
+                        "Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). "
+                        "Skipping market scanning to preserve free API quota."
+                    )
+                    self.statistics.record_scan_end(scan_start_ms, success=True)
+                    results["standby"] = True
+                    return results
+
                 # Get existing active signals for duplicate detection
                 existing_signals = self.repository.get_live_signals()
                 

@@ -71,11 +71,11 @@ class Settings:
     USE_PRICE_HISTORY_FOR_SIGNALS: bool = os.getenv("USE_PRICE_HISTORY_FOR_SIGNALS", "true").lower() == "true"
 
     # Market Data Scheduler Configuration
-    # Watchlist of symbols to ingest for price_history
-    MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD,USDJPY")
+    # Watchlist of symbols to ingest for price_history (Primary 3 Core Assets)
+    MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD")
     
-    # Interval between market data ingestion cycles (seconds)
-    MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "300"))
+    # Interval between market data ingestion cycles (seconds) - 8 minutes (480s)
+    MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "480"))
     
     # Initial delay before first ingestion cycle (seconds)
     INITIAL_BACKFILL_DELAY_SECONDS: int = int(os.getenv("INITIAL_BACKFILL_DELAY_SECONDS", "30"))

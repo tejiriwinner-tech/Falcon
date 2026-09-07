@@ -9,6 +9,7 @@ from app.core.config import settings
 from app.core.engines.market_state_engine import FALCON_WATCHLIST
 from app.core.services.economic_calendar_service import economic_calendar_service
 from app.core.services.market_history_service import market_history_service
+from app.core.services.session_budget_manager import session_budget_manager
 
 router = APIRouter(prefix="/market-data")
 
@@ -77,3 +78,9 @@ def get_history(
         )
         for bar in market_history_service.get_bars(symbol, timeframe, limit)
     ]
+
+
+@router.get("/session-budget")
+def get_session_budget_status():
+    """Returns current active trading session status, local time, and free tier budget mode."""
+    return session_budget_manager.get_status()

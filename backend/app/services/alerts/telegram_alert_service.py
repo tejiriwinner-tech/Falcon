@@ -139,10 +139,24 @@ class TelegramAlertService:
 
         entry = getattr(candidate, 'entryPrice', 0.0)
         sl = getattr(candidate, 'stopLoss', 0.0)
-        tp = getattr(candidate, 'takeProfit', 0.0)
-        rr = getattr(candidate, 'riskReward', 0.0)
+        risk = abs(entry - sl)
+
+        # TP1 and TP2 derived from actual calculations
+        tp1 = getattr(candidate, 'takeProfit1', None) or getattr(candidate, 'takeProfit', 0.0)
+        if not tp1 or tp1 == 0.0:
+            tp1 = entry + (1.5 * risk) if is_buy else entry - (1.5 * risk)
+
+        tp2 = getattr(candidate, 'takeProfit2', None)
+        if not tp2 or tp2 == 0.0:
+            tp2 = entry + (2.5 * risk) if is_buy else entry - (2.5 * risk)
+
+        rr = getattr(candidate, 'riskRewardRatio', getattr(candidate, 'riskReward', 0.0))
+        if not rr or rr == 0.0:
+            rr = round(abs(tp1 - entry) / risk, 2) if risk > 0 else 2.0
+
         strategy = getattr(candidate, 'strategyName', getattr(decision, 'strategyName', 'Falcon Core Strategy'))
         confidence = int(getattr(decision, 'decisionConfidence', getattr(decision, 'confidence', getattr(candidate, 'confidence', 80))))
+        timeframe = getattr(candidate, 'timeframe', '1h')
 
         def format_price(p: float, sym: str) -> str:
             if "XAU" in sym or "GOLD" in sym:
@@ -154,34 +168,42 @@ class TelegramAlertService:
 
         entry_formatted = format_price(entry, symbol)
         sl_formatted = format_price(sl, symbol)
-        tp_formatted = format_price(tp, symbol)
+        tp1_formatted = format_price(tp1, symbol)
+        tp2_formatted = format_price(tp2, symbol)
 
-        # Session & regime
-        session_name = "Active Session"
-        if market_state and hasattr(market_state, 'session'):
-            session_name = getattr(market_state.session, 'name', str(market_state.session))
-
-        now_str = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        # Validity and Expiry
+        expires_at = getattr(candidate, 'expiresAt', None)
+        if isinstance(expires_at, datetime):
+            valid_until_str = expires_at.strftime("%H:%M UTC")
+        elif isinstance(expires_at, str):
+            valid_until_str = expires_at
+        else:
+            valid_until_str = f"Next {timeframe} bar close"
 
         message = (
             f"🦅 <b>FALCON TRADE SIGNAL ALERT</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"{symbol_emoji} <b>Asset:</b> <code>{symbol}</code>\n"
+            f"{symbol_emoji} <b>Instrument:</b> <code>{symbol}</code> ({timeframe})\n"
             f"{action_badge}\n"
             f"🎯 <b>Confidence:</b> <b>{confidence}%</b>\n"
             f"🧠 <b>Strategy:</b> {strategy}\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"💵 <b>Entry Price:</b> <code>{entry_formatted}</code>\n"
             f"🛑 <b>Stop Loss:</b> <code>{sl_formatted}</code>\n"
-            f"🎯 <b>Take Profit:</b> <code>{tp_formatted}</code>\n"
+            f"🎯 <b>Take Profit 1:</b> <code>{tp1_formatted}</code> (Close 50% → Move SL to BE)\n"
+            f"🎯 <b>Take Profit 2:</b> <code>{tp2_formatted}</code> (Final Target)\n"
             f"⚖️ <b>Risk/Reward:</b> 1:{rr:.2f}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⏳ <b>Valid Until:</b> {valid_until_str}\n"
+            f"🌅 <b>Session Expiry:</b> 20:00 UTC+1 (19:00 UTC)\n"
+            f"🟢 <b>Status:</b> <b>ACTIVE</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📱 <b>Tap-to-Copy for MT5 Mobile:</b>\n"
             f"• SL: <code>{sl_formatted}</code>\n"
-            f"• TP: <code>{tp_formatted}</code>\n"
-            f"🌐 <b>Session:</b> {session_name} | {now_str}\n"
+            f"• TP1: <code>{tp1_formatted}</code>\n"
+            f"• TP2: <code>{tp2_formatted}</code>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"💡 <i>Tip: Tap any code box above to instantly copy the value to your phone clipboard!</i>"
+            f"💡 <i>Tip: Tap any code block above to copy directly to MT5!</i>"
         )
         return await self.send_message(message)
 

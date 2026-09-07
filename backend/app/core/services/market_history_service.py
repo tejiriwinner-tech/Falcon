@@ -19,6 +19,7 @@ from app.core.config import settings
 from app.core.config.provider_settings import REQUEST_TIMEOUT_SECONDS
 from app.core.database import PriceBarRecord, database_enabled, get_session
 from app.core.providers.symbol_mapper import symbol_mapper
+from app.core.services.session_budget_manager import session_budget_manager
 
 TWELVE_DATA_PROVIDER = "TwelveData"
 ALPHA_VANTAGE_PROVIDER = "AlphaVantage"
@@ -264,13 +265,21 @@ class MarketHistoryService:
     # ------------------------------------------------------------------
 
     def refresh_symbol(
-        self, symbol: str, timeframe: Optional[str] = None, force: bool = False
+        self,
+        symbol: str,
+        timeframe: Optional[str] = None,
+        force: bool = False,
+        bypass_budget: bool = False,
     ) -> int:
         """Pulls the latest bars for one symbol and stores them.
 
         Refreshes are throttled per symbol so a busy pipeline cannot exhaust the
         provider quota.
         """
+        # Session budget gate: in STANDBY mode, skip outbound provider calls unless explicitly bypassed
+        if not bypass_budget and not session_budget_manager.is_active():
+            return 0
+
         timeframe = timeframe or settings.HISTORY_TIMEFRAME
         limit = settings.HISTORY_BAR_LIMIT
         key = (symbol, timeframe)

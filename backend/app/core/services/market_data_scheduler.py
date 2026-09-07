@@ -20,6 +20,7 @@ from typing import List, Optional
 
 from app.core.config import settings
 from app.core.services.market_history_service import market_history_service
+from app.core.services.session_budget_manager import session_budget_manager
 
 logger = logging.getLogger(__name__)
 
@@ -75,11 +76,24 @@ class MarketDataScheduler:
         Returns:
             Dictionary with cycle results
         """
+        if not session_budget_manager.is_active():
+            logger.info(
+                "Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). "
+                "Skipping market data ingestion to conserve free API quota."
+            )
+            return {
+                "symbols_processed": 0,
+                "bars_stored": 0,
+                "errors": [],
+                "standby": True,
+            }
+
         cycle_start = time.time()
         cycle_result = {
             "symbols_processed": 0,
             "bars_stored": 0,
             "errors": [],
+            "standby": False,
         }
 
         logger.info(f"Starting market data ingestion cycle for {len(self._watchlist)} symbols")
@@ -250,6 +264,7 @@ class MarketDataScheduler:
         """
         return {
             "is_running": self.is_running,
+            "session": session_budget_manager.get_status(),
             "watchlist": self._watchlist,
             "timeframe": self._timeframe,
             "ingestion_interval_seconds": self._ingestion_interval,

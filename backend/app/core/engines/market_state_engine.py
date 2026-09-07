@@ -36,8 +36,8 @@ _FRESH_MAX_SECONDS: float = float(CACHE_TTL_SECONDS)           # 0–10s
 _STALE_MAX_SECONDS: float = float(CACHE_TTL_SECONDS * 3)       # 10–30s
 # Beyond _STALE_MAX_SECONDS → EXPIRED
 
-# ── Watchlist (Focused 4 Core Assets) ─────────────────────────────────────────
-FALCON_WATCHLIST: List[str] = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY"]
+# ── Watchlist (Focused 3 Primary Core Assets) ─────────────────────────────────
+FALCON_WATCHLIST: List[str] = ["XAUUSD", "GBPUSD", "EURUSD"]
 
 # ── Trend classification thresholds ──────────────────────────────────────────
 # Phase 4.3: simple deterministic classification from changePercent.

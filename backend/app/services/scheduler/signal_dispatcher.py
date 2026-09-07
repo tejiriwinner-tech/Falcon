@@ -56,28 +56,49 @@ class SignalDispatcher:
                         
                         entry_str = f"{signal.entryPrice:{fmt}}"
                         sl_str = f"{signal.stopLoss:{fmt}}"
-                        tp1_str = f"{signal.takeProfit1:{fmt}}" if signal.takeProfit1 else "Open"
-                        
+                        risk = abs(signal.entryPrice - signal.stopLoss)
+                        is_buy = "BUY" in type_str
+
+                        # TP1 and TP2 derived from actual calculations
+                        tp1_val = signal.takeProfit1 or (signal.entryPrice + 1.5 * risk if is_buy else signal.entryPrice - 1.5 * risk)
+                        tp2_val = signal.takeProfit2 or (signal.entryPrice + 2.5 * risk if is_buy else signal.entryPrice - 2.5 * risk)
+                        tp1_str = f"{tp1_val:{fmt}}"
+                        tp2_str = f"{tp2_val:{fmt}}"
+
+                        # Expiration formatting
+                        valid_until_str = "Next bar close"
+                        if hasattr(signal, "expiresAt") and signal.expiresAt:
+                            if isinstance(signal.expiresAt, datetime):
+                                valid_until_str = signal.expiresAt.strftime("%H:%M UTC")
+                            else:
+                                valid_until_str = str(signal.expiresAt)
+
                         reason_line = ""
                         if hasattr(signal, "reasoning") and signal.reasoning:
                             reason_line = f"🧠 <b>Trigger:</b> {signal.reasoning}\n"
-                        
+
                         msg = (
                             f"🦅 <b>FALCON TRADE SIGNAL ALERT</b>\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"📊 <b>Asset:</b> <code>{signal.symbol}</code> ({signal.timeframe})\n"
-                            f"{action_emoji} <b>Direction:</b> <b>{type_str.replace('SIGNALTYPE.', '')} SETUP</b>\n"
+                            f"📊 <b>Instrument:</b> <code>{signal.symbol}</code> ({signal.timeframe})\n"
+                            f"{action_emoji} <b>Action:</b> <b>{type_str.replace('SIGNALTYPE.', '')} SETUP</b>\n"
                             f"🎯 <b>Confidence:</b> <b>{signal.confidence:.0f}%</b>\n"
                             f"{reason_line}"
                             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                            f"💵 <b>Entry (Live):</b> <code>{entry_str}</code>\n"
+                            f"💵 <b>Entry Price:</b> <code>{entry_str}</code>\n"
                             f"🛑 <b>Stop Loss:</b> <code>{sl_str}</code>\n"
-                            f"🎯 <b>Take Profit:</b> <code>{tp1_str}</code>\n"
+                            f"🎯 <b>Take Profit 1:</b> <code>{tp1_str}</code> (Close 50% → Move SL to BE)\n"
+                            f"🎯 <b>Take Profit 2:</b> <code>{tp2_str}</code> (Final Target)\n"
                             f"⚖️ <b>Risk/Reward:</b> 1:{signal.riskRewardRatio:.2f}\n"
+                            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                            f"⏳ <b>Valid Until:</b> {valid_until_str}\n"
+                            f"🌅 <b>Session Expiry:</b> 20:00 UTC+1 (19:00 UTC)\n"
+                            f"🟢 <b>Status:</b> <b>ACTIVE</b>\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"📱 <b>Tap-to-Copy for MT5 Mobile:</b>\n"
                             f"• SL: <code>{sl_str}</code>\n"
-                            f"• TP: <code>{tp1_str}</code>\n"
+                            f"• TP1: <code>{tp1_str}</code>\n"
+                            f"• TP2: <code>{tp2_str}</code>\n"
                             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
                             f"💡 <i>Tip: Tap any code block above to copy directly to MT5!</i>"
                         )
