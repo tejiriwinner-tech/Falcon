@@ -166,21 +166,32 @@ class _SignalsScreenState extends State<SignalsScreen> {
             }
             
             final activeSignals = allSignals.where((s) => s.status == 'ACTIVE').toList();
+            final pendingSignals = allSignals.where((s) => s.status != 'ACTIVE').toList();
+            final displaySignals = [...activeSignals, ...pendingSignals];
+            
+            final titleText = activeSignals.isNotEmpty
+                ? '${activeSignals.length} Active Signal${activeSignals.length != 1 ? 's' : ''}'
+                : '0 Active Signals';
+            final subtitleText = activeSignals.isNotEmpty
+                ? 'Approved for immediate execution'
+                : (pendingSignals.isNotEmpty
+                    ? '${pendingSignals.length} setup${pendingSignals.length != 1 ? 's' : ''} under review (pending)'
+                    : 'Updated live during market hours');
             
             return Column(
               children: [
                 SectionTitle(
-                  title: '${activeSignals.length} Active Signal${activeSignals.length != 1 ? 's' : ''}',
-                  subtitle: 'Updated live during market hours',
+                  title: titleText,
+                  subtitle: subtitleText,
                 ),
                 const SizedBox(height: 16),
                 Expanded(
                   child: ListView.builder(
                     controller: _scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount: _allSignals.length + (_isLoadingMore ? 1 : 0),
+                    itemCount: displaySignals.length + (_isLoadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
-                      if (index == _allSignals.length) {
+                      if (index == displaySignals.length) {
                         return const Center(
                           child: Padding(
                             padding: EdgeInsets.all(16),
@@ -190,7 +201,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                       }
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: SignalCard(signal: _allSignals[index]),
+                        child: SignalCard(signal: displaySignals[index]),
                       );
                     },
                   ),
