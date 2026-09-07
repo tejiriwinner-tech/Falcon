@@ -255,6 +255,25 @@ class ProviderManager:
             cacheHit=False,
         )
 
+    def get_quote(self, raw_symbol: str) -> Optional[Dict[str, Any]]:
+        """Return a normalized quote dictionary for intelligence engines."""
+        resp = self.get_market_quote(raw_symbol)
+        if resp is None or resp.quote is None:
+            return None
+        q = resp.quote
+        mid_val = getattr(q.bidAsk, "mid", None) or q.lastPrice
+        return {
+            "symbol": q.symbol,
+            "mid": mid_val,
+            "lastPrice": q.lastPrice,
+            "bid": q.bidAsk.bid,
+            "ask": q.bidAsk.ask,
+            "spread": q.bidAsk.spread,
+            "providerId": q.providerId,
+            "providerName": q.providerName,
+            "timestamp": q.timestamp.isoformat() if hasattr(q.timestamp, "isoformat") else str(q.timestamp),
+        }
+
     def supported_symbols(self) -> List[str]:
         return self._mapper.supported_symbols()
 
