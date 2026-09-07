@@ -70,13 +70,14 @@ class SignalMonitorService {
     bool hasNew = false;
     for (final signal in signals) {
       final action = signal.action.toUpperCase();
-      // Only notify for actual actionable trades (BUY or SELL)
-      if (action == 'BUY' || action == 'SELL') {
+      final status = signal.status.toUpperCase();
+      // Only notify for actual actionable trades (BUY or SELL) that are approved (ACTIVE)
+      if ((action == 'BUY' || action == 'SELL') && status == 'ACTIVE') {
         if (!_notifiedSignalIds.contains(signal.id)) {
           _notifiedSignalIds.add(signal.id);
           hasNew = true;
           debugPrint(
-              '[SignalMonitorService] NEW TRADE DETECTED: ${signal.symbol} $action @ ${signal.entry}');
+              '[SignalMonitorService] NEW ACTIVE TRADE DETECTED: ${signal.symbol} $action @ ${signal.entry}');
           await _notificationService.showTradeAlert(signal);
         }
       }
