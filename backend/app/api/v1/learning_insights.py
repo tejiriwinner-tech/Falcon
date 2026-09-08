@@ -18,120 +18,116 @@ from app.schemas.learning_insight import (
 
 router = APIRouter(prefix="/learning-insights", tags=["learning_insights"])
 
+from app.core.engines.market_state_engine import MarketStateEngine
+
 _learning_engine = LearningInsightEngine()
+_market_state_engine = MarketStateEngine()
 _insights_store: List[LearningInsight] = []
+
+
+def _build_live_market_insights(market_state, now: datetime) -> List[LearningInsight]:
+    insights: List[LearningInsight] = []
+    trend = getattr(market_state, "trend", None) or getattr(market_state, "overallTrend", "Neutral")
+    session = getattr(market_state, "session", None) or getattr(market_state, "activeTradingSession", "Standby")
+    volatility = getattr(market_state, "volatility", "Moderate")
+    spread = getattr(market_state, "spread", 0.3)
+    sentiment = getattr(market_state, "sentiment", "Neutral")
+    fgi = getattr(market_state, "fearGreedIndex", 50)
+    
+    dir_desc = (
+        f"Live quotes across watched symbols indicate {trend.lower()} pressure during the {session} session."
+        if trend != "Neutral"
+        else f"Prices are consolidating within normal bounds during the {session} session with no abnormal breakout."
+    )
+    insights.append(
+        LearningInsight(
+            id="insight-live-001",
+            category=LearningCategory.MARKET,
+            title=f"{trend} Market Structure in {session}",
+            description=dir_desc,
+            severity=InsightSeverity.NOTICE if trend != "Neutral" else InsightSeverity.INFO,
+            confidence=InsightConfidence.HIGH if trend != "Neutral" else InsightConfidence.MEDIUM,
+            recommendation=InsightRecommendation.FOCUS if trend != "Neutral" else InsightRecommendation.MONITOR,
+            pattern=InsightPattern(
+                title=f"{trend} Regime Flow",
+                description=f"Active pricing aligns with {trend.lower()} trajectory in {session}.",
+                occurrences=1,
+                confidencePercentage=80.0 if trend != "Neutral" else 65.0,
+            ),
+            evidence=[
+                InsightEvidence(
+                    title="Live Market State",
+                    description=f"Trend: {trend}, Volatility: {volatility}, Sentiment: {sentiment} (FGI: {fgi})",
+                    source="MarketStateEngine",
+                    artifactId="market-state-live",
+                    timestamp=now,
+                )
+            ],
+            affectedStrategies=["London Breakout", "Trend Continuation"] if trend != "Neutral" else ["Range Reversion"],
+            relatedMissionIds=[],
+            generatedFrom="LiveMarketAnalysis",
+            generatedAt=now,
+            generationDurationMs=5,
+        )
+    )
+    
+    vol_sev = InsightSeverity.WARNING if volatility == "High" else InsightSeverity.INFO
+    vol_rec = InsightRecommendation.ADJUST if volatility == "High" else InsightRecommendation.OBSERVE
+    insights.append(
+        LearningInsight(
+            id="insight-live-002",
+            category=LearningCategory.RISK,
+            title=f"{volatility} Volatility Environment ({spread:.1f} pips spread)",
+            description=f"Observed spread of {spread:.1f} pips with {volatility.lower()} volatility. Session budget and risk limits are active.",
+            severity=vol_sev,
+            confidence=InsightConfidence.HIGH,
+            recommendation=vol_rec,
+            pattern=InsightPattern(
+                title="Volatility Spread Ratio",
+                description=f"{volatility} volatility with {spread:.1f} pips average spread.",
+                occurrences=1,
+                confidencePercentage=75.0,
+            ),
+            evidence=[
+                InsightEvidence(
+                    title="Risk Parameters",
+                    description=f"Volatility: {volatility}, Average Spread: {spread:.2f} pips",
+                    source="ProviderManager",
+                    artifactId="market-risk-live",
+                    timestamp=now,
+                )
+            ],
+            affectedStrategies=["Risk Management"],
+            relatedMissionIds=[],
+            generatedFrom="LiveRiskAnalysis",
+            generatedAt=now,
+            generationDurationMs=4,
+        )
+    )
+    return insights
 
 
 @router.get("", response_model=LearningInsightListResponse)
 def get_learning_insights():
     """
     Runs the Learning & Insight Engine against the current repository state
-    and returns a LearningInsightListResponse.
+    and returns a LearningInsightListResponse. If no missions exist yet,
+    derives dynamic insights from the live market state.
     """
-    # Return sample learning insights for Phase 1.3
+    global _insights_store
     now = datetime.now(timezone.utc)
-    insights = [
-        LearningInsight(
-            id="insight-001",
-            category=LearningCategory.MARKET,
-            title="XAUUSD Breakout Pattern Detected",
-            description="Strong bullish momentum detected on XAUUSD with key support at 4670. Volume surge confirms institutional interest.",
-            severity=InsightSeverity.NOTICE,
-            confidence=InsightConfidence.HIGH,
-            recommendation=InsightRecommendation.MONITOR,
-            pattern=InsightPattern(
-                title="Bullish Breakout",
-                description="Repeated breakouts above resistance levels",
-                occurrences=5,
-                confidencePercentage=85.0
-            ),
-            evidence=[
-                InsightEvidence(
-                    title="Volume Spike",
-                    description="50% increase in trading volume",
-                    source="Market Data Provider",
-                    artifactId="data-001",
-                    timestamp=now
-                )
-            ],
-            affectedStrategies=["London Breakout"],
-            relatedMissionIds=[],
-            generatedFrom="Market Analysis",
-            generatedAt=now,
-            generationDurationMs=150
-        ),
-        LearningInsight(
-            id="insight-002",
-            category=LearningCategory.STRATEGY,
-            title="London Breakout Strategy Performance",
-            description="Strategy shows 78% win rate on EURUSD during London session. Risk/reward ratio improving.",
-            severity=InsightSeverity.INFO,
-            confidence=InsightConfidence.MEDIUM,
-            recommendation=InsightRecommendation.FOCUS,
-            pattern=InsightPattern(
-                title="Session Performance",
-                description="Higher win rates during London session",
-                occurrences=12,
-                confidencePercentage=78.0
-            ),
-            evidence=[
-                InsightEvidence(
-                    title="Win Rate Analysis",
-                    description="78% win rate on EURUSD during London session",
-                    source="Mission Repository",
-                    artifactId="mission-001",
-                    timestamp=now
-                )
-            ],
-            affectedStrategies=["London Breakout"],
-            relatedMissionIds=["mission-001"],
-            generatedFrom="Strategy Analysis",
-            generatedAt=now,
-            generationDurationMs=200
-        ),
-        LearningInsight(
-            id="insight-003",
-            category=LearningCategory.RISK,
-            title="Volatility Spreading Warning",
-            description="Market volatility increasing across all pairs. Recommended to reduce position sizes and widen stop losses.",
-            severity=InsightSeverity.WARNING,
-            confidence=InsightConfidence.MEDIUM,
-            recommendation=InsightRecommendation.ADJUST,
-            pattern=InsightPattern(
-                title="Volatility Increase",
-                description="Market volatility rising across multiple pairs",
-                occurrences=8,
-                confidencePercentage=68.0
-            ),
-            evidence=[
-                InsightEvidence(
-                    title="Volatility Metrics",
-                    description="ATR values increased by 30% across watched symbols",
-                    source="Market Data Provider",
-                    artifactId="data-002",
-                    timestamp=now
-                )
-            ],
-            affectedStrategies=["London Breakout", "Risk Management"],
-            relatedMissionIds=[],
-            generatedFrom="Risk Analysis",
-            generatedAt=now,
-            generationDurationMs=180
-        )
-    ]
+    insights = _learning_engine.generate_learning_insights(mission_repository)
     
-    avg_conf = round(sum(i.pattern.confidencePercentage for i in insights) / len(insights), 1) if insights else 0.0
+    if not insights:
+        ms = _market_state_engine.get_market_state()
+        insights = _build_live_market_insights(ms, now)
+        
+    _insights_store = insights
+    summary = _learning_engine.build_summary(insights)
+    
     return LearningInsightListResponse(
         insights=insights,
-        summary=LearningSummary(
-            totalInsights=len(insights),
-            marketInsights=sum(1 for i in insights if i.category == LearningCategory.MARKET),
-            strategyInsights=sum(1 for i in insights if i.category == LearningCategory.STRATEGY),
-            riskInsights=sum(1 for i in insights if i.category == LearningCategory.RISK),
-            decisionInsights=sum(1 for i in insights if i.category == LearningCategory.DECISION),
-            criticalInsights=sum(1 for i in insights if i.severity == InsightSeverity.CRITICAL),
-            averageConfidence=avg_conf,
-        ),
+        summary=summary,
         lastUpdated=now,
     )
 

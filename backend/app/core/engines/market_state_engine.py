@@ -50,24 +50,27 @@ _VOLATILITY_LOOKBACK: int = 20
 _MAGNITUDE_SUFFIXES: Dict[str, float] = {"K": 1e3, "M": 1e6, "B": 1e9, "T": 1e12}
 
 
-def _derive_session(utc_hour: int) -> str:
-    """Deterministically derive Forex trading session from UTC hour."""
-    if 0 <= utc_hour < 2:
-        return "Sydney"
-    elif 2 <= utc_hour < 8:
-        return "Asian"
-    elif 7 <= utc_hour < 9:
+def _derive_session(now: Optional[datetime] = None) -> str:
+    """Deterministically derive Forex/Gold trading session from UTC time with weekend awareness."""
+    dt = now if isinstance(now, datetime) else (datetime.now(timezone.utc) if now is None else datetime.now(timezone.utc).replace(hour=int(now)))
+    if dt.weekday() in (5, 6):
+        return "Weekend (Closed)"
+
+    total_mins = dt.hour * 60 + dt.minute
+    if 0 <= total_mins < 7 * 60:
+        return "Tokyo / Asian"
+    elif 7 * 60 <= total_mins < 9 * 60:
         return "London Open"
-    elif 8 <= utc_hour < 12:
+    elif 9 * 60 <= total_mins < 12 * 60:
         return "London"
-    elif 12 <= utc_hour < 13:
+    elif 12 * 60 <= total_mins < 16 * 60 + 30:
         return "London-NY Overlap"
-    elif 13 <= utc_hour < 17:
+    elif 16 * 60 + 30 <= total_mins < 20 * 60:
         return "New York"
-    elif 17 <= utc_hour < 22:
+    elif 20 * 60 <= total_mins < 22 * 60:
         return "New York Close"
     else:
-        return "Transition"
+        return "Sydney / Standby"
 
 
 def _news_from_released_events() -> List[MarketNews]:
@@ -292,18 +295,57 @@ class MarketStateEngine:
             primary_provider_id = primary_quote.providerId
             primary_provider_name = primary_quote.providerName
         else:
-            # No quotes available at all
-            trend = "Neutral"
-            market_open = False
-            live_spread = 0.0
-            data_age_secs = 0
-            quote_status_str = "INSUFFICIENT_DATA"
-            confidence = 0
-            primary_provider_id = None
-            primary_provider_name = None
-            primary_freshness = 0.0
+            # Check cached quotes from ProviderManager or stored bars in history
+            cached_quote = None
+            for sym in symbols:
+                entry = provider_manager._cache.get(sym)
+                if entry and hasattr(entry, "data") and isinstance(entry.data, MarketQuote):
+                    cached_quote = entry.data
+                    break
 
-        session = _derive_session(now.hour)
+            if cached_quote is not None:
+                trend = _derive_trend(cached_quote.changePercent)
+                market_open = (cached_quote.marketStatus == MarketStatus.OPEN)
+                live_spread = cached_quote.bidAsk.spread if cached_quote.bidAsk else 0.3
+                data_age_secs = int(now.timestamp() - cached_quote.timestamp.timestamp()) if hasattr(cached_quote.timestamp, "timestamp") else 60
+                data_age_secs = max(0, data_age_secs)
+                quote_status_str = "CACHED"
+                confidence = 80
+                primary_provider_id = cached_quote.providerId
+                primary_provider_name = cached_quote.providerName
+                primary_freshness = float(data_age_secs)
+            else:
+                # Check recent stored price bars for primary asset (XAUUSD or first available)
+                stored_bars = market_history_service.get_bars("XAUUSD", limit=5)
+                if not stored_bars:
+                    for sym in symbols:
+                        stored_bars = market_history_service.get_bars(sym, limit=5)
+                        if stored_bars:
+                            break
+
+                if stored_bars and len(stored_bars) >= 2:
+                    pct_change = ((stored_bars[-1].close - stored_bars[0].close) / stored_bars[0].close) * 100
+                    trend = _derive_trend(pct_change)
+                    bar_time = stored_bars[-1].bar_time
+                    if hasattr(bar_time, "timestamp"):
+                        data_age_secs = max(0, int(now.timestamp() - bar_time.timestamp()))
+                    else:
+                        data_age_secs = 300
+                    quote_status_str = "STANDBY"
+                    confidence = 75
+                else:
+                    trend = "Neutral"
+                    data_age_secs = 0
+                    quote_status_str = "INSUFFICIENT_DATA"
+                    confidence = 50
+
+                market_open = False
+                live_spread = 0.3
+                primary_provider_id = None
+                primary_provider_name = None
+                primary_freshness = float(data_age_secs)
+
+        session = _derive_session(now)
 
         # ── Build static intelligence layers (unchanged from Phase 4.2) ───────
         # Technical indicators computed from stored price history; symbols without

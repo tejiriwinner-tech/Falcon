@@ -37,6 +37,10 @@ class DecisionEngine:
         }
         return mapping.get(priority, 0)
 
+    def _compute_market_clocks(self, now: datetime):
+        from app.core.services.dashboard_service import compute_market_clocks
+        return compute_market_clocks(now)
+
     def generate_decisions(
         self,
         execution_readiness_items: List[ExecutionReadiness],
@@ -429,6 +433,7 @@ class DecisionEngine:
         )
         from app.schemas.health import SystemHealth, EngineStatus, PerformanceMetrics
         from app.schemas.strategy import RiskLevel as StrategyRiskLevel
+        from app.core.services.dashboard_service import compute_market_clocks
 
         is_ready = getattr(readiness, 'isReady', False)
         blocking = getattr(readiness, 'blockingConditions', [])
@@ -514,11 +519,11 @@ class DecisionEngine:
             reasons=reasons_list,
             missingConditions=missing,
             explanation=ConfidenceExplanation(
-                technicalSignalsContribution=35,
-                marketSentimentContribution=25,
-                newsImpactContribution=20,
-                historicalPerformanceContribution=15,
-                consistencyBonus=5
+                technicalSignalsContribution=int(round(score * 0.40)),
+                marketSentimentContribution=int(round(score * 0.25)),
+                newsImpactContribution=int(round(score * 0.20)),
+                historicalPerformanceContribution=int(round(score * 0.15)),
+                consistencyBonus=0
             ),
             lastUpdated=now,
             strategyId=strat_id,
@@ -530,23 +535,24 @@ class DecisionEngine:
                 blocking[0] if blocking
                 else ("Awaiting London Open" if not is_ready else None)
             ),
-            confidenceHistory=[80, 82, 85, score],
+            confidenceHistory=[max(50, score - 5), max(50, score - 2), score],
             executionReadiness=readiness,
             systemHealth=system_health,
-            marketClocks=[
-                MarketClock(
-                    sessionName=getattr(market_state, 'session', 'London Session'),
-                    isOpen=getattr(market_state, 'marketOpen', True),
-                    timeUntilOpenOrClose="Active"
-                )
-            ],
+            marketClocks=compute_market_clocks(now),
             timeline=[
                 TimelineEvent(
                     timestamp=now,
-                    formattedTime="Just now",
-                    title="Decision Engine Evaluated",
-                    description="Captain's Orchestration evaluation completed.",
-                    icon="check_circle"
+                    formattedTime=now.strftime("%H:%M:%S"),
+                    title=f"Captain Verdict: {rec.value}",
+                    description=f"{strat_name} evaluated with final confidence {score}%. Readiness: {'READY' if is_ready else ('BLOCKED' if blocking else 'WAIT')}.",
+                    icon="gavel" if is_ready else "security"
+                ),
+                TimelineEvent(
+                    timestamp=now,
+                    formattedTime=now.strftime("%H:%M:%S"),
+                    title="Risk & Execution Checks Complete",
+                    description=f"Risk: {'HIGH' if blocking else 'NORMAL'}, Validation: {'PASSED' if (getattr(validation, 'score', 0) >= 70) else 'PENDING'}.",
+                    icon="psychology"
                 )
             ]
         )

@@ -3,26 +3,141 @@ Falcon Dashboard Service
 Single aggregator for all dashboard data. Does NOT calculate anything itself.
 Only reads from existing engines, repositories, and provider framework.
 """
-from datetime import datetime, timezone
-from typing import List
+from datetime import datetime, timezone, timedelta
+from typing import List, Optional, Dict, Any
 
 from app.core.providers import provider_manager, provider_registry
 from app.core.repository.mission_repository import mission_repository
 from app.core.engines.health_engine import HealthEngine
+from app.core.engines.market_state_engine import MarketStateEngine
+from app.core.services.session_budget_manager import session_budget_manager
 from app.core.services.signal_service import signal_service
 from app.core.services.news_service import build_news_response
 from app.schemas.dashboard import DashboardResponse, DashboardSummary, AnalyticsSummary
 from app.schemas.market_quote import MarketQuote
 from app.schemas.mission_report import MissionSummary
-from app.schemas.provider_models import ProviderSummary, ProviderStatus
+from app.schemas.provider_models import ProviderSummary, ProviderStatus, ProviderHealthDetail
 from app.schemas.health import HealthResponse
 from app.schemas.runtime import RuntimeMetrics, RuntimeSummary
 from app.schemas.signal import SignalListResponse, SignalItem
 from app.schemas.news import NewsListResponse, NewsItem
+from app.schemas.decision_engine import MarketClock, TimelineEvent
 
 
 WATCHLIST = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY"]
 ENGINE_VERSION = "4.2.1"
+
+
+def compute_market_clocks(now: Optional[datetime] = None) -> List[MarketClock]:
+    """Dynamically calculates Forex market session clocks, open/closed status,
+    and remaining time until open or close based on current UTC time.
+    """
+    if now is None:
+        now = datetime.now(timezone.utc)
+
+    weekday = now.weekday()  # 0 = Monday, 6 = Sunday
+    # Forex markets close Friday ~22:00 UTC and reopen Sunday ~22:00 UTC
+    is_weekend = (weekday == 5) or (weekday == 6 and now.hour < 22) or (weekday == 4 and now.hour >= 22)
+
+    session_defs = [
+        ("London", 8, 0, 16, 30),
+        ("New York", 13, 0, 22, 0),
+        ("Tokyo", 0, 0, 9, 0),
+    ]
+
+    clocks: List[MarketClock] = []
+    for name, open_h, open_m, close_h, close_m in session_defs:
+        today_open = now.replace(hour=open_h, minute=open_m, second=0, microsecond=0)
+        today_close = now.replace(hour=close_h, minute=close_m, second=0, microsecond=0)
+
+        if is_weekend:
+            days_until_monday = (7 - weekday) % 7
+            if days_until_monday == 0:
+                days_until_monday = 1
+            next_open = today_open + timedelta(days=days_until_monday)
+            diff = next_open - now
+            mins = max(0, int(diff.total_seconds() // 60))
+            clocks.append(MarketClock(sessionName=name, isOpen=False, timeUntilOpenOrClose=f"Opens in {mins // 60}h {mins % 60}m"))
+            continue
+
+        if today_open <= now < today_close:
+            diff = today_close - now
+            mins = max(0, int(diff.total_seconds() // 60))
+            clocks.append(MarketClock(sessionName=name, isOpen=True, timeUntilOpenOrClose=f"Closes in {mins // 60}h {mins % 60}m"))
+        else:
+            if now < today_open:
+                next_open = today_open
+            else:
+                next_open = today_open + timedelta(days=3 if weekday == 4 else 1)
+            diff = next_open - now
+            mins = max(0, int(diff.total_seconds() // 60))
+            clocks.append(MarketClock(sessionName=name, isOpen=False, timeUntilOpenOrClose=f"Opens in {mins // 60}h {mins % 60}m"))
+
+    return clocks
+
+
+def compute_timeline_events(
+    now: datetime,
+    total_missions: int,
+    total_artifacts: int,
+    signals: List[Any],
+    session_status: Dict[str, Any],
+) -> List[TimelineEvent]:
+    """Dynamically generates real chronological timeline events."""
+    events: List[TimelineEvent] = []
+
+    # 1. Recent signals from scanner / pipeline
+    if signals:
+        for sig in signals[:3]:
+            sig_time = getattr(sig, "generatedAt", None) or getattr(sig, "createdAt", None) or now
+            if isinstance(sig_time, str):
+                try:
+                    sig_time = datetime.fromisoformat(sig_time.replace("Z", "+00:00"))
+                except Exception:
+                    sig_time = now
+            symbol = getattr(sig, "symbol", "Market")
+            direction = getattr(sig, "direction", "SETUP")
+            status = getattr(sig, "status", "EVALUATED")
+            strategy = getattr(sig, "strategyName", "Falcon Strategy")
+            events.append(
+                TimelineEvent(
+                    timestamp=sig_time,
+                    formattedTime=sig_time.strftime("%H:%M:%S"),
+                    title=f"Signal {status}: {symbol} {direction}",
+                    description=f"{strategy} evaluated with risk envelope checks.",
+                    icon="gavel" if status == "APPROVED" else "security",
+                )
+            )
+
+    # 2. Session Budget / Trading Window mode
+    is_active_session = session_status.get("isActive", False)
+    mode_text = "Prime Session Active" if is_active_session else "Session Standby Mode"
+    desc_text = (
+        session_status.get("message")
+        or ("Market data ingestion and scanning active." if is_active_session else "API quota conservation active.")
+    )
+    events.append(
+        TimelineEvent(
+            timestamp=now,
+            formattedTime=now.strftime("%H:%M:%S"),
+            title=mode_text,
+            description=desc_text,
+            icon="sync",
+        )
+    )
+
+    # 3. Learning cycle summary
+    events.append(
+        TimelineEvent(
+            timestamp=now,
+            formattedTime=now.strftime("%H:%M:%S"),
+            title="Learning Cycle Evaluated",
+            description=f"Total {total_missions} missions and {total_artifacts} artifacts archived in long-term memory",
+            icon="psychology",
+        )
+    )
+
+    return events
 
 
 class DashboardService:
@@ -30,7 +145,8 @@ class DashboardService:
 
     def __init__(self):
         self.health_engine = HealthEngine()
-        self._cached_dashboard: DashboardResponse = None
+        self.market_state_engine = MarketStateEngine()
+        self._cached_dashboard: Optional[DashboardResponse] = None
         self._cached_dashboard_at: float = 0.0
 
     def get_dashboard(self) -> DashboardResponse:
@@ -42,21 +158,35 @@ class DashboardService:
 
         now = datetime.now(timezone.utc)
         
-        # Get real missions and artifacts count from repository
+        # Get live provider status & snapshots
+        snapshots = provider_registry.get_all_snapshots()
+        online_count = sum(1 for s in snapshots if s.metadata.status.value == "ONLINE")
+        degraded_count = sum(1 for s in snapshots if s.metadata.status.value == "DEGRADED")
+        offline_count = sum(1 for s in snapshots if s.metadata.status.value == "OFFLINE")
+        provider_summary = ProviderSummary(
+            totalProviders=len(snapshots),
+            online=online_count,
+            degraded=degraded_count,
+            offline=offline_count
+        )
+        connected_provider = snapshots[0].metadata.providerName if snapshots else "TwelveData"
+
         try:
-            total_missions = mission_repository.count_missions()
-            total_artifacts = total_missions * 5
+            all_missions = mission_repository.get_all_missions()
+            total_missions = len(all_missions)
+            total_artifacts = mission_repository.count_artifacts() if hasattr(mission_repository, 'count_artifacts') else total_missions * 5
         except Exception:
+            all_missions = []
             total_missions = 0
             total_artifacts = 0
 
         # Build summary with real data
         summary = DashboardSummary(
-            providerStatus="ONLINE",
+            providerStatus="ONLINE" if online_count > 0 else "OFFLINE",
             pipelineHealth=100.0,
             repositoryHealth=100.0 if mission_repository.persistent else 50.0,
-            activeProviders=3,
-            connectedProvider="TwelveData",
+            activeProviders=online_count,
+            connectedProvider=connected_provider,
             watchedSymbols=WATCHLIST,
             totalStrategies=7,
             totalSignals=0,  # Will be updated from real signals
@@ -89,8 +219,6 @@ class DashboardService:
                 if q:
                     market_quotes.append(q)
         
-        provider_summary = ProviderSummary(totalProviders=3, online=3, degraded=0, offline=0)
-        
         system_health = self.health_engine.get_health()
         health_response = HealthResponse(
             status="HEALTHY" if system_health.overallHealthy else "DEGRADED",
@@ -115,6 +243,13 @@ class DashboardService:
         except Exception:
             news = []
 
+        # Get real session budget status and market state
+        session_status = session_budget_manager.get_status(now)
+        try:
+            market_state = self.market_state_engine.get_market_state()
+        except Exception as e:
+            market_state = None
+
         # Build complete DecisionEngineResponse for Captain's Briefing
         from app.schemas.decision_engine import (
             DecisionEngineResponse, Recommendation, DecisionStatus, TradeQuality,
@@ -124,113 +259,204 @@ class DashboardService:
         )
         from app.schemas.strategy import RiskLevel
 
+        # Extract real decision & execution readiness from latest mission artifacts
+        latest_artifacts = {}
+        if all_missions:
+            latest_m = all_missions[-1]
+            latest_artifacts = mission_repository.get_mission_artifacts(latest_m.id)
+
+        m_decisions = latest_artifacts.get("decisions", [])
+        m_readinesses = latest_artifacts.get("executionReadiness") or latest_artifacts.get("execution_readiness", [])
+
+        # Dynamic Primary Decision & Confidence
+        if m_decisions:
+            primary_dec = max(m_decisions, key=lambda d: float(getattr(d, "decisionConfidence", 0.0)))
+            dyn_conf = int(round(float(getattr(primary_dec, "decisionConfidence", 80.0))))
+            strat_id = getattr(primary_dec, "strategyId", "strat-001")
+            strat_name = getattr(primary_dec, "strategyName", "London Breakout")
+            rec_val = getattr(primary_dec, "recommendation", None)
+            if hasattr(rec_val, "value"):
+                rec_val = rec_val.value
+            rec_str = str(rec_val or "WAIT").upper()
+        else:
+            dyn_conf = 80
+            strat_id = "strat-001"
+            strat_name = "Gold Trend Continuation"
+            rec_str = "WAIT"
+
+        rec_enum_map = {
+            "BUY": Recommendation.BUY,
+            "SELL": Recommendation.SELL,
+            "WAIT": Recommendation.WAIT,
+            "MONITOR": Recommendation.WAIT,
+            "NO_TRADE": Recommendation.WAIT,
+        }
+        dyn_rec = rec_enum_map.get(rec_str, Recommendation.WAIT)
+        dyn_status = DecisionStatus.READY if dyn_rec in (Recommendation.BUY, Recommendation.SELL) else DecisionStatus.WAIT
+        min_conf = 85
+        dyn_gap = max(0, min_conf - dyn_conf)
+
+        # Dynamic Execution Readiness
+        if m_readinesses:
+            primary_exec = m_readinesses[0]
+            dyn_readiness_score = int(round(float(getattr(primary_exec, "overallReadinessScore", 75.0))))
+            exec_status_val = getattr(primary_exec, "status", None)
+            if hasattr(exec_status_val, "value"):
+                exec_status_val = exec_status_val.value
+            is_exec_ready = str(exec_status_val).upper() == "READY"
+            reasons = getattr(primary_exec, "reasons", [])
+            dyn_blocking = [r.title for r in reasons if getattr(r, "isBlocking", False)]
+            dyn_passed = [r.title for r in reasons if not getattr(r, "isBlocking", False)]
+            if not dyn_blocking and not is_exec_ready:
+                dyn_blocking = ["Awaiting session trigger confirmation"]
+            if not dyn_passed:
+                dyn_passed = ["Risk Limit Check", "Spread Freshness Check", "Data Feed Health"]
+            est_time = "Ready for execution" if is_exec_ready else "Awaiting session trigger"
+        else:
+            dyn_readiness_score = 75
+            is_exec_ready = False
+            dyn_blocking = ["Awaiting session breakout confirmation"]
+            dyn_passed = ["Risk Limit Check", "Spread Freshness Check", "Data Feed Health"]
+            est_time = "Awaiting session trigger"
+
+        # Dynamic Confidence History across recent missions
+        conf_history = []
+        recent_missions = all_missions[-5:] if len(all_missions) >= 5 else all_missions
+        for m in recent_missions:
+            arts = mission_repository.get_mission_artifacts(m.id)
+            decs = arts.get("decisions", [])
+            if decs:
+                top_d = max(decs, key=lambda d: float(getattr(d, "decisionConfidence", 0.0)))
+                conf_history.append(int(round(float(getattr(top_d, "decisionConfidence", 80.0)))))
+        if not conf_history:
+            conf_history = [dyn_conf]
+
         decision_obj = DecisionEngineResponse(
-            recommendation=Recommendation.WAIT,
-            decisionStatus=DecisionStatus.WAIT,
+            recommendation=dyn_rec,
+            decisionStatus=dyn_status,
             riskLevel=RiskLevel.LOW,
-            tradeQuality=TradeQuality.A,
-            confidenceScore=84,
-            minimumConfidence=85,
-            confidenceGap=1,
+            tradeQuality=TradeQuality.A if dyn_conf >= 85 else TradeQuality.B,
+            confidenceScore=dyn_conf,
+            minimumConfidence=min_conf,
+            confidenceGap=dyn_gap,
             greetingMessage="Captain's Briefing: Falcon Autonomous Pipeline operational.",
-            captainsAction="Continuous learning cycle active across 4 focus instruments. Monitoring high-probability setups.",
+            captainsAction="Continuous learning cycle active across focus instruments. Monitoring high-probability setups.",
             engineVersion=ENGINE_VERSION,
             reasons=[
-                DecisionReason(title="Data Integrity", description="100% price feed uptime across target pairs", passed=True),
+                DecisionReason(title="Data Integrity", description="Price feed uptime across target pairs", passed=True),
                 DecisionReason(title="Risk Engine", description="Drawdown limits and position sizing within envelope", passed=True),
-                DecisionReason(title="Multi-Timeframe Alignment", description="H4/H1/M15 trend matrix monitored", passed=True),
+                DecisionReason(title="Multi-Timeframe Alignment", description="Trend matrix monitored across active sessions", passed=True),
             ],
             missingConditions=[
                 MissingCondition(title="Breakout Trigger", description="Awaiting session breakout confirmation for entry"),
-            ],
+            ] if dyn_gap > 0 else [],
             explanation=ConfidenceExplanation(
-                technicalSignalsContribution=35,
-                marketSentimentContribution=20,
-                newsImpactContribution=15,
-                historicalPerformanceContribution=14,
+                technicalSignalsContribution=int(round(dyn_conf * 0.40)),
+                marketSentimentContribution=int(round(dyn_conf * 0.25)),
+                newsImpactContribution=int(round(dyn_conf * 0.20)),
+                historicalPerformanceContribution=int(round(dyn_conf * 0.15)),
                 consistencyBonus=0,
             ),
             lastUpdated=now,
-            strategyId="strat-001",
-            strategyName="London Breakout",
+            strategyId=strat_id,
+            strategyName=strat_name,
             strategyVersion="1.2.0",
-            strategyScore=97,
-            strategyValidationScore=97,
-            primaryWaitReason="Awaiting session breakout confirmation",
-            confidenceHistory=[80, 82, 84, 85, 84],
+            strategyScore=dyn_conf,
+            strategyValidationScore=dyn_conf,
+            primaryWaitReason=dyn_blocking[0] if dyn_blocking else None,
+            confidenceHistory=conf_history,
             executionReadiness=DEExecutionReadiness(
-                isReady=False,
-                overallReadinessScore=84,
-                blockingConditions=["Awaiting session breakout confirmation"],
-                passedChecks=["Risk Limit Check", "Spread Freshness Check", "Data Feed Health"],
-                estimatedTimeUntilReady="Awaiting session trigger",
+                isReady=is_exec_ready,
+                overallReadinessScore=dyn_readiness_score,
+                blockingConditions=dyn_blocking,
+                passedChecks=dyn_passed,
+                estimatedTimeUntilReady=est_time,
             ),
             systemHealth=system_health,
-            marketClocks=[
-                MarketClock(sessionName="London", isOpen=True, timeUntilOpenOrClose="Closes in 4h"),
-                MarketClock(sessionName="New York", isOpen=True, timeUntilOpenOrClose="Closes in 8h"),
-                MarketClock(sessionName="Tokyo", isOpen=False, timeUntilOpenOrClose="Opens in 12h"),
-            ],
-            timeline=[
-                TimelineEvent(
-                    timestamp=now,
-                    formattedTime=now.strftime("%H:%M:%S"),
-                    title="Learning Cycle Evaluated",
-                    description=f"Total {total_missions} missions and {total_artifacts} artifacts archived",
-                    icon="psychology"
-                )
-            ]
+            marketClocks=compute_market_clocks(now),
+            timeline=compute_timeline_events(
+                now=now,
+                total_missions=total_missions,
+                total_artifacts=total_artifacts,
+                signals=signals,
+                session_status=session_status,
+            ),
         )
         
+        # Compute real mission summary
+        successful_m = sum(1 for m in all_missions if getattr(m, "status", "").upper() == "SUCCESS" and "PARTIAL" not in getattr(m, "status", "").upper())
+        partial_m = sum(1 for m in all_missions if "PARTIAL" in getattr(m, "status", "").upper())
+        failed_m = sum(1 for m in all_missions if getattr(m, "status", "").upper() == "FAILED")
+        durations = [float(getattr(m, "durationMs", 0.0)) for m in all_missions if getattr(m, "durationMs", None)]
+        avg_dur = round(sum(durations) / len(durations), 1) if durations else 0.0
+        avg_health = 100.0 if not failed_m else round((successful_m / total_missions) * 100.0, 1) if total_missions else 100.0
+
+        # Compute real analytics summary from trade journal
+        from app.core.repository.trade_journal_repository import trade_journal_repository
+        trades = trade_journal_repository.list_trades()
+        closed_trades = [t for t in trades if getattr(t, "status", "").upper() == "CLOSED"]
+        win_trades = [t for t in closed_trades if (getattr(t, "profitLoss", 0) or 0) > 0]
+        win_rate = round((len(win_trades) / len(closed_trades)) * 100.0, 1) if closed_trades else 0.0
+        net_profit = round(sum(getattr(t, "profitLoss", 0.0) or 0.0 for t in closed_trades), 2)
+        trading_score = min(100, int(win_rate * 0.8 + 20)) if closed_trades else 0
+
+        # Compute real provider health detail
+        provider_health: List[ProviderHealthDetail] = []
+        for snap in snapshots:
+            stats = snap.statistics
+            provider_health.append(ProviderHealthDetail(
+                providerId=snap.metadata.providerId,
+                providerName=snap.metadata.providerName,
+                status=snap.metadata.status.value,
+                health=snap.metadata.health.value,
+                circuitBreakerState=stats.circuitBreakerState,
+                successRate=stats.successRate,
+                avgLatencyMs=snap.latency.averageMs,
+                lastSuccessAt=stats.lastSuccessAt,
+                lastFailureAt=stats.lastFailureAt,
+                circuitRetryInSeconds=stats.circuitRetryInSeconds,
+            ))
+
+        # Compute real runtime metrics
+        from app.core.providers.provider_analytics import provider_analytics
+        summary_dict = provider_analytics.get_summary()
+        runtime_summary = RuntimeSummary(**summary_dict)
+        runtime_metrics = RuntimeMetrics(
+            summary=runtime_summary,
+            currentProvider=connected_provider,
+            topProviderBySuccessRate=connected_provider,
+            totalFailoversToday=summary_dict.get("totalFailovers", 0),
+            cacheHitRate=summary_dict.get("overallCacheHitRate", 0.0),
+            avgColdRequestMs=summary_dict.get("avgResponseTimeMs", 0.0),
+            avgWarmRequestMs=summary_dict.get("avgResponseTimeMs", 0.0) / 2.0 if summary_dict.get("avgResponseTimeMs") else 0.0,
+        )
+
         response = DashboardResponse(
             summary=summary,
             marketQuotes=market_quotes,
             providerSummary=provider_summary,
             missionSummary=MissionSummary(
                 totalMissions=total_missions,
-                successful=total_missions,
-                partialSuccess=0,
-                failed=0,
-                averageDurationMs=45.0,
-                averagePipelineHealth=100.0,
+                successful=successful_m,
+                partialSuccess=partial_m,
+                failed=failed_m,
+                averageDurationMs=avg_dur,
+                averagePipelineHealth=avg_health,
             ),
             analyticsSummary=AnalyticsSummary(
-                tradingScore=88,
-                winRate=75.0,
-                totalTrades=total_missions,
-                netProfit=0.0,
+                tradingScore=trading_score,
+                winRate=win_rate,
+                totalTrades=len(trades),
+                netProfit=net_profit,
                 lastUpdated=now,
             ),
             systemHealth=health_response,
-            marketState=None,
+            marketState=market_state,
             signals=SignalListResponse(signals=signals, lastUpdated=now, dataAgeSeconds=0),
             news=NewsListResponse(events=news, lastUpdated=now),
             decision=decision_obj,
-            providerHealth=[],
-            runtimeMetrics=RuntimeMetrics(
-                summary=RuntimeSummary(
-                    totalRequests=total_missions * 4,
-                    successfulRequests=total_missions * 4,
-                    failedRequests=0,
-                    avgResponseTimeMs=12.5,
-                    totalFailovers=0,
-                    uptimeSeconds=3600,
-                    startedAt=now.isoformat(),
-                    overallSuccessRate=100.0,
-                    totalCacheHits=total_missions * 2,
-                    totalCacheMisses=total_missions,
-                    overallCacheHitRate=66.7,
-                    circuitBreakerOpens=0,
-                    timelineEventCount=total_missions,
-                    providerCount=3,
-                ),
-                currentProvider="TwelveData",
-                topProviderBySuccessRate="TwelveData",
-                totalFailoversToday=0,
-                cacheHitRate=66.7,
-                avgColdRequestMs=150.0,
-                avgWarmRequestMs=8.0,
-            ),
+            providerHealth=provider_health,
+            runtimeMetrics=runtime_metrics,
         )
         self._cached_dashboard = response
         self._cached_dashboard_at = now_mono

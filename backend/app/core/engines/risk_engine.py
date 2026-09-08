@@ -16,9 +16,9 @@ class RiskEngine:
     def __init__(self):
         self.version = "1.0.2"
         self.thresholds = RiskThresholds(
-            lowMax=25,
-            mediumMax=50,
-            highMax=75,
+            lowMax=50,
+            mediumMax=70,
+            highMax=85,
             extremeMax=100
         )
 
@@ -84,7 +84,13 @@ class RiskEngine:
         )
 
         # SESSION: Evaluate execution session risk
-        session_score = 5 if candidate.marketSnapshot.session == "London Open" else 10
+        sess = str(getattr(candidate.marketSnapshot, "session", "") or "").lower()
+        if any(s in sess for s in ("london", "new york", "ny", "overlap")):
+            session_score = 4  # Low session risk (deep liquidity)
+        elif any(s in sess for s in ("asian", "tokyo", "sydney")):
+            session_score = 7  # Moderate session risk (lower volume)
+        else:
+            session_score = 10  # High session risk (closed or transition)
         cat_session = RiskCategoryScore(
             category=RiskCategory.SESSION,
             score=session_score,

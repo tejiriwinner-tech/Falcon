@@ -479,13 +479,8 @@ class LiveIntelligenceService:
         )
         
         # News
-        now = datetime.now(timezone.utc)
-        news = NewsListResponse(
-            events=[
-                NewsItem(id=1, currency="USD", title="CPI", impact="High", time=now, forecast="0.3%", previous="0.2%", actual=None, status="Upcoming")
-            ],
-            lastUpdated=now
-        )
+        from app.core.services.news_service import build_news_response
+        news = build_news_response(symbols=WATCHLIST)
         
         # Decision Engine Response from live intelligence
         captain_briefing = self._generate_captain_briefing(decisions, market_state)
@@ -514,39 +509,35 @@ class LiveIntelligenceService:
             engineVersion=ENGINE_VERSION
         )
         
-        # Analytics Summary
+        # Real Analytics Summary from trade journal
+        from app.core.repository.trade_journal_repository import trade_journal_repository
+        trades = trade_journal_repository.list_trades()
+        closed_trades = [t for t in trades if getattr(t, "status", "").upper() == "CLOSED"]
+        win_trades = [t for t in closed_trades if (getattr(t, "profitLoss", 0) or 0) > 0]
+        win_rate = round((len(win_trades) / len(closed_trades)) * 100.0, 1) if closed_trades else 0.0
+        net_profit = round(sum(getattr(t, "profitLoss", 0.0) or 0.0 for t in closed_trades), 2)
+        trading_score = min(100, int(win_rate * 0.8 + 20)) if closed_trades else 0
+
         analytics_summary = AnalyticsSummary(
-            tradingScore=85,
-            winRate=75.0,
-            totalTrades=repo_stats.totalMissions,
-            netProfit=2450.50,
+            tradingScore=trading_score,
+            winRate=win_rate,
+            totalTrades=len(trades),
+            netProfit=net_profit,
             lastUpdated=datetime.now(timezone.utc)
         )
         
-        # Runtime Metrics
+        # Real Runtime Metrics from provider_analytics
         from app.schemas.runtime import RuntimeSummary
+        summary_dict = provider_analytics.get_summary()
+        runtime_summary = RuntimeSummary(**summary_dict)
         runtime_metrics = RuntimeMetrics(
-            summary=RuntimeSummary(
-                uptimeSeconds=3600,
-                startedAt=datetime.now(timezone.utc).isoformat(),
-                totalRequests=1000,
-                successfulRequests=995,
-                failedRequests=5,
-                overallSuccessRate=99.5,
-                totalFailovers=2,
-                totalCacheHits=600,
-                totalCacheMisses=400,
-                overallCacheHitRate=60.0,
-                circuitBreakerOpens=0,
-                timelineEventCount=50,
-                providerCount=3
-            ),
+            summary=runtime_summary,
             currentProvider=provider_used,
             topProviderBySuccessRate=provider_used,
-            totalFailoversToday=2,
-            cacheHitRate=60.0,
-            avgColdRequestMs=150.0,
-            avgWarmRequestMs=10.0
+            totalFailoversToday=summary_dict.get("totalFailovers", 0),
+            cacheHitRate=summary_dict.get("overallCacheHitRate", 0.0),
+            avgColdRequestMs=summary_dict.get("avgResponseTimeMs", 0.0),
+            avgWarmRequestMs=summary_dict.get("avgResponseTimeMs", 0.0) / 2.0 if summary_dict.get("avgResponseTimeMs") else 0.0
         )
         
         # Build complete DashboardResponse
@@ -782,14 +773,14 @@ class LiveIntelligenceService:
             strategyVersion=primary_decision.strategyVersion,
             strategyScore=int(primary_decision.decisionConfidence),
             strategyValidationScore=int(primary_decision.decisionConfidence),
-            primaryWaitReason="Market analysis complete",
+            primaryWaitReason="Market analysis complete" if recommendation in (Recommendation.BUY, Recommendation.SELL) else "Awaiting execution trigger",
             confidenceHistory=[int(primary_decision.decisionConfidence)],
             executionReadiness=DEExecutionReadiness(
-                isReady=True,
+                isReady=(recommendation in (Recommendation.BUY, Recommendation.SELL)),
                 overallReadinessScore=int(primary_decision.decisionConfidence),
-                blockingConditions=[],
+                blockingConditions=[] if recommendation in (Recommendation.BUY, Recommendation.SELL) else ["Awaiting session trigger confirmation"],
                 passedChecks=["Market analysis complete"],
-                estimatedTimeUntilReady=None
+                estimatedTimeUntilReady="Ready for execution" if recommendation in (Recommendation.BUY, Recommendation.SELL) else "Awaiting session trigger"
             ),
             systemHealth=SystemHealth(
                 overallHealthy=True,

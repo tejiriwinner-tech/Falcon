@@ -58,11 +58,12 @@ class ValidationEngine:
             )
 
             # 3. RSI Validation (Weight: 15, Mandatory: Yes)
-            # Pass except for GBP/USD Momentum (cand-003) to simulate intermediate failures
-            rsi_passed = candidate.id != "cand-003"
+            # Confirms RSI indicator is within healthy non-exhaustion boundary (30.0 - 70.0)
+            rsi_val = float(getattr(candidate.marketSnapshot, "rsi", 50.0))
+            rsi_passed = 30.0 <= rsi_val <= 70.0
             check_rsi = ValidationCheck(
                 title="RSI Validation",
-                description="Ensures RSI indicator does not show overbought or oversold conditions.",
+                description=f"Ensures RSI ({rsi_val:.1f}) is within normal operating range (30-70).",
                 passed=rsi_passed,
                 mandatory=True,
                 weight=15,
@@ -82,11 +83,19 @@ class ValidationEngine:
             )
 
             # 5. Spread Threshold (Weight: 15, Mandatory: Yes)
-            # Pass if spread is at most 0.4 pips
-            spread_passed = spread <= 0.4
+            # Dynamic asset-aware spread limit (Gold up to 3.5 pips, GBP pairs 2.5, Majors 1.8)
+            symbol = getattr(candidate, "symbol", "") or ""
+            if "XAU" in symbol or "GOLD" in symbol:
+                max_spread = 3.5
+            elif "GBP" in symbol:
+                max_spread = 2.5
+            else:
+                max_spread = 1.8
+
+            spread_passed = spread <= max_spread
             check_spread = ValidationCheck(
                 title="Spread Threshold",
-                description=f"Validates current spread of {spread:.2f} pips is within the maximum limit of 0.4 pips.",
+                description=f"Validates current spread of {spread:.2f} pips is within the maximum limit of {max_spread:.1f} pips for {symbol or 'asset'}.",
                 passed=spread_passed,
                 mandatory=True,
                 weight=15,
