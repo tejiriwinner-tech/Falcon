@@ -15,6 +15,7 @@ class OutcomeAnalysisScreen extends StatefulWidget {
 class _OutcomeAnalysisScreenState extends State<OutcomeAnalysisScreen> {
   final ApiService _apiService = ApiService();
   late Future<OutcomeAnalysisListResponse> _outcomeFuture;
+  int _displayLimit = 10;
 
   @override
   void initState() {
@@ -24,6 +25,7 @@ class _OutcomeAnalysisScreenState extends State<OutcomeAnalysisScreen> {
 
   void _fetchData() {
     setState(() {
+      _displayLimit = 10;
       _outcomeFuture = _apiService.getOutcomeAnalysis();
     });
   }
@@ -166,11 +168,27 @@ class _OutcomeAnalysisScreenState extends State<OutcomeAnalysisScreen> {
                           ),
                         ),
                       )
-                    else
-                      ...sorted.map((r) => Padding(
+                    else ...[
+                      ...sorted.take(_displayLimit).map((r) => Padding(
                             padding: const EdgeInsets.only(bottom: 16),
                             child: _buildOutcomeCard(r),
                           )),
+                      if (sorted.length > _displayLimit)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8.0),
+                          child: Center(
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                setState(() {
+                                  _displayLimit += 10;
+                                });
+                              },
+                              icon: const Icon(Icons.expand_more),
+                              label: Text('Show More (${sorted.length - _displayLimit} remaining)'),
+                            ),
+                          ),
+                        ),
+                    ],
                     const SizedBox(height: 12),
                     _buildMetadataFooter(sorted),
                     const SizedBox(height: 20),

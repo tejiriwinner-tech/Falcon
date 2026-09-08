@@ -36,13 +36,15 @@ class OutcomeAnalysisEngine:
     # Public API
     # ------------------------------------------------------------------
 
-    def generate_reports(self, repository: MissionRepository) -> List[OutcomeAnalysisReport]:
+    def generate_reports(self, repository: MissionRepository, limit: int = 30) -> List[OutcomeAnalysisReport]:
         start_time = time.time()
         now = datetime.now(timezone.utc)
 
-        missions = repository.get_all_missions()
-        if not missions:
+        all_missions = repository.get_all_missions()
+        if not all_missions:
             return []
+
+        missions = all_missions[-limit:] if (limit and limit > 0 and len(all_missions) > limit) else all_missions
 
         reports: List[OutcomeAnalysisReport] = []
         counter = 1
