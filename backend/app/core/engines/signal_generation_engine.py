@@ -233,7 +233,7 @@ class SignalGenerationEngine:
             else:
                 reduct_reasons = []
                 if not spread_passed:
-                    reduct_reasons.append(f"Spread {spread:.2f} pips exceeds preferred threshold of 0.4.")
+                    reduct_reasons.append(f"Spread {spread:.2f} pips exceeds preferred threshold of {spread_limit:.1f} pips.")
                 if not session_passed:
                     reduct_reasons.append(f"Current session '{session}' is not optimal for strategy preferred sessions.")
                 if not news_passed:
@@ -247,23 +247,29 @@ class SignalGenerationEngine:
                     passed=False
                 ))
 
-            # Price calculations (Mock entries)
+            # Dynamic price levels based on asset volatility and risk-reward
             rr = strategy.minimumRiskReward or 2.0
-            if direction == CandidateDirection.BUY:
-                tick_size = 0.5 if "XAU" in strategy.symbol else 0.0002
-                stop_loss = entry_price - (15 * tick_size)
-                take_profit = entry_price + (15 * tick_size * rr)
-            elif direction == CandidateDirection.SELL:
-                tick_size = 0.5 if "XAU" in strategy.symbol else 0.0002
-                stop_loss = entry_price + (15 * tick_size)
-                take_profit = entry_price - (15 * tick_size * rr)
+            if "XAU" in strategy.symbol or "GOLD" in strategy.symbol:
+                stop_distance = 3.5  # $3.50 buffer for Gold
+            elif "JPY" in strategy.symbol:
+                stop_distance = 0.25  # 25 pips for JPY pairs
             else:
-                stop_loss = entry_price - (20 * (0.5 if "XAU" in strategy.symbol else 0.0002))
-                take_profit = entry_price + (20 * (0.5 if "XAU" in strategy.symbol else 0.0002) * rr)
+                stop_distance = 0.0020  # 20 pips for standard FX majors
 
-            # Simulated evaluation duration (between 30ms and 60ms)
-            duration_ms = 30 + (i * 7) % 25
-            completed_at = started_at + timedelta(milliseconds=duration_ms)
+            if direction == CandidateDirection.BUY:
+                stop_loss = round(entry_price - stop_distance, 5)
+                take_profit = round(entry_price + (stop_distance * rr), 5)
+            elif direction == CandidateDirection.SELL:
+                stop_loss = round(entry_price + stop_distance, 5)
+                take_profit = round(entry_price - (stop_distance * rr), 5)
+            else:
+                stop_loss = round(entry_price - stop_distance, 5)
+                take_profit = round(entry_price + (stop_distance * rr), 5)
+
+            # Real evaluation duration measurement
+            now_utc = datetime.now(timezone.utc)
+            duration_ms = max(1, int((now_utc - started_at).total_seconds() * 1000))
+            completed_at = now_utc
             
             market_snapshot = CandidateMarketSnapshot(
                 trend=trend,

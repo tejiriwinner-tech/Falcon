@@ -40,21 +40,45 @@ class StructureEvaluator(BaseEvaluator):
                 warnings=[f"Cannot evaluate structure for non-directional candidate: {candidate_dir}"]
             )
 
-        # Basic default behavior
+        trend = (context.trend or "Neutral").capitalize()
+
+        if (candidate_dir == "BUY" and trend == "Bullish") or (candidate_dir == "SELL" and trend == "Bearish"):
+            score = 85.0
+            passed = True
+            impact = EvidenceImpact.SUPPORTING
+            status = EvidenceStatus.PASS
+            obs = f"{trend} Structure Aligned"
+            exp = f"Market structure ({trend}) confirms directional flow for {candidate_dir} signal."
+        elif trend in ("Neutral", "Ranging"):
+            score = 55.0
+            passed = True
+            impact = EvidenceImpact.NEUTRAL
+            status = EvidenceStatus.WARN
+            obs = f"{trend} Structure"
+            exp = f"Market structure is consolidating/ranging; neutral structure alignment for {candidate_dir}."
+        else:
+            score = 25.0
+            passed = False
+            impact = EvidenceImpact.CONTRADICTING
+            status = EvidenceStatus.FAIL
+            obs = f"Contradicting {trend} Structure"
+            exp = f"Market structure ({trend}) directly opposes {candidate_dir} setup."
+            warnings.append(f"Structure contradiction: {candidate_dir} against {trend} trend.")
+
         evidence.append(DecisionEvidence(
             indicator="MARKET_STRUCTURE",
-            observedValue="UNKNOWN",
-            weight=0.5,
-            impact=EvidenceImpact.NEUTRAL,
-            status=EvidenceStatus.WARN,
-            explanation="Detailed market structure data (BOS/CHoCH) not fully available in context.",
+            observedValue=obs,
+            weight=self.weight,
+            impact=impact,
+            status=status,
+            explanation=exp,
             category="STRUCTURE"
         ))
         
         return EvaluatorResult(
             name=self.name,
-            passed=True,  # Default to true so it doesn't block
-            score=50.0,   # Neutral score
+            passed=passed,
+            score=score,
             weight=self.weight,
             evidence=evidence,
             warnings=warnings

@@ -25,9 +25,14 @@ class SpreadEvaluator(BaseEvaluator):
         
         spread = context.spread
         
-        # A simple check: if spread is unusually high, penalize.
-        # In a real implementation, this would compare against a symbol-specific average or max.
-        max_acceptable_spread = 2.0  # Just a placeholder arbitrary threshold
+        # Dynamic asset-aware acceptable spread limits
+        symbol = getattr(context.strategy, "symbol", "") if context.strategy else ""
+        if "XAU" in symbol or "GOLD" in symbol:
+            max_acceptable_spread = 3.5
+        elif "GBP" in symbol or "JPY" in symbol:
+            max_acceptable_spread = 2.5
+        else:
+            max_acceptable_spread = 1.8
         
         if spread <= 0:
             evidence.append(DecisionEvidence(
