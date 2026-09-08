@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/constants/app_colors.dart';
 import '../../widgets/typography/section_title.dart';
 import '../../services/theme/theme_service.dart';
@@ -20,12 +21,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     ThemeService().addListener(_onThemeChanged);
+    _loadSettings();
   }
 
   @override
   void dispose() {
     ThemeService().removeListener(_onThemeChanged);
     super.dispose();
+  }
+
+  Future<void> _loadSettings() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      setState(() {
+        _pushNotifications = prefs.getBool('settings_push_notifications') ?? true;
+        _signalAlerts = prefs.getBool('settings_signal_alerts') ?? true;
+        _newsAlerts = prefs.getBool('settings_news_alerts') ?? false;
+        _selectedRisk = prefs.getString('settings_selected_risk') ?? 'Medium';
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _updateSetting(String key, dynamic value) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (value is bool) {
+        await prefs.setBool(key, value);
+      } else if (value is String) {
+        await prefs.setString(key, value);
+      }
+    } catch (_) {}
   }
 
   void _onThemeChanged() {
@@ -54,15 +79,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'Push Notifications',
               subtitle: 'Receive in-app alerts',
               value: _pushNotifications,
-              onChanged: (v) => setState(() => _pushNotifications = v),
+              onChanged: (v) {
+                setState(() => _pushNotifications = v);
+                _updateSetting('settings_push_notifications', v);
+              },
             ),
             _buildDivider(),
             _buildToggleTile(
               icon: Icons.trending_up,
               title: 'Signal Alerts',
-              subtitle: 'Notify on new signals',
+              subtitle: 'Notify on new active signals',
               value: _signalAlerts,
-              onChanged: (v) => setState(() => _signalAlerts = v),
+              onChanged: (v) {
+                setState(() => _signalAlerts = v);
+                _updateSetting('settings_signal_alerts', v);
+              },
             ),
             _buildDivider(),
             _buildToggleTile(
@@ -70,7 +101,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
               title: 'News Alerts',
               subtitle: 'High-impact economic news',
               value: _newsAlerts,
-              onChanged: (v) => setState(() => _newsAlerts = v),
+              onChanged: (v) {
+                setState(() => _newsAlerts = v);
+                _updateSetting('settings_news_alerts', v);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(v
+                        ? '📰 News Alerts Enabled (High-impact event warnings)'
+                        : 'News alerts muted'),
+                    duration: const Duration(seconds: 2),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
             ),
           ]),
           const SizedBox(height: 24),
@@ -220,6 +263,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Widget _buildRiskSelector() {
+    String riskDesc = '2.0% max risk per trade • Standard institutional growth';
+    if (_selectedRisk == 'Low') {
+      riskDesc = '1.0% max risk per trade • Conservative capital preservation';
+    } else if (_selectedRisk == 'High') {
+      riskDesc = '3.0% max risk per trade • Aggressive momentum allocation';
+    }
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
@@ -229,12 +279,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             children: [
               const Icon(Icons.tune, color: AppColors.primary, size: 22),
               const SizedBox(width: 12),
-              const Expanded(
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Risk Level', style: TextStyle(color: AppColors.textPrimary, fontSize: 15)),
-                    Text('Max risk per trade', style: TextStyle(color: AppColors.textTertiary, fontSize: 12)),
+                    const Text('Risk Level', style: TextStyle(color: AppColors.textPrimary, fontSize: 15)),
+                    Text(riskDesc, style: const TextStyle(color: AppColors.textTertiary, fontSize: 12)),
                   ],
                 ),
               ),
@@ -253,7 +303,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 3),
                   child: GestureDetector(
-                    onTap: () => setState(() => _selectedRisk = level),
+                    onTap: () {
+                      setState(() => _selectedRisk = level);
+                      _updateSetting('settings_selected_risk', level);
+                      final pct = level == 'Low' ? '1%' : level == 'Medium' ? '2%' : '3%';
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('🛡️ Risk level adjusted to $level ($pct account risk per trade)'),
+                          duration: const Duration(seconds: 2),
+                          behavior: SnackBarBehavior.floating,
+                        ),
+                      );
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(vertical: 10),

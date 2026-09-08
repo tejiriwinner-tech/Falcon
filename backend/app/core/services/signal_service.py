@@ -42,6 +42,7 @@ class SignalService:
         missions = all_missions[-mission_limit:]
 
         signals: List[SignalItem] = []
+        seen_strategies = set()
         for mission in reversed(missions):
             try:
                 artifacts = mission_repository.get_mission_artifacts(mission.id)
@@ -50,14 +51,21 @@ class SignalService:
                 by_candidate = {d.candidateId: d for d in decisions}
 
                 for index, candidate in enumerate(candidates):
-                    signals.append(
-                        self._to_signal(
-                            candidate,
-                            by_candidate.get(candidate.id),
-                            self._signal_id(mission.id, index),
-                            now,
+                    dec = by_candidate.get(candidate.id)
+                    is_active = dec and dec.status == DecisionStatus.APPROVED
+                    strat_key = (candidate.symbol, candidate.strategyId)
+
+                    # Always retain approved ACTIVE signals; for pending setups, keep only the latest per strategy
+                    if is_active or strat_key not in seen_strategies:
+                        seen_strategies.add(strat_key)
+                        signals.append(
+                            self._to_signal(
+                                candidate,
+                                dec,
+                                self._signal_id(mission.id, index),
+                                now,
+                            )
                         )
-                    )
             except Exception:
                 continue  # Skip missions with artifact errors
 
