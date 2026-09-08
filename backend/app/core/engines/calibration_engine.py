@@ -43,23 +43,24 @@ class CalibrationEngine:
     # Public API
     # ------------------------------------------------------------------
 
-    def generate_reports(self, repository: MissionRepository) -> List[CalibrationReport]:
-        start_time = time.time()
-        now = datetime.now(timezone.utc)
-
-        missions = repository.get_all_missions()
-
-        # ── Gather historical metrics from archived artifacts ──────────
+    def _compute_single_report(
+        self,
+        missions: List[Any],
+        bulk_artifacts: dict,
+        report_id: str,
+        window_title: str,
+        now: datetime,
+        start_time: float,
+    ) -> CalibrationReport:
         all_decision_confidences: List[float] = []
         all_validation_scores: List[float] = []
         all_risk_confidences: List[float] = []
         all_execution_scores: List[float] = []
         all_market_confidences: List[float] = []
-        mission_ids: List[str] = []
+        mission_ids: List[str] = [m.id for m in missions]
 
         for mission in missions:
-            artifacts = repository.get_mission_artifacts(mission.id)
-            mission_ids.append(mission.id)
+            artifacts = bulk_artifacts.get(mission.id, {})
 
             market_state = artifacts.get("marketState")
             if market_state is not None:
@@ -73,24 +74,25 @@ class CalibrationEngine:
                     all_decision_confidences.append(float(conf))
 
             for v in artifacts.get("validations", []):
-                score = getattr(v, "overallScore", None)
+                score = getattr(v, "validationScore", getattr(v, "overallScore", getattr(v, "score", None)))
                 if score is not None:
                     all_validation_scores.append(float(score))
 
-            for r in artifacts.get("risk_assessments", []):
+            risks = artifacts.get("riskAssessments") or artifacts.get("risk_assessments", [])
+            for r in risks:
                 conf = getattr(r, "overallRiskScore", None)
                 if conf is not None:
-                    # Invert risk score: lower risk → higher confidence
                     all_risk_confidences.append(max(0.0, 100.0 - float(conf)))
 
-            for e in artifacts.get("execution_readiness", []):
-                score = getattr(e, "overallScore", None)
+            readinesses = artifacts.get("executionReadiness") or artifacts.get("execution_readiness", [])
+            for e in readinesses:
+                score = getattr(e, "overallReadinessScore", getattr(e, "overallScore", None))
                 if score is not None:
                     all_execution_scores.append(float(score))
 
         mission_count = len(missions)
 
-        # ── Compute per-metric averages (with fallback defaults) ──────
+        # ── Compute per-metric averages ──────────────────────────────
         avg_decision_conf = (
             sum(all_decision_confidences) / len(all_decision_confidences)
             if all_decision_confidences else 0.0
@@ -108,7 +110,6 @@ class CalibrationEngine:
             if all_execution_scores else 0.0
         )
 
-        # Derived approximations for components not tracked directly
         avg_outcome_score = min(avg_decision_conf * 1.01, 100.0)
         strategy_stability = min(avg_val_score * 0.97, 100.0)
         market_agreement = (
@@ -118,13 +119,6 @@ class CalibrationEngine:
         learning_confidence = min(avg_decision_conf * 0.95, 100.0)
 
         # ── Weighted calibration score ────────────────────────────────
-        # Historical Decision Accuracy  30%
-        # Outcome Consistency           20%
-        # Strategy Stability            15%
-        # Market Regime Agreement       10%
-        # Risk Reliability              10%
-        # Execution Reliability         10%
-        # Learning Confidence            5%
         calibration_score = round(
             avg_decision_conf    * 0.30
             + avg_outcome_score  * 0.20
@@ -156,7 +150,7 @@ class CalibrationEngine:
         else:
             status = CalibrationStatus.LOW_CONFIDENCE
 
-        # ── Trend (deterministic: based on number of missions) ────────
+        # ── Trend ────────────────────────────────────────────────────
         if mission_count >= 3:
             trend = CalibrationTrend.IMPROVING
         elif mission_count >= 1:
@@ -180,7 +174,7 @@ class CalibrationEngine:
                 name="Historical Decision Accuracy",
                 weight=0.30,
                 score=round(avg_decision_conf, 2),
-                description="Average confidence across all historical decisions",
+                description=f"Average confidence ({window_title}) across decisions",
             ),
             CalibrationMetric(
                 name="Outcome Consistency",
@@ -224,8 +218,8 @@ class CalibrationEngine:
         evidence = [
             CalibrationEvidence(
                 source="MissionRepository",
-                description=f"Analyzed {mission_count} archived missions for calibration",
-                relatedMissionIds=mission_ids[:5],  # cap for readability
+                description=f"Analyzed {mission_count} missions for {window_title}",
+                relatedMissionIds=mission_ids[:5],
             ),
             CalibrationEvidence(
                 source="DecisionArtifacts",
@@ -251,8 +245,8 @@ class CalibrationEngine:
 
         duration_ms = max(1, int((time.time() - start_time) * 1000))
 
-        report = CalibrationReport(
-            id="calibration-001",
+        return CalibrationReport(
+            id=report_id,
             calibrationScore=calibration_score,
             calibrationLevel=level,
             calibrationStatus=status,
@@ -265,8 +259,60 @@ class CalibrationEngine:
             durationMs=duration_ms,
         )
 
-        self._emit_event(report)
-        return [report]
+    def generate_reports(self, repository: MissionRepository) -> List[CalibrationReport]:
+        start_time = time.time()
+        now = datetime.now(timezone.utc)
+
+        all_missions = repository.get_all_missions()
+        if not all_missions:
+            return []
+
+        sample_missions = all_missions[-50:] if len(all_missions) > 50 else all_missions
+        mission_ids = [m.id for m in sample_missions]
+        bulk_artifacts = (
+            repository.get_all_mission_artifacts_bulk(mission_ids)
+            if hasattr(repository, "get_all_mission_artifacts_bulk")
+            else {}
+        )
+
+        reports: List[CalibrationReport] = []
+
+        # Window 1: Recent Window (last 10 missions)
+        if len(all_missions) >= 10:
+            reports.append(self._compute_single_report(
+                missions=all_missions[-10:],
+                bulk_artifacts=bulk_artifacts,
+                report_id="calibration-recent-10m",
+                window_title="Recent Window (Last 10 Missions)",
+                now=now,
+                start_time=start_time,
+            ))
+
+        # Window 2: Medium Window (last 25 missions)
+        if len(all_missions) >= 25:
+            reports.append(self._compute_single_report(
+                missions=all_missions[-25:],
+                bulk_artifacts=bulk_artifacts,
+                report_id="calibration-mid-25m",
+                window_title="Mid-term Window (Last 25 Missions)",
+                now=now,
+                start_time=start_time,
+            ))
+
+        # Window 3: Global Window (all sampled missions up to 50)
+        reports.append(self._compute_single_report(
+            missions=sample_missions,
+            bulk_artifacts=bulk_artifacts,
+            report_id="calibration-global-50m",
+            window_title=f"Global Baseline ({len(sample_missions)} Missions)",
+            now=now,
+            start_time=start_time,
+        ))
+
+        for r in reports:
+            self._emit_event(r)
+
+        return reports
 
     def build_summary(self, reports: List[CalibrationReport]) -> CalibrationSummary:
         if not reports:

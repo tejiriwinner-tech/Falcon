@@ -56,6 +56,10 @@ def get_calibration_by_id(report_id: str):
         if r.id == report_id:
             return r
 
+    # Backwards compatibility alias for calibration-001
+    if report_id == "calibration-001" and _calibration_store:
+        return _calibration_store[-1]
+
     raise HTTPException(
         status_code=404,
         detail=f"Calibration report '{report_id}' not found",
