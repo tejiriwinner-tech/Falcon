@@ -936,6 +936,8 @@ class _PerformanceAnalyticsScreenState
               color: color,
               fontSize: 13,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(
@@ -944,6 +946,8 @@ class _PerformanceAnalyticsScreenState
               color: AppColors.textTertiary,
               fontSize: 10,
             ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ],
       ),

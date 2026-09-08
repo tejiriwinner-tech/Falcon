@@ -240,8 +240,15 @@ class _CalibrationScreenState extends State<CalibrationScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // ── Header
         Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-          Text('Report: ${r.id}',
-              style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.bold)),
+          Expanded(
+            child: Text(
+              'Report: ${r.id}',
+              style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.bold),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+          const SizedBox(width: 8),
           Row(children: [
             Icon(_trendIcon(r.calibrationTrend), color: tColor, size: 16),
             const SizedBox(width: 4),

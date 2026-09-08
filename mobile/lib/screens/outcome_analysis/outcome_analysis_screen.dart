@@ -261,10 +261,15 @@ class _OutcomeAnalysisScreenState extends State<OutcomeAnalysisScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Outcome: ${r.id}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  'Outcome: ${r.id}',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               Row(
                 children: [
                   _buildBadge(r.accuracy.name, accuracyColor),
@@ -426,10 +431,12 @@ class _OutcomeAnalysisScreenState extends State<OutcomeAnalysisScreen> {
     return Row(
       children: [
         SizedBox(
-          width: 120,
+          width: 95,
           child: Text(
             stage.stage,
             style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 12),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         Container(

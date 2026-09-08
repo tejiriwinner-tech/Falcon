@@ -274,10 +274,15 @@ class _MarketRegimesScreenState extends State<MarketRegimesScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Report: ${r.id}',
-                style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.bold),
+              Expanded(
+                child: Text(
+                  'Report: ${r.id}',
+                  style: const TextStyle(fontSize: 12, color: AppColors.textTertiary, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
+              const SizedBox(width: 8),
               Row(
                 children: [
                   _buildBadge(r.strength.name, strengthColor),
@@ -540,19 +545,35 @@ class _MarketRegimesScreenState extends State<MarketRegimesScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(l1, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-              Text(v1, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  v1,
+                  style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         Container(width: 1, height: 14, color: AppColors.surfaceLight),
-        const SizedBox(width: 16),
+        const SizedBox(width: 12),
         Expanded(
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(l2, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
-              Text(v2, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 12)),
+              const SizedBox(width: 4),
+              Flexible(
+                child: Text(
+                  v2,
+                  style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.bold, fontSize: 12),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
             ],
           ),
         ),

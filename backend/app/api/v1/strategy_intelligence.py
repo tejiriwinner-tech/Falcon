@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
-from typing import List
+import time
+from typing import List, Optional
 
 from app.core.analytics.strategy_intelligence_engine import StrategyIntelligenceEngine
 from app.core.repository.mission_repository import mission_repository
@@ -13,22 +14,32 @@ router = APIRouter(prefix="/strategy-intelligence", tags=["strategy_intelligence
 
 _intelligence_engine = StrategyIntelligenceEngine()
 _reports_store: List[StrategyIntelligenceReport] = []
+_intelligence_cache: Optional[StrategyIntelligenceListResponse] = None
+_intelligence_cache_time: float = 0.0
+_CACHE_TTL_SECONDS = 60.0
 
 
 @router.get("", response_model=StrategyIntelligenceListResponse)
 def get_strategy_intelligence():
     """
-    Evaluates strategies using archived repository data and returns StrategyIntelligenceListResponse.
+    Evaluates strategies using archived repository data and returns StrategyIntelligenceListResponse with in-memory caching.
     """
-    global _reports_store
+    global _reports_store, _intelligence_cache, _intelligence_cache_time
+    now_mono = time.monotonic()
+    if _intelligence_cache is not None and (now_mono - _intelligence_cache_time) < _CACHE_TTL_SECONDS:
+        return _intelligence_cache
+
     _reports_store = _intelligence_engine.generate_reports(mission_repository)
     summary = _intelligence_engine.build_summary(_reports_store)
 
-    return StrategyIntelligenceListResponse(
+    response = StrategyIntelligenceListResponse(
         reports=_reports_store,
         summary=summary,
         lastUpdated=datetime.now(timezone.utc),
     )
+    _intelligence_cache = response
+    _intelligence_cache_time = now_mono
+    return response
 
 
 @router.get("/latest", response_model=StrategyIntelligenceListResponse)

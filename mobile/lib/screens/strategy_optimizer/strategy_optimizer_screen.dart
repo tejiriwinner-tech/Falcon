@@ -254,14 +254,18 @@ class _StrategyOptimizerScreenState extends State<StrategyOptimizerScreen> {
           ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatItem('Total', summary.totalStrategies.toString(), AppColors.textPrimary),
-              _buildStatItem('Prioritize', summary.prioritizeCount.toString(), AppColors.success),
-              _buildStatItem('Maintain', summary.maintainCount.toString(), const Color(0xFF8BC34A)),
-              _buildStatItem('Monitor', summary.monitorCount.toString(), AppColors.warning),
-              _buildStatItem('Pause', summary.pauseCount.toString(), const Color(0xFFFF9800)),
-              _buildStatItem('Retire', summary.retireCount.toString(), AppColors.error),
+              Expanded(child: _buildStatItem('Total', summary.totalStrategies.toString(), AppColors.textPrimary)),
+              Expanded(child: _buildStatItem('Prioritize', summary.prioritizeCount.toString(), AppColors.success)),
+              Expanded(child: _buildStatItem('Maintain', summary.maintainCount.toString(), const Color(0xFF8BC34A))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildStatItem('Monitor', summary.monitorCount.toString(), AppColors.warning)),
+              Expanded(child: _buildStatItem('Pause', summary.pauseCount.toString(), const Color(0xFFFF9800))),
+              Expanded(child: _buildStatItem('Retire', summary.retireCount.toString(), AppColors.error)),
             ],
           ),
           const SizedBox(height: 12),
@@ -448,10 +452,14 @@ class _StrategyOptimizerScreenState extends State<StrategyOptimizerScreen> {
                     Text(
                       r.strategyName,
                       style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     Text(
                       'ID: ${r.strategyId} • Report: ${r.id}',
                       style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
@@ -535,20 +543,18 @@ class _StrategyOptimizerScreenState extends State<StrategyOptimizerScreen> {
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildBreakdown('Historical (25%)', '${sb.historicalPerformance.toStringAsFixed(1)}%'),
-                    _buildBreakdown('Strategy Health (20%)', '${sb.strategyHealth.toStringAsFixed(1)}%'),
-                    _buildBreakdown('Market Compat (20%)', '${sb.marketCompatibility.toStringAsFixed(1)}%'),
+                    Expanded(child: _buildBreakdown('Historical (25%)', '${sb.historicalPerformance.toStringAsFixed(1)}%')),
+                    Expanded(child: _buildBreakdown('Strategy Health (20%)', '${sb.strategyHealth.toStringAsFixed(1)}%')),
+                    Expanded(child: _buildBreakdown('Market Compat (20%)', '${sb.marketCompatibility.toStringAsFixed(1)}%')),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildBreakdown('Consistency (15%)', '${sb.consistency.toStringAsFixed(1)}%'),
-                    _buildBreakdown('Risk Efficiency (10%)', '${sb.riskEfficiency.toStringAsFixed(1)}%'),
-                    _buildBreakdown('Execution (10%)', '${sb.executionReliability.toStringAsFixed(1)}%'),
+                    Expanded(child: _buildBreakdown('Consistency (15%)', '${sb.consistency.toStringAsFixed(1)}%')),
+                    Expanded(child: _buildBreakdown('Risk Efficiency (10%)', '${sb.riskEfficiency.toStringAsFixed(1)}%')),
+                    Expanded(child: _buildBreakdown('Execution (10%)', '${sb.executionReliability.toStringAsFixed(1)}%')),
                   ],
                 ),
               ],

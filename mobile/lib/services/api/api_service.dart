@@ -27,7 +27,6 @@ import '../../models/analytics_report.dart';
 import '../../models/strategy_intelligence.dart';
 import '../../models/strategy_optimization.dart';
 import '../../models/provider_models.dart' hide LegacyMarketQuote;
-import 'package:flutter/foundation.dart';
 import '../../models/market_quote.dart';
 import '../../models/dashboard.dart';
 import '../../models/intelligence.dart';
@@ -55,11 +54,6 @@ class ApiService {
   static final CacheService _cacheService = CacheService();
   static bool _isOfflineMode = false;
 
-  // Request batching and debouncing
-  static final Map<String, Timer> _pendingRequests = {};
-  static final Map<String, List<Completer>> _batchedRequests = {};
-  static const Duration _debounceDelay = Duration(milliseconds: 300);
-
   static Future<void> initCacheService() async {
     await _cacheService.init();
   }
@@ -67,45 +61,6 @@ class ApiService {
   static bool get isOfflineMode => _isOfflineMode;
   static void setOfflineMode(bool value) {
     _isOfflineMode = value;
-  }
-
-  // Debounced request method to reduce API call frequency
-  static Future<T> _debouncedGet<T>(
-    String endpoint,
-    T Function(Map<String, dynamic>) fromJson,
-  ) async {
-    final completer = Completer<T>();
-    
-    // Cancel existing pending request for same endpoint
-    _pendingRequests[endpoint]?.cancel();
-    
-    // Add to batch
-    if (!_batchedRequests.containsKey(endpoint)) {
-      _batchedRequests[endpoint] = [];
-    }
-    _batchedRequests[endpoint]!.add(completer);
-    
-    // Set debounce timer
-    _pendingRequests[endpoint] = Timer(_debounceDelay, () async {
-      final batchedCompleters = _batchedRequests[endpoint]!;
-      _batchedRequests.remove(endpoint);
-      _pendingRequests.remove(endpoint);
-      
-      // Make the actual request using the static method
-      try {
-        final apiService = ApiService();
-        final result = await apiService._get<T>(endpoint, fromJson);
-        for (final c in batchedCompleters) {
-          c.complete(result);
-        }
-      } catch (e) {
-        for (final c in batchedCompleters) {
-          c.completeError(e);
-        }
-      }
-    });
-    
-    return completer.future;
   }
 
   Future<T> _get<T>(String endpoint, T Function(Map<String, dynamic>) fromJson) async {
@@ -425,7 +380,7 @@ class ApiService {
 
   /// Purges old historical missions and associated artifacts from the database.
   Future<Map<String, dynamic>> purgeMissions({int keepLatest = 10}) async {
-    return _send<Map<String, dynamic>>('POST', '/missions/purge?keep_latest=$keepLatest', (json) => json as Map<String, dynamic>);
+    return _send<Map<String, dynamic>>('POST', '/missions/purge?keep_latest=$keepLatest', (json) => json);
   }
 
 

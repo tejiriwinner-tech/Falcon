@@ -117,105 +117,40 @@ class _ProvidersScreenState extends State<ProvidersScreen> {
   }
 
   Widget _buildSummaryCards(ProviderSummary summary) {
-    return Row(
+    return AppCard(
+      child: Row(
+        children: [
+          Expanded(child: _buildSummaryItem('Total', summary.totalProviders.toString(), AppColors.textPrimary)),
+          Container(width: 1, height: 36, color: AppColors.surfaceLight),
+          Expanded(child: _buildSummaryItem('Online', summary.online.toString(), AppColors.success)),
+          Container(width: 1, height: 36, color: AppColors.surfaceLight),
+          Expanded(child: _buildSummaryItem('Degraded', summary.degraded.toString(), AppColors.warning)),
+          Container(width: 1, height: 36, color: AppColors.surfaceLight),
+          Expanded(child: _buildSummaryItem('Offline', summary.offline.toString(), AppColors.error)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSummaryItem(String label, String value, Color color) {
+    return Column(
       children: [
-        Expanded(
-          child: AppCard(
-            child: Column(
-              children: [
-                const Text(
-                  'Total',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  summary.totalProviders.toString(),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
+        Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 12,
           ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: AppCard(
-            child: Column(
-              children: [
-                const Text(
-                  'Online',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  summary.online.toString(),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.success,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: AppCard(
-            child: Column(
-              children: [
-                const Text(
-                  'Degraded',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  summary.degraded.toString(),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.warning,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: AppCard(
-            child: Column(
-              children: [
-                const Text(
-                  'Offline',
-                  style: TextStyle(
-                    color: AppColors.textSecondary,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  summary.offline.toString(),
-                  style: const TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.error,
-                  ),
-                ),
-              ],
-            ),
+        const SizedBox(height: 6),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.bold,
+            color: color,
           ),
         ),
       ],

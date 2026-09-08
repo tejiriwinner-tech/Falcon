@@ -230,26 +230,32 @@ class _StrategyIntelligenceScreenState extends State<StrategyIntelligenceScreen>
                 child: const Icon(Icons.psychology, color: AppColors.primary, size: 24),
               ),
               const SizedBox(width: 12),
-              const Text(
-                'Strategy Portfolio Health Summary',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              const Expanded(
+                child: Text(
+                  'Strategy Portfolio Health Summary',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatItem('Total', summary.totalStrategies.toString(), AppColors.textPrimary),
-              _buildStatItem('Excellent', summary.excellentStrategies.toString(), AppColors.success),
-              _buildStatItem('Good', summary.goodStrategies.toString(), const Color(0xFF8BC34A)),
-              _buildStatItem('Watch', summary.watchStrategies.toString(), AppColors.warning),
-              _buildStatItem('Poor', summary.poorStrategies.toString(), const Color(0xFFFF9800)),
-              _buildStatItem('Retired', summary.retiredStrategies.toString(), AppColors.error),
+              Expanded(child: _buildStatItem('Total', summary.totalStrategies.toString(), AppColors.textPrimary)),
+              Expanded(child: _buildStatItem('Excellent', summary.excellentStrategies.toString(), AppColors.success)),
+              Expanded(child: _buildStatItem('Good', summary.goodStrategies.toString(), const Color(0xFF8BC34A))),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _buildStatItem('Watch', summary.watchStrategies.toString(), AppColors.warning)),
+              Expanded(child: _buildStatItem('Poor', summary.poorStrategies.toString(), const Color(0xFFFF9800))),
+              Expanded(child: _buildStatItem('Retired', summary.retiredStrategies.toString(), AppColors.error)),
             ],
           ),
         ],
@@ -462,20 +468,18 @@ class _StrategyIntelligenceScreenState extends State<StrategyIntelligenceScreen>
             child: Column(
               children: [
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildBreakdownItem('Signal Conf (20%)', '${sb.signalConfidenceScore.toStringAsFixed(1)}%'),
-                    _buildBreakdownItem('Validation (20%)', '${sb.validationScore.toStringAsFixed(1)}%'),
-                    _buildBreakdownItem('Risk Perf (15%)', '${sb.riskScore.toStringAsFixed(1)}%'),
+                    Expanded(child: _buildBreakdownItem('Signal Conf (20%)', '${sb.signalConfidenceScore.toStringAsFixed(1)}%')),
+                    Expanded(child: _buildBreakdownItem('Validation (20%)', '${sb.validationScore.toStringAsFixed(1)}%')),
+                    Expanded(child: _buildBreakdownItem('Risk Perf (15%)', '${sb.riskScore.toStringAsFixed(1)}%')),
                   ],
                 ),
                 const SizedBox(height: 8),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    _buildBreakdownItem('Execution (15%)', '${sb.executionScore.toStringAsFixed(1)}%'),
-                    _buildBreakdownItem('Decision (20%)', '${sb.decisionScore.toStringAsFixed(1)}%'),
-                    _buildBreakdownItem('Consistency (10%)', '${sb.consistencyScore.toStringAsFixed(1)}%'),
+                    Expanded(child: _buildBreakdownItem('Execution (15%)', '${sb.executionScore.toStringAsFixed(1)}%')),
+                    Expanded(child: _buildBreakdownItem('Decision (20%)', '${sb.decisionScore.toStringAsFixed(1)}%')),
+                    Expanded(child: _buildBreakdownItem('Consistency (10%)', '${sb.consistencyScore.toStringAsFixed(1)}%')),
                   ],
                 ),
               ],

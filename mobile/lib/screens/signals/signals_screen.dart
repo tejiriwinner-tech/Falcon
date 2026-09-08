@@ -16,8 +16,6 @@ class _SignalsScreenState extends State<SignalsScreen> {
   late Future<SignalListResponse> _signalsFuture;
   final ApiService _apiService = ApiService();
   final ScrollController _scrollController = ScrollController();
-  int _currentPage = 1;
-  final int _pageSize = 20;
   bool _isLoadingMore = false;
   List<Signal> _allSignals = [];
 
@@ -42,7 +40,6 @@ class _SignalsScreenState extends State<SignalsScreen> {
 
   void _fetchSignals() {
     setState(() {
-      _currentPage = 1;
       _allSignals = [];
       _signalsFuture = _apiService.getSignals();
     });
@@ -58,7 +55,6 @@ class _SignalsScreenState extends State<SignalsScreen> {
       final newSignals = await _apiService.getSignals();
       setState(() {
         _allSignals.addAll(newSignals.signals);
-        _currentPage++;
         _isLoadingMore = false;
       });
     } catch (e) {

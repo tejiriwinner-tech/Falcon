@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
-from typing import List
+import time
+from typing import List, Optional
 
 from app.core.engines.calibration_engine import CalibrationEngine
 from app.core.repository.mission_repository import mission_repository
@@ -13,19 +14,29 @@ router = APIRouter(prefix="/calibration", tags=["calibration"])
 
 _calibration_engine = CalibrationEngine()
 _calibration_store: List[CalibrationReport] = []
+_calibration_cache: Optional[CalibrationReportListResponse] = None
+_calibration_cache_time: float = 0.0
+_CACHE_TTL_SECONDS = 60.0
 
 
 @router.get("", response_model=CalibrationReportListResponse)
 def get_calibration_reports():
-    """Run the Calibration Engine and return all CalibrationReports."""
-    global _calibration_store
+    """Run the Calibration Engine and return all CalibrationReports with in-memory caching."""
+    global _calibration_store, _calibration_cache, _calibration_cache_time
+    now_mono = time.monotonic()
+    if _calibration_cache is not None and (now_mono - _calibration_cache_time) < _CACHE_TTL_SECONDS:
+        return _calibration_cache
+
     _calibration_store = _calibration_engine.generate_reports(mission_repository)
     summary = _calibration_engine.build_summary(_calibration_store)
-    return CalibrationReportListResponse(
+    response = CalibrationReportListResponse(
         reports=_calibration_store,
         summary=summary,
         lastUpdated=datetime.now(timezone.utc),
     )
+    _calibration_cache = response
+    _calibration_cache_time = now_mono
+    return response
 
 
 @router.get("/latest", response_model=CalibrationReportListResponse)

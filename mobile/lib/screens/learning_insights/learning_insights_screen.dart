@@ -242,13 +242,12 @@ class _LearningInsightsScreenState extends State<LearningInsightsScreen> {
           ),
           const SizedBox(height: 16),
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildStatItem('Total', summary.totalInsights.toString(), AppColors.textPrimary),
-              _buildStatItem('Critical', summary.criticalInsights.toString(), AppColors.error),
-              _buildStatItem('Market', summary.marketInsights.toString(), AppColors.info),
-              _buildStatItem('Strategy', summary.strategyInsights.toString(), const Color(0xFF9C27B0)),
-              _buildStatItem('Decision', summary.decisionInsights.toString(), AppColors.warning),
+              Expanded(child: _buildStatItem('Total', summary.totalInsights.toString(), AppColors.textPrimary)),
+              Expanded(child: _buildStatItem('Critical', summary.criticalInsights.toString(), AppColors.error)),
+              Expanded(child: _buildStatItem('Market', summary.marketInsights.toString(), AppColors.info)),
+              Expanded(child: _buildStatItem('Strategy', summary.strategyInsights.toString(), const Color(0xFF9C27B0))),
+              Expanded(child: _buildStatItem('Decision', summary.decisionInsights.toString(), AppColors.warning)),
             ],
           ),
           const SizedBox(height: 12),

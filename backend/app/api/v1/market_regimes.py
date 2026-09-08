@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
-from typing import List
+import time
+from typing import List, Optional
 
 from app.core.engines.market_regime_engine import MarketRegimeEngine
 from app.core.repository.mission_repository import mission_repository
@@ -13,23 +14,33 @@ router = APIRouter(prefix="/market-regimes", tags=["market_regimes"])
 
 _regime_engine = MarketRegimeEngine()
 _regime_store: List[MarketRegimeReport] = []
+_regime_cache: Optional[MarketRegimeListResponse] = None
+_regime_cache_time: float = 0.0
+_CACHE_TTL_SECONDS = 60.0
 
 
 @router.get("", response_model=MarketRegimeListResponse)
 def get_market_regimes():
     """
     Runs the Market Regime Engine against the current state
-    and returns a MarketRegimeListResponse.
+    and returns a MarketRegimeListResponse with in-memory caching.
     """
-    global _regime_store
+    global _regime_store, _regime_cache, _regime_cache_time
+    now_mono = time.monotonic()
+    if _regime_cache is not None and (now_mono - _regime_cache_time) < _CACHE_TTL_SECONDS:
+        return _regime_cache
+
     _regime_store = _regime_engine.generate_reports(mission_repository)
     summary = _regime_engine.build_summary(_regime_store)
 
-    return MarketRegimeListResponse(
+    response = MarketRegimeListResponse(
         reports=_regime_store,
         summary=summary,
         lastUpdated=datetime.now(timezone.utc),
     )
+    _regime_cache = response
+    _regime_cache_time = now_mono
+    return response
 
 
 @router.get("/latest", response_model=MarketRegimeListResponse)

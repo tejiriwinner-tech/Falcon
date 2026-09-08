@@ -120,16 +120,17 @@ def get_learning_insights():
         )
     ]
     
+    avg_conf = round(sum(i.pattern.confidencePercentage for i in insights) / len(insights), 1) if insights else 0.0
     return LearningInsightListResponse(
         insights=insights,
         summary=LearningSummary(
-            totalInsights=3,
-            marketInsights=1,
-            strategyInsights=1,
-            riskInsights=1,
-            decisionInsights=0,
-            criticalInsights=0,
-            averageConfidence=0.0
+            totalInsights=len(insights),
+            marketInsights=sum(1 for i in insights if i.category == LearningCategory.MARKET),
+            strategyInsights=sum(1 for i in insights if i.category == LearningCategory.STRATEGY),
+            riskInsights=sum(1 for i in insights if i.category == LearningCategory.RISK),
+            decisionInsights=sum(1 for i in insights if i.category == LearningCategory.DECISION),
+            criticalInsights=sum(1 for i in insights if i.severity == InsightSeverity.CRITICAL),
+            averageConfidence=avg_conf,
         ),
         lastUpdated=now,
     )
