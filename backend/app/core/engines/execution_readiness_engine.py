@@ -19,8 +19,8 @@ class ExecutionReadinessEngine:
     def __init__(self):
         self.version = "1.0.0"
         self.thresholds = ReadinessThresholds(
-            readyMin=96,
-            waitMin=60,
+            readyMin=80,
+            waitMin=50,
             blockedMin=0
         )
 
@@ -110,24 +110,45 @@ class ExecutionReadinessEngine:
 
             # 3. SPREAD (Max: 15)
             spread = candidate.marketSnapshot.spread
-            if spread <= 0.40:
+            sym = (strategy.symbol if strategy else getattr(candidate, "symbol", "")).upper()
+            
+            # Asset-aware institutional spread thresholds
+            if "XAU" in sym or "GOLD" in sym:
+                ideal_spread, acceptable_spread, max_spread = 2.5, 4.0, 4.5
+            elif "GBP" in sym:
+                ideal_spread, acceptable_spread, max_spread = 1.5, 2.5, 3.0
+            elif "JPY" in sym:
+                ideal_spread, acceptable_spread, max_spread = 1.5, 2.2, 3.0
+            else:  # EURUSD and standard majors
+                ideal_spread, acceptable_spread, max_spread = 1.0, 1.8, 2.5
+
+            if spread <= ideal_spread:
                 sp_score = 15
-                sp_desc = f"Spread of {spread:.2f} pips is within preferred limits (<= 0.40)."
-            elif spread <= 0.60:
+                sp_desc = f"Spread of {spread:.2f} pips is within preferred limits (<= {ideal_spread:.2f} for {sym})."
+            elif spread <= acceptable_spread:
                 sp_score = 8
-                sp_desc = f"Spread of {spread:.2f} pips is slightly elevated, but acceptable."
+                sp_desc = f"Spread of {spread:.2f} pips is slightly elevated for {sym}, but acceptable."
                 reasons.append(ReadinessReason(
                     title="Elevated Spread Warning",
-                    description=f"Current spread is {spread:.2f} pips, which is slightly above the ideal 0.40 limit.",
+                    description=f"Current spread is {spread:.2f} pips, which is slightly above the ideal {ideal_spread:.2f} limit for {sym}.",
+                    severity=ReadinessSeverity.WARNING,
+                    isBlocking=False
+                ))
+            elif spread <= max_spread:
+                sp_score = 4
+                sp_desc = f"Spread of {spread:.2f} pips is high for {sym} (limit <= {max_spread:.2f})."
+                reasons.append(ReadinessReason(
+                    title="High Spread Warning",
+                    description=f"Current spread is {spread:.2f} pips for {sym}. Caution advised on entry.",
                     severity=ReadinessSeverity.WARNING,
                     isBlocking=False
                 ))
             else:
                 sp_score = 0
-                sp_desc = f"Spread of {spread:.2f} pips exceeds maximum threshold (> 0.60)."
+                sp_desc = f"Spread of {spread:.2f} pips exceeds maximum threshold (> {max_spread:.2f} for {sym})."
                 reasons.append(ReadinessReason(
                     title="Spread Exceeds Threshold",
-                    description=f"Execution spread of {spread:.2f} pips is wider than the maximum allowed limit of 0.60 pips.",
+                    description=f"Execution spread of {spread:.2f} pips is wider than the maximum allowed limit of {max_spread:.2f} pips for {sym}.",
                     severity=ReadinessSeverity.CRITICAL,
                     isBlocking=True
                 ))
@@ -340,7 +361,7 @@ class ExecutionReadinessEngine:
                             primary_block = "After news release"
                             break
                         elif "Spread" in r.title:
-                            primary_block = "When spread <= 0.40"
+                            primary_block = "When spread normalizes"
                             break
                         elif "Validation" in r.title:
                             primary_block = "After indicator recalculation"
@@ -374,7 +395,7 @@ class ExecutionReadinessEngine:
                         next_review = "At London Open"
                         break
                     elif "Spread" in r.title:
-                        next_review = "When spread <= 0.40"
+                        next_review = "When spread normalizes"
                         break
                     elif "News" in r.title:
                         next_review = "After news release"

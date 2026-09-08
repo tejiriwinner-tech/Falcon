@@ -130,10 +130,12 @@ class RiskEngine:
         reasons = []
         is_blocking_overall = False
 
-        if candidate.marketSnapshot.spread > 0.5:
+        cand_sym = (candidate.symbol or "").upper()
+        spread_warn_limit = 4.0 if ("XAU" in cand_sym or "GOLD" in cand_sym) else (2.5 if "GBP" in cand_sym else 1.8)
+        if candidate.marketSnapshot.spread > spread_warn_limit:
             reasons.append(RiskReason(
                 title="Spread Threshold Exceeded",
-                description=f"Current spread is {candidate.marketSnapshot.spread:.2f} which exceeds preferred risk limits.",
+                description=f"Current spread is {candidate.marketSnapshot.spread:.2f} which exceeds preferred risk limits ({spread_warn_limit:.1f}).",
                 severity=RiskSeverity.WARNING,
                 isBlocking=False
             ))
