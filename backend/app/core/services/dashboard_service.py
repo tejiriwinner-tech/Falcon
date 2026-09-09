@@ -331,6 +331,31 @@ class DashboardService:
         if not conf_history:
             conf_history = [dyn_conf]
 
+        # Extract matching artifacts for the primary decision strategy
+        matching_cand = next((c for c in latest_artifacts.get("candidates", []) if getattr(c, "strategyId", None) == strat_id), None)
+        matching_val = next((v for v in latest_artifacts.get("validations", []) if getattr(v, "strategyId", None) == strat_id), None)
+        matching_risk = next((r for r in latest_artifacts.get("riskAssessments", []) if getattr(r, "strategyId", None) == strat_id), None)
+
+        cand_conf = float(getattr(matching_cand, "confidence", dyn_conf))
+        val_score = float(getattr(matching_val, "validationScore", dyn_conf))
+        risk_val = float(getattr(matching_risk, "overallRiskScore", 20.0))
+        risk_conf = max(0.0, 100.0 - risk_val)
+
+        tech_contrib = int(round(cand_conf * 0.40))
+        hist_contrib = int(round(val_score * 0.25))
+        mkt_contrib = int(round(risk_conf * 0.20))
+        high_impact_news = sum(1 for n in news if str(getattr(n, "impact", "")).upper() == "HIGH")
+        news_contrib = max(5, int(round((dyn_conf * 0.15) - (high_impact_news * 2))))
+
+        consistency_bonus = 0
+        if len(conf_history) >= 2:
+            diffs = [abs(conf_history[i] - conf_history[i-1]) for i in range(1, len(conf_history))]
+            avg_diff = sum(diffs) / len(diffs)
+            if avg_diff < 5:
+                consistency_bonus = 5
+            elif avg_diff < 10:
+                consistency_bonus = 3
+
         decision_obj = DecisionEngineResponse(
             recommendation=dyn_rec,
             decisionStatus=dyn_status,
@@ -351,11 +376,11 @@ class DashboardService:
                 MissingCondition(title="Breakout Trigger", description="Awaiting session breakout confirmation for entry"),
             ] if dyn_gap > 0 else [],
             explanation=ConfidenceExplanation(
-                technicalSignalsContribution=int(round(dyn_conf * 0.40)),
-                marketSentimentContribution=int(round(dyn_conf * 0.25)),
-                newsImpactContribution=int(round(dyn_conf * 0.20)),
-                historicalPerformanceContribution=int(round(dyn_conf * 0.15)),
-                consistencyBonus=0,
+                technicalSignalsContribution=tech_contrib,
+                marketSentimentContribution=mkt_contrib,
+                newsImpactContribution=news_contrib,
+                historicalPerformanceContribution=hist_contrib,
+                consistencyBonus=consistency_bonus,
             ),
             lastUpdated=now,
             strategyId=strat_id,
