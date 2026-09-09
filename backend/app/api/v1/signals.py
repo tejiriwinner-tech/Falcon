@@ -17,8 +17,14 @@ async def get_signals(
 ):
     """
     Signals projected from the candidates and decisions of recent stored missions.
+    Immediately journals newly emitted signals as OPEN trades in the Trade Journal.
     """
-    return signal_service.build_signals(mission_limit=missionLimit)
+    res = signal_service.build_signals(mission_limit=missionLimit)
+    try:
+        signal_outcome_resolver.resolve_signals()
+    except Exception:
+        pass
+    return res
 
 
 @router.post("/signals/resolve", response_model=SignalResolutionSummary, tags=["signals"])

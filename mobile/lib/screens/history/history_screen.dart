@@ -174,15 +174,55 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 ),
               ),
               const Spacer(),
-              Text(
-                '${isProfit ? '+' : ''}${trade.profitLoss.toStringAsFixed(2)}',
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  color: isProfit ? AppColors.success : AppColors.error,
+              if (trade.status.toUpperCase() == 'OPEN')
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(4),
+                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                  ),
+                  child: const Text(
+                    'RUNNING (LIVE)',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 11,
+                      color: AppColors.warning,
+                    ),
+                  ),
+                )
+              else
+                Text(
+                  '${isProfit ? '+' : ''}${trade.profitLoss.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    color: isProfit ? AppColors.success : AppColors.error,
+                  ),
                 ),
-              ),
             ],
           ),
+          if (trade.status.toUpperCase() == 'OPEN') ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceLight.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.radar_rounded, size: 14, color: AppColors.info),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'Live Tracking: Monitoring price between SL (${trade.stopLoss}) & TP (${trade.takeProfit})',
+                      style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           if (trade.reasonForExit != null && trade.reasonForExit!.isNotEmpty) ...[
             const SizedBox(height: 8),
             Container(

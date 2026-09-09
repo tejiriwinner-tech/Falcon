@@ -21,7 +21,7 @@ from app.core.repository.mission_repository import mission_repository
 from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.core.services.signal_service import signal_service
 from app.schemas.signal_outcome import SignalOutcomeItem, SignalResolutionSummary
-from app.schemas.trade_journal import TradeJournalCreate, TradeJournalItem
+from app.schemas.trade_journal import TradeJournalCreate, TradeJournalItem, TradeJournalUpdate
 
 logger = logging.getLogger("falcon.signal_outcome_resolver")
 
@@ -61,12 +61,13 @@ class SignalOutcomeResolver:
     def resolve_signals(self, force_simulate: bool = False) -> SignalResolutionSummary:
         """
         Scan active signals and mission candidates against real-time quotes.
-        Resolves setups hitting SL/TP, diagnoses root causes, and logs to trade journal.
+        Immediately journals newly generated signals as OPEN trades,
+        resolves setups hitting SL/TP to CLOSED, diagnoses root causes, and logs to trade journal.
         """
         now = datetime.now(timezone.utc)
         existing_trades = trade_journal_repository.list_trades()
-        resolved_signal_ids: Set[int] = {
-            t.signalId for t in existing_trades if t.signalId is not None and t.status.upper() == "CLOSED"
+        existing_trades_by_sig_id: Dict[int, TradeJournalItem] = {
+            t.signalId: t for t in existing_trades if t.signalId is not None
         }
 
         candidates_to_check = []
@@ -134,17 +135,57 @@ class SignalOutcomeResolver:
         new_outcomes: List[SignalOutcomeItem] = []
 
         for sig_id, cand in unique_candidates.items():
-            if sig_id in resolved_signal_ids:
-                continue
-
             symbol = cand["symbol"]
             direction = cand["direction"]
             entry = cand["entry"]
             stop_loss = cand["stopLoss"]
             take_profit = cand["takeProfit"]
 
+            risk_dist = abs(entry - stop_loss)
+            reward_dist = abs(take_profit - entry)
+            risk_reward = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 1.0
+
+            # STEP 1: If signal is not yet in Trade Journal, register it immediately as OPEN
+            existing_trade = existing_trades_by_sig_id.get(sig_id)
+            if existing_trade is None:
+                trade_create = TradeJournalCreate(
+                    signalId=sig_id,
+                    strategyId=cand["strategyId"],
+                    symbol=symbol,
+                    direction=direction,
+                    entryPrice=entry,
+                    exitPrice=None,
+                    stopLoss=stop_loss,
+                    takeProfit=take_profit,
+                    timeframe=cand["timeframe"],
+                    marketSession=cand["marketSession"],
+                    tradeDate=cand["timestamp"],
+                    closeDate=None,
+                    status="OPEN",
+                    result="OPEN",
+                    profitLoss=0.0,
+                    riskReward=risk_reward,
+                    confidence=cand["confidence"],
+                    reasonForEntry=f"Signal #{sig_id} initiated by {cand['strategyName']}",
+                    reasonForExit=None,
+                    lessonLearned=None,
+                    notes=f"Active signal monitored by Falcon ({cand['strategyName']})",
+                )
+                try:
+                    existing_trade = trade_journal_repository.create_trade(trade_create)
+                    existing_trades_by_sig_id[sig_id] = existing_trade
+                    logger.info(f"Journaled newly emitted signal #{sig_id} ({symbol} {direction}) as OPEN")
+                except Exception as ex:
+                    logger.error(f"Failed to record OPEN trade for signal #{sig_id}: {ex}")
+
+            # STEP 2: If trade is already CLOSED, skip
+            if existing_trade and existing_trade.status.upper() == "CLOSED":
+                continue
+
+            # STEP 3: Check live quote for boundary breaches (SL or TP)
             quote_resp = provider_manager.get_market_quote(symbol)
             if not quote_resp or not quote_resp.quote:
+                open_count += 1
                 continue
 
             quote = quote_resp.quote
@@ -183,7 +224,7 @@ class SignalOutcomeResolver:
                 open_count += 1
                 continue
 
-            # Step 3: Automated Root-Cause Post-Mortem Diagnostic
+            # STEP 4: Automated Root-Cause Post-Mortem Diagnostic
             if result == "LOSS":
                 losses_count += 1
                 is_spread_spike = (
@@ -208,11 +249,7 @@ class SignalOutcomeResolver:
                 reason_exit = f"Take Profit target reached cleanly at {exit_price:.4f}."
                 lesson = "Optimal alignment between institutional trend, momentum, and session liquidity."
 
-            # Step 4: Calculate PnL and Risk:Reward
-            risk_dist = abs(entry - stop_loss)
-            reward_dist = abs(take_profit - entry)
-            risk_reward = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 1.0
-
+            # STEP 5: Calculate PnL and update Trade Journal to CLOSED
             multiplier = 10.0 if "XAU" in symbol else 10000.0
             if direction == "BUY":
                 price_delta = exit_price - entry
@@ -225,34 +262,48 @@ class SignalOutcomeResolver:
             elif result == "WIN" and pnl <= 0:
                 pnl = round(reward_dist * multiplier, 2)
 
-            # Step 5: Save to Trade Journal
-            trade_create = TradeJournalCreate(
-                signalId=sig_id,
-                strategyId=cand["strategyId"],
-                symbol=symbol,
-                direction=direction,
-                entryPrice=entry,
+            trade_update = TradeJournalUpdate(
                 exitPrice=exit_price,
-                stopLoss=stop_loss,
-                takeProfit=take_profit,
-                timeframe=cand["timeframe"],
-                marketSession=cand["marketSession"],
-                tradeDate=cand["timestamp"],
                 closeDate=now,
                 status="CLOSED",
                 result=result,
                 profitLoss=pnl,
                 riskReward=risk_reward,
                 confidence=cand["confidence"],
-                reasonForEntry=f"Signal #{sig_id} initiated by {cand['strategyName']}",
                 reasonForExit=reason_exit,
                 lessonLearned=lesson,
                 notes=f"Auto-resolved by Falcon Outcome Resolver ({cand['strategyName']})",
             )
 
             try:
-                trade_journal_repository.create_trade(trade_create)
-                resolved_signal_ids.add(sig_id)
+                if existing_trade:
+                    trade_journal_repository.update_trade(existing_trade.id, trade_update)
+                else:
+                    trade_create = TradeJournalCreate(
+                        signalId=sig_id,
+                        strategyId=cand["strategyId"],
+                        symbol=symbol,
+                        direction=direction,
+                        entryPrice=entry,
+                        exitPrice=exit_price,
+                        stopLoss=stop_loss,
+                        takeProfit=take_profit,
+                        timeframe=cand["timeframe"],
+                        marketSession=cand["marketSession"],
+                        tradeDate=cand["timestamp"],
+                        closeDate=now,
+                        status="CLOSED",
+                        result=result,
+                        profitLoss=pnl,
+                        riskReward=risk_reward,
+                        confidence=cand["confidence"],
+                        reasonForEntry=f"Signal #{sig_id} initiated by {cand['strategyName']}",
+                        reasonForExit=reason_exit,
+                        lessonLearned=lesson,
+                        notes=f"Auto-resolved by Falcon Outcome Resolver ({cand['strategyName']})",
+                    )
+                    trade_journal_repository.create_trade(trade_create)
+
                 resolved_count += 1
 
                 outcome_item = SignalOutcomeItem(
@@ -274,9 +325,9 @@ class SignalOutcomeResolver:
                 )
                 self._resolved_cache[sig_id] = outcome_item
                 new_outcomes.append(outcome_item)
-                logger.info(f"Successfully resolved signal #{sig_id} ({symbol} {direction}) -> {result} ({pnl:+0.2f})")
+                logger.info(f"Successfully closed signal #{sig_id} ({symbol} {direction}) -> {result} ({pnl:+0.2f})")
             except Exception as e:
-                logger.error(f"Failed to persist trade journal entry for signal #{sig_id}: {e}")
+                logger.error(f"Failed to update trade journal entry for signal #{sig_id}: {e}")
 
         return SignalResolutionSummary(
             totalChecked=total_checked,
