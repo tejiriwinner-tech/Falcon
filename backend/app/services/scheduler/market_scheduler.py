@@ -139,8 +139,13 @@ class MarketScheduler:
                         except Exception as e:
                             error_msg = f"Error scanning {symbol} {timeframe}: {e}"
                             logger.error(error_msg)
-                            results["errors"].append(error_msg)
-                
+                # Track and resolve signal outcomes against live prices
+                try:
+                    from app.core.services.signal_outcome_resolver import signal_outcome_resolver
+                    signal_outcome_resolver.resolve_signals()
+                except Exception as ex:
+                    logger.debug(f"Signal outcome resolution during scan cycle: {ex}")
+
                 self.statistics.record_scan_end(scan_start_ms, success=True)
                 logger.info(f"Scan cycle completed: {results}")
                 

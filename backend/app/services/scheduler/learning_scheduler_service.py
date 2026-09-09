@@ -76,6 +76,18 @@ class LearningSchedulerService:
         except Exception as e:
             logger.warning(f"[Stage 1] Pipeline execution failed: {e}")
 
+        # Stage 1b: Automated Signal Outcome Resolution & Post-Mortem Feedback
+        try:
+            from app.core.services.signal_outcome_resolver import signal_outcome_resolver
+            resolution_summary = await asyncio.to_thread(signal_outcome_resolver.resolve_signals)
+            logger.info(
+                f"[Stage 1b] Outcome Resolver checked {resolution_summary.totalChecked} setups, "
+                f"resolved {resolution_summary.resolvedCount} trades "
+                f"(Wins: {resolution_summary.winsCount}, Losses: {resolution_summary.lossesCount})"
+            )
+        except Exception as e:
+            logger.warning(f"[Stage 1b] Signal outcome resolution failed: {e}")
+
         # Stage 2: Learning Insights
         try:
             insights_engine = LearningInsightEngine()

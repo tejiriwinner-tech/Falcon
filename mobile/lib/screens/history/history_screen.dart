@@ -183,6 +183,73 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ],
           ),
+          if (trade.reasonForExit != null && trade.reasonForExit!.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: (trade.result.toUpperCase() == 'LOSS'
+                        ? AppColors.error
+                        : AppColors.success)
+                    .withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: (trade.result.toUpperCase() == 'LOSS'
+                          ? AppColors.error
+                          : AppColors.success)
+                      .withValues(alpha: 0.2),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        trade.result.toUpperCase() == 'LOSS'
+                            ? Icons.biotech_outlined
+                            : Icons.check_circle_outline,
+                        size: 14,
+                        color: trade.result.toUpperCase() == 'LOSS'
+                            ? AppColors.error
+                            : AppColors.success,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        trade.result.toUpperCase() == 'LOSS'
+                            ? 'POST-MORTEM DIAGNOSTIC'
+                            : 'OUTCOME RESOLUTION',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          color: trade.result.toUpperCase() == 'LOSS'
+                              ? AppColors.error
+                              : AppColors.success,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    trade.reasonForExit!,
+                    style: const TextStyle(fontSize: 11, color: AppColors.textPrimary),
+                  ),
+                  if (trade.lessonLearned != null && trade.lessonLearned!.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      '💡 Self-Learning: ${trade.lessonLearned}',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontStyle: FontStyle.italic,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ],
         ],
       ),
     );

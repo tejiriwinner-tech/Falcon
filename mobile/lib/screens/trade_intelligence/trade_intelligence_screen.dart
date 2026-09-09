@@ -184,6 +184,47 @@ class _TradeIntelligenceScreenState extends State<TradeIntelligenceScreen> {
         // Empty State Guidance if no closed trades exist in Journal
         if (data.totalTrades == 0) _buildEmptyJournalBanner(),
 
+        // Active Autonomous Self-Learning Banner
+        if (data.totalTrades > 0)
+          Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withValues(alpha: 0.08),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.psychology_outlined, color: AppColors.primary, size: 24),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Autonomous Learning Loop Active',
+                        style: TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Signals hitting SL/TP are automatically diagnosed and logged into intelligence metrics.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
         // ── Summary metrics ────────────────────────────────────────
         const SectionTitle(
           title: 'Performance Summary',
