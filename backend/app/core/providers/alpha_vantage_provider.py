@@ -116,6 +116,13 @@ class AlphaVantageProvider(BaseProvider):
                 self._record_request(True, 1.0)
                 return cached_data
 
+        # Session budget gate: in STANDBY mode (night or weekend), permit zero external network calls
+        from app.core.services.session_budget_manager import session_budget_manager
+        if not session_budget_manager.is_active():
+            if cached and (now_ts - cached[0]) < 3600.0:
+                return cached[1]
+            return None
+
         # Daily budget protection gate
         if self._daily_calls >= self._daily_budget or self._is_rate_limited:
             logger.warning("[AlphaVantage] Daily budget/rate limit active (%s/%s calls). Skipping fetch.", self._daily_calls, self._daily_budget)

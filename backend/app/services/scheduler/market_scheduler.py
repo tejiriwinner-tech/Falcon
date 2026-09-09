@@ -195,7 +195,7 @@ class MarketScheduler:
                 return result
             
             from app.services.history.history_service import HistoryService
-            from app.core.providers.provider_manager import provider_manager
+            from app.core.providers import provider_manager
 
             history_service = HistoryService(db)
             candles = history_service.get_candles(symbol, tf, limit=200)

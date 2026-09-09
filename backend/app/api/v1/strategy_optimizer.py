@@ -4,6 +4,8 @@ import time
 from typing import List, Optional
 
 from app.core.analytics.adaptive_strategy_optimizer import AdaptiveStrategyOptimizer
+from app.core.analytics.strategy_intelligence_engine import StrategyIntelligenceEngine
+from app.core.engines.market_state_engine import MarketStateEngine
 from app.core.repository.mission_repository import mission_repository
 from app.schemas.strategy_optimization import (
     StrategyOptimizationReport,
@@ -13,28 +15,33 @@ from app.schemas.strategy_optimization import (
 router = APIRouter(prefix="/strategy-optimizer", tags=["strategy_optimizer"])
 
 _optimizer = AdaptiveStrategyOptimizer()
+_intelligence_engine = StrategyIntelligenceEngine()
+_market_state_engine = MarketStateEngine()
 _reports_store: List[StrategyOptimizationReport] = []
 _optimizer_cache: Optional[StrategyOptimizationListResponse] = None
 _optimizer_cache_time: float = 0.0
-_CACHE_TTL_SECONDS = 60.0
+_CACHE_TTL_SECONDS = 30.0
 
 
 @router.get("", response_model=StrategyOptimizationListResponse)
 def get_strategy_optimization():
     """
-    Runs the Adaptive Strategy Optimizer against the current repository state
-    and returns a StrategyOptimizationListResponse with in-memory caching.
+    Runs the Adaptive Strategy Optimizer against the current repository state,
+    incorporating live market state and strategy intelligence reports.
     """
     global _reports_store, _optimizer_cache, _optimizer_cache_time
     now_mono = time.monotonic()
     if _optimizer_cache is not None and (now_mono - _optimizer_cache_time) < _CACHE_TTL_SECONDS:
         return _optimizer_cache
 
+    market_state = _market_state_engine.get_market_state()
+    strategy_reports = _intelligence_engine.generate_reports(mission_repository)
+
     _reports_store = _optimizer.generate_optimization_reports(
         repository=mission_repository,
         analytics_report=None,
-        strategy_reports=None,
-        market_state=None,
+        strategy_reports=strategy_reports,
+        market_state=market_state,
     )
     summary = _optimizer.build_summary(_reports_store)
 
@@ -59,8 +66,12 @@ def get_strategy_optimization_report_by_id(report_id: str):
     """Returns a single StrategyOptimizationReport by ID (e.g. optimizer-001)."""
     global _reports_store
     if not _reports_store:
+        market_state = _market_state_engine.get_market_state()
+        strategy_reports = _intelligence_engine.generate_reports(mission_repository)
         _reports_store = _optimizer.generate_optimization_reports(
             repository=mission_repository,
+            strategy_reports=strategy_reports,
+            market_state=market_state,
         )
 
     for r in _reports_store:

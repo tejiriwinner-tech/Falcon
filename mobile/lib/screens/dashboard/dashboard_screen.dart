@@ -1949,19 +1949,19 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   }
 
   Widget _buildMarketSnapshotCard(DecisionEngineResponse data, [MarketState? ms]) {
-    // Pull from live MarketState if available, otherwise fall back to hardcoded
-    final trend = ms?.trend ?? 'Bullish';
+    // Pull from live MarketState if available, otherwise fall back to neutral state
+    final trend = ms?.trend ?? 'Neutral';
     final volatility = ms?.volatility ?? 'Moderate';
-    final liquidity = ms?.liquidity ?? 'Excellent';
-    final session = ms?.session ?? 'London Open';
-    final spread = ms != null ? '${ms.spread.toStringAsFixed(1)} pips' : '0.3 pips';
-    final newsImpact = ms?.currentNewsImpact ?? 'None';
+    final liquidity = ms?.liquidity ?? '--';
+    final session = ms?.session ?? 'Standby';
+    final spread = ms != null ? '${ms.spread.toStringAsFixed(1)} pips' : '--';
+    final newsImpact = ms?.currentNewsImpact ?? 'Low';
     final newsSafety = (ms?.upcomingHighImpactNews == true) ? 'High-impact event approaching' : 'No imminent news events';
-    final sentiment = ms?.marketSentimentLabel ?? 'Greedy';
+    final sentiment = ms?.marketSentimentLabel ?? 'Neutral';
     final fgi = ms?.fearGreedIndex != null ? ' (Fear & Greed: ${ms!.fearGreedIndex})' : '';
     final confidence = ms?.overallMarketConfidence != null ? '${ms!.overallMarketConfidence}%' : 'N/A';
     final dataAge = ms != null ? '${ms.dataAgeSeconds}s ago' : 'N/A';
-    final dataSource = ms?.dataSource ?? 'Falcon';
+    final dataSource = ms?.dataSource ?? 'Falcon Intelligence Layer';
 
     return AppCard(
       child: Column(

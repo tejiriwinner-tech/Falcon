@@ -41,8 +41,8 @@ class SignalService:
         
         missions = all_missions[-mission_limit:]
 
-        signals: List[SignalItem] = []
-        seen_strategies = set()
+        # Gather all candidates with their associated decisions from recent missions
+        candidate_pool: List[dict] = []
         for mission in reversed(missions):
             try:
                 artifacts = mission_repository.get_mission_artifacts(mission.id)
@@ -52,22 +52,52 @@ class SignalService:
 
                 for index, candidate in enumerate(candidates):
                     dec = by_candidate.get(candidate.id)
-                    is_active = dec and dec.status == DecisionStatus.APPROVED
-                    strat_key = (candidate.symbol, candidate.strategyId)
+                    is_approved = dec is not None and dec.status == DecisionStatus.APPROVED
+                    
+                    # Calculate composite conviction score
+                    # Approved setups get high priority (+100); then rank by confidence & execution readiness
+                    readiness = getattr(candidate, "readinessScore", 50.0) or 50.0
+                    confidence = float(candidate.confidence)
+                    conviction_score = (100.0 if is_approved else 0.0) + (confidence * 0.5) + (readiness * 0.5)
 
-                    # Always retain approved ACTIVE signals; for pending setups, keep only the latest per strategy
-                    if is_active or strat_key not in seen_strategies:
-                        seen_strategies.add(strat_key)
-                        signals.append(
-                            self._to_signal(
-                                candidate,
-                                dec,
-                                self._signal_id(mission.id, index),
-                                now,
-                            )
-                        )
+                    candidate_pool.append({
+                        "candidate": candidate,
+                        "decision": dec,
+                        "signal_id": self._signal_id(mission.id, index),
+                        "conviction_score": conviction_score,
+                        "is_approved": is_approved,
+                        "mission_id": mission.id,
+                    })
             except Exception:
-                continue  # Skip missions with artifact errors
+                continue
+
+        if not candidate_pool:
+            return SignalListResponse(signals=[], lastUpdated=now, dataAgeSeconds=0)
+
+        # Sort candidate pool by conviction score descending
+        candidate_pool.sort(key=lambda x: x["conviction_score"], reverse=True)
+
+        # Deduplicate strictly by Symbol (at most 1 setup per asset to eliminate conflicting duplicate signals)
+        seen_symbols = set()
+        curated_pool: List[dict] = []
+        for item in candidate_pool:
+            symbol = item["candidate"].symbol
+            if symbol not in seen_symbols:
+                seen_symbols.add(symbol)
+                curated_pool.append(item)
+
+        # Limit to the TOP 1 to 3 elite setups only
+        top_setups = curated_pool[:3]
+
+        signals: List[SignalItem] = [
+            self._to_signal(
+                item["candidate"],
+                item["decision"],
+                item["signal_id"],
+                now,
+            )
+            for item in top_setups
+        ]
 
         return SignalListResponse(
             signals=signals,
@@ -85,13 +115,53 @@ class SignalService:
         now: datetime,
     ) -> SignalItem:
         strategy = self._strategy_engine.get_strategy_by_id(candidate.strategyId)
+        preferred_session = (
+            ", ".join(strategy.preferredSessions)
+            if strategy and strategy.preferredSessions
+            else "London / New York"
+        )
+        timeframe = strategy.bestTimeframe if strategy else "H1"
 
-        if decision is not None:
-            status = _DECISION_TO_SIGNAL_STATUS.get(decision.status, decision.status.value)
-            analysis = decision.recommendationDetails.description
+        is_approved = decision is not None and decision.status == DecisionStatus.APPROVED
+        is_ready = getattr(candidate, "readinessScore", 0) >= 80
+
+        if is_approved and is_ready:
+            status = "ACTIVE"
+            trend_str = f"trend '{candidate.marketSnapshot.trend}'" if candidate.marketSnapshot else "trend"
+            spread_str = f"spread {candidate.marketSnapshot.spread:.2f} pips" if candidate.marketSnapshot else "spread"
+            analysis = (
+                f"✅ CLEARED FOR EXECUTION: Strategy '{candidate.strategyName}' aligned across {trend_str}, "
+                f"{spread_str}, and liquidity. Optimal entry window: Current {preferred_session} session. "
+                f"SL placed with structural volatility buffer."
+            )
         else:
-            status = candidate.status.value
-            analysis = candidate.reasons[0].description if candidate.reasons else ""
+            status = "WAITING"
+            decision_rec = (
+                decision.recommendationDetails.recommendation.value
+                if decision and hasattr(decision, "recommendationDetails")
+                else "WAIT"
+            )
+            # Pull exact dynamic reasons evaluated by the pipeline
+            reason_details = ""
+            if decision and hasattr(decision, "recommendationDetails") and decision.recommendationDetails.description:
+                reason_details = decision.recommendationDetails.description
+            elif candidate.reasons:
+                failed_reasons = [r.description for r in candidate.reasons if not r.passed]
+                if failed_reasons:
+                    reason_details = failed_reasons[0].replace("\n", " ")
+            
+            if not reason_details:
+                reason_details = "Awaiting execution readiness score >= 80% and session volume confirmation."
+
+            current_session = candidate.marketSnapshot.session if candidate.marketSnapshot and candidate.marketSnapshot.session else "Active"
+            spread_val = f"Live Spread: {candidate.marketSnapshot.spread:.2f} pips." if candidate.marketSnapshot and candidate.marketSnapshot.spread else ""
+
+            analysis = (
+                f"⏳ DO NOT ENTER YET (Captain Decision: {decision_rec}). Setup is monitoring on WATCHLIST. "
+                f"Reason: {reason_details} "
+                f"Target Window: {preferred_session} (Current: {current_session}). {spread_val} "
+                f"Do not place on MT5 until status is ACTIVE."
+            )
 
         return SignalItem(
             id=signal_id,
@@ -101,7 +171,7 @@ class SignalService:
             takeProfit=candidate.takeProfit,
             stopLoss=candidate.stopLoss,
             confidence=candidate.confidence,
-            timeframe=strategy.bestTimeframe if strategy else "",
+            timeframe=timeframe,
             status=status,
             analysis=analysis,
             timestamp=candidate.generatedAt,

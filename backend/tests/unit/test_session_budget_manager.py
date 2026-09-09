@@ -167,6 +167,32 @@ class TestSchedulerStandbyProtection(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNone(result)
                 mock_http_get.assert_not_called()
 
+    def test_fmp_provider_blocks_fetch_in_standby(self):
+        """FmpProvider.fetch must return None without HTTP call when in STANDBY."""
+        from app.core.providers.fmp_provider import FmpProvider
+
+        provider = FmpProvider(api_key="test_dummy_key")
+        provider._connected = True
+
+        with patch.object(session_budget_manager, "is_active", return_value=False):
+            with patch.object(provider._session, "get") as mock_session_get:
+                result = provider.fetch("EURUSD")
+                self.assertIsNone(result)
+                mock_session_get.assert_not_called()
+
+    def test_alpha_vantage_provider_blocks_fetch_in_standby(self):
+        """AlphaVantageProvider.fetch must return None without HTTP call when in STANDBY."""
+        from app.core.providers.alpha_vantage_provider import AlphaVantageProvider
+
+        provider = AlphaVantageProvider(api_key="test_dummy_key")
+        provider._connected = True
+
+        with patch.object(session_budget_manager, "is_active", return_value=False):
+            with patch.object(provider._session, "get") as mock_session_get:
+                result = provider.fetch("EURUSD")
+                self.assertIsNone(result)
+                mock_session_get.assert_not_called()
+
 
 if __name__ == "__main__":
     unittest.main()

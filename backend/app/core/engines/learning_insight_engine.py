@@ -41,9 +41,13 @@ class LearningInsightEngine:
         start_time = time.time()
         now = datetime.now(timezone.utc)
 
-        missions = repository.get_all_missions()
-        if not missions:
+        all_missions = repository.get_all_missions()
+        if not all_missions:
             return []
+
+        missions = all_missions[-50:] if len(all_missions) > 50 else all_missions
+        mission_ids = [m.id for m in missions]
+        bulk_artifacts = repository.get_all_mission_artifacts_bulk(mission_ids) if hasattr(repository, "get_all_mission_artifacts_bulk") else {}
 
         # ---- Collect all artifacts across all missions ----
         all_candidates: List[Any] = []
@@ -53,14 +57,12 @@ class LearningInsightEngine:
         all_decisions: List[Any] = []
 
         for m in missions:
-            arts = repository.get_mission_artifacts(m.id)
+            arts = bulk_artifacts.get(m.id) or repository.get_mission_artifacts(m.id)
             all_candidates.extend(arts.get("candidates", []))
             all_validations.extend(arts.get("validations", []))
             all_risks.extend(arts.get("riskAssessments", []))
             all_executions.extend(arts.get("executionReadiness", []))
             all_decisions.extend(arts.get("decisions", []))
-
-        mission_ids = [m.id for m in missions]
         insights: List[LearningInsight] = []
         counter = 1
 

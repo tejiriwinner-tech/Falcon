@@ -4,6 +4,7 @@ import time
 from typing import List, Optional
 
 from app.core.engines.market_regime_engine import MarketRegimeEngine
+from app.core.engines.market_state_engine import MarketStateEngine
 from app.core.repository.mission_repository import mission_repository
 from app.schemas.market_regime import (
     MarketRegimeReport,
@@ -13,10 +14,11 @@ from app.schemas.market_regime import (
 router = APIRouter(prefix="/market-regimes", tags=["market_regimes"])
 
 _regime_engine = MarketRegimeEngine()
+_market_state_engine = MarketStateEngine()
 _regime_store: List[MarketRegimeReport] = []
 _regime_cache: Optional[MarketRegimeListResponse] = None
 _regime_cache_time: float = 0.0
-_CACHE_TTL_SECONDS = 60.0
+_CACHE_TTL_SECONDS = 30.0
 
 
 @router.get("", response_model=MarketRegimeListResponse)
@@ -30,7 +32,8 @@ def get_market_regimes():
     if _regime_cache is not None and (now_mono - _regime_cache_time) < _CACHE_TTL_SECONDS:
         return _regime_cache
 
-    _regime_store = _regime_engine.generate_reports(mission_repository)
+    market_state = _market_state_engine.get_market_state()
+    _regime_store = _regime_engine.generate_reports(mission_repository, market_state=market_state)
     summary = _regime_engine.build_summary(_regime_store)
 
     response = MarketRegimeListResponse(
@@ -54,7 +57,8 @@ def get_market_regime_by_id(report_id: str):
     """Returns a single MarketRegimeReport by ID."""
     global _regime_store
     if not _regime_store:
-        _regime_store = _regime_engine.generate_reports(mission_repository)
+        market_state = _market_state_engine.get_market_state()
+        _regime_store = _regime_engine.generate_reports(mission_repository, market_state=market_state)
 
     for r in _regime_store:
         if r.id == report_id:

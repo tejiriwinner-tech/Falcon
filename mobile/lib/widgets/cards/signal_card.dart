@@ -8,18 +8,22 @@ class SignalCard extends StatelessWidget {
 
   const SignalCard({super.key, required this.signal});
 
+  bool get _isActive => signal.status.toUpperCase() == 'ACTIVE';
   bool get _isBuy => signal.action == 'BUY';
-  Color get _directionColor => _isBuy ? AppColors.success : AppColors.error;
+  Color get _directionColor => _isActive
+      ? (_isBuy ? AppColors.success : AppColors.error)
+      : AppColors.warning;
 
   Color get _statusColor {
     switch (signal.status.toUpperCase()) {
       case 'ACTIVE':
-        return AppColors.info;
+        return AppColors.success;
       case 'WON':
         return AppColors.success;
       case 'LOST':
         return AppColors.error;
       case 'PENDING':
+      case 'WAITING':
         return AppColors.warning;
       default:
         return AppColors.textTertiary;
@@ -37,21 +41,20 @@ class SignalCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        // Navigate to signal detail (would need to implement signal detail screen)
-        // For now, show a dialog
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text('${signal.symbol} ${signal.action} Signal'),
+            title: Text('${signal.symbol} ${signal.action} Setup'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                Text('Status: ${signal.status}'),
                 Text('Entry: ${signal.entry}'),
                 Text('Take Profit: ${signal.takeProfit}'),
                 Text('Stop Loss: ${signal.stopLoss}'),
                 Text('Confidence: ${signal.confidence}%'),
-                const SizedBox(height: 8),
+                const SizedBox(height: 10),
                 Text(signal.analysis),
               ],
             ),
@@ -69,7 +72,10 @@ class SignalCard extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: _directionColor.withValues(alpha: 0.25),
+            color: _isActive 
+                ? _directionColor.withValues(alpha: 0.35)
+                : AppColors.warning.withValues(alpha: 0.3),
+            width: _isActive ? 1.5 : 1.0,
           ),
         ),
         child: Column(
@@ -88,7 +94,9 @@ class SignalCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
-                    _isBuy ? '🟢 BUY' : '🔴 SELL',
+                    _isActive
+                        ? (_isBuy ? '🟢 BUY NOW' : '🔴 SELL NOW')
+                        : (_isBuy ? '⏳ WATCHLIST (BUY)' : '⏳ WATCHLIST (SELL)'),
                     style: TextStyle(
                       color: _directionColor,
                       fontWeight: FontWeight.bold,
@@ -120,6 +128,45 @@ class SignalCard extends StatelessWidget {
                       color: _statusColor,
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Execution Advisory Banner
+          Container(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: _isActive
+                  ? AppColors.success.withValues(alpha: 0.1)
+                  : AppColors.warning.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _isActive
+                    ? AppColors.success.withValues(alpha: 0.3)
+                    : AppColors.warning.withValues(alpha: 0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _isActive ? Icons.check_circle : Icons.pause_circle_filled,
+                  color: _isActive ? AppColors.success : AppColors.warning,
+                  size: 14,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    _isActive
+                        ? 'CLEARED BY CAPTAIN: Validated for MT5 entry.'
+                        : 'DECISION: WAIT — Monitoring. DO NOT execute on MT5 yet.',
+                    style: TextStyle(
+                      color: _isActive ? AppColors.success : AppColors.warning,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),

@@ -166,13 +166,11 @@ class _SignalsScreenState extends State<SignalsScreen> {
             final displaySignals = [...activeSignals, ...pendingSignals];
             
             final titleText = activeSignals.isNotEmpty
-                ? '${activeSignals.length} Active Signal${activeSignals.length != 1 ? 's' : ''}'
-                : '0 Active Signals';
+                ? 'Curated Live Setups (${activeSignals.length} Active)'
+                : 'Curated Watchlist (0 Cleared)';
             final subtitleText = activeSignals.isNotEmpty
-                ? 'Approved for immediate execution'
-                : (pendingSignals.isNotEmpty
-                    ? '${pendingSignals.length} setup${pendingSignals.length != 1 ? 's' : ''} under review (pending)'
-                    : 'Updated live during market hours');
+                ? '${activeSignals.length} trade${activeSignals.length != 1 ? 's' : ''} approved for execution • Max 3 top setups'
+                : 'Capital Defense active • Setups awaiting entry trigger';
             
             return Column(
               children: [
@@ -180,7 +178,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
                   title: titleText,
                   subtitle: subtitleText,
                 ),
-                const SizedBox(height: 16),
+                if (activeSignals.isEmpty) _buildCapitalDefenseBanner(),
                 Expanded(
                   child: ListView.builder(
                     controller: _scrollController,
@@ -209,6 +207,49 @@ class _SignalsScreenState extends State<SignalsScreen> {
           }
           return const SizedBox.shrink();
         },
+      ),
+    );
+  }
+
+  Widget _buildCapitalDefenseBanner() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 4),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+      ),
+      child: const Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.shield_outlined, color: AppColors.warning, size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'CAPITAL DEFENSE ACTIVE: 0 TRADES CLEARED',
+                  style: TextStyle(
+                    color: AppColors.warning,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  'Current market session / spread conditions do not offer a high-probability edge. Setups below are on WATCHLIST with strict entry triggers. DO NOT execute on MT5 until confirmed ACTIVE.',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

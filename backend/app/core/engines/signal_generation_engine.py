@@ -249,12 +249,15 @@ class SignalGenerationEngine:
 
             # Dynamic price levels based on asset volatility and risk-reward
             rr = strategy.minimumRiskReward or 2.0
+            vol_mult = 1.4 if volatility == "High" else (1.0 if volatility == "Moderate" else 0.8)
             if "XAU" in strategy.symbol or "GOLD" in strategy.symbol:
-                stop_distance = 3.5  # $3.50 buffer for Gold
+                stop_distance = round(11.50 * vol_mult, 2)  # $9.20 - $16.10 realistic swing buffer for Gold
             elif "JPY" in strategy.symbol:
-                stop_distance = 0.25  # 25 pips for JPY pairs
+                stop_distance = round(0.45 * vol_mult, 3)   # 36 - 63 pips for JPY pairs
+            elif "GBP" in strategy.symbol:
+                stop_distance = round(0.0035 * vol_mult, 5) # 28 - 49 pips for GBP pairs
             else:
-                stop_distance = 0.0020  # 20 pips for standard FX majors
+                stop_distance = round(0.0028 * vol_mult, 5) # 22 - 39 pips for EUR/USD and FX majors
 
             if direction == CandidateDirection.BUY:
                 stop_loss = round(entry_price - stop_distance, 5)
