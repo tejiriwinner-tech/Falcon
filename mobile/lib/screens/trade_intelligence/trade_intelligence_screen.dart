@@ -181,6 +181,9 @@ class _TradeIntelligenceScreenState extends State<TradeIntelligenceScreen> {
         ),
         const SizedBox(height: 24),
 
+        // Empty State Guidance if no closed trades exist in Journal
+        if (data.totalTrades == 0) _buildEmptyJournalBanner(),
+
         // ── Summary metrics ────────────────────────────────────────
         const SectionTitle(
           title: 'Performance Summary',
@@ -715,6 +718,75 @@ class _TradeIntelligenceScreenState extends State<TradeIntelligenceScreen> {
                 ),
               ],
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyJournalBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.auto_graph_rounded, color: AppColors.primary, size: 24),
+              const SizedBox(width: 10),
+              Text(
+                'Awaiting Closed Journal Trades',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Trade Intelligence dynamically derives your win rate, profit factor, best sessions, and loss patterns from closed trades in your Trade Journal. No closed trades have been recorded yet.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              ElevatedButton.icon(
+                onPressed: () => context.push('/journal'),
+                icon: const Icon(Icons.edit_note_rounded, size: 18),
+                label: const Text('Open Trade Journal'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.black,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              OutlinedButton.icon(
+                onPressed: () => context.push('/signals'),
+                icon: const Icon(Icons.trending_up, size: 18),
+                label: const Text('View Signals'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.textPrimary,
+                  side: BorderSide(color: AppColors.textTertiary.withValues(alpha: 0.5)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
