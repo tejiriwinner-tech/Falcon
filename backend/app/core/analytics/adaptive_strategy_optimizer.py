@@ -5,6 +5,7 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 from app.core.repository.mission_repository import MissionRepository
+from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.core.engines.strategy_engine import StrategyEngine
 from app.schemas.strategy_optimization import (
     OptimizationStatus,
@@ -119,8 +120,19 @@ class AdaptiveStrategyOptimizer:
                 else:
                     consistency_raw = 95.0
 
-                # Historical performance = blended signal + validation + decision
-                hist_perf = round((sig_conf_avg * 0.4 + val_avg * 0.3 + dec_avg * 0.3), 1)
+                # Check real Trade Journal execution records for this strategy
+                strat_trades = [
+                    t for t in trade_journal_repository.list_trades()
+                    if t.strategyId == strat.id and t.status.upper() == "CLOSED"
+                ]
+                if strat_trades:
+                    strat_wins = sum(1 for t in strat_trades if t.result.upper() == "WIN")
+                    journal_win_rate = (strat_wins / len(strat_trades)) * 100.0
+                    # Factor 50% real market execution outcomes + 50% signal pipeline metrics
+                    hist_perf = round((journal_win_rate * 0.5) + ((sig_conf_avg * 0.4 + val_avg * 0.3 + dec_avg * 0.3) * 0.5), 1)
+                else:
+                    # Historical performance = blended signal + validation + decision
+                    hist_perf = round((sig_conf_avg * 0.4 + val_avg * 0.3 + dec_avg * 0.3), 1)
 
                 # Strategy Health Score from intel report if available
                 intel = intel_map.get(strat.id)
@@ -150,19 +162,7 @@ class AdaptiveStrategyOptimizer:
                 0.10 * exec_reliability
             )
 
-            # Benchmark overrides matching spec expected output
-            if "London Breakout" in strat.name:
-                overall_score = 97.0
-            elif "Gold Trend" in strat.name:
-                overall_score = 94.0
-            elif "European Breakout" in strat.name:
-                overall_score = 80.0
-            elif "London Momentum" in strat.name:
-                overall_score = 63.0
-            elif "Scalp" in strat.name:
-                overall_score = 42.0
-            else:
-                overall_score = round(max(0.0, min(100.0, weighted)), 1)
+            overall_score = round(max(0.0, min(100.0, weighted)), 1)
 
             # ---- Recommendation ----
             if overall_score >= 95.0:
