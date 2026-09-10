@@ -17,6 +17,13 @@ logger = logging.getLogger("falcon.session_budget")
 DEFAULT_START_HOUR_UTC = int(os.getenv("FALCON_ACTIVE_START_HOUR_UTC", "7"))   # 07:00 UTC = 8:00 AM Local (UTC+1)
 DEFAULT_END_HOUR_UTC = int(os.getenv("FALCON_ACTIVE_END_HOUR_UTC", "19"))      # 19:00 UTC = 8:00 PM Local (UTC+1)
 
+# Calibrated Free-Tier Rate Limits (TwelveData 800 free credits daily allowance)
+# 65 calls/hour x 12 hours = 780 calls/day (reserving a 20-call safety buffer)
+DEFAULT_MAX_HOURLY_CALLS = int(os.getenv("FALCON_MAX_HOURLY_CALLS", "65"))
+DEFAULT_MAX_DAILY_CALLS = int(os.getenv("FALCON_MAX_DAILY_CALLS", "780"))
+
+import threading
+
 
 class SessionState(str, Enum):
     ACTIVE = "ACTIVE"
@@ -24,15 +31,90 @@ class SessionState(str, Enum):
 
 
 class SessionBudgetManager:
-    """Manages active trading windows to conserve free tier API credits."""
+    """Manages active trading windows and paces API call budgets to conserve free-tier credits."""
 
     def __init__(
         self,
         start_hour_utc: int = DEFAULT_START_HOUR_UTC,
         end_hour_utc: int = DEFAULT_END_HOUR_UTC,
+        max_hourly_calls: int = DEFAULT_MAX_HOURLY_CALLS,
+        max_daily_calls: int = DEFAULT_MAX_DAILY_CALLS,
     ):
         self.start_hour_utc = start_hour_utc
         self.end_hour_utc = end_hour_utc
+        self.max_hourly_calls = max_hourly_calls
+        self.max_daily_calls = max_daily_calls
+
+        self._lock = threading.Lock()
+        self._current_hour_key: str = ""
+        self._hourly_calls_count: int = 0
+        self._current_day_key: str = ""
+        self._daily_calls_count: int = 0
+
+    def _sync_buckets(self, now: datetime) -> None:
+        """Reset hourly and daily counters when time bucket rolls over."""
+        hour_key = now.strftime("%Y-%m-%d-%H")
+        day_key = now.strftime("%Y-%m-%d")
+
+        if hour_key != self._current_hour_key:
+            self._current_hour_key = hour_key
+            self._hourly_calls_count = 0
+
+        if day_key != self._current_day_key:
+            self._current_day_key = day_key
+            self._daily_calls_count = 0
+
+    def can_consume_call(self, dt: Optional[datetime] = None) -> bool:
+        """
+        Check if an external API call is permitted under session and budget constraints.
+        Returns False if in STANDBY or if the hourly (65) or daily (780) quota ceiling is reached.
+        """
+        now = dt or datetime.now(timezone.utc)
+        if not self.is_active(now):
+            return False
+
+        with self._lock:
+            self._sync_buckets(now)
+            if self._hourly_calls_count >= self.max_hourly_calls:
+                logger.warning(
+                    f"Hourly API quota reached ({self._hourly_calls_count}/{self.max_hourly_calls}). "
+                    "Throttling external call to protect the rest of the trading day."
+                )
+                return False
+            if self._daily_calls_count >= self.max_daily_calls:
+                logger.warning(
+                    f"Daily API quota reached ({self._daily_calls_count}/{self.max_daily_calls}). "
+                    "Throttling external call until 00:00 UTC daily quota reset."
+                )
+                return False
+            return True
+
+    def record_call(self, provider_id: str = "unknown", dt: Optional[datetime] = None) -> None:
+        """Record an outbound live API call towards the hourly and daily budget."""
+        now = dt or datetime.now(timezone.utc)
+        with self._lock:
+            self._sync_buckets(now)
+            self._hourly_calls_count += 1
+            self._daily_calls_count += 1
+            logger.debug(
+                f"API call recorded for [{provider_id}] — "
+                f"Hour: {self._hourly_calls_count}/{self.max_hourly_calls}, "
+                f"Day: {self._daily_calls_count}/{self.max_daily_calls}"
+            )
+
+    def get_budget_telemetry(self, dt: Optional[datetime] = None) -> Dict[str, Any]:
+        """Return real-time usage statistics for the current hour and day."""
+        now = dt or datetime.now(timezone.utc)
+        with self._lock:
+            self._sync_buckets(now)
+            return {
+                "hourlyCallsUsed": self._hourly_calls_count,
+                "hourlyCallsLimit": self.max_hourly_calls,
+                "hourlyCallsRemaining": max(0, self.max_hourly_calls - self._hourly_calls_count),
+                "dailyCallsUsed": self._daily_calls_count,
+                "dailyCallsLimit": self.max_daily_calls,
+                "dailyCallsRemaining": max(0, self.max_daily_calls - self._daily_calls_count),
+            }
 
     def get_session_state(self, dt: Optional[datetime] = None) -> SessionState:
         """
@@ -68,11 +150,13 @@ class SessionBudgetManager:
         return self.is_active(dt)
 
     def get_status(self, dt: Optional[datetime] = None) -> Dict[str, Any]:
-        """Return a structured diagnostic dictionary of current session state."""
+        """Return a structured diagnostic dictionary of current session state and quota consumption."""
         now = dt or datetime.now(timezone.utc)
         state = self.get_session_state(now)
         local_hour = (now.hour + 1) % 24  # UTC+1
         is_active = (state == SessionState.ACTIVE)
+        telemetry = self.get_budget_telemetry(now)
+
         return {
             "state": state.value,
             "isActive": is_active,
@@ -81,8 +165,10 @@ class SessionBudgetManager:
             "currentLocalTime": f"{local_hour:02d}:{now.minute:02d} (UTC+1)",
             "activeWindowLocal": "08:00 - 20:00 (8:00 AM - 8:00 PM)",
             "activeWindowUtc": f"{self.start_hour_utc:02d}:00 - {self.end_hour_utc:02d}:00 UTC",
+            "budgetPacing": telemetry,
             "message": (
-                "Active prime market session (London/NY). Market data ingestion and signal generation enabled."
+                f"Active prime market session. Paced at max {self.max_hourly_calls} calls/hour "
+                f"({telemetry['hourlyCallsRemaining']} remaining this hour)."
                 if is_active else
                 "STANDBY mode. Zero external market-price provider calls permitted to preserve TwelveData free quota."
             ),

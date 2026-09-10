@@ -85,6 +85,7 @@ class MarketHistoryService:
             "apikey": settings.TWELVEDATA_API_KEY,
         }
         try:
+            session_budget_manager.record_call(TWELVE_DATA_PROVIDER)
             response = requests.get(
                 f"{settings.TWELVEDATA_BASE_URL.rstrip('/')}/time_series",
                 params=params,
@@ -276,8 +277,8 @@ class MarketHistoryService:
         Refreshes are throttled per symbol so a busy pipeline cannot exhaust the
         provider quota.
         """
-        # Session budget gate: in STANDBY mode, skip outbound provider calls unless explicitly bypassed
-        if not bypass_budget and not session_budget_manager.is_active():
+        # Session budget gate: in STANDBY mode or if hourly quota reached, skip outbound provider calls unless explicitly bypassed
+        if not bypass_budget and not session_budget_manager.can_consume_call():
             return 0
 
         timeframe = timeframe or settings.HISTORY_TIMEFRAME

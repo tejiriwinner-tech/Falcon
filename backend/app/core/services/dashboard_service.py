@@ -10,6 +10,7 @@ from app.core.providers import provider_manager, provider_registry
 from app.core.repository.mission_repository import mission_repository
 from app.core.engines.health_engine import HealthEngine
 from app.core.engines.market_state_engine import MarketStateEngine
+from app.core.engines.strategy_engine import StrategyEngine
 from app.core.services.session_budget_manager import session_budget_manager
 from app.core.services.signal_service import signal_service
 from app.core.services.news_service import build_news_response
@@ -146,6 +147,7 @@ class DashboardService:
     def __init__(self):
         self.health_engine = HealthEngine()
         self.market_state_engine = MarketStateEngine()
+        self.strategy_engine = StrategyEngine()
         self._cached_dashboard: Optional[DashboardResponse] = None
         self._cached_dashboard_at: float = 0.0
 
@@ -188,7 +190,7 @@ class DashboardService:
             activeProviders=online_count,
             connectedProvider=connected_provider,
             watchedSymbols=WATCHLIST,
-            totalStrategies=7,
+            totalStrategies=len(self.strategy_engine.get_strategies()),
             totalSignals=0,  # Will be updated from real signals
             totalMissions=total_missions,
             totalArchivedArtifacts=total_artifacts,
@@ -202,9 +204,6 @@ class DashboardService:
         from concurrent.futures import ThreadPoolExecutor, as_completed
         def _fetch_quote(sym):
             try:
-                cached_entry = provider_manager._cache.get(f"quote:{sym}")
-                if cached_entry and hasattr(cached_entry, 'quote'):
-                    return cached_entry.quote
                 resp = provider_manager.get_market_quote(sym)
                 if resp and hasattr(resp, 'quote'):
                     return resp.quote
@@ -293,6 +292,8 @@ class DashboardService:
         }
         dyn_rec = rec_enum_map.get(rec_str, Recommendation.WAIT)
         dyn_status = DecisionStatus.READY if dyn_rec in (Recommendation.BUY, Recommendation.SELL) else DecisionStatus.WAIT
+        active_signal_action = next((s.action for s in signals if getattr(s, "status", "") == "ACTIVE"), None)
+        summary.latestDecision = active_signal_action or dyn_rec.value
         min_conf = 85
         dyn_gap = max(0, min_conf - dyn_conf)
 

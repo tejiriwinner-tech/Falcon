@@ -124,11 +124,21 @@ class MarketScheduler:
                     logger.info(f"Expired {len(expirable)} signals")
                 
                 # Scan each market/timeframe combination
+                from app.core.providers import provider_manager
                 for symbol in scheduler_config.MARKETS:
+                    # Fetch live quote once per symbol for this scan cycle (cached for all timeframes)
+                    symbol_live_price = None
+                    try:
+                        quote_resp = provider_manager.get_market_quote(symbol)
+                        if quote_resp and quote_resp.quote:
+                            symbol_live_price = quote_resp.quote.lastPrice or quote_resp.quote.bidAsk.bid or quote_resp.quote.bidAsk.ask
+                    except Exception as q_err:
+                        logger.debug(f"Failed to fetch market quote for {symbol}: {q_err}")
+
                     for timeframe in scheduler_config.TIMEFRAMES:
                         try:
                             signal_result = await self._scan_market_timeframe(
-                                symbol, timeframe, db, existing_signals
+                                symbol, timeframe, db, existing_signals, live_price=symbol_live_price
                             )
                             
                             results["signals_generated"] += signal_result["generated"]
@@ -161,7 +171,8 @@ class MarketScheduler:
         symbol: str,
         timeframe: str,
         db: Session,
-        existing_signals: List[TradeSetup]
+        existing_signals: List[TradeSetup],
+        live_price: Optional[float] = None
     ) -> dict:
         """
         Scan a single market/timeframe combination.
@@ -171,6 +182,7 @@ class MarketScheduler:
             timeframe: Timeframe
             db: Database session
             existing_signals: List of existing signals for duplicate detection
+            live_price: Optional pre-fetched live price for this symbol
             
         Returns:
             Dictionary with scan results for this combination
@@ -205,21 +217,22 @@ class MarketScheduler:
             history_service = HistoryService(db)
             candles = history_service.get_candles(symbol, tf, limit=200)
 
-            # Fetch real live market quote from TwelveData / AlphaVantage / FMP
-            live_price = None
-            try:
-                live_quote = provider_manager.get_quote(symbol)
-                if live_quote:
-                    live_price = float(live_quote.get("mid") or live_quote.get("lastPrice") or live_quote.get("ask") or 0.0)
-            except Exception:
-                pass
-            if not live_price and indicator_result:
-                live_price = indicator_result.bb_middle
+            # Fallback to provider if live_price was not supplied
+            if live_price is None:
+                try:
+                    quote_resp = provider_manager.get_market_quote(symbol)
+                    if quote_resp and quote_resp.quote:
+                        live_price = quote_resp.quote.lastPrice
+                except Exception:
+                    pass
 
             # Run Falcon pipeline
             trend_result = trend_service.calculate_trend(symbol, tf, limit=200)
             structure_result = structure_service.analyze_structure(symbol, tf, limit=200)
             indicator_result = indicator_service.calculate_indicators(symbol, tf, limit=200)
+            
+            if not live_price and indicator_result:
+                live_price = indicator_result.bb_middle
             
             signal_score_result = signal_scoring_engine.calculate_signal_score(
                 symbol=symbol,

@@ -134,6 +134,10 @@ class TwelveDataProvider(BaseProvider):
     def circuit_breaker_state(self) -> str:
         """Return current circuit breaker state string (CLOSED | OPEN | HALF_OPEN)."""
         with self._cb_lock:
+            if self._cb_state == _CB_OPEN and self._cb_opened_at is not None:
+                elapsed = time.monotonic() - self._cb_opened_at
+                if elapsed >= CIRCUIT_BREAKER_COOLDOWN_SECONDS:
+                    self._cb_state = _CB_HALF_OPEN
             return self._cb_state
 
     def _cb_seconds_until_retry(self) -> Optional[float]:
@@ -347,9 +351,9 @@ class TwelveDataProvider(BaseProvider):
         if cached and (now_ts - cached["fetched_at"]) < 60.0:
             return cached["data"]
 
-        # Session budget gate: in STANDBY mode (night or weekend), permit zero external network calls
+        # Session budget gate: in STANDBY mode (night or weekend) or if hourly quota reached, permit zero external network calls
         from app.core.services.session_budget_manager import session_budget_manager
-        if not session_budget_manager.is_active():
+        if not session_budget_manager.can_consume_call():
             # If recently cached data is available, serve it without outbound network request
             if cached and (now_ts - cached["fetched_at"]) < 3600.0:
                 return cached["data"]
@@ -398,6 +402,7 @@ class TwelveDataProvider(BaseProvider):
 
         self._last_call_ts = time.time()
         self._daily_calls += 1
+        session_budget_manager.record_call(self.PROVIDER_ID)
 
         try:
             params = {"symbol": ticker, "apikey": self._api_key}

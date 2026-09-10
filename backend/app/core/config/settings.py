@@ -74,8 +74,8 @@ class Settings:
     # Watchlist of symbols to ingest for price_history (Primary 3 Core Assets)
     MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD")
     
-    # Interval between market data ingestion cycles (seconds) - 8 minutes (480s)
-    MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "480"))
+    # Interval between market data ingestion cycles (seconds) - 36 minutes (2160s) = ~5 calls/hour across 3 assets
+    MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "2160"))
     
     # Initial delay before first ingestion cycle (seconds)
     INITIAL_BACKFILL_DELAY_SECONDS: int = int(os.getenv("INITIAL_BACKFILL_DELAY_SECONDS", "30"))

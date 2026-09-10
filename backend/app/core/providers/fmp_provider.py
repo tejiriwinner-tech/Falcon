@@ -515,9 +515,9 @@ class FmpProvider(BaseProvider):
                 self._record_request(True, 1.0)
                 return cached_data
 
-        # Session budget gate: in STANDBY mode (night or weekend), permit zero external network calls
+        # Session budget gate: in STANDBY mode (night or weekend) or if hourly quota reached, permit zero external network calls
         from app.core.services.session_budget_manager import session_budget_manager
-        if not session_budget_manager.is_active():
+        if not session_budget_manager.can_consume_call():
             if cached and (now_ts - cached[0]) < 3600.0:
                 return cached[1]
             return None
@@ -543,6 +543,7 @@ class FmpProvider(BaseProvider):
 
         self._last_call_ts = time.time()
         self._daily_calls += 1
+        session_budget_manager.record_call(self.PROVIDER_ID)
 
         provider_ticker = symbol_mapper.to_provider_symbol(canonical, self.PROVIDER_ID)
 

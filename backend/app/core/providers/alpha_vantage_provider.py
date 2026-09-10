@@ -63,7 +63,7 @@ class AlphaVantageProvider(BaseProvider):
         self._connected: bool = False
         self._session = requests.Session()
         self._quote_cache: Dict[str, tuple] = {}
-        self._daily_budget: int = 25  # Matches Alpha Vantage free key limit of 25 req/day
+        self._daily_budget: int = 500  # Generous budget with dynamic API-payload detection
         self._daily_date: str = ""
         self._daily_calls: int = 0
         self._last_call_ts: float = 0.0
@@ -116,9 +116,9 @@ class AlphaVantageProvider(BaseProvider):
                 self._record_request(True, 1.0)
                 return cached_data
 
-        # Session budget gate: in STANDBY mode (night or weekend), permit zero external network calls
+        # Session budget gate: in STANDBY mode (night or weekend) or if hourly quota reached, permit zero external network calls
         from app.core.services.session_budget_manager import session_budget_manager
-        if not session_budget_manager.is_active():
+        if not session_budget_manager.can_consume_call():
             if cached and (now_ts - cached[0]) < 3600.0:
                 return cached[1]
             return None
@@ -134,8 +134,14 @@ class AlphaVantageProvider(BaseProvider):
             self._record_request(False, (time.time() - t0) * 1000)
             return None
 
+        # Ensure 1.2 second spacing between calls to respect Alpha Vantage's 1 req/sec burst limit
+        elapsed_since_last = time.time() - self._last_call_ts
+        if elapsed_since_last < 1.2:
+            time.sleep(1.2 - elapsed_since_last)
+
         self._last_call_ts = time.time()
         self._daily_calls += 1
+        session_budget_manager.record_call(self.PROVIDER_ID)
 
         from_currency, to_currency = pair
         params = {
