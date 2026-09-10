@@ -108,6 +108,16 @@ class InMemoryTradeJournalStorage:
         with self._lock:
             return self._trades.pop(trade_id, None) is not None
 
+    def purge_invalid_trades(self) -> int:
+        with self._lock:
+            to_del = [
+                tid for tid, t in self._trades.items()
+                if t.direction.upper() not in ("BUY", "SELL") or t.entryPrice <= 0 or t.stopLoss <= 0 or t.takeProfit <= 0
+            ]
+            for tid in to_del:
+                del self._trades[tid]
+            return len(to_del)
+
 
 class DatabaseTradeJournalStorage:
     """Postgres-backed storage."""
@@ -166,6 +176,17 @@ class DatabaseTradeJournalStorage:
             session.commit()
             return True
 
+    def purge_invalid_trades(self) -> int:
+        with get_session() as session:
+            count = session.query(TradeJournalRecord).filter(
+                (TradeJournalRecord.direction.notin_(["BUY", "SELL"]))
+                | (TradeJournalRecord.entry_price <= 0)
+                | (TradeJournalRecord.stop_loss <= 0)
+                | (TradeJournalRecord.take_profit <= 0)
+            ).delete(synchronize_session=False)
+            session.commit()
+            return count
+
 
 Storage = Union[InMemoryTradeJournalStorage, DatabaseTradeJournalStorage]
 
@@ -208,6 +229,9 @@ class TradeJournalRepository:
 
     def delete_trade(self, trade_id: int) -> bool:
         return self._storage.delete_trade(trade_id)
+
+    def purge_invalid_trades(self) -> int:
+        return self._storage.purge_invalid_trades()
 
     def clear(self) -> None:
         """Clear all stored entries (for testing purposes only)."""

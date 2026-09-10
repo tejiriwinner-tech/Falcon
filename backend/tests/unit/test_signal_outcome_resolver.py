@@ -1,4 +1,4 @@
-﻿from datetime import datetime, timezone
+from datetime import datetime, timezone
 from unittest.mock import MagicMock, patch
 import pytest
 
@@ -11,9 +11,13 @@ from app.schemas.market_quote import BidAsk, MarketQuote, MarketStatus, QuoteSta
 
 @pytest.fixture(autouse=True)
 def clean_journal():
+    from app.core.repository.trade_journal_repository import InMemoryTradeJournalStorage
+    original_storage = trade_journal_repository._storage
+    trade_journal_repository._storage = InMemoryTradeJournalStorage()
     trade_journal_repository.clear()
     yield
     trade_journal_repository.clear()
+    trade_journal_repository._storage = original_storage
 
 
 def make_mock_quote(symbol: str, price: float, spread: float = 0.0001) -> MarketQuoteResponse:

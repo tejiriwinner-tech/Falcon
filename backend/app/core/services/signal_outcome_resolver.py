@@ -1,7 +1,7 @@
 ﻿"""
 Falcon Signal Outcome Resolver and Feedback Engine.
 
-Monitors active signals against live market price action from ProviderManager,
+Monitors ALL active open signals against live market price action from ProviderManager,
 detects Stop Loss and Take Profit breaches, conducts automated root-cause
 post-mortem diagnostics on losses, and records closed trade records into
 the Trade Journal.
@@ -61,128 +61,87 @@ class SignalOutcomeResolver:
     def resolve_signals(self, force_simulate: bool = False) -> SignalResolutionSummary:
         """
         Scan active signals and mission candidates against real-time quotes.
-        Immediately journals newly generated signals as OPEN trades,
-        resolves setups hitting SL/TP to CLOSED, diagnoses root causes, and logs to trade journal.
+        Immediately purges any dummy non-trades, monitors ALL open trades in the database,
+        detects SL/TP breaches, diagnoses root causes, and updates trade journal and intelligence.
         """
         now = datetime.now(timezone.utc)
-        existing_trades = trade_journal_repository.list_trades()
-        existing_trades_by_sig_id: Dict[int, TradeJournalItem] = {
-            t.signalId: t for t in existing_trades if t.signalId is not None
+
+        # Step 0: Purge any invalid dummy non-trades (e.g. WAIT with entry=0)
+        try:
+            trade_journal_repository.purge_invalid_trades()
+        except Exception as ex:
+            logger.warning(f"Error purging invalid trades: {ex}")
+
+        # Step 1: Ingest any newly emitted signals from signal_service
+        all_stored_trades = trade_journal_repository.list_trades()
+        existing_sig_ids: Set[int] = {
+            t.signalId for t in all_stored_trades if t.signalId is not None
         }
 
-        candidates_to_check = []
-
-        # 1. From recent signals projection
         try:
-            signal_resp = signal_service.build_signals(mission_limit=25)
+            signal_resp = signal_service.build_signals(mission_limit=10)
             for sig in signal_resp.signals:
-                candidates_to_check.append({
-                    "signalId": sig.id,
-                    "symbol": sig.symbol,
-                    "direction": sig.action.upper(),
-                    "entry": sig.entry,
-                    "stopLoss": sig.stopLoss,
-                    "takeProfit": sig.takeProfit,
-                    "confidence": sig.confidence,
-                    "timeframe": sig.timeframe,
-                    "strategyId": sig.strategyId,
-                    "strategyName": sig.strategyName,
-                    "marketSession": "London / New York",
-                    "timestamp": sig.timestamp,
-                })
+                action = sig.action.upper()
+                if action not in ("BUY", "SELL"):
+                    continue
+                if sig.entry <= 0 or sig.stopLoss <= 0 or sig.takeProfit <= 0:
+                    continue
+
+                if sig.id not in existing_sig_ids:
+                    risk_dist = abs(sig.entry - sig.stopLoss)
+                    reward_dist = abs(sig.takeProfit - sig.entry)
+                    rr = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 1.0
+
+                    trade_create = TradeJournalCreate(
+                        signalId=sig.id,
+                        strategyId=sig.strategyId,
+                        symbol=sig.symbol,
+                        direction=action,
+                        entryPrice=sig.entry,
+                        exitPrice=None,
+                        stopLoss=sig.stopLoss,
+                        takeProfit=sig.takeProfit,
+                        timeframe=sig.timeframe,
+                        marketSession="London / New York",
+                        tradeDate=sig.timestamp,
+                        closeDate=None,
+                        status="OPEN",
+                        result="OPEN",
+                        profitLoss=0.0,
+                        riskReward=rr,
+                        confidence=sig.confidence,
+                        reasonForEntry=f"Signal #{sig.id} initiated by {sig.strategyName}",
+                        notes=f"Active signal monitored by Falcon ({sig.strategyName})",
+                    )
+                    created = trade_journal_repository.create_trade(trade_create)
+                    existing_sig_ids.add(sig.id)
+                    all_stored_trades.append(created)
+                    logger.info(f"Ingested new signal #{sig.id} ({sig.symbol} {action}) as OPEN")
         except Exception as e:
-            logger.warning(f"Could not fetch signals from signal_service: {e}")
+            logger.warning(f"Error ingesting new signals: {e}")
 
-        # 2. From mission repository
-        try:
-            all_missions = mission_repository.get_all_missions()
-            recent_missions = all_missions[-25:] if len(all_missions) > 25 else all_missions
-            for mission in recent_missions:
-                artifacts = mission_repository.get_mission_artifacts(mission.id)
-                candidates = artifacts.get("candidates", [])
-                market_state = artifacts.get("marketState")
-                session_name = market_state.session if market_state else "London"
-                for idx, cand in enumerate(candidates):
-                    sig_id = mission.id * 100 + idx
-                    candidates_to_check.append({
-                        "signalId": sig_id,
-                        "symbol": cand.symbol,
-                        "direction": cand.direction.upper() if hasattr(cand, "direction") else cand.action.upper(),
-                        "entry": cand.entryPrice if hasattr(cand, "entryPrice") else getattr(cand, "entry", 0.0),
-                        "stopLoss": cand.stopLoss,
-                        "takeProfit": cand.takeProfit,
-                        "confidence": getattr(cand, "confidence", 80),
-                        "timeframe": getattr(cand, "timeframe", "H1"),
-                        "strategyId": cand.strategyId,
-                        "strategyName": cand.strategyName,
-                        "marketSession": session_name,
-                        "timestamp": mission.startedAt,
-                    })
-        except Exception as e:
-            logger.warning(f"Could not fetch candidates from mission_repository: {e}")
+        # Step 2: Query ALL currently OPEN trades from the database
+        all_stored_trades = trade_journal_repository.list_trades()
+        open_trades = [
+            t for t in all_stored_trades
+            if t.status.upper() == "OPEN" and t.direction.upper() in ("BUY", "SELL") and t.entryPrice > 0
+        ]
 
-        # Deduplicate candidates by signalId
-        unique_candidates = {}
-        for c in candidates_to_check:
-            if c["signalId"] not in unique_candidates:
-                unique_candidates[c["signalId"]] = c
-
-        total_checked = len(unique_candidates)
+        total_checked = len(open_trades)
         resolved_count = 0
         wins_count = 0
         losses_count = 0
         open_count = 0
         new_outcomes: List[SignalOutcomeItem] = []
 
-        for sig_id, cand in unique_candidates.items():
-            symbol = cand["symbol"]
-            direction = cand["direction"]
-            entry = cand["entry"]
-            stop_loss = cand["stopLoss"]
-            take_profit = cand["takeProfit"]
+        # Step 3: Evaluate every open trade against current market quotes
+        for trade in open_trades:
+            symbol = trade.symbol
+            direction = trade.direction.upper()
+            entry = trade.entryPrice
+            stop_loss = trade.stopLoss
+            take_profit = trade.takeProfit
 
-            risk_dist = abs(entry - stop_loss)
-            reward_dist = abs(take_profit - entry)
-            risk_reward = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 1.0
-
-            # STEP 1: If signal is not yet in Trade Journal, register it immediately as OPEN
-            existing_trade = existing_trades_by_sig_id.get(sig_id)
-            if existing_trade is None:
-                trade_create = TradeJournalCreate(
-                    signalId=sig_id,
-                    strategyId=cand["strategyId"],
-                    symbol=symbol,
-                    direction=direction,
-                    entryPrice=entry,
-                    exitPrice=None,
-                    stopLoss=stop_loss,
-                    takeProfit=take_profit,
-                    timeframe=cand["timeframe"],
-                    marketSession=cand["marketSession"],
-                    tradeDate=cand["timestamp"],
-                    closeDate=None,
-                    status="OPEN",
-                    result="OPEN",
-                    profitLoss=0.0,
-                    riskReward=risk_reward,
-                    confidence=cand["confidence"],
-                    reasonForEntry=f"Signal #{sig_id} initiated by {cand['strategyName']}",
-                    reasonForExit=None,
-                    lessonLearned=None,
-                    notes=f"Active signal monitored by Falcon ({cand['strategyName']})",
-                )
-                try:
-                    existing_trade = trade_journal_repository.create_trade(trade_create)
-                    existing_trades_by_sig_id[sig_id] = existing_trade
-                    logger.info(f"Journaled newly emitted signal #{sig_id} ({symbol} {direction}) as OPEN")
-                except Exception as ex:
-                    logger.error(f"Failed to record OPEN trade for signal #{sig_id}: {ex}")
-
-            # STEP 2: If trade is already CLOSED, skip
-            if existing_trade and existing_trade.status.upper() == "CLOSED":
-                continue
-
-            # STEP 3: Check live quote for boundary breaches (SL or TP)
             quote_resp = provider_manager.get_market_quote(symbol)
             if not quote_resp or not quote_resp.quote:
                 open_count += 1
@@ -190,6 +149,8 @@ class SignalOutcomeResolver:
 
             quote = quote_resp.quote
             current_price = quote.lastPrice
+            bid = quote.bidAsk.bid
+            ask = quote.bidAsk.ask
             spread = quote.bidAsk.spread
 
             result: Optional[str] = None
@@ -197,23 +158,28 @@ class SignalOutcomeResolver:
 
             # Evaluate boundary hits
             if direction == "BUY":
-                if current_price <= stop_loss:
+                # For a BUY position, if current price or bid is at/below SL -> LOSS
+                if current_price <= stop_loss or (bid > 0 and bid <= stop_loss):
                     result = "LOSS"
                     exit_price = stop_loss
-                elif current_price >= take_profit:
+                # If current price or bid is at/above TP -> WIN
+                elif current_price >= take_profit or (bid > 0 and bid >= take_profit):
                     result = "WIN"
                     exit_price = take_profit
             elif direction == "SELL":
-                if current_price >= stop_loss:
+                # For a SELL position, if current price or ask is at/above SL -> LOSS
+                if current_price >= stop_loss or (ask > 0 and ask >= stop_loss):
                     result = "LOSS"
                     exit_price = stop_loss
-                elif current_price <= take_profit:
+                # If current price or ask is at/below TP -> WIN
+                elif current_price <= take_profit or (ask > 0 and ask <= take_profit):
                     result = "WIN"
                     exit_price = take_profit
 
-            # Handle optional simulation trigger
+            # Handle optional simulation trigger for testing
             if result is None and force_simulate:
-                if sig_id % 2 == 0:
+                sig_key = trade.signalId or trade.id
+                if sig_key % 2 == 0:
                     result = "WIN"
                     exit_price = take_profit
                 else:
@@ -224,7 +190,7 @@ class SignalOutcomeResolver:
                 open_count += 1
                 continue
 
-            # STEP 4: Automated Root-Cause Post-Mortem Diagnostic
+            # Step 4: Automated Root-Cause Post-Mortem Diagnostic
             if result == "LOSS":
                 losses_count += 1
                 is_spread_spike = (
@@ -233,7 +199,7 @@ class SignalOutcomeResolver:
                     or ("GBP" in symbol and spread >= 0.00035)
                     or spread > 2.5
                 )
-                is_off_peak = cand["marketSession"].lower() in ["asian", "tokyo", "sydney", "off-peak"]
+                is_off_peak = trade.marketSession.lower() in ["asian", "tokyo", "sydney", "off-peak"]
 
                 if is_spread_spike:
                     reason_exit = f"Stop Loss hit at {exit_price:.4f}. Spread widened to {spread:.4f} during volatility surge."
@@ -249,7 +215,11 @@ class SignalOutcomeResolver:
                 reason_exit = f"Take Profit target reached cleanly at {exit_price:.4f}."
                 lesson = "Optimal alignment between institutional trend, momentum, and session liquidity."
 
-            # STEP 5: Calculate PnL and update Trade Journal to CLOSED
+            # Step 5: Calculate PnL and update Trade Journal to CLOSED
+            risk_dist = abs(entry - stop_loss)
+            reward_dist = abs(take_profit - entry)
+            risk_reward = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 1.0
+
             multiplier = 10.0 if "XAU" in symbol else 10000.0
             if direction == "BUY":
                 price_delta = exit_price - entry
@@ -269,49 +239,23 @@ class SignalOutcomeResolver:
                 result=result,
                 profitLoss=pnl,
                 riskReward=risk_reward,
-                confidence=cand["confidence"],
+                confidence=trade.confidence,
                 reasonForExit=reason_exit,
                 lessonLearned=lesson,
-                notes=f"Auto-resolved by Falcon Outcome Resolver ({cand['strategyName']})",
+                notes=f"Auto-resolved by Falcon Outcome Resolver ({trade.notes or 'Falcon'})",
             )
 
             try:
-                if existing_trade:
-                    trade_journal_repository.update_trade(existing_trade.id, trade_update)
-                else:
-                    trade_create = TradeJournalCreate(
-                        signalId=sig_id,
-                        strategyId=cand["strategyId"],
-                        symbol=symbol,
-                        direction=direction,
-                        entryPrice=entry,
-                        exitPrice=exit_price,
-                        stopLoss=stop_loss,
-                        takeProfit=take_profit,
-                        timeframe=cand["timeframe"],
-                        marketSession=cand["marketSession"],
-                        tradeDate=cand["timestamp"],
-                        closeDate=now,
-                        status="CLOSED",
-                        result=result,
-                        profitLoss=pnl,
-                        riskReward=risk_reward,
-                        confidence=cand["confidence"],
-                        reasonForEntry=f"Signal #{sig_id} initiated by {cand['strategyName']}",
-                        reasonForExit=reason_exit,
-                        lessonLearned=lesson,
-                        notes=f"Auto-resolved by Falcon Outcome Resolver ({cand['strategyName']})",
-                    )
-                    trade_journal_repository.create_trade(trade_create)
-
+                trade_journal_repository.update_trade(trade.id, trade_update)
                 resolved_count += 1
 
+                sig_identifier = trade.signalId or trade.id
                 outcome_item = SignalOutcomeItem(
-                    signalId=sig_id,
+                    signalId=sig_identifier,
                     symbol=symbol,
                     direction=direction,
-                    strategyId=cand["strategyId"],
-                    strategyName=cand["strategyName"],
+                    strategyId=trade.strategyId or "unknown",
+                    strategyName=trade.notes or "Falcon Strategy",
                     entryPrice=entry,
                     exitPrice=exit_price,
                     stopLoss=stop_loss,
@@ -323,11 +267,11 @@ class SignalOutcomeResolver:
                     lessonLearned=lesson,
                     resolvedAt=now,
                 )
-                self._resolved_cache[sig_id] = outcome_item
+                self._resolved_cache[sig_identifier] = outcome_item
                 new_outcomes.append(outcome_item)
-                logger.info(f"Successfully closed signal #{sig_id} ({symbol} {direction}) -> {result} ({pnl:+0.2f})")
+                logger.info(f"Resolved open trade #{trade.id} (Signal #{sig_identifier} {symbol} {direction}) -> {result} ({pnl:+0.2f})")
             except Exception as e:
-                logger.error(f"Failed to update trade journal entry for signal #{sig_id}: {e}")
+                logger.error(f"Failed to update trade #{trade.id} in journal: {e}")
 
         return SignalResolutionSummary(
             totalChecked=total_checked,
