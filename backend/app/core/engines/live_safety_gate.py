@@ -15,8 +15,8 @@ from app.schemas.market_state import MarketState, MarketPrice
 from app.core.config.provider_settings import CACHE_TTL_SECONDS
 
 
-# Stale threshold = TTL × 3 (derived, not a magic number)
-_STALE_THRESHOLD_SECONDS: float = CACHE_TTL_SECONDS * 3
+# Stale threshold = 15 minutes (aligned with 5-minute candle ingestion & provider quota limits)
+_STALE_THRESHOLD_SECONDS: float = 900.0
 
 
 class SafetyGateResult:

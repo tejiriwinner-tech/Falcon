@@ -31,10 +31,10 @@ from app.core.services.market_history_service import compute_rsi, market_history
 from app.core.config.provider_settings import CACHE_TTL_SECONDS
 from app.core.events.event_bus import event_bus, MarketStateUpdated
 
-# ── Freshness thresholds derived from configured TTL ─────────────────────────
-_FRESH_MAX_SECONDS: float = float(CACHE_TTL_SECONDS)           # 0–10s
-_STALE_MAX_SECONDS: float = float(CACHE_TTL_SECONDS * 3)       # 10–30s
-# Beyond _STALE_MAX_SECONDS → EXPIRED
+# ── Freshness thresholds aligned with 5-minute budget cycle & M5/M15 timeframe ─
+_FRESH_MAX_SECONDS: float = 300.0          # 0–5 min (current candle window is LIVE)
+_STALE_MAX_SECONDS: float = 900.0          # 5–15 min (prior candle window is STALE)
+# Beyond 15 min → EXPIRED
 
 # ── Watchlist (Focused 3 Primary Core Assets) ─────────────────────────────────
 FALCON_WATCHLIST: List[str] = ["XAUUSD", "GBPUSD", "EURUSD"]
@@ -212,7 +212,7 @@ def _confidence_from_status(quote_status: str, base: int = 85) -> int:
     if quote_status == "LIVE":
         return base
     elif quote_status == "STALE":
-        return min(base, 50)
+        return min(base, 75)
     elif quote_status == "EXPIRED":
         return 0
     return 0  # INSUFFICIENT_DATA

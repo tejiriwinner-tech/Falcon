@@ -27,6 +27,11 @@ from app.schemas.mission_report import (
 )
 
 
+import logging
+
+logger = logging.getLogger(__name__)
+
+
 class PipelineOrchestrator:
     """Central coordinator for the Falcon intelligence pipeline.
 
@@ -58,7 +63,10 @@ class PipelineOrchestrator:
         Returns an immutable MissionReport that is the single source of
         truth for all downstream consumers.
         """
-        market_history_service.refresh_watchlist(FALCON_WATCHLIST)
+        try:
+            market_history_service.refresh_watchlist(FALCON_WATCHLIST)
+        except Exception as exc:
+            logger.warning(f"Error refreshing market history watchlist: {exc}")
 
         mission_number = mission_repository.next_mission_number()
         mission_id = f"mission-{mission_number:03d}"
