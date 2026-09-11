@@ -77,6 +77,15 @@ def compute_market_clocks(now: Optional[datetime] = None) -> List[MarketClock]:
     return clocks
 
 
+def _format_local_time(dt: datetime) -> str:
+    """Format UTC datetime into user's local time (UTC+1)."""
+    from datetime import timedelta
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    local_dt = dt.astimezone(timezone(timedelta(hours=1)))
+    return local_dt.strftime("%H:%M:%S")
+
+
 def compute_timeline_events(
     now: datetime,
     total_missions: int,
@@ -84,7 +93,7 @@ def compute_timeline_events(
     signals: List[Any],
     session_status: Dict[str, Any],
 ) -> List[TimelineEvent]:
-    """Dynamically generates real chronological timeline events."""
+    """Dynamically generates real chronological timeline events in local time."""
     events: List[TimelineEvent] = []
 
     # 1. Recent signals from scanner / pipeline
@@ -103,7 +112,7 @@ def compute_timeline_events(
             events.append(
                 TimelineEvent(
                     timestamp=sig_time,
-                    formattedTime=sig_time.strftime("%H:%M:%S"),
+                    formattedTime=_format_local_time(sig_time),
                     title=f"Signal {status}: {symbol} {direction}",
                     description=f"{strategy} evaluated with risk envelope checks.",
                     icon="gavel" if status == "APPROVED" else "security",
@@ -120,7 +129,7 @@ def compute_timeline_events(
     events.append(
         TimelineEvent(
             timestamp=now,
-            formattedTime=now.strftime("%H:%M:%S"),
+            formattedTime=_format_local_time(now),
             title=mode_text,
             description=desc_text,
             icon="sync",
@@ -131,7 +140,7 @@ def compute_timeline_events(
     events.append(
         TimelineEvent(
             timestamp=now,
-            formattedTime=now.strftime("%H:%M:%S"),
+            formattedTime=_format_local_time(now),
             title="Learning Cycle Evaluated",
             description=f"Total {total_missions} missions and {total_artifacts} artifacts archived in long-term memory",
             icon="psychology",

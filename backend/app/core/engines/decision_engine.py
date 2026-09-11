@@ -1,7 +1,14 @@
 import json
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Optional
+
+def _format_local_time(dt: datetime) -> str:
+    """Format UTC datetime into user's local time (UTC+1)."""
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    local_dt = dt.astimezone(timezone(timedelta(hours=1)))
+    return local_dt.strftime("%H:%M:%S")
 
 from app.schemas.market_state import MarketState
 from app.schemas.strategy import StrategyItem
@@ -542,14 +549,14 @@ class DecisionEngine:
             timeline=[
                 TimelineEvent(
                     timestamp=now,
-                    formattedTime=now.strftime("%H:%M:%S"),
+                    formattedTime=_format_local_time(now),
                     title=f"Captain Verdict: {rec.value}",
                     description=f"{strat_name} evaluated with final confidence {score}%. Readiness: {'READY' if is_ready else ('BLOCKED' if blocking else 'WAIT')}.",
                     icon="gavel" if is_ready else "security"
                 ),
                 TimelineEvent(
                     timestamp=now,
-                    formattedTime=now.strftime("%H:%M:%S"),
+                    formattedTime=_format_local_time(now),
                     title="Risk & Execution Checks Complete",
                     description=f"Risk: {'HIGH' if blocking else 'NORMAL'}, Validation: {'PASSED' if (getattr(validation, 'score', 0) >= 70) else 'PENDING'}.",
                     icon="psychology"
