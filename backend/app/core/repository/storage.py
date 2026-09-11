@@ -94,6 +94,10 @@ class InMemoryMissionStorage:
     def get_all_missions(self) -> List[MissionReport]:
         return [copy.deepcopy(mission) for mission in self._missions.values()]
 
+    def get_recent_missions(self, limit: int = 20) -> List[MissionReport]:
+        missions = list(self._missions.values())
+        return [copy.deepcopy(m) for m in missions[-limit:]]
+
     def get_latest_mission(self) -> Optional[MissionReport]:
         if not self._missions:
             return None
@@ -209,6 +213,13 @@ class DatabaseMissionStorage:
                 select(MissionRecord).order_by(MissionRecord.stored_at)
             ).all()
             return [MissionReport.model_validate(record.payload) for record in records]
+
+    def get_recent_missions(self, limit: int = 20) -> List[MissionReport]:
+        with get_session() as session:
+            records = session.scalars(
+                select(MissionRecord).order_by(MissionRecord.stored_at.desc()).limit(limit)
+            ).all()
+            return [MissionReport.model_validate(record.payload) for record in reversed(records)]
 
     def get_latest_mission(self) -> Optional[MissionReport]:
         with get_session() as session:

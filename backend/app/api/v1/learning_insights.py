@@ -1,6 +1,7 @@
+import time
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
-from typing import List
+from typing import List, Optional
 
 from app.core.engines.learning_insight_engine import LearningInsightEngine
 from app.core.repository.mission_repository import mission_repository
@@ -107,29 +108,50 @@ def _build_live_market_insights(market_state, now: datetime) -> List[LearningIns
     return insights
 
 
+_cached_insights_resp: Optional[LearningInsightListResponse] = None
+_cached_insights_at: float = 0.0
+
+
 @router.get("", response_model=LearningInsightListResponse)
 def get_learning_insights():
     """
     Runs the Learning & Insight Engine against the current repository state
-    and returns a LearningInsightListResponse. If no missions exist yet,
+    and returns a LearningInsightListResponse. If no missions exist yet or on error,
     derives dynamic insights from the live market state.
     """
-    global _insights_store
+    global _insights_store, _cached_insights_resp, _cached_insights_at
+    now_mono = time.monotonic()
+    if _cached_insights_resp is not None and (now_mono - _cached_insights_at) < 60.0:
+        return _cached_insights_resp
+
     now = datetime.now(timezone.utc)
-    insights = _learning_engine.generate_learning_insights(mission_repository)
-    
+    insights = []
+    try:
+        insights = _learning_engine.generate_learning_insights(mission_repository)
+    except Exception as ex:
+        import logging
+        logging.getLogger("falcon.learning_insights").error(f"Failed to generate repository insights: {ex}")
+
     if not insights:
-        ms = _market_state_engine.get_market_state()
-        insights = _build_live_market_insights(ms, now)
-        
+        try:
+            ms = _market_state_engine.get_market_state()
+            insights = _build_live_market_insights(ms, now)
+        except Exception as ex:
+            import logging
+            logging.getLogger("falcon.learning_insights").error(f"Failed to generate live market insights: {ex}")
+            insights = []
+
     _insights_store = insights
     summary = _learning_engine.build_summary(insights)
-    
-    return LearningInsightListResponse(
+
+    resp = LearningInsightListResponse(
         insights=insights,
         summary=summary,
         lastUpdated=now,
     )
+    _cached_insights_resp = resp
+    _cached_insights_at = now_mono
+    return resp
 
 
 @router.get("/latest", response_model=LearningInsightListResponse)

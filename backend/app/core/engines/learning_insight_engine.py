@@ -41,11 +41,10 @@ class LearningInsightEngine:
         start_time = time.time()
         now = datetime.now(timezone.utc)
 
-        all_missions = repository.get_all_missions()
-        if not all_missions:
+        missions = repository.get_recent_missions(25) if hasattr(repository, "get_recent_missions") else (repository.get_all_missions()[-25:] if repository.count_missions() > 0 else [])
+        if not missions:
             return []
 
-        missions = all_missions[-50:] if len(all_missions) > 50 else all_missions
         mission_ids = [m.id for m in missions]
         bulk_artifacts = repository.get_all_mission_artifacts_bulk(mission_ids) if hasattr(repository, "get_all_mission_artifacts_bulk") else {}
 

@@ -88,6 +88,11 @@ class MissionRepository:
         self._cached_missions_at = now
         return missions
 
+    def get_recent_missions(self, limit: int = 20) -> List[MissionReport]:
+        if hasattr(self._storage, "get_recent_missions"):
+            return self._storage.get_recent_missions(limit)
+        return self.get_all_missions()[-limit:]
+
     def get_latest_mission(self) -> Optional[MissionReport]:
         return self._storage.get_latest_mission()
 
@@ -162,9 +167,10 @@ class MissionRepository:
         if self._cached_bulk_artifacts is not None and (now - self._cached_bulk_at) < 60.0:
             if mission_ids is None:
                 return dict(self._cached_bulk_artifacts)
-            return {mid: self._cached_bulk_artifacts[mid] for mid in mission_ids if mid in self._cached_bulk_artifacts}
+            if all(mid in self._cached_bulk_artifacts for mid in mission_ids):
+                return {mid: self._cached_bulk_artifacts[mid] for mid in mission_ids}
         if hasattr(self._storage, "get_all_artifacts_bulk"):
-            bulk = self._storage.get_all_artifacts_bulk(None)
+            bulk = self._storage.get_all_artifacts_bulk(mission_ids)
             result = {}
             for mid, grouped in bulk.items():
                 market_states = grouped.get(MARKET_STATE, [])
@@ -177,11 +183,10 @@ class MissionRepository:
                     "executionReadiness": grouped.get(EXECUTION_READINESS, []),
                     "decisions": grouped.get(DECISION, []),
                 }
-            self._cached_bulk_artifacts = result
-            self._cached_bulk_at = now
             if mission_ids is None:
-                return dict(result)
-            return {mid: result[mid] for mid in mission_ids if mid in result}
+                self._cached_bulk_artifacts = result
+                self._cached_bulk_at = now
+            return result
         missions = self.get_all_missions() if mission_ids is None else [self.get_mission(m) for m in mission_ids]
         return {m.id: self.get_mission_artifacts(m.id) for m in missions if m}
 
