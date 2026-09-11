@@ -298,10 +298,20 @@ class MarketStateEngine:
             # Check cached quotes from ProviderManager or stored bars in history
             cached_quote = None
             for sym in symbols:
-                entry = provider_manager._cache.get(sym)
+                entry = provider_manager._cache.get(sym, allow_stale=True)
                 if entry and hasattr(entry, "data") and isinstance(entry.data, MarketQuote):
-                    cached_quote = entry.data
-                    break
+                    q = entry.data
+                    prices[sym] = MarketPrice(
+                        symbol=q.symbol,
+                        currentPrice=q.lastPrice,
+                        bid=q.bidAsk.bid,
+                        ask=q.bidAsk.ask,
+                        spread=q.bidAsk.spread,
+                        timestamp=q.timestamp,
+                        provider=q.providerName,
+                    )
+                    if cached_quote is None or sym == "XAUUSD":
+                        cached_quote = q
 
             if cached_quote is not None:
                 trend = _derive_trend(cached_quote.changePercent)
@@ -315,22 +325,27 @@ class MarketStateEngine:
                 primary_provider_name = cached_quote.providerName
                 primary_freshness = float(data_age_secs)
             else:
-                # Check recent stored price bars for primary asset (XAUUSD or first available)
-                stored_bars = market_history_service.get_bars("XAUUSD", limit=5)
-                if not stored_bars:
-                    for sym in symbols:
-                        stored_bars = market_history_service.get_bars(sym, limit=5)
-                        if stored_bars:
-                            break
+                # Check recent stored price bars for fallback
+                for sym in symbols:
+                    stored_bars = market_history_service.get_bars(sym, limit=5)
+                    if stored_bars:
+                        last_bar = stored_bars[-1]
+                        prices[sym] = MarketPrice(
+                            symbol=sym,
+                            currentPrice=last_bar.close,
+                            bid=last_bar.close - (0.0001 if "USD" in sym else 0.5),
+                            ask=last_bar.close + (0.0001 if "USD" in sym else 0.5),
+                            spread=0.2 if "USD" in sym else 1.0,
+                            timestamp=last_bar.bar_time,
+                            provider=last_bar.provider or "Stored History",
+                        )
 
-                if stored_bars and len(stored_bars) >= 2:
-                    pct_change = ((stored_bars[-1].close - stored_bars[0].close) / stored_bars[0].close) * 100
+                primary_bars = market_history_service.get_bars("XAUUSD", limit=5) or market_history_service.get_bars(symbols[0] if symbols else "EURUSD", limit=5)
+                if primary_bars and len(primary_bars) >= 2:
+                    pct_change = ((primary_bars[-1].close - primary_bars[0].close) / primary_bars[0].close) * 100
                     trend = _derive_trend(pct_change)
-                    bar_time = stored_bars[-1].bar_time
-                    if hasattr(bar_time, "timestamp"):
-                        data_age_secs = max(0, int(now.timestamp() - bar_time.timestamp()))
-                    else:
-                        data_age_secs = 300
+                    bar_time = primary_bars[-1].bar_time
+                    data_age_secs = max(0, int(now.timestamp() - bar_time.timestamp())) if hasattr(bar_time, "timestamp") else 300
                     quote_status_str = "STANDBY"
                     confidence = 75
                 else:
@@ -339,10 +354,10 @@ class MarketStateEngine:
                     quote_status_str = "INSUFFICIENT_DATA"
                     confidence = 50
 
-                market_open = False
+                market_open = True
                 live_spread = 0.3
-                primary_provider_id = None
-                primary_provider_name = None
+                primary_provider_id = "cache_fallback"
+                primary_provider_name = "Falcon Market Cache"
                 primary_freshness = float(data_age_secs)
 
         session = _derive_session(now)

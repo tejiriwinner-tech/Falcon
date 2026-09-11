@@ -80,7 +80,7 @@ class ProviderManager:
 
         # ── Single-Flight + Cache ──────────────────────────────────────
         with self._lock:
-            cached_entry = self._cache.get(canonical)
+            cached_entry = self._cache.get(canonical, allow_stale=True)
             if cached_entry is not None:
                 quote = cached_entry.data
                 if isinstance(quote, MarketQuote):
