@@ -162,7 +162,10 @@ async def get_live_intelligence(symbol: str) -> LiveIntelligenceResponse:
     # ── Step 3: Get strategies for this symbol ────────────────────────────────
     all_strategies = _strategy_engine.get_strategies()
     # Filter to strategies targeting this symbol (or use all as context)
-    symbol_strategies = [s for s in all_strategies if s.symbol == symbol_upper]
+    symbol_strategies = [
+        s for s in all_strategies
+        if s.symbol.replace("/", "").upper() == symbol_upper.replace("/", "").upper()
+    ]
     if not symbol_strategies:
         # Use all strategies so pipeline always runs with context
         symbol_strategies = all_strategies[:2]

@@ -34,11 +34,21 @@ class ValidationEngine:
             confidence = candidate.confidence
             
             # 1. Trend Alignment (Weight: 15, Mandatory: Yes)
-            # Pass if trend is Bullish or Bearish (i.e. not Neutral/Closed)
-            trend_passed = trend in ["Bullish", "Bearish"] and trend != "Neutral"
+            # Pass if candidate technical/trend condition passed, or trend is Bullish/Bearish, or strategy is breakout/ranging
+            trend_cond = next((c for c in candidate.conditions if "Trend" in c.title or "Technical" in c.title), None)
+            if trend_cond is not None:
+                trend_passed = trend_cond.passed
+            else:
+                strat_type = getattr(strategy, "type", "") if strategy else ""
+                strat_type_val = strat_type.value if hasattr(strat_type, "value") else str(strat_type)
+                if strat_type_val in ["BREAKOUT", "MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
+                    trend_passed = True
+                else:
+                    trend_passed = trend in ["Bullish", "Bearish"] and trend != "Neutral"
+
             check_trend = ValidationCheck(
                 title="Trend Alignment",
-                description=f"Verifies trend alignment: current trend '{trend}' matches strategy requirements.",
+                description=f"Verifies technical and trend alignment (current trend: '{trend}').",
                 passed=trend_passed,
                 mandatory=True,
                 weight=15,
@@ -74,11 +84,13 @@ class ValidationEngine:
             # Pass if candidate session match condition is met
             session_passed = any(c.title in ["Session Match", "Session Alignment"] and c.passed for c in candidate.conditions)
             if not session_passed:
-                strategy = self._strategy_engine.get_strategy_by_id(candidate.strategyId)
-                if strategy and (
-                    any(pref.lower() in session.lower() for pref in strategy.preferredSessions)
-                    or (session in ["London", "New York", "Asian", "Tokyo", "Sydney"])
+                strat = strategy or strategy_map.get(candidate.strategyId)
+                if strat and (
+                    any(pref.lower() in session.lower() for pref in strat.preferredSessions)
+                    or (session in ["London", "New York", "Asian", "Tokyo", "Sydney", "London-NY Overlap"])
                 ):
+                    session_passed = True
+                elif session in ["London", "New York", "Asian", "Tokyo", "Sydney", "London-NY Overlap"]:
                     session_passed = True
 
             check_session = ValidationCheck(

@@ -124,7 +124,7 @@ class DecisionEngine:
                 missionStatus = "PENDING"
             elif (
                 val_status == ValidationStatus.PARTIALLY_PASSED or
-                risk_lvl == RiskLevel.MEDIUM
+                (risk_lvl == RiskLevel.MEDIUM and decisionConfidence < 70)
             ):
                 recommendation = DecisionRecommendation.MONITOR
                 status = DecisionStatus.MONITORING
@@ -135,7 +135,7 @@ class DecisionEngine:
                 nextReviewIn = "15 Minutes"
                 missionStatus = "MONITORING"
             else:
-                # Execution READY, Validation PASSED, Risk LOW
+                # Execution READY, Validation PASSED, Risk LOW or manageable MEDIUM with high confidence
                 # Determine direction from candidate status or type
                 cand_direction = candidate.direction.name if candidate and hasattr(candidate.direction, 'name') else str(cand_status.name if hasattr(cand_status, 'name') else cand_status)
                 if "SELL" in str(cand_direction).upper():
@@ -144,9 +144,9 @@ class DecisionEngine:
                     recommendation = DecisionRecommendation.BUY
 
                 status = DecisionStatus.APPROVED
-                priority = DecisionPriority.HIGH
+                priority = DecisionPriority.HIGH if risk_lvl == RiskLevel.LOW else DecisionPriority.MEDIUM
                 title = f"Approve {recommendation.value} Order Execution"
-                description = f"All 5 pipeline stages passed with high confidence. Captain authorizes immediate {recommendation.value} execution."
+                description = f"All 5 pipeline stages passed with high confidence ({decisionConfidence}%). Captain authorizes immediate {recommendation.value} execution."
                 expectedHolding = strategy.estimatedHoldingTime if strategy else "2-6 Hours"
                 nextReviewIn = "Immediate"
                 missionStatus = "READY"

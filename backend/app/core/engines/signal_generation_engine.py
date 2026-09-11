@@ -13,6 +13,7 @@ from app.core.engines.candlestick_pattern_engine import (
 )
 from app.core.services.market_history_service import market_history_service
 from app.core.providers import provider_manager
+from app.schemas.market_quote import MarketQuote
 
 
 class SignalGenerationEngine:
@@ -53,8 +54,8 @@ class SignalGenerationEngine:
 
         def _load_bars(sym):
             try:
-                b5 = market_history_service.get_bars(sym, timeframe="5m", limit=15)
-                b15 = market_history_service.get_bars(sym, timeframe="15m", limit=15)
+                b5 = market_history_service.get_bars(sym, timeframe="5m", limit=15) or market_history_service.get_bars(sym, limit=15)
+                b15 = market_history_service.get_bars(sym, timeframe="15m", limit=15) or market_history_service.get_bars(sym, limit=15)
                 return sym, b5, b15
             except Exception:
                 return sym, [], []
@@ -133,9 +134,11 @@ class SignalGenerationEngine:
 
             # ── 1. Asset-Specific Trend & Momentum Evaluation ─────────────────
             # Retrieve specific quote metrics for this asset (DO NOT leak Gold's trend to EUR or GBP)
-            quote_entry = provider_manager._cache.get(f"quote:{canonical_symbol}")
+            quote_entry = provider_manager._cache.get(canonical_symbol, allow_stale=True)
             change_pct = 0.0
-            if quote_entry and hasattr(quote_entry, "quote"):
+            if quote_entry and hasattr(quote_entry, "data") and isinstance(quote_entry.data, MarketQuote):
+                change_pct = quote_entry.data.changePercent or 0.0
+            elif quote_entry and hasattr(quote_entry, "quote"):
                 change_pct = getattr(quote_entry.quote, "changePercent", 0.0) or 0.0
 
             sym_indicators = market_state.indicators.get(canonical_symbol, [])
@@ -221,21 +224,30 @@ class SignalGenerationEngine:
 
                 if strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
                     direction = CandidateDirection.BUY if asset_trend in ["Bearish", "Neutral"] else CandidateDirection.SELL
+                elif strat_type_val == "BREAKOUT":
+                    if rsi_val is not None and rsi_val >= 50.0:
+                        direction = CandidateDirection.BUY
+                    elif rsi_val is not None and rsi_val < 50.0:
+                        direction = CandidateDirection.SELL
+                    elif asset_trend == "Bearish":
+                        direction = CandidateDirection.SELL
+                    else:
+                        direction = CandidateDirection.BUY
                 elif asset_trend == "Bullish":
                     direction = CandidateDirection.BUY
                 elif asset_trend == "Bearish":
                     direction = CandidateDirection.SELL
                 else:
-                    direction = CandidateDirection.WAIT
+                    direction = CandidateDirection.BUY if (rsi_val or 50.0) >= 50.0 else CandidateDirection.SELL
 
             # ── 3. Evaluate Strategy Execution Filters ────────────────────────
             # Condition 1: Trend Alignment / Technical Setup
             if sniper_pattern:
                 trend_passed = True
                 trend_desc = f"🎯 Sniper Setup Identified: {pattern_name} with {pattern_conviction*100:.0f}% conviction. {sniper_trigger_rule}"
-            elif strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
-                trend_passed = asset_trend in ["Neutral", "Ranging"] or volatility in ["Low", "Moderate"]
-                trend_desc = f"Asset {raw_symbol} in ranging structure. Trend: {asset_trend}, volatility: {volatility}."
+            elif strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE", "BREAKOUT"]:
+                trend_passed = True
+                trend_desc = f"Asset {raw_symbol} in structural setup window. Trend: {asset_trend}, volatility: {volatility}."
             else:
                 trend_passed = asset_trend in ["Bullish", "Bearish"] and asset_trend != "Neutral"
                 trend_desc = f"Asset {raw_symbol} specific trend is {asset_trend}."
@@ -259,7 +271,7 @@ class SignalGenerationEngine:
             # Passes if explicitly listed, or if in active liquid global session with optimal spread
             session_passed = (
                 any(pref.lower() in session.lower() for pref in strategy.preferredSessions)
-                or (session in ["London", "New York", "Asian", "Tokyo", "Sydney"] and spread_passed)
+                or (session in ["London", "New York", "Asian", "Tokyo", "Sydney", "London-NY Overlap"] and spread_passed)
             )
             session_cond = CandidateCondition(
                 title="Session Match",
@@ -309,7 +321,7 @@ class SignalGenerationEngine:
 
             readiness_news = 20 if news_passed else 0
             readiness_vol = 10 if volatility in ["Moderate", "Low"] else 5
-            readiness_fresh = 10 if data_age <= 5 else (5 if data_age <= 15 else 2)
+            readiness_fresh = 10 if data_age <= 300 else (5 if data_age <= 900 else 2)
 
             readiness_score = readiness_session + readiness_spread + readiness_news + readiness_vol + readiness_fresh
 
