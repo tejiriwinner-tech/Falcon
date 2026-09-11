@@ -262,7 +262,7 @@ class SignalGenerationEngine:
                 or (session in ["London", "New York", "Asian", "Tokyo", "Sydney"] and spread_passed)
             )
             session_cond = CandidateCondition(
-                title="Session Alignment",
+                title="Session Match",
                 description=f"Session '{session}' execution window (preferred: {', '.join(strategy.preferredSessions)}).",
                 passed=session_passed
             )

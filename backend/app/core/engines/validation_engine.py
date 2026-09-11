@@ -72,7 +72,15 @@ class ValidationEngine:
 
             # 4. Session Match (Weight: 10, Mandatory: Yes)
             # Pass if candidate session match condition is met
-            session_passed = any(c.title == "Session Match" and c.passed for c in candidate.conditions)
+            session_passed = any(c.title in ["Session Match", "Session Alignment"] and c.passed for c in candidate.conditions)
+            if not session_passed:
+                strategy = self._strategy_engine.get_strategy_by_id(candidate.strategyId)
+                if strategy and (
+                    any(pref.lower() in session.lower() for pref in strategy.preferredSessions)
+                    or (session in ["London", "New York", "Asian", "Tokyo", "Sydney"])
+                ):
+                    session_passed = True
+
             check_session = ValidationCheck(
                 title="Session Match",
                 description=f"Verifies execution session '{session}' matches preferred sessions.",
