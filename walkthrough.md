@@ -92,3 +92,31 @@ Total Curated Signals: 3
   ValidUntil: 2026-09-10T11:45:22.992264Z
 ```
 All fields (`triggerCondition`, `validUntil`, `setupPattern`, `latestDecision`) are live in production.
+
+---
+
+## 4. Learning & Insight Engine 502 Bad Gateway Fix & Strategy Optimizer Optimization
+
+### Problem Diagnosed:
+- Over 900+ historical mission runs had accumulated in Postgres with 57 artifact records per mission (>50,000+ artifact rows).
+- When `/api/v1/learning-insights` or `/api/v1/strategy-optimizer` was called, their engines called `repository.get_all_missions()` and `repository.get_all_artifacts_bulk(None)`.
+- This forced Postgres to query tens of thousands of rows across the wire and deserialize them with Pydantic. The request exceeded Fly.io's 60-second proxy timeout, triggering a `502 Bad Gateway`.
+
+### Solutions Applied:
+1. **Optimized Recent Missions Query**:
+   - Implemented `get_recent_missions(limit=25)` in `storage.py` and `mission_repository.py` using indexed `ORDER BY stored_at DESC LIMIT :limit`.
+   - Updated `learning_insight_engine.py`, `strategy_intelligence_engine.py`, `adaptive_strategy_optimizer.py`, `outcome_analysis_engine.py`, `calibration_engine.py`, `performance_analytics_engine.py`, and `missions.py` to query only recent missions instead of downloading the entire repository.
+2. **Bulk Artifacts Scope Limitation**:
+   - `get_all_mission_artifacts_bulk` now only fetches artifacts for the target recent `mission_ids` rather than querying every artifact in the database.
+3. **Response Caching & Error Boundaries**:
+   - Added 60s in-memory caching and resilient exception handling to both `/api/v1/learning-insights` and `/api/v1/strategy-optimizer`.
+
+### Live Verification on Fly.io (`https://falcon-api-tejiri.fly.dev`):
+- **`/api/v1/learning-insights`**: HTTP 200 OK in **1.35 seconds** (resolved from 502 timeout).
+- **`/api/v1/strategy-optimizer`**: HTTP 200 OK in **0.75 seconds** (cached) / **6.73s** (cold). Returning 11 optimized strategies with top performers:
+  - *European Breakout* (Score: 86.0 | Recommendation: MAINTAIN)
+  - *EUR/USD Trend Continuation* (Score: 86.0 | Recommendation: MAINTAIN)
+  - *London Breakout* (Score: 81.5 | Recommendation: MONITOR)
+  - *Asian Mean Reversion Range* (Score: 57.4 | Recommendation: PAUSE)
+- **`/api/v1/missions?limit=10`**: HTTP 200 OK in **1.62 seconds**.
+- **`/api/v1/analytics`**: HTTP 200 OK in **8.93 seconds**.
