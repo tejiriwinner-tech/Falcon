@@ -263,11 +263,15 @@ class CalibrationEngine:
         start_time = time.time()
         now = datetime.now(timezone.utc)
 
-        all_missions = repository.get_all_missions()
-        if not all_missions:
+        if hasattr(repository, "get_recent_missions"):
+            sample_missions = repository.get_recent_missions(50)
+        else:
+            all_missions = repository.get_all_missions()
+            sample_missions = all_missions[-50:] if len(all_missions) > 50 else all_missions
+
+        if not sample_missions:
             return []
 
-        sample_missions = all_missions[-50:] if len(all_missions) > 50 else all_missions
         mission_ids = [m.id for m in sample_missions]
         bulk_artifacts = (
             repository.get_all_mission_artifacts_bulk(mission_ids)
@@ -278,9 +282,9 @@ class CalibrationEngine:
         reports: List[CalibrationReport] = []
 
         # Window 1: Recent Window (last 10 missions)
-        if len(all_missions) >= 10:
+        if len(sample_missions) >= 10:
             reports.append(self._compute_single_report(
-                missions=all_missions[-10:],
+                missions=sample_missions[-10:],
                 bulk_artifacts=bulk_artifacts,
                 report_id="calibration-recent-10m",
                 window_title="Recent Window (Last 10 Missions)",
@@ -289,9 +293,9 @@ class CalibrationEngine:
             ))
 
         # Window 2: Medium Window (last 25 missions)
-        if len(all_missions) >= 25:
+        if len(sample_missions) >= 25:
             reports.append(self._compute_single_report(
-                missions=all_missions[-25:],
+                missions=sample_missions[-25:],
                 bulk_artifacts=bulk_artifacts,
                 report_id="calibration-mid-25m",
                 window_title="Mid-term Window (Last 25 Missions)",

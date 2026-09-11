@@ -40,11 +40,14 @@ class OutcomeAnalysisEngine:
         start_time = time.time()
         now = datetime.now(timezone.utc)
 
-        all_missions = repository.get_all_missions()
-        if not all_missions:
-            return []
+        if hasattr(repository, "get_recent_missions"):
+            missions = repository.get_recent_missions(limit or 30)
+        else:
+            all_missions = repository.get_all_missions()
+            missions = all_missions[-limit:] if (limit and limit > 0 and len(all_missions) > limit) else all_missions
 
-        missions = all_missions[-limit:] if (limit and limit > 0 and len(all_missions) > limit) else all_missions
+        if not missions:
+            return []
 
         reports: List[OutcomeAnalysisReport] = []
         counter = 1

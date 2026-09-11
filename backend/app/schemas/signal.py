@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import List
+from typing import List, Optional
 
 class SignalItem(BaseModel):
     id: int
@@ -18,6 +18,10 @@ class SignalItem(BaseModel):
     strategyName: str
     strategyVersion: str
     dataAgeSeconds: int
+    triggerCondition: Optional[str] = None
+    validUntil: Optional[datetime] = None
+    setupPattern: Optional[str] = None
+    riskReward: Optional[float] = None
 
 class SignalListResponse(BaseModel):
     signals: List[SignalItem]

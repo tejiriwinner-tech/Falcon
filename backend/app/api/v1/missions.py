@@ -23,12 +23,16 @@ def get_missions(limit: int = 20):
 
     Read-only: POST /missions/run executes the intelligence pipeline.
     """
-    all_missions = mission_repository.get_all_missions()
+    recent_missions = (
+        mission_repository.get_recent_missions(limit)
+        if hasattr(mission_repository, "get_recent_missions")
+        else mission_repository.get_all_missions()[-limit:]
+    )
     # Sort newest first
-    sorted_missions = list(reversed(all_missions))
+    sorted_missions = list(reversed(recent_missions))
     return _build_list_response(
-        missions=sorted_missions[:limit],
-        all_missions=all_missions,
+        missions=sorted_missions,
+        all_missions=None,
     )
 
 
@@ -87,7 +91,7 @@ def _build_list_response(
     avg_health = round(sum(healths) / total, 2) if total > 0 else 0.0
 
     summary = MissionSummary(
-        totalMissions=total,
+        totalMissions=mission_repository.count_missions() if hasattr(mission_repository, "count_missions") else total,
         successful=successful,
         partialSuccess=partial,
         failed=failed,

@@ -32162,3 +32162,48 @@ WHERE mission_artifacts.mission_id = %(mission_id_1)s::VARCHAR AND mission_artif
 2026-09-02 14:35:23,246 - main - INFO - Autonomous learning scheduler started
 2026-09-02 14:35:23,247 - app.core.services.market_data_scheduler - INFO - Market data scheduler waiting 30s before initial refresh
 2026-09-02 14:35:23,253 - app.services.scheduler.market_scheduler - WARNING - Skipping scan: Would exceed MAX_TOTAL_ACTIVE_SIGNALS (50) (currently 50)
+2026-09-09 14:47:39,009 - falcon.signal_outcome_resolver - INFO - Successfully resolved signal #9901 (EUR/USD BUY) -> LOSS (-30.00)
+2026-09-09 14:47:46,053 - falcon.signal_outcome_resolver - INFO - Successfully resolved signal #9902 (GBP/USD BUY) -> WIN (+100.00)
+2026-09-09 14:47:52,639 - falcon.signal_outcome_resolver - INFO - Successfully resolved signal #9903 (XAU/USD BUY) -> LOSS (-100.00)
+2026-09-09 14:53:37,088 - falcon.signal_outcome_resolver - INFO - Successfully resolved signal #9901 (EUR/USD BUY) -> LOSS (-30.00)
+2026-09-09 14:53:43,069 - falcon.signal_outcome_resolver - INFO - Successfully resolved signal #9902 (GBP/USD BUY) -> WIN (+100.00)
+2026-09-09 14:53:50,081 - falcon.signal_outcome_resolver - INFO - Successfully resolved signal #9903 (XAU/USD BUY) -> LOSS (-100.00)
+2026-09-09 15:28:02,462 - falcon.signal_outcome_resolver - INFO - Successfully resolved signal #9901 (EUR/USD BUY) -> LOSS (-30.00)
+2026-09-09 15:28:08,457 - falcon.signal_outcome_resolver - INFO - Successfully resolved signal #9902 (GBP/USD BUY) -> WIN (+100.00)
+2026-09-09 15:28:14,537 - falcon.signal_outcome_resolver - INFO - Successfully resolved signal #9903 (XAU/USD BUY) -> LOSS (-100.00)
+2026-09-09 15:56:42,917 - falcon.signal_outcome_resolver - INFO - Journaled newly emitted signal #9901 (EUR/USD BUY) as OPEN
+2026-09-09 15:56:44,941 - falcon.signal_outcome_resolver - INFO - Successfully closed signal #9901 (EUR/USD BUY) -> LOSS (-30.00)
+2026-09-09 15:56:50,374 - falcon.signal_outcome_resolver - INFO - Journaled newly emitted signal #9902 (GBP/USD BUY) as OPEN
+2026-09-09 15:56:52,212 - falcon.signal_outcome_resolver - INFO - Successfully closed signal #9902 (GBP/USD BUY) -> WIN (+100.00)
+2026-09-09 15:56:57,501 - falcon.signal_outcome_resolver - INFO - Journaled newly emitted signal #9903 (XAU/USD BUY) as OPEN
+2026-09-09 15:56:59,172 - falcon.signal_outcome_resolver - INFO - Successfully closed signal #9903 (XAU/USD BUY) -> LOSS (-100.00)
+2026-09-10 11:11:06,154 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9901 (EUR/USD BUY) as OPEN
+2026-09-10 11:11:08,824 - falcon.signal_outcome_resolver - INFO - Resolved open trade #361 (Signal #9901 EUR/USD BUY) -> LOSS (-30.00)
+2026-09-10 11:11:13,648 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9901 (EUR/USD BUY) as OPEN
+2026-09-10 11:11:16,203 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9902 (GBP/USD BUY) as OPEN
+2026-09-10 11:11:16,576 - falcon.signal_outcome_resolver - INFO - Resolved open trade #362 (Signal #9901 EUR/USD BUY) -> LOSS (-30.00)
+2026-09-10 11:11:18,512 - falcon.signal_outcome_resolver - INFO - Resolved open trade #363 (Signal #9902 GBP/USD BUY) -> WIN (+100.00)
+2026-09-10 11:11:22,595 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9902 (GBP/USD BUY) as OPEN
+2026-09-10 11:11:24,586 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9903 (XAU/USD BUY) as OPEN
+2026-09-10 11:11:25,019 - falcon.signal_outcome_resolver - INFO - Resolved open trade #367 (Signal #9902 GBP/USD BUY) -> WIN (+100.00)
+2026-09-10 11:11:26,909 - falcon.signal_outcome_resolver - ERROR - Failed to update trade #368 in journal: Could not refresh instance '<TradeJournalRecord at 0x2eb4debaea0>'
+2026-09-10 11:11:30,687 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9903 (XAU/USD BUY) as OPEN
+2026-09-10 11:11:33,410 - falcon.signal_outcome_resolver - INFO - Resolved open trade #369 (Signal #9903 XAU/USD BUY) -> LOSS (-100.00)
+2026-09-10 11:12:06,471 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9901 (EUR/USD BUY) as OPEN
+2026-09-10 11:12:06,472 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9901 EUR/USD BUY) -> LOSS (-30.00)
+2026-09-10 11:12:06,478 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9902 (GBP/USD BUY) as OPEN
+2026-09-10 11:12:06,479 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9902 GBP/USD BUY) -> WIN (+100.00)
+2026-09-10 11:12:06,486 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9903 (XAU/USD BUY) as OPEN
+2026-09-10 11:12:06,486 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9903 XAU/USD BUY) -> LOSS (-100.00)
+2026-09-10 12:13:10,824 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9901 (EUR/USD BUY) as OPEN
+2026-09-10 12:13:10,825 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9901 EUR/USD BUY) -> LOSS (-30.00)
+2026-09-10 12:13:10,838 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9902 (GBP/USD BUY) as OPEN
+2026-09-10 12:13:10,838 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9902 GBP/USD BUY) -> WIN (+100.00)
+2026-09-10 12:13:10,844 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9903 (XAU/USD BUY) as OPEN
+2026-09-10 12:13:10,845 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9903 XAU/USD BUY) -> LOSS (-100.00)
+2026-09-10 12:16:19,138 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9901 (EUR/USD BUY) as OPEN
+2026-09-10 12:16:19,139 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9901 EUR/USD BUY) -> LOSS (-30.00)
+2026-09-10 12:16:19,147 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9902 (GBP/USD BUY) as OPEN
+2026-09-10 12:16:19,148 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9902 GBP/USD BUY) -> WIN (+100.00)
+2026-09-10 12:16:19,154 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9903 (XAU/USD BUY) as OPEN
+2026-09-10 12:16:19,154 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9903 XAU/USD BUY) -> LOSS (-100.00)

@@ -49,9 +49,9 @@ class PerformanceAnalyticsEngine:
         self._report_counter += 1
         report_id = f"analytics-{self._report_counter:03d}"
 
-        missions = repository.get_all_missions()
+        total_missions = repository.count_missions() if hasattr(repository, "count_missions") else len(repository.get_all_missions())
         stats = repository.get_statistics()
-        total_missions = len(missions)
+        missions = repository.get_recent_missions(50) if hasattr(repository, "get_recent_missions") else repository.get_all_missions()
 
         if total_missions == 0:
             # Handle empty repository gracefully
@@ -122,11 +122,18 @@ class PerformanceAnalyticsEngine:
         mission_durations: List[int] = []
         stage_durations: List[float] = []
 
+        mission_ids = [m.id for m in missions]
+        bulk_artifacts = (
+            repository.get_all_mission_artifacts_bulk(mission_ids)
+            if hasattr(repository, "get_all_mission_artifacts_bulk")
+            else {}
+        )
+
         for m in missions:
             mission_durations.append(m.performance.totalDurationMs)
             stage_durations.append(m.performance.averageStageDurationMs)
 
-            artifacts = repository.get_mission_artifacts(m.id)
+            artifacts = bulk_artifacts.get(m.id) or repository.get_mission_artifacts(m.id)
             candidates = artifacts.get("candidates", [])
             validations = artifacts.get("validations", [])
             risk_assessments = artifacts.get("riskAssessments", [])

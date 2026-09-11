@@ -415,18 +415,18 @@ class LiveIntelligenceService:
         
         # Repository & Mission Summary
         repo_stats = mission_repository.get_statistics()
-        all_missions = mission_repository.get_all_missions()
+        recent_missions = mission_repository.get_recent_missions(50) if hasattr(mission_repository, "get_recent_missions") else mission_repository.get_all_missions()
         
-        successful = sum(1 for m in all_missions if m.status.value == "SUCCESS")
-        partial = sum(1 for m in all_missions if m.status.value == "PARTIAL_SUCCESS")
-        failed = sum(1 for m in all_missions if m.status.value == "FAILED")
+        successful = sum(1 for m in recent_missions if m.status.value == "SUCCESS")
+        partial = sum(1 for m in recent_missions if m.status.value == "PARTIAL_SUCCESS")
+        failed = sum(1 for m in recent_missions if m.status.value == "FAILED")
         avg_duration = (
-            sum(m.performance.totalDurationMs for m in all_missions) / len(all_missions)
-            if all_missions else 0.0
+            sum(m.performance.totalDurationMs for m in recent_missions) / len(recent_missions)
+            if recent_missions else 0.0
         )
         avg_health = (
-            sum(m.health.pipelineHealthPercentage for m in all_missions) / len(all_missions)
-            if all_missions else 100.0
+            sum(m.health.pipelineHealthPercentage for m in recent_missions) / len(recent_missions)
+            if recent_missions else 100.0
         )
         mission_summary_obj = MissionSummary(
             totalMissions=repo_stats.totalMissions,
@@ -855,8 +855,7 @@ class LiveIntelligenceService:
         logger.info("Checking for duplicate missions")
         
         # Get the most recent mission
-        all_missions = mission_repository.get_all_missions()
-        latest_mission = all_missions[0] if all_missions else None
+        latest_mission = mission_repository.get_latest_mission()
         
         # Check if this intelligence is materially different
         if latest_mission and self._is_duplicate_intelligence(latest_mission, decisions, market_state):

@@ -41,8 +41,11 @@ class StrategyIntelligenceEngine:
         now = datetime.now(timezone.utc)
 
         strategies = self._strategy_engine.get_strategies()
-        all_missions = repository.get_all_missions()
-        missions = all_missions[-25:] if len(all_missions) > 25 else all_missions
+        missions = (
+            repository.get_recent_missions(25)
+            if hasattr(repository, "get_recent_missions")
+            else (repository.get_all_missions()[-25:] if repository.count_missions() > 0 else [])
+        )
         mission_ids = [m.id for m in missions]
         artifacts_by_mission = repository.get_all_mission_artifacts_bulk(mission_ids)
         all_mission_artifacts = [artifacts_by_mission[m_id] for m_id in mission_ids if m_id in artifacts_by_mission]
