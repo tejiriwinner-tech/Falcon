@@ -45,6 +45,34 @@ from app.schemas.candlestick_research import (
 )
 
 
+def normalize_timeframe(tf_str: Optional[str]) -> str:
+    """Normalizes timeframe representations (e.g. '1H', 'H1', '1h') to canonical price_history format."""
+    if not tf_str:
+        return "1h"
+    clean = tf_str.strip().lower()
+    mapping = {
+        "h1": "1h",
+        "1h": "1h",
+        "h4": "4h",
+        "4h": "4h",
+        "d1": "daily",
+        "daily": "daily",
+        "m15": "15min",
+        "15m": "15min",
+        "15min": "15min",
+        "m30": "30min",
+        "30m": "30min",
+        "30min": "30min",
+        "m5": "5min",
+        "5m": "5min",
+        "5min": "5min",
+        "m1": "1min",
+        "1m": "1min",
+        "1min": "1min",
+    }
+    return mapping.get(clean, clean)
+
+
 class CandlestickResearchService:
     """
     Stateless, deterministic research service for candlestick and wick behaviour analysis.
@@ -989,7 +1017,17 @@ class CandlestickResearchService:
         h = getattr(current_candle, "high", current_candle.get("high") if isinstance(current_candle, dict) else 0.0)
         l = getattr(current_candle, "low", current_candle.get("low") if isinstance(current_candle, dict) else 0.0)
         c = getattr(current_candle, "close", current_candle.get("close") if isinstance(current_candle, dict) else 0.0)
-        t_raw = getattr(current_candle, "timestamp", current_candle.get("timestamp") if isinstance(current_candle, dict) else None)
+        t_raw = getattr(
+            current_candle,
+            "timestamp",
+            getattr(
+                current_candle,
+                "bar_time",
+                current_candle.get("timestamp", current_candle.get("bar_time"))
+                if isinstance(current_candle, dict)
+                else None,
+            ),
+        )
         vol_raw = getattr(current_candle, "volume", current_candle.get("volume") if isinstance(current_candle, dict) else None)
 
         if isinstance(t_raw, datetime):
@@ -1013,7 +1051,17 @@ class CandlestickResearchService:
                 hh = getattr(hc, "high", hc.get("high") if isinstance(hc, dict) else 0.0)
                 hl = getattr(hc, "low", hc.get("low") if isinstance(hc, dict) else 0.0)
                 hc_close = getattr(hc, "close", hc.get("close") if isinstance(hc, dict) else 0.0)
-                ht_raw = getattr(hc, "timestamp", hc.get("timestamp") if isinstance(hc, dict) else None)
+                ht_raw = getattr(
+                    hc,
+                    "timestamp",
+                    getattr(
+                        hc,
+                        "bar_time",
+                        hc.get("timestamp", hc.get("bar_time"))
+                        if isinstance(hc, dict)
+                        else None,
+                    ),
+                )
                 if isinstance(ht_raw, datetime):
                     ht = ht_raw if ht_raw.tzinfo else ht_raw.replace(tzinfo=timezone.utc)
                 elif isinstance(ht_raw, (int, float)):
@@ -1096,7 +1144,17 @@ class CandlestickResearchService:
                 fh = getattr(fc, "high", fc.get("high") if isinstance(fc, dict) else 0.0)
                 fl = getattr(fc, "low", fc.get("low") if isinstance(fc, dict) else 0.0)
                 fc_close = getattr(fc, "close", fc.get("close") if isinstance(fc, dict) else 0.0)
-                ft_raw = getattr(fc, "timestamp", fc.get("timestamp") if isinstance(fc, dict) else None)
+                ft_raw = getattr(
+                    fc,
+                    "timestamp",
+                    getattr(
+                        fc,
+                        "bar_time",
+                        fc.get("timestamp", fc.get("bar_time"))
+                        if isinstance(fc, dict)
+                        else None,
+                    ),
+                )
                 if isinstance(ft_raw, datetime):
                     ft = ft_raw if ft_raw.tzinfo else ft_raw.replace(tzinfo=timezone.utc)
                 elif isinstance(ft_raw, (int, float)):
@@ -1251,36 +1309,36 @@ class CandlestickResearchService:
                 history_window = candles[:i]
                 obs = self.analyze_candle(c, historical_candles=history_window, as_of=as_of_effective)
                 computed_obs.append(obs)
-        elif instrument and timeframe:
-            # Attempt to query historical candles safely from database if available
+        else:
+            # Query canonical price_history via market_history_service
             try:
-                from app.core.config.database import SessionLocal
-                from app.repositories.market_repository import MarketRepository
-                from app.models.market_candle import Timeframe
+                from app.core.config import settings
+                from app.core.services.market_history_service import market_history_service
 
-                tf_enum = None
-                try:
-                    tf_enum = Timeframe(timeframe.upper())
-                except Exception:
-                    pass
+                if instrument:
+                    symbols = [instrument.upper()]
+                else:
+                    wl = getattr(settings, "MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD")
+                    symbols = [s.strip().upper() for s in wl.split(",") if s.strip()]
 
-                if tf_enum:
-                    db = SessionLocal()
-                    try:
-                        repo = MarketRepository(db)
-                        fetched_candles = repo.get_history(
-                            symbol=instrument.upper(),
-                            timeframe=tf_enum,
-                            end_time=as_of_effective,
-                            limit=limit + self.DEFAULT_LOOKBACK,
-                        )
-                        if fetched_candles:
-                            for i, c in enumerate(fetched_candles):
-                                history_window = fetched_candles[:i]
-                                obs = self.analyze_candle(c, historical_candles=history_window, as_of=as_of_effective)
-                                computed_obs.append(obs)
-                    finally:
-                        db.close()
+                tf = normalize_timeframe(timeframe) if timeframe else getattr(settings, "HISTORY_TIMEFRAME", "1h")
+                fetch_limit = limit + self.DEFAULT_LOOKBACK
+
+                for sym in symbols:
+                    bars = market_history_service.get_bars(
+                        symbol=sym,
+                        timeframe=tf,
+                        limit=fetch_limit,
+                    )
+                    if bars:
+                        sym_bars = [
+                            b for b in bars
+                            if (getattr(b, "bar_time", getattr(b, "timestamp", None)) or as_of_effective) <= as_of_effective
+                        ]
+                        for i, c in enumerate(sym_bars):
+                            history_window = sym_bars[:i]
+                            obs = self.analyze_candle(c, historical_candles=history_window, as_of=as_of_effective)
+                            computed_obs.append(obs)
             except Exception:
                 computed_obs = []
 
@@ -1291,8 +1349,11 @@ class CandlestickResearchService:
                 continue
             if instrument and obs.instrument.upper() != instrument.upper():
                 continue
-            if timeframe and obs.timeframe.upper() != timeframe.upper():
-                continue
+            if timeframe:
+                req_tf = normalize_timeframe(timeframe).upper()
+                obs_tf = normalize_timeframe(obs.timeframe).upper()
+                if req_tf != obs_tf:
+                    continue
             if pattern:
                 p_clean = pattern.upper()
                 if not any(

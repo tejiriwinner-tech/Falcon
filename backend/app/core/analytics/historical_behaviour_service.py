@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from app.core.analytics.candlestick_research_service import (
     CandlestickResearchService,
     candlestick_research_service,
+    normalize_timeframe,
 )
 from app.schemas.candlestick_research import (
     BodyDirection,
@@ -198,7 +199,17 @@ class HistoricalBehaviourService:
         if as_of is not None:
             as_of_utc = as_of if as_of.tzinfo else as_of.replace(tzinfo=timezone.utc)
             for c in fwd_slice:
-                t_raw = getattr(c, "timestamp", c.get("timestamp") if isinstance(c, dict) else None)
+                t_raw = getattr(
+                    c,
+                    "timestamp",
+                    getattr(
+                        c,
+                        "bar_time",
+                        c.get("timestamp", c.get("bar_time"))
+                        if isinstance(c, dict)
+                        else None,
+                    ),
+                )
                 if t_raw is not None:
                     t_utc = t_raw if getattr(t_raw, "tzinfo", None) else t_raw.replace(tzinfo=timezone.utc)
                     if t_utc > as_of_utc:
@@ -420,7 +431,17 @@ class HistoricalBehaviourService:
 
         for i, c in enumerate(candles):
             # Parse candle timestamp
-            t_raw = getattr(c, "timestamp", c.get("timestamp") if isinstance(c, dict) else None)
+            t_raw = getattr(
+                c,
+                "timestamp",
+                getattr(
+                    c,
+                    "bar_time",
+                    c.get("timestamp", c.get("bar_time"))
+                    if isinstance(c, dict)
+                    else None,
+                ),
+            )
             if isinstance(t_raw, datetime):
                 c_ts = t_raw if t_raw.tzinfo else t_raw.replace(tzinfo=timezone.utc)
             elif isinstance(t_raw, (int, float)):
@@ -481,10 +502,13 @@ class HistoricalBehaviourService:
             primary_metric = forward_metrics_map.get(primary_window)
             dq = primary_metric.data_quality if primary_metric else DataQuality.VALID
 
+            c_sym = getattr(c, "symbol", c.get("symbol", instrument) if isinstance(c, dict) else instrument)
+            c_tf = getattr(c, "timeframe", c.get("timeframe", timeframe) if isinstance(c, dict) else timeframe)
+
             obs_record = HistoricalBehaviourObservation(
-                observation_id=f"obs-{i:05d}-{c_ts.strftime('%Y%m%d%H%M%S')}",
-                instrument=getattr(c, "symbol", c.get("symbol", instrument) if isinstance(c, dict) else instrument),
-                timeframe=getattr(c, "timeframe", c.get("timeframe", timeframe) if isinstance(c, dict) else timeframe),
+                observation_id=f"obs-{c_sym.lower()}-{i:05d}-{c_ts.strftime('%Y%m%d%H%M%S')}",
+                instrument=c_sym,
+                timeframe=c_tf,
                 observation_time=c_ts,
                 evaluated_at=eval_time,
                 as_of=eval_time,
@@ -762,40 +786,42 @@ class HistoricalBehaviourService:
                 instrument=instrument or "UNKNOWN",
                 timeframe=timeframe or "M15",
             )
-        elif instrument and timeframe:
-            # Safely attempt to fetch candles from MarketRepository if available
+        else:
+            # Query canonical price_history via market_history_service
             try:
-                from app.core.config.database import SessionLocal
-                from app.models.market_candle import Timeframe
-                from app.repositories.market_repository import MarketRepository
+                from app.core.config import settings
+                from app.core.services.market_history_service import market_history_service
 
-                tf_enum = None
-                try:
-                    tf_enum = Timeframe(timeframe.upper())
-                except Exception:
-                    pass
+                if instrument:
+                    symbols = [instrument.upper()]
+                else:
+                    wl = getattr(settings, "MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD")
+                    symbols = [s.strip().upper() for s in wl.split(",") if s.strip()]
 
-                if tf_enum:
-                    db = SessionLocal()
-                    try:
-                        repo = MarketRepository(db)
-                        fetched_candles = repo.get_history(
-                            symbol=instrument.upper(),
-                            timeframe=tf_enum,
-                            end_time=as_of_effective,
-                            limit=limit + self.DEFAULT_REF_LOOKBACK + max(self.FORWARD_WINDOWS),
-                        )
-                        if fetched_candles:
-                            computed_obs = self.analyze_historical_candles(
-                                candles=fetched_candles,
+                tf = normalize_timeframe(timeframe) if timeframe else getattr(settings, "HISTORY_TIMEFRAME", "1h")
+                fetch_limit = limit + self.DEFAULT_REF_LOOKBACK + max(self.FORWARD_WINDOWS)
+
+                for sym in symbols:
+                    bars = market_history_service.get_bars(
+                        symbol=sym,
+                        timeframe=tf,
+                        limit=fetch_limit,
+                    )
+                    if bars:
+                        sym_bars = [
+                            b for b in bars
+                            if (getattr(b, "bar_time", getattr(b, "timestamp", None)) or as_of_effective) <= as_of_effective
+                        ]
+                        if sym_bars:
+                            obs_list = self.analyze_historical_candles(
+                                candles=sym_bars,
                                 forward_windows=self.FORWARD_WINDOWS,
                                 as_of=as_of_effective,
                                 primary_window=forward_window,
-                                instrument=instrument.upper(),
-                                timeframe=timeframe.upper(),
+                                instrument=sym,
+                                timeframe=tf,
                             )
-                    finally:
-                        db.close()
+                            computed_obs.extend(obs_list)
             except Exception:
                 computed_obs = []
 
@@ -806,8 +832,11 @@ class HistoricalBehaviourService:
                 continue
             if instrument and o.instrument.upper() != instrument.upper():
                 continue
-            if timeframe and o.timeframe.upper() != timeframe.upper():
-                continue
+            if timeframe:
+                req_tf = normalize_timeframe(timeframe).upper()
+                obs_tf = normalize_timeframe(o.timeframe).upper()
+                if req_tf != obs_tf:
+                    continue
             if behaviour:
                 b_clean = behaviour.upper()
                 c_obs = o.candle_observation

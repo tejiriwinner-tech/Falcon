@@ -456,21 +456,23 @@ class HistoricalFindingsService:
         valid_discovery = cls.filter_valid_outcome_observations(discovery_observations, horizon=horizon)
         valid_validation = cls.filter_valid_outcome_observations(validation_observations, horizon=horizon)
 
-        # Group Discovery observations by behaviour + context
-        def get_group_key(obs: HistoricalBehaviourObservation) -> Tuple[str, str]:
+        # Group Discovery observations by instrument, timeframe, behaviour + context
+        def get_group_key(obs: HistoricalBehaviourObservation) -> Tuple[str, str, str, str]:
+            inst = (obs.instrument or getattr(obs.candle_observation, "instrument", instrument) or instrument).upper()
+            tf = (obs.timeframe or getattr(obs.candle_observation, "timeframe", timeframe) or timeframe).upper()
             c_obs = obs.candle_observation
             beh = c_obs.rejection_observation.value
             regime = c_obs.market_regime_context or "UNKNOWN"
             struct = c_obs.support_resistance_interaction.value
             ctx = f"{regime}+{struct}"
-            return beh, ctx
+            return inst, tf, beh, ctx
 
-        discovery_groups: Dict[Tuple[str, str], List[HistoricalBehaviourObservation]] = {}
+        discovery_groups: Dict[Tuple[str, str, str, str], List[HistoricalBehaviourObservation]] = {}
         for o in valid_discovery:
             k = get_group_key(o)
             discovery_groups.setdefault(k, []).append(o)
 
-        validation_groups: Dict[Tuple[str, str], List[HistoricalBehaviourObservation]] = {}
+        validation_groups: Dict[Tuple[str, str, str, str], List[HistoricalBehaviourObservation]] = {}
         for o in valid_validation:
             k = get_group_key(o)
             validation_groups.setdefault(k, []).append(o)
@@ -480,9 +482,9 @@ class HistoricalFindingsService:
         # Sort group keys deterministically
         sorted_keys = sorted(discovery_groups.keys())
 
-        for beh, ctx in sorted_keys:
-            disc_obs = discovery_groups[(beh, ctx)]
-            val_obs = validation_groups.get((beh, ctx), [])
+        for inst, tf, beh, ctx in sorted_keys:
+            disc_obs = discovery_groups[(inst, tf, beh, ctx)]
+            val_obs = validation_groups.get((inst, tf, beh, ctx), [])
 
             disc_n = len(disc_obs)
             disc_stats, _, disc_adequacy = historical_behaviour_service.calculate_descriptive_statistics(
@@ -542,7 +544,7 @@ class HistoricalFindingsService:
                 limitations.append(f"Validation period has limited sample size (N={val_n} < 30).")
 
             hyp_id = (
-                f"HYP-{instrument.upper()}-{timeframe.upper()}-H{horizon}-{beh.replace(' ', '_')}"
+                f"HYP-{inst}-{tf}-H{horizon}-{beh.replace(' ', '_')}"
                 f"-{ctx.replace(' ', '_').replace('+', '_')}"
             )
 
@@ -552,8 +554,8 @@ class HistoricalFindingsService:
                 hypothesis_id=hyp_id,
                 behaviour=beh,
                 context=ctx,
-                instrument=instrument.upper(),
-                timeframe=timeframe.upper(),
+                instrument=inst,
+                timeframe=tf,
                 horizon=horizon,
                 historical_period="DISCOVERY_70_VALIDATION_30",
                 descriptive_observation=wording,
@@ -599,22 +601,24 @@ class HistoricalFindingsService:
 
         valid_obs = self.filter_valid_outcome_observations(observations, horizon=horizon)
 
-        # Group by behaviour + context
-        def get_group_key(obs: HistoricalBehaviourObservation) -> Tuple[str, str]:
+        # Group by instrument, timeframe, behaviour + context
+        def get_group_key(obs: HistoricalBehaviourObservation) -> Tuple[str, str, str, str]:
+            inst = (obs.instrument or getattr(obs.candle_observation, "instrument", instrument) or instrument).upper()
+            tf = (obs.timeframe or getattr(obs.candle_observation, "timeframe", timeframe) or timeframe).upper()
             c_obs = obs.candle_observation
             beh = c_obs.rejection_observation.value
             regime = c_obs.market_regime_context or "UNKNOWN"
             struct = c_obs.support_resistance_interaction.value
             ctx = f"{regime}+{struct}"
-            return beh, ctx
+            return inst, tf, beh, ctx
 
-        groups: Dict[Tuple[str, str], List[HistoricalBehaviourObservation]] = {}
+        groups: Dict[Tuple[str, str, str, str], List[HistoricalBehaviourObservation]] = {}
         for o in valid_obs:
             k = get_group_key(o)
             groups.setdefault(k, []).append(o)
 
         findings: List[ResearchFinding] = []
-        for (beh, ctx), g_obs in sorted(groups.items()):
+        for (inst, tf, beh, ctx), g_obs in sorted(groups.items()):
             stats, dist, adequacy = historical_behaviour_service.calculate_descriptive_statistics(
                 g_obs, horizon=horizon
             )
@@ -622,14 +626,14 @@ class HistoricalFindingsService:
             ids_sample = self.get_deterministic_observation_ids_sample(g_obs)
 
             f_id = (
-                f"FND-{instrument.upper()}-{timeframe.upper()}-H{horizon}-{beh.replace(' ', '_')}"
+                f"FND-{inst}-{tf}-H{horizon}-{beh.replace(' ', '_')}"
                 f"-{ctx.replace(' ', '_').replace('+', '_')}"
             )
 
             fnd = ResearchFinding(
                 finding_id=f_id,
-                instrument=instrument.upper(),
-                timeframe=timeframe.upper(),
+                instrument=inst,
+                timeframe=tf,
                 horizon=horizon,
                 behaviour_identity=beh,
                 context_identity=ctx,
@@ -693,6 +697,17 @@ class HistoricalFindingsService:
         all_obs = base_resp.observations
         valid_obs = self.filter_valid_outcome_observations(all_obs, horizon=forward_window)
 
+        # Partition discovery and validation for candidate count census
+        disc_obs, val_obs = self.partition_discovery_validation(all_obs)
+        hyps = self.formulate_candidate_hypotheses(
+            discovery_observations=disc_obs,
+            validation_observations=val_obs,
+            horizon=forward_window,
+            instrument=instrument or "UNKNOWN",
+            timeframe=timeframe or "1h",
+        )
+        candidate_count = sum(1 for h in hyps if h.status == HypothesisStatus.CANDIDATE_PAPER_HYPOTHESIS)
+
         # Population Metrics Census
         pop_metrics = PopulationMetrics(
             all_observations=len(all_obs),
@@ -701,7 +716,7 @@ class HistoricalFindingsService:
             limited_sample_population=len(valid_obs) if 10 <= len(valid_obs) < 30 else 0,
             insufficient_sample_population=len(valid_obs) if 1 <= len(valid_obs) < 10 else 0,
             stability_analysis_population=len(valid_obs),
-            candidate_hypothesis_population=0,  # populated below
+            candidate_hypothesis_population=candidate_count,
         )
 
         findings = self.evaluate_historical_findings(
@@ -709,7 +724,7 @@ class HistoricalFindingsService:
             horizon=forward_window,
             as_of=as_of_effective,
             instrument=instrument or "UNKNOWN",
-            timeframe=timeframe or "M15",
+            timeframe=timeframe or "1h",
         )
 
         # Slice to limit
@@ -846,7 +861,7 @@ class HistoricalFindingsService:
             validation_observations=validation_obs,
             horizon=horizon,
             instrument=instrument or "UNKNOWN",
-            timeframe=timeframe or "M15",
+            timeframe=timeframe or "1h",
         )
 
         # Filter by sample_adequacy if requested
