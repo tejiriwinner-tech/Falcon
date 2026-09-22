@@ -1,0 +1,274 @@
+"""
+Falcon V10 — Historical Research Findings & Stability Analysis Schemas (Phase 3).
+
+Defines research-only data contracts for:
+1. Temporal Stability Analysis across chronological periods (Full, Early, Middle, Late).
+2. Out-of-sample Discovery vs Validation isolation (Chronological 70/30 split).
+3. Candidate Paper-Only Research Hypotheses with mandatory limitations.
+4. Objective, non-ranking eligibility qualification.
+
+Strict separation:
+Descriptive research evidence only; zero production trading decisions.
+"""
+
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Any, Dict, List, Optional
+from pydantic import BaseModel, Field
+
+from app.schemas.historical_behaviour import (
+    DataQuality,
+    DescriptiveStatistics,
+    DirectionalBias,
+    DistributionMetrics,
+    ForwardWindowMetrics,
+    HistoricalBehaviourObservation,
+    SampleAdequacy,
+    SubsequentDirection,
+)
+
+
+# -----------------------------------------------------------------------------
+# Phase 3 Categorical Enums
+# -----------------------------------------------------------------------------
+
+class StabilityStatus(str, Enum):
+    """
+    Descriptive categorization of cross-period relationship stability.
+    Strictly non-scoring; never converted to a numerical score.
+    """
+    STABLE_DESCRIPTIVE = "STABLE_DESCRIPTIVE"
+    MIXED = "MIXED"
+    INCONSISTENT = "INCONSISTENT"
+    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+    UNKNOWN = "UNKNOWN"
+
+
+class DirectionConsistency(str, Enum):
+    """
+    Descriptive categorization of directional consistency across evaluable periods.
+    """
+    CONSISTENT = "CONSISTENT"
+    MIXED = "MIXED"
+    INCONSISTENT = "INCONSISTENT"
+    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+
+
+class TemporalPeriod(str, Enum):
+    """
+    Chronological partition identifiers for temporal stability evaluation.
+    """
+    FULL_PERIOD = "FULL_PERIOD"
+    EARLY_PERIOD = "EARLY_PERIOD"
+    MIDDLE_PERIOD = "MIDDLE_PERIOD"
+    LATE_PERIOD = "LATE_PERIOD"
+
+
+class ResearchPartitionPhase(str, Enum):
+    """
+    Chronological split for out-of-sample research isolation.
+    """
+    DISCOVERY = "DISCOVERY"
+    VALIDATION = "VALIDATION"
+
+
+class HypothesisStatus(str, Enum):
+    """
+    Status of an objective candidate research hypothesis.
+    """
+    CANDIDATE_PAPER_HYPOTHESIS = "CANDIDATE_PAPER_HYPOTHESIS"
+    INSUFFICIENT_EVIDENCE = "INSUFFICIENT_EVIDENCE"
+    REJECTED_STABILITY = "REJECTED_STABILITY"
+    EXPLORATORY = "EXPLORATORY"
+
+
+# -----------------------------------------------------------------------------
+# Stability Metrics Models
+# -----------------------------------------------------------------------------
+
+class PeriodStabilityMetrics(BaseModel):
+    """
+    Descriptive outcome metrics measured for a specific temporal partition period.
+    """
+    period: TemporalPeriod
+    sample_size: int = 0
+    sample_adequacy: SampleAdequacy = SampleAdequacy.UNKNOWN
+    mean_raw_return: Optional[float] = None
+    median_raw_return: Optional[float] = None
+    mean_directional_return: Optional[float] = None
+    median_directional_return: Optional[float] = None
+    follow_through_rate: float = 0.0
+    reversal_rate: float = 0.0
+    neutral_rate: float = 0.0
+    mean_mfe: Optional[float] = None
+    median_mfe: Optional[float] = None
+    mean_mae: Optional[float] = None
+    median_mae: Optional[float] = None
+    volatility_normalized_return: Optional[float] = None
+    start_time: Optional[datetime] = None
+    end_time: Optional[datetime] = None
+
+
+class GroupStabilityAnalysis(BaseModel):
+    """
+    Comprehensive cross-period stability diagnostics for a candidate group.
+    Contains zero numerical stability scores.
+    """
+    sample_size_by_period: Dict[str, int] = Field(default_factory=dict)
+    median_return_by_period: Dict[str, Optional[float]] = Field(default_factory=dict)
+    mean_return_by_period: Dict[str, Optional[float]] = Field(default_factory=dict)
+    follow_through_rate_by_period: Dict[str, float] = Field(default_factory=dict)
+    reversal_rate_by_period: Dict[str, float] = Field(default_factory=dict)
+    mfe_by_period: Dict[str, Optional[float]] = Field(default_factory=dict)
+    mae_by_period: Dict[str, Optional[float]] = Field(default_factory=dict)
+    volatility_normalized_return_by_period: Dict[str, Optional[float]] = Field(default_factory=dict)
+    periods_available: int = 0
+    periods_with_evaluable_samples: int = 0  # Periods with SampleAdequacy in {ADEQUATE, LIMITED} (N >= 10)
+    direction_consistency: DirectionConsistency = DirectionConsistency.INSUFFICIENT_DATA
+    sign_consistency: Optional[bool] = None
+    magnitude_variation: Optional[float] = None  # max(median) - min(median) across evaluable periods
+    stability_status: StabilityStatus = StabilityStatus.INSUFFICIENT_DATA
+    period_metrics: Dict[str, PeriodStabilityMetrics] = Field(default_factory=dict)
+
+
+# -----------------------------------------------------------------------------
+# Research Finding Model
+# -----------------------------------------------------------------------------
+
+class ResearchFinding(BaseModel):
+    """
+    Traceable historical research finding binding behaviour, context, horizon,
+    descriptive distributions, and multi-period stability.
+    """
+    finding_id: str
+    instrument: str
+    timeframe: str
+    horizon: int
+    behaviour_identity: str
+    context_identity: str
+    sample_size: int = 0
+    sample_adequacy: SampleAdequacy = SampleAdequacy.UNKNOWN
+    full_period_statistics: DescriptiveStatistics = Field(default_factory=DescriptiveStatistics)
+    full_period_distribution: DistributionMetrics = Field(default_factory=DistributionMetrics)
+    stability_analysis: GroupStabilityAnalysis = Field(default_factory=GroupStabilityAnalysis)
+    observation_ids_sample: List[str] = Field(default_factory=list)  # max 20 deterministic IDs
+    phase1_methodology_version: str = "1.0.0"
+    phase2_methodology_version: str = "1.0.0"
+    phase3_methodology_version: str = "1.0.0"
+    partition_methodology: str = "CHRONOLOGICAL_TERTILES_V1"
+    as_of: datetime
+
+
+# -----------------------------------------------------------------------------
+# Candidate Hypothesis Model
+# -----------------------------------------------------------------------------
+
+class CandidateHypothesis(BaseModel):
+    """
+    Objective, descriptive candidate research hypothesis.
+    Maintains strict structural separation between Discovery and Validation data.
+    Contains mandatory limitations and zero recommendation language.
+    """
+    hypothesis_id: str
+    behaviour: str
+    context: str
+    instrument: str
+    timeframe: str
+    horizon: int
+    historical_period: str
+    descriptive_observation: str
+    limitations: List[str] = Field(default_factory=list)
+    status: HypothesisStatus = HypothesisStatus.CANDIDATE_PAPER_HYPOTHESIS
+
+    # Discovery Population (Sole determinant of qualification & wording)
+    discovery_sample_size: int = 0
+    discovery_sample_adequacy: SampleAdequacy = SampleAdequacy.UNKNOWN
+    discovery_metrics: DescriptiveStatistics = Field(default_factory=DescriptiveStatistics)
+    discovery_stability: GroupStabilityAnalysis = Field(default_factory=GroupStabilityAnalysis)
+
+    # Validation Population (Independent descriptive evaluation only)
+    validation_sample_size: int = 0
+    validation_sample_adequacy: SampleAdequacy = SampleAdequacy.UNKNOWN
+    validation_metrics: Optional[DescriptiveStatistics] = None
+    validation_stability: Optional[GroupStabilityAnalysis] = None
+    validation_data_quality: DataQuality = DataQuality.VALID
+
+    # Traceability & Provenance
+    discovery_spread_methodology: str = "CHRONOLOGICAL_DISCOVERY_TERTILES_V1"
+    partition_methodology: str = "CHRONOLOGICAL_TERTILES_V1"
+    discovery_validation_methodology: str = "CHRONOLOGICAL_70_30_V1"
+    observation_ids_sample: List[str] = Field(default_factory=list)  # max 20 deterministic IDs
+
+
+# -----------------------------------------------------------------------------
+# Population Metrics & Response Models
+# -----------------------------------------------------------------------------
+
+class PopulationMetrics(BaseModel):
+    """
+    Census counts across all defined research populations.
+    Prevents double-counting and mixing incomplete records with valid outcomes.
+    """
+    all_observations: int = 0
+    valid_outcome_population: int = 0
+    adequate_sample_population: int = 0
+    limited_sample_population: int = 0
+    insufficient_sample_population: int = 0
+    stability_analysis_population: int = 0
+    candidate_hypothesis_population: int = 0
+
+
+class HistoricalFindingsResponse(BaseModel):
+    """
+    Response schema for GET /api/v1/analytics/candlestick-behaviour/findings.
+    Stateless, read-only, deterministic.
+    """
+    experiment_name: str = "HISTORICAL_RESEARCH_FINDINGS_AND_STABILITY"
+    experiment_version: str = "1.0.0"
+    phase_1_version: str = "1.0.0"
+    phase_2_version: str = "1.0.0"
+    research_methodology_version: str = "1.0.0"
+    partition_methodology: str = "CHRONOLOGICAL_TERTILES_V1"
+    discovery_validation_methodology: str = "CHRONOLOGICAL_70_30_V1"
+    discovery_spread_methodology: str = "CHRONOLOGICAL_DISCOVERY_TERTILES_V1"
+    as_of: datetime
+    query_parameters: Dict[str, Any] = Field(default_factory=dict)
+    population_metrics: PopulationMetrics = Field(default_factory=PopulationMetrics)
+    sample_adequacy: SampleAdequacy = SampleAdequacy.UNKNOWN
+    findings: List[ResearchFinding] = Field(default_factory=list)
+    breakdowns: Dict[str, Any] = Field(default_factory=dict)
+    data_quality: DataQuality = DataQuality.VALID
+
+
+class HistoricalStabilityResponse(BaseModel):
+    """
+    Response schema for GET /api/v1/analytics/candlestick-behaviour/stability.
+    """
+    experiment_name: str = "HISTORICAL_RESEARCH_FINDINGS_AND_STABILITY"
+    experiment_version: str = "1.0.0"
+    phase_1_version: str = "1.0.0"
+    phase_2_version: str = "1.0.0"
+    research_methodology_version: str = "1.0.0"
+    partition_methodology: str = "CHRONOLOGICAL_TERTILES_V1"
+    as_of: datetime
+    query_parameters: Dict[str, Any] = Field(default_factory=dict)
+    sample_size: int = 0
+    stability_records: List[GroupStabilityAnalysis] = Field(default_factory=list)
+    group_summaries: Dict[str, Any] = Field(default_factory=dict)
+
+
+class HistoricalHypothesesResponse(BaseModel):
+    """
+    Response schema for GET /api/v1/analytics/candlestick-behaviour/hypotheses.
+    """
+    experiment_name: str = "HISTORICAL_RESEARCH_FINDINGS_AND_STABILITY"
+    experiment_version: str = "1.0.0"
+    phase_1_version: str = "1.0.0"
+    phase_2_version: str = "1.0.0"
+    research_methodology_version: str = "1.0.0"
+    discovery_validation_methodology: str = "CHRONOLOGICAL_70_30_V1"
+    discovery_spread_methodology: str = "CHRONOLOGICAL_DISCOVERY_TERTILES_V1"
+    as_of: datetime
+    query_parameters: Dict[str, Any] = Field(default_factory=dict)
+    total_hypotheses: int = 0
+    hypotheses: List[CandidateHypothesis] = Field(default_factory=list)
