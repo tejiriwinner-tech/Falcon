@@ -26,6 +26,7 @@ class SignalResolutionSummary(BaseModel):
     resolvedCount: int
     winsCount: int
     lossesCount: int
+    breakevensCount: int = 0
     openCount: int
     outcomes: List[SignalOutcomeItem]
     timestamp: datetime

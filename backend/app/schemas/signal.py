@@ -17,11 +17,17 @@ class SignalItem(BaseModel):
     strategyId: str
     strategyName: str
     strategyVersion: str
+    adaptiveRuleVersion: Optional[str] = None
+    adaptiveStopMultiplier: Optional[float] = None
     dataAgeSeconds: int
     triggerCondition: Optional[str] = None
     validUntil: Optional[datetime] = None
     setupPattern: Optional[str] = None
     riskReward: Optional[float] = None
+    isPinned: bool = False
+    breakevenTrigger: Optional[float] = None
+    breakevenPrice: Optional[float] = None
+    isBreakeven: bool = False
 
 class SignalListResponse(BaseModel):
     signals: List[SignalItem]

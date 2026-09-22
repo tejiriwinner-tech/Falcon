@@ -4,6 +4,7 @@ Central configuration object consumed by main.py, health.py, logger.py, and all 
 """
 
 
+from decimal import Decimal
 import os
 from pathlib import Path
 from typing import Optional
@@ -65,6 +66,12 @@ class Settings:
     # Account equity the trade journal analytics are measured against
     STARTING_EQUITY: float = float(os.getenv("STARTING_EQUITY", "10000"))
 
+    # Capital Cycle Configuration (V10 Phase 2 & 3)
+    CAPITAL_CYCLE_STARTING_CAPITAL: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_STARTING_CAPITAL", "20.00"))
+    CAPITAL_CYCLE_TARGET: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_TARGET", "500.00"))
+    CAPITAL_CYCLE_NEXT_ALLOCATION: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_NEXT_ALLOCATION", "20.00"))
+    MAX_SIMULTANEOUS_TRADES: int = int(os.getenv("MAX_SIMULTANEOUS_TRADES", "3"))
+
     # Signal pipeline data source configuration
     # When true: TrendService and IndicatorService read from price_history via MarketHistoryAdapter
     # When false: TrendService and IndicatorService read from market_candles via HistoryService (legacy)
@@ -92,5 +99,16 @@ class Settings:
     TELEGRAM_ALERTS_ENABLED: bool = os.getenv("TELEGRAM_ALERTS_ENABLED", "True").lower() == "true"
     TELEGRAM_MIN_CONFIDENCE: int = int(os.getenv("TELEGRAM_MIN_CONFIDENCE", "75"))
 
+    # Execution Mode Configuration (Phase 5F)
+    # Default is strictly "PAPER". LIVE requires explicit affirmative acknowledgment.
+    EXECUTION_MODE: str = os.getenv("EXECUTION_MODE", "PAPER").upper()
+    LIVE_EXECUTION_ACKNOWLEDGED: bool = os.getenv("LIVE_EXECUTION_ACKNOWLEDGED", "False").lower() == "true"
+
+    # Signal Quality & Regime-Confluence Experiment (Post-V10 Research)
+    SIGNAL_QUALITY_EXPERIMENT_ENABLED: bool = os.getenv("SIGNAL_QUALITY_EXPERIMENT_ENABLED", "False").lower() == "true"
+    SIGNAL_QUALITY_EXPERIMENT_VERSION: str = os.getenv("SIGNAL_QUALITY_EXPERIMENT_VERSION", "1.0.0")
+    SIGNAL_QUALITY_MIN_SAMPLE_SIZE: int = int(os.getenv("SIGNAL_QUALITY_MIN_SAMPLE_SIZE", "10"))
+
 settings = Settings()
+
 

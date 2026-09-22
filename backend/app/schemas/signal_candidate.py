@@ -42,6 +42,7 @@ class CandidateMarketSnapshot(BaseModel):
     newsImpact: str
     marketSentiment: str
     marketConfidence: int
+    atr: Optional[float] = None
 
 class SignalCandidate(BaseModel):
     id: str
@@ -68,6 +69,9 @@ class SignalCandidate(BaseModel):
     marketDataAgeSeconds: int
     evaluationStartedAt: datetime
     evaluationCompletedAt: datetime
+    # Adaptive tuning metadata (immutable snapshot from candidate generation)
+    adaptiveRuleVersion: Optional[str] = None
+    adaptiveStopMultiplier: Optional[float] = None
     # Pipeline metadata — consistent with all immutable Falcon artifacts
     pipelineStage: str = "SIGNAL_GENERATION"
     pipelineVersion: str = "1.0"

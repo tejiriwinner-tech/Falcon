@@ -38,10 +38,15 @@ def _group(
 
 
 def _win_rate(trades: Sequence[TradeJournalItem]) -> float:
-    if not trades:
+    # Canonical win rate: wins / (wins + losses + breakevens)
+    actionable = [
+        t for t in trades
+        if t.result.upper() in ("WIN", "WON", "LOSS", "LOST", "BREAKEVEN", "BE")
+    ]
+    if not actionable:
         return 0.0
-    wins = sum(1 for trade in trades if trade.result.upper() == "WIN")
-    return round(wins / len(trades), 4)
+    wins = sum(1 for trade in actionable if trade.result.upper() in ("WIN", "WON"))
+    return round(wins / len(actionable), 4)
 
 
 def _profit(trades: Sequence[TradeJournalItem]) -> float:
@@ -100,12 +105,12 @@ def build_trade_intelligence() -> TradeIntelligenceResponse:
 
     return TradeIntelligenceResponse(
         totalTrades=len(trades),
-        winningTrades=sum(1 for trade in closed if trade.result.upper() == "WIN"),
-        losingTrades=sum(1 for trade in closed if trade.result.upper() == "LOSS"),
+        winningTrades=sum(1 for trade in closed if trade.result.upper() in ("WIN", "WON")),
+        losingTrades=sum(1 for trade in closed if trade.result.upper() in ("LOSS", "LOST")),
         breakEvenTrades=sum(
-            1 for trade in closed if trade.result.upper() == "BREAKEVEN"
+            1 for trade in closed if trade.result.upper() in ("BREAKEVEN", "BE")
         ),
-        openTrades=len(trades) - len(closed),
+        openTrades=sum(1 for trade in trades if trade.status.upper() in ("OPEN", "FILLED")),
         winRate=_win_rate(closed),
         winningDays=sum(1 for profit in daily.values() if profit > 0),
         losingDays=sum(1 for profit in daily.values() if profit < 0),

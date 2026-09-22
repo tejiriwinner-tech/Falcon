@@ -1,5 +1,6 @@
-from typing import Optional, List
 from datetime import datetime
+from decimal import Decimal
+from typing import List, Optional
 from pydantic import BaseModel
 
 class TradeJournalBase(BaseModel):
@@ -24,6 +25,21 @@ class TradeJournalBase(BaseModel):
     reasonForExit: Optional[str] = None
     lessonLearned: Optional[str] = None
     notes: Optional[str] = None
+    # V10 Performance & Validation Fields
+    fillTime: Optional[datetime] = None
+    fillPrice: Optional[float] = None
+    realizedRMultiple: Optional[float] = None
+    peakPrice: Optional[float] = None
+    troughPrice: Optional[float] = None
+    mfeR: Optional[float] = None
+    maeR: Optional[float] = None
+    strategyVersion: Optional[str] = None
+    adaptiveRuleVersion: Optional[str] = None
+    adaptiveStopMultiplier: Optional[float] = None
+    spreadAtEntry: Optional[float] = None
+    atrAtEntry: Optional[float] = None
+    initialMonetaryRisk: Optional[Decimal] = None
+    executionMode: Optional[str] = None
 
 class TradeJournalCreate(TradeJournalBase):
     """Payload for a new entry. ``id`` and timestamps are assigned by the server."""
@@ -40,6 +56,22 @@ class TradeJournalUpdate(BaseModel):
     reasonForExit: Optional[str] = None
     lessonLearned: Optional[str] = None
     notes: Optional[str] = None
+    # V10 Performance & Validation Fields
+    fillTime: Optional[datetime] = None
+    fillPrice: Optional[float] = None
+    realizedRMultiple: Optional[float] = None
+    peakPrice: Optional[float] = None
+    troughPrice: Optional[float] = None
+    mfeR: Optional[float] = None
+    maeR: Optional[float] = None
+    strategyVersion: Optional[str] = None
+    adaptiveRuleVersion: Optional[str] = None
+    adaptiveStopMultiplier: Optional[float] = None
+    spreadAtEntry: Optional[float] = None
+    atrAtEntry: Optional[float] = None
+    initialMonetaryRisk: Optional[Decimal] = None
+    executionMode: Optional[str] = None
+
 
 class TradeJournalItem(TradeJournalBase):
     id: int

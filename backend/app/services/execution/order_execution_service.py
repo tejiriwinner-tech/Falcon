@@ -2,11 +2,15 @@
 Falcon Order Execution Service
 Manages order queue, MT5 bridge synchronization, trade journaling, and execution alerts.
 """
-import uuid
 import logging
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Dict, List, Optional
+import uuid
 
+from app.core.repository.trade_journal_repository import trade_journal_repository
+from app.core.services.signal_authorization_service import signal_authorization_service
+from app.schemas.capital_guardian import ProposedTradeInput
 from app.schemas.execution_order import (
     ExecutionOrderCreate,
     ExecutionOrderItem,
@@ -16,7 +20,6 @@ from app.schemas.execution_order import (
     OrderAction,
 )
 from app.schemas.trade_journal import TradeJournalCreate
-from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.services.alerts.telegram_alert_service import telegram_alert_service
 
 logger = logging.getLogger("falcon.execution.service")
@@ -36,8 +39,42 @@ class OrderExecutionService:
         order_id = f"ord-{uuid.uuid4().hex[:8]}"
         now = datetime.now(timezone.utc)
 
+        # Capital Guardian Safety Gate: verify existing reservation or authorize now
+        existing_res = None
+        if order_in.signal_id is not None:
+            existing_trades = trade_journal_repository.list_trades()
+            existing_res = next(
+                (
+                    t for t in existing_trades
+                    if t.signalId == order_in.signal_id
+                    and (t.status or "").upper() in ("PENDING", "OPEN", "FILLED")
+                    and t.closeDate is None
+                ),
+                None
+            )
+
+        if existing_res is None:
+            proposal = ProposedTradeInput(
+                symbol=order_in.symbol.upper(),
+                direction=order_in.action.value.upper(),
+                entryPrice=Decimal(str(order_in.entry_price)),
+                stopLoss=Decimal(str(order_in.stop_loss)),
+                takeProfit=Decimal(str(order_in.take_profit)),
+                lotSize=Decimal(str(lot_size)),
+            )
+            decision, res_item = signal_authorization_service.authorize_and_reserve(
+                proposal=proposal,
+                signal_id=order_in.signal_id,
+                strategy_id=order_in.strategy_name,
+                notes=f"Order {order_id} execution reservation",
+            )
+            if not decision.allowed:
+                logger.warning(f"Order {order_id} rejected by Capital Guardian: {decision.reason}")
+                raise ValueError(f"Order rejected by Capital Guardian: {decision.reason}")
+
         item = ExecutionOrderItem(
             order_id=order_id,
+            signal_id=order_in.signal_id,
             symbol=order_in.symbol.upper(),
             action=order_in.action,
             lot_size=lot_size,
@@ -55,6 +92,15 @@ class OrderExecutionService:
 
         self._orders[order_id] = item
         logger.info(f"Order created and queued: {order_id} ({item.action.value} {item.lot_size} {item.symbol})")
+
+        # Phase 5F Safety Gate: Automatic broker execution is strictly prohibited.
+        # Falcon is a decision-support system: Falcon -> Signal -> USER -> MT5 -> Exness.
+        # Orders remain PENDING for manual user execution / bridge synchronization only.
+        logger.info(
+            f"Order {order_id} recorded for decision-support tracking. "
+            "Automated broker order placement is strictly disabled."
+        )
+
 
         # Send Telegram notification about dispatched order
         mode_badge = "🧪 <b>DEMO MODE</b>" if self.settings.is_demo_mode else "⚠️ <b>LIVE MODE</b>"
@@ -105,23 +151,75 @@ class OrderExecutionService:
 
         logger.info(f"Order {order_id} executed by MT5. Ticket #{confirm_in.ticket_number} @ {confirm_in.fill_price}")
 
-        # Automatically record into Falcon Trade Journal
+        # Update existing reservation or record into Falcon Trade Journal
         try:
-            journal_entry = TradeJournalCreate(
-                date=now.date(),
-                instrument=order.symbol,
-                direction=order.action.value,
-                entryPrice=confirm_in.fill_price,
-                exitPrice=None,
-                positionSize=order.lot_size,
-                stopLoss=order.stop_loss,
-                takeProfit=order.take_profit,
-                strategy=order.strategy_name,
-                session="Live MT5",
-                notes=f"Auto-executed via MT5 Bridge. Ticket #{confirm_in.ticket_number}",
-                tags=["MT5", "Demo" if self.settings.is_demo_mode else "Live", order.strategy_name],
-            )
-            trade_journal_repository.create_trade(journal_entry)
+            from app.schemas.trade_journal import TradeJournalUpdate
+            existing_trades = trade_journal_repository.list_trades()
+            existing_res = None
+            if order.signal_id is not None:
+                existing_res = next(
+                    (
+                        t for t in existing_trades
+                        if t.signalId == order.signal_id
+                        and (t.status or "").upper() in ("PENDING", "OPEN", "FILLED")
+                        and t.closeDate is None
+                    ),
+                    None
+                )
+            if existing_res is None:
+                existing_res = next(
+                    (
+                        t for t in existing_trades
+                        if t.symbol.upper() == order.symbol.upper()
+                        and t.direction.upper() == order.action.value.upper()
+                        and (t.status or "").upper() == "PENDING"
+                        and t.closeDate is None
+                    ),
+                    None
+                )
+
+            if existing_res is not None:
+                ticket_note = f"Auto-executed via MT5 Bridge. Ticket #{confirm_in.ticket_number}"
+                merged_notes = f"{existing_res.notes} | {ticket_note}" if existing_res.notes else ticket_note
+                update_payload = TradeJournalUpdate(
+                    status="OPEN",
+                    result="OPEN",
+                    fillPrice=confirm_in.fill_price,
+                    fillTime=now,
+                    peakPrice=confirm_in.fill_price,
+                    troughPrice=confirm_in.fill_price,
+                    initialMonetaryRisk=existing_res.initialMonetaryRisk,
+                    notes=merged_notes,
+                )
+                trade_journal_repository.update_trade(existing_res.id, update_payload)
+                logger.info(f"Updated reservation #{existing_res.id} to OPEN for order {order_id}")
+            else:
+                journal_entry = TradeJournalCreate(
+                    signalId=order.signal_id,
+                    strategyId=order.strategy_name,
+                    symbol=order.symbol,
+                    direction=order.action.value,
+                    entryPrice=confirm_in.fill_price,
+                    exitPrice=None,
+                    stopLoss=order.stop_loss,
+                    takeProfit=order.take_profit,
+                    timeframe="M15",
+                    marketSession="Live MT5",
+                    tradeDate=now,
+                    closeDate=None,
+                    status="OPEN",
+                    result="OPEN",
+                    profitLoss=0.0,
+                    riskReward=0.0,
+                    confidence=order.confidence,
+                    reasonForEntry=f"Auto-executed via MT5 Bridge. Ticket #{confirm_in.ticket_number}",
+                    notes=f"Auto-executed via MT5 Bridge. Ticket #{confirm_in.ticket_number}",
+                    fillPrice=confirm_in.fill_price,
+                    fillTime=now,
+                    peakPrice=confirm_in.fill_price,
+                    troughPrice=confirm_in.fill_price,
+                )
+                trade_journal_repository.create_trade(journal_entry)
         except Exception as e:
             logger.warning(f"Could not auto-journal executed trade {order_id}: {e}")
 

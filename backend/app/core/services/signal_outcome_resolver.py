@@ -1,4 +1,4 @@
-﻿"""
+"""
 Falcon Signal Outcome Resolver and Feedback Engine.
 
 Monitors ALL active open signals against live market price action from ProviderManager,
@@ -13,9 +13,14 @@ This triggers automatic self-learning across:
 """
 
 import logging
-from datetime import datetime, timezone
+import threading
+from datetime import datetime, timezone, timedelta
+from enum import Enum
 from typing import Dict, List, Optional, Set
 
+from sqlalchemy import text
+
+from app.core.database import database_enabled, get_session
 from app.core.providers import provider_manager
 from app.core.repository.mission_repository import mission_repository
 from app.core.repository.trade_journal_repository import trade_journal_repository
@@ -25,12 +30,65 @@ from app.schemas.trade_journal import TradeJournalCreate, TradeJournalItem, Trad
 
 logger = logging.getLogger("falcon.signal_outcome_resolver")
 
+# Stable PostgreSQL transaction advisory lock key for Capital Guardian & Signal Lifecycle
+FALCON_GUARDIAN_ADVISORY_LOCK_KEY: int = 8882026
+
+
+class LifecycleClassification(str, Enum):
+    LEGITIMATE_ACTUAL_EXECUTION = "LEGITIMATE_ACTUAL_EXECUTION"
+    LEGACY_UNEXECUTED_RESERVATION = "LEGACY_UNEXECUTED_RESERVATION"
+    DUPLICATE_SPECULATIVE_EXECUTION = "DUPLICATE_SPECULATIVE_EXECUTION"
+    UNKNOWN = "UNKNOWN"
+
+
+def classify_record(trade: TradeJournalItem, all_trades: List[TradeJournalItem]) -> LifecycleClassification:
+    """
+    Authoritatively classify a trade journal record using forensic lifecycle evidence.
+    Distinguishes genuine executions from unexecuted reservations and speculative duplicates.
+    Never guesses; returns UNKNOWN if provenance cannot be established.
+    """
+    # 1. Authoritative fill information proves actual execution
+    if trade.fillPrice is not None or trade.fillTime is not None:
+        return LifecycleClassification.LEGITIMATE_ACTUAL_EXECUTION
+
+    if trade.notes and "ticket #" in trade.notes.lower():
+        return LifecycleClassification.LEGITIMATE_ACTUAL_EXECUTION
+
+    # 2. PENDING status: Legitimate reservation created by SignalAuthorizationService
+    if (trade.status or "").upper() == "PENDING":
+        return LifecycleClassification.LEGACY_UNEXECUTED_RESERVATION
+
+    # 3. OPEN status with fillPrice is None: Forensic provenance check
+    if (trade.status or "").upper() == "OPEN" and trade.fillPrice is None and trade.fillTime is None:
+        # Check if record matches the known defective resolver behavior:
+        # Erroneous duplicate creation with note 'Active signal monitored by Falcon'
+        # alongside a paired PENDING reservation for the same analytical signalId.
+        is_resolver_signature = bool(trade.notes and "Active signal monitored by Falcon" in trade.notes)
+        has_paired_reservation = any(
+            other.id != trade.id
+            and other.signalId == trade.signalId
+            and other.signalId is not None
+            and (
+                (other.status or "").upper() == "PENDING"
+                or (other.reasonForEntry and "Capital Guardian authorized reservation" in other.reasonForEntry)
+                or (other.notes and "Auto-reserved from signal candidate" in other.notes)
+            )
+            for other in all_trades
+        )
+        if is_resolver_signature and has_paired_reservation:
+            return LifecycleClassification.DUPLICATE_SPECULATIVE_EXECUTION
+
+        return LifecycleClassification.UNKNOWN
+
+    return LifecycleClassification.UNKNOWN
+
 
 class SignalOutcomeResolver:
     """Automated signal tracking, boundary breach detection, and post-mortem learning."""
 
     def __init__(self):
         self._resolved_cache: Dict[int, SignalOutcomeItem] = {}
+        self._lock = threading.Lock()
 
     def get_outcomes(self, limit: int = 50) -> List[SignalOutcomeItem]:
         """Return all resolved signal outcomes, latest first."""
@@ -63,7 +121,32 @@ class SignalOutcomeResolver:
         Scan active signals and mission candidates against real-time quotes.
         Immediately purges any dummy non-trades, monitors ALL open trades in the database,
         detects SL/TP breaches, diagnoses root causes, and updates trade journal and intelligence.
+        Protected by PostgreSQL advisory lock (8882026) and thread lock for concurrency.
         """
+        with self._lock:
+            if database_enabled():
+                with get_session() as session:
+                    with session.begin():
+                        self._acquire_advisory_lock_if_postgres(session)
+                        return self._execute_resolve_signals(force_simulate=force_simulate, session=session)
+            return self._execute_resolve_signals(force_simulate=force_simulate, session=None)
+
+    def _acquire_advisory_lock_if_postgres(self, session: object) -> None:
+        """Acquire PostgreSQL transaction advisory lock if connected to PostgreSQL."""
+        try:
+            bind = session.get_bind()
+            if bind is not None and bind.dialect.name == "postgresql":
+                session.execute(
+                    text("SELECT pg_advisory_xact_lock(:lock_id)"),
+                    {"lock_id": FALCON_GUARDIAN_ADVISORY_LOCK_KEY},
+                )
+                logger.debug(f"Acquired pg_advisory_xact_lock({FALCON_GUARDIAN_ADVISORY_LOCK_KEY}) for resolver")
+        except Exception as ex:
+            logger.warning(f"Could not acquire PostgreSQL advisory lock in resolver: {ex}")
+
+    def _execute_resolve_signals(
+        self, force_simulate: bool = False, session: Optional[object] = None
+    ) -> SignalResolutionSummary:
         now = datetime.now(timezone.utc)
 
         # Step 0: Purge any invalid dummy non-trades (e.g. WAIT with entry=0)
@@ -72,70 +155,102 @@ class SignalOutcomeResolver:
         except Exception as ex:
             logger.warning(f"Error purging invalid trades: {ex}")
 
-        # Step 1: Ingest any newly emitted signals from signal_service
-        all_stored_trades = trade_journal_repository.list_trades()
-        existing_sig_ids: Set[int] = {
-            t.signalId for t in all_stored_trades if t.signalId is not None
-        }
-
-        try:
-            signal_resp = signal_service.build_signals(mission_limit=10)
-            for sig in signal_resp.signals:
-                action = sig.action.upper()
-                if action not in ("BUY", "SELL"):
-                    continue
-                if sig.entry <= 0 or sig.stopLoss <= 0 or sig.takeProfit <= 0:
-                    continue
-
-                if sig.id not in existing_sig_ids:
-                    risk_dist = abs(sig.entry - sig.stopLoss)
-                    reward_dist = abs(sig.takeProfit - sig.entry)
-                    rr = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 1.0
-
-                    trade_create = TradeJournalCreate(
-                        signalId=sig.id,
-                        strategyId=sig.strategyId,
-                        symbol=sig.symbol,
-                        direction=action,
-                        entryPrice=sig.entry,
-                        exitPrice=None,
-                        stopLoss=sig.stopLoss,
-                        takeProfit=sig.takeProfit,
-                        timeframe=sig.timeframe,
-                        marketSession="London / New York",
-                        tradeDate=sig.timestamp,
-                        closeDate=None,
-                        status="OPEN",
-                        result="OPEN",
-                        profitLoss=0.0,
-                        riskReward=rr,
-                        confidence=sig.confidence,
-                        reasonForEntry=f"Signal #{sig.id} initiated by {sig.strategyName}",
-                        notes=f"Active signal monitored by Falcon ({sig.strategyName})",
-                    )
-                    created = trade_journal_repository.create_trade(trade_create)
-                    existing_sig_ids.add(sig.id)
-                    all_stored_trades.append(created)
-                    logger.info(f"Ingested new signal #{sig.id} ({sig.symbol} {action}) as OPEN")
-        except Exception as e:
-            logger.warning(f"Error ingesting new signals: {e}")
-
-        # Step 2: Query ALL currently OPEN trades from the database
-        all_stored_trades = trade_journal_repository.list_trades()
-        open_trades = [
+        # Step 1: Query ALL currently OPEN and PENDING trades from the database
+        all_stored_trades = trade_journal_repository.list_trades(session=session)
+        active_trades = [
             t for t in all_stored_trades
-            if t.status.upper() == "OPEN" and t.direction.upper() in ("BUY", "SELL") and t.entryPrice > 0
+            if (t.status or "").upper() in ("OPEN", "PENDING", "FILLED")
+            and t.closeDate is None
+            and t.entryPrice > 0
         ]
 
-        total_checked = len(open_trades)
+        total_checked = len(active_trades)
         resolved_count = 0
         wins_count = 0
         losses_count = 0
         open_count = 0
         new_outcomes: List[SignalOutcomeItem] = []
 
-        # Step 3: Evaluate every open trade against current market quotes
-        for trade in open_trades:
+        # Step 2: Evaluate every active trade
+        for trade in active_trades:
+            trade_status = (trade.status or "").upper()
+            t_date = trade.tradeDate if trade.tradeDate.tzinfo else trade.tradeDate.replace(tzinfo=timezone.utc)
+            elapsed_seconds = (now - t_date).total_seconds()
+
+            # -------------------------------------------------------------
+            # Case 1: PENDING Reservation Lifecycle (Section 5 & 6)
+            # -------------------------------------------------------------
+            if trade_status == "PENDING":
+                # Expiration: 45 minutes elapsed without execution
+                if elapsed_seconds > 45 * 60:
+                    trade_update = TradeJournalUpdate(
+                        status="EXPIRED",
+                        result="EXPIRED",
+                        closeDate=now,
+                        reasonForExit="Signal validity window (45m) elapsed without execution",
+                        notes=f"{trade.notes or 'Falcon'} | Auto-expired unexecuted reservation",
+                    )
+                    trade_journal_repository.update_trade(trade.id, trade_update, session=session)
+                    resolved_count += 1
+                    logger.info(f"Expired unexecuted PENDING reservation #{trade.id} (Signal #{trade.signalId})")
+                    continue
+
+                # Pre-entry Invalidation: Authoritative market data check (Section 6)
+                quote_resp = provider_manager.get_market_quote(trade.symbol)
+                if quote_resp and quote_resp.quote and quote_resp.quote.lastPrice > 0:
+                    cur_px = quote_resp.quote.lastPrice
+                    is_invalidated = False
+                    if trade.direction.upper() == "BUY" and cur_px <= trade.stopLoss:
+                        is_invalidated = True
+                    elif trade.direction.upper() == "SELL" and cur_px >= trade.stopLoss:
+                        is_invalidated = True
+
+                    if is_invalidated:
+                        trade_update = TradeJournalUpdate(
+                            status="INVALIDATED",
+                            result="INVALIDATED",
+                            closeDate=now,
+                            reasonForExit="Setup invalidated: market price breached stop loss level prior to execution",
+                            notes=f"{trade.notes or 'Falcon'} | Auto-invalidated unexecuted reservation",
+                        )
+                        trade_journal_repository.update_trade(trade.id, trade_update, session=session)
+                        resolved_count += 1
+                        logger.info(f"Invalidated unexecuted PENDING reservation #{trade.id} (Signal #{trade.signalId})")
+                        continue
+
+                # Within 45m and SL not breached: remain PENDING to preserve user's execution window
+                open_count += 1
+                continue
+
+            # -------------------------------------------------------------
+            # Case 2: OPEN / FILLED Lifecycle & Forensic Classification
+            # -------------------------------------------------------------
+            if trade_status in ("OPEN", "FILLED"):
+                # If unexecuted (fillPrice is None and fillTime is None), classify forensically (Section 7, 8, 9)
+                if trade.fillPrice is None and trade.fillTime is None and not (trade.notes and "ticket #" in trade.notes.lower()):
+                    classification = classify_record(trade, all_stored_trades)
+                    if classification == LifecycleClassification.DUPLICATE_SPECULATIVE_EXECUTION:
+                        if elapsed_seconds > 45 * 60:
+                            trade_update = TradeJournalUpdate(
+                                status="EXPIRED",
+                                result="EXPIRED",
+                                closeDate=now,
+                                reasonForExit="Duplicate speculative record retired; parent signal expired without execution",
+                                notes=f"{trade.notes or 'Falcon'} | Auto-expired duplicate speculative record",
+                            )
+                            trade_journal_repository.update_trade(trade.id, trade_update, session=session)
+                            resolved_count += 1
+                            logger.info(f"Retired duplicate speculative record #{trade.id} (Signal #{trade.signalId})")
+                            continue
+                    elif classification == LifecycleClassification.UNKNOWN:
+                        # Section 8: UNKNOWN -> DO NOT MUTATE IT
+                        logger.info(f"Legacy record #{trade.id} classified as UNKNOWN. Preserving without mutation.")
+                        open_count += 1
+                        continue
+
+            # -------------------------------------------------------------
+            # Case 3: Genuine Executed Trade Monitoring (SL/TP Boundary Breach)
+            # -------------------------------------------------------------
             symbol = trade.symbol
             direction = trade.direction.upper()
             entry = trade.entryPrice
@@ -188,6 +303,30 @@ class SignalOutcomeResolver:
 
             if result is None:
                 open_count += 1
+                # Phase 5C: Track post-fill excursion for OPEN/FILLED trades
+                if (trade.status or "").upper() in ("OPEN", "FILLED") and trade.fillPrice is not None:
+                    obs_time = getattr(quote, "timestamp", now)
+                    obs_price = bid if (direction == "BUY" and bid and bid > 0) else (
+                        ask if (direction == "SELL" and ask and ask > 0) else current_price
+                    )
+                    if obs_price and obs_price > 0:
+                        from app.core.analytics.execution_quality_service import execution_quality_service
+                        new_peak, new_trough, cur_mfe_r, cur_mae_r = execution_quality_service.update_open_trade_excursion(
+                            trade=trade,
+                            observed_price=obs_price,
+                            observation_time=obs_time,
+                        )
+                        if new_peak != trade.peakPrice or new_trough != trade.troughPrice:
+                            trade_update = TradeJournalUpdate(
+                                peakPrice=new_peak,
+                                troughPrice=new_trough,
+                                mfeR=cur_mfe_r,
+                                maeR=cur_mae_r,
+                            )
+                            try:
+                                trade_journal_repository.update_trade(trade.id, trade_update, session=session)
+                            except Exception as ex:
+                                logger.warning(f"Error updating open trade excursion for trade #{trade.id}: {ex}")
                 continue
 
             # Step 4: Automated Root-Cause Post-Mortem Diagnostic
@@ -232,6 +371,36 @@ class SignalOutcomeResolver:
             elif result == "WIN" and pnl <= 0:
                 pnl = round(reward_dist * multiplier, 2)
 
+            # Phase 5A / Blocker 1: Authoritative Realized R Multiple Calculation
+            # Realized R = actual realized monetary P/L / preserved authoritative initial monetary risk
+            # Strict Safety: If authoritative initial risk is unavailable, realized_r_multiple MUST remain None (NULL).
+            # Do NOT independently recalculate initial risk at close.
+            realized_r = None
+            initial_risk = getattr(trade, "initialMonetaryRisk", None)
+            if initial_risk is not None and float(initial_risk) > 0:
+                # Monetary PnL calculation: for standard Falcon micro-lot (0.01 lot = 1,000 units on FX, 1 oz on Gold)
+                if "XAU" in symbol or "GOLD" in symbol:
+                    monetary_pnl = round(price_delta * 1.0, 2)
+                elif "JPY" in symbol:
+                    monetary_pnl = round(price_delta * 1000.0 / 150.0, 2)
+                else:
+                    monetary_pnl = round(price_delta * 1000.0, 2)
+
+                if result == "WIN":
+                    realized_r = round(float(monetary_pnl) / float(initial_risk), 2)
+                elif result == "LOSS":
+                    realized_r = -round(abs(float(monetary_pnl)) / float(initial_risk), 2)
+                elif result in ("BREAKEVEN", "BE"):
+                    realized_r = 0.0
+
+            # Phase 5C: Excursion peak / trough & R finalization on close
+            from app.core.analytics.execution_quality_service import execution_quality_service
+            peak_val, trough_val, final_mfe_r, final_mae_r = execution_quality_service.finalize_closed_trade_excursion(
+                trade=trade,
+                exit_price=exit_price,
+                close_time=now,
+            )
+
             trade_update = TradeJournalUpdate(
                 exitPrice=exit_price,
                 closeDate=now,
@@ -239,14 +408,21 @@ class SignalOutcomeResolver:
                 result=result,
                 profitLoss=pnl,
                 riskReward=risk_reward,
+                realizedRMultiple=realized_r,
+                peakPrice=peak_val,
+                troughPrice=trough_val,
+                mfeR=final_mfe_r,
+                maeR=final_mae_r,
                 confidence=trade.confidence,
                 reasonForExit=reason_exit,
                 lessonLearned=lesson,
                 notes=f"Auto-resolved by Falcon Outcome Resolver ({trade.notes or 'Falcon'})",
+                executionMode=getattr(trade, "executionMode", None),
             )
 
+
             try:
-                trade_journal_repository.update_trade(trade.id, trade_update)
+                trade_journal_repository.update_trade(trade.id, trade_update, session=session)
                 resolved_count += 1
 
                 sig_identifier = trade.signalId or trade.id

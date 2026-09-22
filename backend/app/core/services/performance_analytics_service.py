@@ -10,6 +10,7 @@ from statistics import pstdev
 from typing import Dict, List, Sequence
 
 from app.core.config import settings
+from app.core.repository.capital_cycle_repository import capital_cycle_repository
 from app.core.repository.mission_repository import mission_repository
 from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.schemas.performance_analytics import (
@@ -42,13 +43,24 @@ def _trade_day(trade: TradeJournalItem) -> date:
 
 
 def _is_closed(trade: TradeJournalItem) -> bool:
-    return trade.status.upper() == "CLOSED"
+    return (
+        trade.status.upper() == "CLOSED"
+        and trade.closeDate is not None
+        and (trade.result or "").upper() not in ("EXPIRED", "INVALIDATED")
+    )
 
 
-def _outcome(profit_loss: float) -> str:
-    if profit_loss > 0:
+def _outcome(trade: TradeJournalItem) -> str:
+    res = (trade.result or "").strip().upper()
+    if res in ("WIN", "WON"):
         return "WIN"
-    if profit_loss < 0:
+    if res in ("LOSS", "LOST"):
+        return "LOSS"
+    if res in ("BREAKEVEN", "BE"):
+        return "BREAKEVEN"
+    if trade.profitLoss > 0:
+        return "WIN"
+    if trade.profitLoss < 0:
         return "LOSS"
     return "BREAKEVEN"
 
@@ -103,7 +115,8 @@ def _daily_performance(closed: Sequence[TradeJournalItem]) -> List[DailyPerforma
         trades = by_weekday.get(weekday)
         if not trades:
             continue
-        outcomes = Counter(_outcome(trade.profitLoss) for trade in trades)
+        outcomes = Counter(_outcome(trade) for trade in trades)
+        total_actionable = outcomes["WIN"] + outcomes["LOSS"] + outcomes["BREAKEVEN"]
         performance.append(
             DailyPerformance(
                 day=weekday,
@@ -111,7 +124,7 @@ def _daily_performance(closed: Sequence[TradeJournalItem]) -> List[DailyPerforma
                 wins=outcomes["WIN"],
                 losses=outcomes["LOSS"],
                 breakEvens=outcomes["BREAKEVEN"],
-                winRate=round(outcomes["WIN"] / len(trades), 4),
+                winRate=round(outcomes["WIN"] / total_actionable, 4) if total_actionable > 0 else 0.0,
                 profitLoss=round(sum(trade.profitLoss for trade in trades), 2),
             )
         )
@@ -126,7 +139,8 @@ def _monthly_performance(closed: Sequence[TradeJournalItem]) -> List[MonthlyPerf
 
     performance: List[MonthlyPerformance] = []
     for (year, month), trades in sorted(by_month.items()):
-        outcomes = Counter(_outcome(trade.profitLoss) for trade in trades)
+        outcomes = Counter(_outcome(trade) for trade in trades)
+        total_actionable = outcomes["WIN"] + outcomes["LOSS"] + outcomes["BREAKEVEN"]
         profit_by_weekday: Dict[str, float] = defaultdict(float)
         for trade in trades:
             profit_by_weekday[WEEKDAYS[_trade_day(trade).weekday()]] += trade.profitLoss
@@ -137,7 +151,7 @@ def _monthly_performance(closed: Sequence[TradeJournalItem]) -> List[MonthlyPerf
                 totalTrades=len(trades),
                 wins=outcomes["WIN"],
                 losses=outcomes["LOSS"],
-                winRate=round(outcomes["WIN"] / len(trades), 4),
+                winRate=round(outcomes["WIN"] / total_actionable, 4) if total_actionable > 0 else 0.0,
                 profitLoss=round(sum(trade.profitLoss for trade in trades), 2),
                 bestDay=best_day,
             )
@@ -150,8 +164,15 @@ def _trading_calendar(closed: Sequence[TradeJournalItem], today: date) -> List[T
     calendar: List[TradingCalendarDay] = []
     for offset in range(CALENDAR_DAYS - 1, -1, -1):
         day = today - timedelta(days=offset)
-        result = "NO_TRADE" if day not in totals else _outcome(totals[day])
-        calendar.append(TradingCalendarDay(date=day.isoformat(), result=result))
+        if day not in totals:
+            res_str = "NO_TRADE"
+        elif totals[day] > 0:
+            res_str = "WIN"
+        elif totals[day] < 0:
+            res_str = "LOSS"
+        else:
+            res_str = "BREAKEVEN"
+        calendar.append(TradingCalendarDay(date=day.isoformat(), result=res_str))
     return calendar
 
 
@@ -180,9 +201,9 @@ def _consistency_score(closed: Sequence[TradeJournalItem]) -> int:
 
 def _avg_holding_minutes(closed: Sequence[TradeJournalItem]) -> int:
     durations = [
-        (_as_utc(trade.closeDate) - _as_utc(trade.tradeDate)).total_seconds() / 60
+        (_as_utc(trade.closeDate) - _as_utc(trade.fillTime or trade.tradeDate)).total_seconds() / 60
         for trade in closed
-        if trade.closeDate
+        if trade.closeDate and (trade.fillTime or trade.tradeDate)
     ]
     return round(sum(durations) / len(durations)) if durations else 0
 
@@ -212,11 +233,16 @@ def build_performance_analytics() -> PerformanceAnalyticsResponse:
     closed = [trade for trade in trades if _is_closed(trade)]
     closed_ordered = sorted(closed, key=lambda trade: _as_utc(trade.closeDate or trade.tradeDate))
 
-    starting_equity = float(settings.STARTING_EQUITY)
+    active_cycle = capital_cycle_repository.get_active_cycle()
+    if active_cycle:
+        starting_equity = float(active_cycle.startingCapital)
+    else:
+        starting_equity = float(settings.STARTING_EQUITY)
+
     net_profit = round(sum(trade.profitLoss for trade in closed), 2)
     curve, max_drawdown = _equity_curve(closed_ordered, starting_equity)
     longest_win, longest_loss = _streaks(
-        [_outcome(trade.profitLoss) for trade in closed_ordered]
+        [_outcome(trade) for trade in closed_ordered]
     )
 
     trade_days = {_trade_day(trade) for trade in trades}
@@ -241,8 +267,8 @@ def build_performance_analytics() -> PerformanceAnalyticsResponse:
         todaySignals=_today_signals(today),
         todayOpenTrades=sum(1 for trade in today_trades if not _is_closed(trade)),
         todayClosedTrades=len(today_closed),
-        todayWins=sum(1 for trade in today_closed if trade.profitLoss > 0),
-        todayLosses=sum(1 for trade in today_closed if trade.profitLoss < 0),
+        todayWins=sum(1 for trade in today_closed if _outcome(trade) == "WIN"),
+        todayLosses=sum(1 for trade in today_closed if _outcome(trade) == "LOSS"),
         todayUpcomingNews=0,
         commonLessons=_common_lessons(trades),
         dailyPerformance=_daily_performance(closed),

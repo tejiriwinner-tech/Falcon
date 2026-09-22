@@ -32,8 +32,12 @@ from app.api.v1 import live_intelligence
 from app.api.v1 import runtime
 from app.api.v1 import telegram_alerts
 from app.api.v1 import orders
+from app.api.v1 import capital_cycles
+from app.api.v1 import execution
+from app.api.v1 import paper
 
 api_router = APIRouter()
+api_router.include_router(capital_cycles.router, tags=["capital_cycles"])
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(market_data.router, tags=["market_data"])
 api_router.include_router(providers.router)
@@ -67,6 +71,8 @@ api_router.include_router(live_intelligence.router, tags=["live_intelligence"])
 api_router.include_router(runtime.router)
 api_router.include_router(telegram_alerts.router)
 api_router.include_router(orders.router)
+api_router.include_router(execution.router, tags=["execution"])
+api_router.include_router(paper.router, tags=["paper"])
 
 
 

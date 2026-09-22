@@ -14,6 +14,7 @@ from app.core.engines.candlestick_pattern_engine import (
 from app.core.services.market_history_service import market_history_service
 from app.core.providers import provider_manager
 from app.schemas.market_quote import MarketQuote
+from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
 
 
 class SignalGenerationEngine:
@@ -24,8 +25,10 @@ class SignalGenerationEngine:
     def generate_candidates(
         self,
         market_state: MarketState,
-        strategies: List[StrategyItem]
+        strategies: List[StrategyItem],
+        as_of: Optional[datetime] = None,
     ) -> List[SignalCandidate]:
+        eval_time = as_of or getattr(market_state, "timestamp", None) or datetime.now(timezone.utc)
         # 1. Filter out inactive strategies
         active_strategies = [s for s in strategies if s.status == StrategyStatus.ACTIVE]
         
@@ -367,20 +370,34 @@ class SignalGenerationEngine:
                     passed=False
                 ))
 
-            # ── 6. Precise Invalidation and Target Calculation ────────────────
+            # ── 6. Precise Invalidation and Target Calculation with Adaptive Tuning ──
             rr = strategy.minimumRiskReward or 2.0
             vol_mult = 1.4 if volatility == "High" else (1.0 if volatility == "Moderate" else 0.8)
+
+            # Query autonomous adaptive tuning for this strategy and asset
+            tuning_profile = adaptive_tuning_engine.get_strategy_tuning(strategy.id, raw_symbol, as_of=eval_time)
+            adaptive_mult = tuning_profile.adaptive_stop_multiplier
+
             if "XAU" in raw_symbol or "GOLD" in raw_symbol:
-                base_stop_dist = round(11.50 * vol_mult, 2)
+                base_stop_dist = round(11.50 * vol_mult * adaptive_mult, 2)
             elif "JPY" in raw_symbol:
-                base_stop_dist = round(0.45 * vol_mult, 3)
+                base_stop_dist = round(0.45 * vol_mult * adaptive_mult, 3)
             elif "GBP" in raw_symbol:
-                base_stop_dist = round(0.0035 * vol_mult, 5)
+                base_stop_dist = round(0.0035 * vol_mult * adaptive_mult, 5)
             else:
-                base_stop_dist = round(0.0028 * vol_mult, 5)
+                base_stop_dist = round(0.0028 * vol_mult * adaptive_mult, 5)
 
             if sniper_stop is not None and sniper_target is not None:
-                stop_loss = sniper_stop
+                # If adaptive multiplier is expanded (>1.0), apply protective padding to sniper stop as well
+                if adaptive_mult > 1.05:
+                    raw_risk = abs(entry_price - sniper_stop)
+                    pad = raw_risk * (adaptive_mult - 1.0)
+                    if direction == CandidateDirection.BUY:
+                        stop_loss = round(sniper_stop - pad, 5)
+                    else:
+                        stop_loss = round(sniper_stop + pad, 5)
+                else:
+                    stop_loss = sniper_stop
                 take_profit = sniper_target
                 risk_dist = abs(entry_price - stop_loss)
                 if risk_dist > 1e-6:
@@ -395,6 +412,16 @@ class SignalGenerationEngine:
                 else:
                     stop_loss = round(entry_price - base_stop_dist, 5)
                     take_profit = round(entry_price + (base_stop_dist * rr), 5)
+
+            if adaptive_mult > 1.05:
+                reasons.append(CandidateReason(
+                    title=f"Adaptive Risk Defense Active ({tuning_profile.tuning_status})",
+                    description=(
+                        f"Stop buffer dynamically scaled {adaptive_mult}x ATR to protect capital against structural liquidity sweeps. "
+                        f"Rationale: {tuning_profile.rationale}"
+                    ),
+                    passed=True
+                ))
 
             now_utc = datetime.now(timezone.utc)
             duration_ms = max(1, int((now_utc - started_at).total_seconds() * 1000))
@@ -435,6 +462,8 @@ class SignalGenerationEngine:
                 marketDataAgeSeconds=data_age,
                 evaluationStartedAt=started_at,
                 evaluationCompletedAt=completed_at,
+                adaptiveRuleVersion=getattr(adaptive_tuning_engine, "version", "1.0.0"),
+                adaptiveStopMultiplier=adaptive_mult,
                 engineVersion=self.version
             ))
 

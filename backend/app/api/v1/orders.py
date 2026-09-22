@@ -72,3 +72,23 @@ async def fail_order(order_id: str, fail_in: ExecutionOrderFail) -> ExecutionOrd
     if not order:
         raise HTTPException(status_code=404, detail=f"Order '{order_id}' not found")
     return order
+
+
+@router.get("/cloud-broker/status")
+async def get_cloud_broker_status() -> Dict[str, Any]:
+    """Check 24/7 Zero-PC Cloud MT5 Broker connection status."""
+    from app.services.execution.cloud_mt5_service import cloud_mt5_service
+    return cloud_mt5_service.get_status()
+
+
+@router.post("/cloud-broker/connect")
+async def connect_cloud_broker(payload: Dict[str, str]) -> Dict[str, Any]:
+    """Connect Exness MT5 account via MetaApi Cloud Token and Account ID (Zero-PC/VPS)."""
+    from app.services.execution.cloud_mt5_service import cloud_mt5_service
+    token = payload.get("token", "").strip()
+    account_id = payload.get("account_id", "").strip()
+    if not token or not account_id:
+        raise HTTPException(status_code=400, detail="Both 'token' and 'account_id' are required.")
+    cloud_mt5_service.configure(token, account_id)
+    return cloud_mt5_service.get_status()
+

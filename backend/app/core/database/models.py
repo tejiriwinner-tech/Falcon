@@ -1,6 +1,7 @@
 """SQLAlchemy models backing the Falcon mission repository."""
 
 from datetime import datetime
+from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -8,6 +9,7 @@ from sqlalchemy import (
     Float,
     Index,
     Integer,
+    Numeric,
     String,
     Text,
     UniqueConstraint,
@@ -54,7 +56,7 @@ Index(
 class TradeJournalRecord(Base):
     __tablename__ = "trade_journal"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     signal_id: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     strategy_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -80,6 +82,33 @@ class TradeJournalRecord(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    # Execution (V10)
+    fill_time: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    fill_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Realized performance (V10)
+    realized_r_multiple: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # MFE / MAE tracking (V10)
+    peak_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    trough_price: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mfe_r: Mapped[float | None] = mapped_column(Float, nullable=True)
+    mae_r: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Strategy versioning (V10)
+    strategy_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
+
+    # Adaptive-rule versioning (V10)
+    adaptive_rule_version: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    adaptive_stop_multiplier: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Market conditions at entry (V10)
+    spread_at_entry: Mapped[float | None] = mapped_column(Float, nullable=True)
+    atr_at_entry: Mapped[float | None] = mapped_column(Float, nullable=True)
+
+    # Authoritative initial risk established at entry (V10 Phase 5A.1)
+    initial_monetary_risk: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
 
 
 Index("ix_trade_journal_trade_date", TradeJournalRecord.trade_date)
@@ -146,3 +175,39 @@ class EconomicEventRecord(Base):
 
 
 Index("ix_economic_events_event_time", EconomicEventRecord.event_time)
+
+
+class CapitalCycleRecord(Base):
+    __tablename__ = "capital_cycles"
+
+    id: Mapped[int] = mapped_column(
+        BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True
+    )
+    cycle_id: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
+    cycle_number: Mapped[int] = mapped_column(Integer, unique=True, nullable=False)
+    starting_capital: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    target_capital: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    active_trading_capital: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    protected_profit: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00")
+    )
+    status: Mapped[str] = mapped_column(String(16), nullable=False)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_capital: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    realized_profit: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    next_cycle_allocation: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+Index("ix_capital_cycles_status", CapitalCycleRecord.status)
+Index("ix_capital_cycles_cycle_number", CapitalCycleRecord.cycle_number)
+Index(
+    "uq_capital_cycles_active",
+    CapitalCycleRecord.status,
+    unique=True,
+    postgresql_where=(CapitalCycleRecord.status == "ACTIVE"),
+    sqlite_where=(CapitalCycleRecord.status == "ACTIVE"),
+)
+

@@ -27,6 +27,7 @@ class OrderStatus(str, Enum):
 
 
 class ExecutionOrderCreate(BaseModel):
+    signal_id: Optional[int] = None
     symbol: str
     action: OrderAction
     lot_size: float = Field(default=0.01, ge=0.01, le=1.0)
@@ -52,6 +53,7 @@ class ExecutionOrderFail(BaseModel):
 
 class ExecutionOrderItem(BaseModel):
     order_id: str
+    signal_id: Optional[int] = None
     symbol: str
     action: OrderAction
     lot_size: float

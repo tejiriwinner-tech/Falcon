@@ -1,9 +1,15 @@
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional
 
+logger = logging.getLogger("falcon.signal_service")
+
 from app.core.repository.mission_repository import mission_repository
+from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.core.engines.strategy_engine import StrategyEngine
+from app.core.services.signal_authorization_service import signal_authorization_service
 from app.schemas.decision_artifact import DecisionArtifact, DecisionStatus
+from app.schemas.execution_order import ExecutionSettings
 from app.schemas.signal_candidate import SignalCandidate, CandidateStatus, CandidateDirection
 from app.schemas.signal import SignalItem, SignalListResponse
 
@@ -22,84 +28,220 @@ class SignalService:
 
     def build_signals(self, mission_limit: int = 5) -> SignalListResponse:
         now = datetime.now(timezone.utc)
-        
+        signals: List[SignalItem] = []
+        seen_signatures = set()
+
+        # Step 1: Query TradeJournal for recently RESOLVED trades (WON, LOST, BREAKEVEN)
+        # These are authoritative completed trade outcomes.
+        try:
+            closed_trades = [
+                t for t in trade_journal_repository.list_trades()
+                if t.status.upper() in ("CLOSED", "EXPIRED", "INVALIDATED")
+                and t.result.upper() in ("WIN", "WON", "LOSS", "LOST", "BREAKEVEN", "BE", "EXPIRED", "INVALIDATED")
+            ]
+            closed_trades.sort(key=lambda t: t.closeDate or t.tradeDate, reverse=True)
+            for ct in closed_trades[:5]:
+                sig_key = (
+                    ct.symbol,
+                    ct.direction.upper(),
+                    round(ct.entryPrice, 4),
+                    round(ct.stopLoss, 4),
+                    round(ct.takeProfit, 4),
+                )
+                if sig_key in seen_signatures:
+                    continue
+                seen_signatures.add(sig_key)
+
+                res_str = ct.result.upper()
+                if res_str in ("WIN", "WON"):
+                    outcome_status = "WON"
+                    analysis_msg = (
+                        f"🏆 TARGET ACHIEVED [WON]: Take Profit hit cleanly at "
+                        f"{ct.exitPrice or ct.takeProfit:.4f} (+{ct.profitLoss:+.1f} pts). "
+                        f"R:R 1:{ct.riskReward:.1f} secured."
+                    )
+                elif res_str in ("BREAKEVEN", "BE"):
+                    outcome_status = "BREAKEVEN"
+                    analysis_msg = (
+                        f"🛡️ CAPITAL DEFENDED [BREAKEVEN]: Market reached +1.0R excursion, "
+                        f"stop shifted to entry ({ct.entryPrice:.4f}); exited with zero loss."
+                    )
+                elif res_str in ("EXPIRED", "INVALIDATED") or ct.status.upper() == "EXPIRED":
+                    outcome_status = "EXPIRED"
+                    analysis_msg = (
+                        f"⏳ UNTRIGGERED SETUP [EXPIRED]: Market moved away without reaching "
+                        f"entry ({ct.entryPrice:.4f}). Order auto-canceled cleanly without risk."
+                    )
+                else:
+                    outcome_status = "LOST"
+                    analysis_msg = (
+                        f"🛑 STOPPED OUT [LOST]: Invalidation boundary hit at "
+                        f"{ct.exitPrice or ct.stopLoss:.4f} (-{abs(ct.profitLoss):.1f} pts). "
+                        f"Capital defended."
+                    )
+
+                dec = 2 if "XAU" in ct.symbol or ct.entryPrice > 100 else 4
+                risk_d = abs(ct.entryPrice - ct.stopLoss)
+                be_trig = ct.entryPrice + risk_d if ct.direction.upper() == "BUY" else ct.entryPrice - risk_d
+
+                resolved_signal = SignalItem(
+                    id=ct.signalId or ct.id,
+                    symbol=ct.symbol,
+                    action=ct.direction.upper(),
+                    entry=ct.entryPrice,
+                    takeProfit=ct.takeProfit,
+                    stopLoss=ct.stopLoss,
+                    confidence=ct.confidence or 80,
+                    timeframe=ct.timeframe or "M15",
+                    status=outcome_status,
+                    analysis=analysis_msg,
+                    timestamp=ct.tradeDate,
+                    strategyId=ct.strategyId or "falcon-opt",
+                    strategyName=ct.notes or "Falcon Strategy",
+                    strategyVersion="4.2",
+                    dataAgeSeconds=0,
+                    triggerCondition="Trade Completed",
+                    validUntil=ct.closeDate,
+                    setupPattern=ct.notes or "Sniper Setup",
+                    riskReward=ct.riskReward,
+                    isPinned=False,
+                    breakevenTrigger=round(be_trig, dec),
+                    breakevenPrice=round(ct.entryPrice, dec),
+                    isBreakeven=res_str in ("BREAKEVEN", "BE"),
+                )
+                signals.append(resolved_signal)
+        except Exception as ex:
+            logger.debug(f"Could not load resolved trades: {ex}")
+
+        # Step 2: Ingest candidate setups from recent missions
         all_missions = mission_repository.get_all_missions()
-        if not all_missions:
-            return SignalListResponse(
-                signals=[],
-                lastUpdated=now,
-                dataAgeSeconds=0,
-            )
-        
-        missions = all_missions[-mission_limit:]
+        if all_missions:
+            missions = all_missions[-mission_limit:]
+            candidate_pool: List[dict] = []
+            for mission in reversed(missions):
+                try:
+                    artifacts = mission_repository.get_mission_artifacts(mission.id)
+                    candidates: List[SignalCandidate] = artifacts.get("candidates", [])
+                    decisions: List[DecisionArtifact] = artifacts.get("decisions", [])
+                    by_candidate = {d.candidateId: d for d in decisions}
 
-        # Gather candidates from recent missions
-        candidate_pool: List[dict] = []
-        for mission in reversed(missions):
-            try:
-                artifacts = mission_repository.get_mission_artifacts(mission.id)
-                candidates: List[SignalCandidate] = artifacts.get("candidates", [])
-                decisions: List[DecisionArtifact] = artifacts.get("decisions", [])
-                by_candidate = {d.candidateId: d for d in decisions}
+                    for index, candidate in enumerate(candidates):
+                        if candidate.direction == CandidateDirection.WAIT:
+                            continue
+                        if candidate.status == CandidateStatus.REJECTED:
+                            continue
+                        if candidate.confidence < 80:
+                            continue
 
-                for index, candidate in enumerate(candidates):
-                    # Quality gate: Reject WAIT, REJECTED, and low-confidence candidates
-                    if candidate.direction == CandidateDirection.WAIT:
-                        continue
-                    if candidate.status == CandidateStatus.REJECTED:
-                        continue
-                    if candidate.confidence < 80:
-                        continue
+                        # Omit candidates older than 6 hours to eliminate ancient stale clutter
+                        if candidate.generatedAt and (now - candidate.generatedAt).total_seconds() > 6 * 3600:
+                            continue
 
-                    dec = by_candidate.get(candidate.id)
-                    is_approved = dec is not None and dec.status == DecisionStatus.APPROVED
-                    
-                    readiness = getattr(candidate, "readinessScore", 50.0) or 50.0
-                    confidence = float(candidate.confidence)
-                    
-                    # Approved setups prioritized; sniper pattern boosts conviction score
-                    has_sniper = any(r.title.startswith("Sniper Setup:") for r in getattr(candidate, "reasons", []))
-                    sniper_boost = 25.0 if has_sniper else 0.0
-                    conviction_score = (100.0 if is_approved else 0.0) + sniper_boost + (confidence * 0.5) + (readiness * 0.5)
+                        dec = by_candidate.get(candidate.id)
+                        is_approved = dec is not None and dec.status == DecisionStatus.APPROVED
+                        readiness = getattr(candidate, "readinessScore", 50.0) or 50.0
+                        confidence = float(candidate.confidence)
 
-                    candidate_pool.append({
-                        "candidate": candidate,
-                        "decision": dec,
-                        "signal_id": self._signal_id(mission.id, index),
-                        "conviction_score": conviction_score,
-                        "is_approved": is_approved,
-                        "mission_id": mission.id,
-                    })
-            except Exception:
-                continue
+                        has_sniper = any(r.title.startswith("Sniper Setup:") for r in getattr(candidate, "reasons", []))
+                        sniper_boost = 25.0 if has_sniper else 0.0
+                        conviction_score = (100.0 if is_approved else 0.0) + sniper_boost + (confidence * 0.5) + (readiness * 0.5)
 
-        if not candidate_pool:
-            return SignalListResponse(signals=[], lastUpdated=now, dataAgeSeconds=0)
+                        candidate_pool.append({
+                            "candidate": candidate,
+                            "decision": dec,
+                            "signal_id": self._signal_id(mission.id, index),
+                            "conviction_score": conviction_score,
+                            "is_approved": is_approved,
+                            "mission_id": mission.id,
+                        })
+                except Exception:
+                    continue
 
-        # Sort candidate pool by conviction score descending
-        candidate_pool.sort(key=lambda x: x["conviction_score"], reverse=True)
+            # Sort candidate pool by conviction score descending
+            candidate_pool.sort(key=lambda x: x["conviction_score"], reverse=True)
 
-        # Deduplicate strictly by Symbol (at most 1 setup per asset)
-        seen_symbols = set()
-        curated_pool: List[dict] = []
-        for item in candidate_pool:
-            symbol = item["candidate"].symbol
-            if symbol not in seen_symbols:
-                seen_symbols.add(symbol)
-                curated_pool.append(item)
+            seen_symbols = set()
+            curated_active: List[dict] = []
+            curated_watchlist: List[dict] = []
 
-        # Top 1 to 3 elite sniper setups
-        top_setups = curated_pool[:3]
+            for item in candidate_pool:
+                cand = item["candidate"]
+                symbol = cand.symbol
+                direction_str = cand.direction.value if hasattr(cand.direction, "value") else str(cand.direction)
+                sig_key = (
+                    symbol,
+                    direction_str,
+                    round(cand.entryPrice, 4),
+                    round(cand.stopLoss, 4),
+                    round(cand.takeProfit, 4),
+                )
+                # Skip if already closed in TradeJournal or duplicate in this batch
+                if sig_key in seen_signatures:
+                    continue
+                seen_signatures.add(sig_key)
 
-        signals: List[SignalItem] = [
-            self._to_signal(
-                item["candidate"],
-                item["decision"],
-                item["signal_id"],
-                now,
-            )
-            for item in top_setups
-        ]
+                # Check expiration: valid for 45 minutes
+                valid_until = cand.generatedAt + timedelta(minutes=45)
+                is_expired = now > valid_until
+                is_approved = item["is_approved"]
+                is_ready = getattr(cand, "readinessScore", 0) >= 80
+
+                if is_approved and is_ready and not is_expired:
+                    lot_size = ExecutionSettings().default_lot_size
+
+                    decision, reservation = signal_authorization_service.authorize_candidate(
+                        candidate=cand,
+                        signal_id=item["signal_id"],
+                        lot_size=lot_size,
+                        strategy_id=cand.strategyId,
+                    )
+                    if decision.allowed:
+                        if symbol not in seen_symbols:
+                            seen_symbols.add(symbol)
+                            item["is_guardian_authorized"] = True
+                            item["reservation"] = reservation
+                            item["lot_size"] = lot_size
+                            curated_active.append(item)
+                    else:
+                        # Hard safety gate: rejected by Capital Guardian!
+                        item["is_guardian_authorized"] = False
+                        item["guardian_reason"] = decision.reason
+                        if len(curated_watchlist) < 3:
+                            curated_watchlist.append(item)
+                elif not is_expired:
+                    item["is_guardian_authorized"] = False
+                    # Valid pending setup on watchlist
+                    if len(curated_watchlist) < 3:
+                        curated_watchlist.append(item)
+
+            # Convert top active setups (max 3)
+            active_items = [
+                self._to_signal(
+                    item["candidate"],
+                    item["decision"],
+                    item["signal_id"],
+                    now,
+                    is_active=True,
+                    lot_size=item.get("lot_size"),
+                )
+                for item in curated_active[:3]
+            ]
+
+            # Convert top watchlist setups (max 3)
+            watchlist_items = [
+                self._to_signal(
+                    item["candidate"],
+                    item["decision"],
+                    item["signal_id"],
+                    now,
+                    is_active=False,
+                    guardian_reason=item.get("guardian_reason"),
+                )
+                for item in curated_watchlist[:3]
+            ]
+
+            # Assemble response: Active first, then Watchlist, then Resolved outcomes
+            signals = active_items + watchlist_items + signals
 
         return SignalListResponse(
             signals=signals,
@@ -115,6 +257,9 @@ class SignalService:
         decision: Optional[DecisionArtifact],
         signal_id: int,
         now: datetime,
+        is_active: bool = False,
+        lot_size: Optional[float] = None,
+        guardian_reason: Optional[str] = None,
     ) -> SignalItem:
         strategy = self._strategy_engine.get_strategy_by_id(candidate.strategyId)
         preferred_session = (
@@ -136,29 +281,98 @@ class SignalService:
             setup_pattern = candidate.strategyName
             trigger_rule = f"Enter on confirmed {candidate.direction.value} candle close. Invalidation at {candidate.stopLoss}."
 
-        is_approved = decision is not None and decision.status == DecisionStatus.APPROVED
-        is_ready = getattr(candidate, "readinessScore", 0) >= 80
         valid_until = candidate.generatedAt + timedelta(minutes=45)
+        is_expired = now > valid_until
 
-        if is_approved and is_ready:
+        # Calculate Breakeven targets (1:1 Risk-Reward threshold for risk-free protection)
+        risk_dist = abs(candidate.entryPrice - candidate.stopLoss)
+        dec = 2 if "XAU" in candidate.symbol or candidate.entryPrice > 100 else 4
+        direction_val = candidate.direction.value.upper()
+        if direction_val == "BUY":
+            be_trigger = round(candidate.entryPrice + risk_dist, dec)
+        else:
+            be_trigger = round(candidate.entryPrice - risk_dist, dec)
+        be_price = round(candidate.entryPrice, dec)
+
+        # Determine if live market has already achieved Breakeven
+        is_breakeven = False
+        current_px = None
+        try:
+            from app.core.providers import provider_manager
+            q = provider_manager.get_market_quote(candidate.symbol)
+            if q and q.quote:
+                current_px = q.quote.lastPrice
+        except Exception:
+            pass
+
+        if current_px is not None and current_px > 0:
+            if direction_val == "BUY" and current_px >= be_trigger:
+                is_breakeven = True
+            elif direction_val == "SELL" and current_px <= be_trigger:
+                is_breakeven = True
+
+        be_rule = f"BE Rule: Shift SL to Entry ({be_price}) at {be_trigger} (+1.0R risk-free)."
+
+        if is_active and not is_expired:
             status = "ACTIVE"
+            be_status_text = " [🛡️ BREAKEVEN LOCKED]" if is_breakeven else ""
             analysis = (
-                f"🎯 SNIPER SIGNAL ACTIVE [{setup_pattern}]: "
+                f"🎯 SNIPER SIGNAL ACTIVE [{setup_pattern}]{be_status_text}: "
                 f"{trigger_rule}. "
                 f"Entry: {candidate.entryPrice} | SL: {candidate.stopLoss} | "
                 f"TP: {candidate.takeProfit} (1:{candidate.riskReward:.1f} R:R). "
+                f"{be_rule} "
                 f"Active Window: {preferred_session}. Valid until {valid_until.strftime('%H:%M UTC')}."
+            )
+            # Auto-queue active order for MT5 execution bridge
+            try:
+                from app.services.execution.order_execution_service import order_execution_service
+                from app.schemas.execution_order import ExecutionOrderCreate, OrderAction
+                existing_orders = order_execution_service.list_orders(limit=25)
+                already_queued = any(
+                    o.symbol == candidate.symbol.upper()
+                    and o.action.value == candidate.direction.value.upper()
+                    and abs(o.entry_price - candidate.entryPrice) < (0.0002 if "USD" in candidate.symbol and "XAU" not in candidate.symbol else 0.5)
+                    for o in existing_orders
+                )
+                if not already_queued:
+                    order_in = ExecutionOrderCreate(
+                        signal_id=signal_id,
+                        symbol=candidate.symbol,
+                        action=OrderAction.BUY if candidate.direction.value.upper() == "BUY" else OrderAction.SELL,
+                        lot_size=lot_size or 0.01,
+                        entry_price=candidate.entryPrice,
+                        stop_loss=candidate.stopLoss,
+                        take_profit=candidate.takeProfit,
+                        strategy_name=setup_pattern,
+                        confidence=candidate.confidence,
+                        comment=f"Falcon {setup_pattern[:15]}",
+                    )
+                    order_execution_service.create_order(order_in)
+                    logger.info(f"Auto-dispatched active signal #{signal_id} ({candidate.symbol}) to MT5 execution queue")
+            except Exception as ex:
+                logger.warning(f"Could not auto-queue signal #{signal_id} to MT5: {ex}")
+        elif is_expired:
+            status = "EXPIRED"
+            analysis = (
+                f"⌛ EXPIRED [{setup_pattern}]: Entry window expired at {valid_until.strftime('%H:%M UTC')}. "
+                f"Setup is outside optimal session window."
             )
         else:
             status = "WAITING"
-            decision_rec = (
-                decision.recommendationDetails.recommendation.value
-                if decision and hasattr(decision, "recommendationDetails")
-                else "WAIT"
-            )
+            rec_details = getattr(decision, "recommendationDetails", None) if decision else None
+            if rec_details and getattr(rec_details, "recommendation", None):
+                decision_rec = getattr(rec_details.recommendation, "value", str(rec_details.recommendation))
+            elif decision and getattr(decision, "recommendation", None):
+                decision_rec = getattr(decision.recommendation, "value", str(decision.recommendation))
+            else:
+                decision_rec = "WAIT"
+
             reason_details = ""
-            if decision and hasattr(decision, "recommendationDetails") and decision.recommendationDetails.description:
-                reason_details = decision.recommendationDetails.description
+            if guardian_reason:
+                reason_details = f"Capital Guardian: {guardian_reason}"
+            elif rec_details and getattr(rec_details, "description", None):
+                reason_details = rec_details.description
             elif candidate.reasons:
                 failed_reasons = [r.description for r in candidate.reasons if not r.passed]
                 if failed_reasons:
@@ -173,6 +387,7 @@ class SignalService:
                 f"⏳ WATCHLIST HUNTING [{setup_pattern}] (Status: {decision_rec}): "
                 f"{trigger_rule} "
                 f"Pending condition: {reason_details} {spread_val} "
+                f"{be_rule} "
                 f"Do not enter MT5 order until status turns ACTIVE."
             )
 
@@ -191,11 +406,17 @@ class SignalService:
             strategyId=candidate.strategyId,
             strategyName=candidate.strategyName,
             strategyVersion=candidate.strategyVersion,
+            adaptiveRuleVersion=getattr(candidate, "adaptiveRuleVersion", None),
+            adaptiveStopMultiplier=getattr(candidate, "adaptiveStopMultiplier", None),
             dataAgeSeconds=candidate.marketDataAgeSeconds,
             triggerCondition=trigger_rule,
             validUntil=valid_until,
             setupPattern=setup_pattern,
             riskReward=candidate.riskReward,
+            isPinned=False,
+            breakevenTrigger=be_trigger,
+            breakevenPrice=be_price,
+            isBreakeven=is_breakeven,
         )
 
     @staticmethod

@@ -17,16 +17,16 @@ async def get_signals(
 ):
     """
     Signals projected from the candidates and decisions of recent stored missions.
-    Immediately journals newly emitted signals as OPEN trades in the Trade Journal.
+    Resolves live market outcomes first so newly completed trades appear as WON/LOST/BREAKEVEN.
     """
-    res = signal_service.build_signals(mission_limit=missionLimit)
     try:
         signal_outcome_resolver.resolve_signals()
     except Exception:
         pass
-    return res
+    return signal_service.build_signals(mission_limit=missionLimit)
 
 
+@router.get("/signals/resolve", response_model=SignalResolutionSummary, tags=["signals"])
 @router.post("/signals/resolve", response_model=SignalResolutionSummary, tags=["signals"])
 def resolve_signals(
     forceSimulate: bool = Query(
