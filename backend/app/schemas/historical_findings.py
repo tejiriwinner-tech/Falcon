@@ -272,3 +272,79 @@ class HistoricalHypothesesResponse(BaseModel):
     query_parameters: Dict[str, Any] = Field(default_factory=dict)
     total_hypotheses: int = 0
     hypotheses: List[CandidateHypothesis] = Field(default_factory=list)
+
+
+# -----------------------------------------------------------------------------
+# Phase 3B Candidate Monitoring & Persistence Analysis Models
+# -----------------------------------------------------------------------------
+
+class CandidateMonitoring(BaseModel):
+    """
+    Descriptive historical candidate monitoring result (Phase 3B).
+    Evaluates what descriptive behaviour is observed in chronological observations
+    occurring strictly after the candidate's frozen boundary (candidate_as_of).
+    Strictly read-only; non-ranking; zero trading directives.
+    """
+    candidate_id: str
+    candidate_as_of: datetime
+    instrument: str
+    timeframe: str
+    horizon: int
+    behaviour_identity: str
+    context_identity: str
+    candidate_wording: str
+
+    # Frozen Historical Candidate Baseline (Immutable)
+    discovery_sample_size: int = 0
+    discovery_metrics: Optional[DescriptiveStatistics] = None
+    validation_sample_size: int = 0
+    validation_metrics: Optional[DescriptiveStatistics] = None
+    qualification_status: HypothesisStatus = HypothesisStatus.CANDIDATE_PAPER_HYPOTHESIS
+    candidate_limitations: List[str] = Field(default_factory=list)
+
+    # Monitoring Period & Census (Strictly observation_time > candidate_as_of)
+    monitoring_start: Optional[datetime] = None
+    monitoring_end: Optional[datetime] = None
+    monitoring_total_observations: int = 0
+    monitoring_sample_size: int = 0  # Count of VALID outcome observations
+    monitoring_incomplete_observations: int = 0
+    monitoring_invalid_observations: int = 0
+    monitoring_sample_adequacy: SampleAdequacy = SampleAdequacy.UNKNOWN
+    monitoring_data_quality: DataQuality = DataQuality.VALID
+
+    # Descriptive Monitoring Metrics
+    monitoring_metrics: Optional[DescriptiveStatistics] = None
+    monitoring_stability: Optional[GroupStabilityAnalysis] = None
+    observation_ids_sample: List[str] = Field(default_factory=list)  # max 20 deterministic IDs
+
+    # Traceability & Provenance
+    methodology_version: str = "1.0.0"
+    monitoring_limitations: List[str] = Field(default_factory=list)
+
+
+class CandidateMonitoringResponse(BaseModel):
+    """
+    Response schema for GET /api/v1/analytics/candlestick-behaviour/monitoring (Phase 3B).
+    Stateless, read-only, deterministic.
+    """
+    experiment_name: str = "HISTORICAL_CANDIDATE_MONITORING"
+    experiment_version: str = "1.0.0"
+    phase_1_version: str = "1.0.0"
+    phase_2_version: str = "1.0.0"
+    phase_3_version: str = "1.0.0"
+    as_of: datetime
+    candidate_as_of: datetime
+    query_parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    total_candidates: int = 0
+    total_monitoring_observations: int = 0
+    total_valid_monitoring_observations: int = 0
+    total_incomplete_monitoring_observations: int = 0
+
+    monitoring_records: List[CandidateMonitoring] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
+
+
+# Type aliases for flexible contract compatibility
+CandidateMonitoringMetrics = CandidateMonitoring
+HistoricalMonitoringResponse = CandidateMonitoringResponse

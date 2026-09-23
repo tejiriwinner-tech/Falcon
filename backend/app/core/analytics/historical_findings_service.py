@@ -34,6 +34,8 @@ from app.schemas.historical_behaviour import (
 )
 from app.schemas.historical_findings import (
     CandidateHypothesis,
+    CandidateMonitoring,
+    CandidateMonitoringResponse,
     DirectionConsistency,
     GroupStabilityAnalysis,
     HistoricalFindingsResponse,
@@ -115,6 +117,23 @@ class HistoricalFindingsService:
         """
         sorted_obs = cls.sort_observations_chronologically(observations)
         return [o.observation_id for o in sorted_obs[: cls.MAX_OBSERVATION_IDS_SAMPLE]]
+
+    @classmethod
+    def evaluate_sample_adequacy(cls, n: int) -> SampleAdequacy:
+        """
+        Evaluates sample adequacy status according to canonical V10 thresholds:
+        N >= 30: ADEQUATE
+        10 <= N <= 29: LIMITED
+        1 <= N <= 9: INSUFFICIENT
+        N == 0: UNKNOWN
+        """
+        if n >= cls.MIN_CANDIDATE_QUALIFICATION_SAMPLE:
+            return SampleAdequacy.ADEQUATE
+        if n >= cls.MIN_EVALUABLE_PERIOD_SAMPLE:
+            return SampleAdequacy.LIMITED
+        if n > 0:
+            return SampleAdequacy.INSUFFICIENT
+        return SampleAdequacy.UNKNOWN
 
     # -------------------------------------------------------------------------
     # 2. Chronological Partitioning Algorithms
@@ -892,6 +911,259 @@ class HistoricalFindingsService:
             query_parameters=query_params,
             total_hypotheses=len(hypotheses),
             hypotheses=hypotheses,
+        )
+
+    # -------------------------------------------------------------------------
+    # 8. Candidate Monitoring & Persistence Analysis (Phase 3B)
+    # -------------------------------------------------------------------------
+
+    def get_historical_monitoring(
+        self,
+        instrument: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        horizon: int = 5,
+        candidate_id: Optional[str] = None,
+        candidate_as_of: Optional[datetime] = None,
+        as_of: Optional[datetime] = None,
+        candles: Optional[List[Any]] = None,
+        observations: Optional[List[HistoricalBehaviourObservation]] = None,
+    ) -> CandidateMonitoringResponse:
+        """
+        Evaluates descriptive monitoring metrics for Phase 3 candidate hypotheses (Phase 3B).
+        Strictly observes subsequent observations where:
+            candidate_as_of < observation_time <= as_of
+        Zero lookahead; candidate definitions and discovery metrics remain 100% immutable.
+        """
+        # Determine candidate boundary
+        cand_as_of_effective = (
+            candidate_as_of
+            if candidate_as_of is not None
+            else datetime(2026, 9, 22, 0, 0, 0, tzinfo=timezone.utc)
+        )
+        if cand_as_of_effective.tzinfo is None:
+            cand_as_of_effective = cand_as_of_effective.replace(tzinfo=timezone.utc)
+
+        # Determine evaluation boundary
+        as_of_effective = as_of if as_of is not None else datetime.now(timezone.utc)
+        if as_of_effective.tzinfo is None:
+            as_of_effective = as_of_effective.replace(tzinfo=timezone.utc)
+
+        # Symbols to monitor
+        if instrument:
+            symbols = [instrument.upper()]
+        else:
+            # Authoritative active watchlist for default enumeration
+            symbols = ["XAUUSD", "GBPUSD", "EURUSD"]
+
+        tf_normalized = timeframe.upper() if timeframe else "1H"
+
+        query_params = {
+            "instrument": instrument,
+            "timeframe": timeframe,
+            "horizon": horizon,
+            "candidate_id": candidate_id,
+            "candidate_as_of": cand_as_of_effective.isoformat(),
+            "as_of": as_of_effective.isoformat(),
+        }
+
+        all_monitoring_records: List[CandidateMonitoring] = []
+        total_monitoring_obs_count = 0
+        total_valid_monitoring_obs_count = 0
+        total_incomplete_monitoring_obs_count = 0
+
+        for sym in symbols:
+            # 1. Get frozen candidate hypotheses formulated up to candidate_as_of_effective
+            cand_candles = None
+            if candles:
+                cand_candles = [
+                    c for c in candles
+                    if (getattr(c, "bar_time", getattr(c, "timestamp", None)) or cand_as_of_effective) <= cand_as_of_effective
+                ]
+
+            cand_obs = None
+            if observations:
+                cand_obs = [o for o in observations if o.observation_time <= cand_as_of_effective]
+
+            hyp_resp = self.get_historical_hypotheses(
+                instrument=sym,
+                timeframe=tf_normalized,
+                horizon=horizon,
+                as_of=cand_as_of_effective,
+                candles=cand_candles,
+                observations=cand_obs,
+            )
+
+            # Filter candidates: only qualified CANDIDATE_PAPER_HYPOTHESIS candidates
+            target_candidates = [
+                h for h in hyp_resp.hypotheses
+                if h.status == HypothesisStatus.CANDIDATE_PAPER_HYPOTHESIS
+            ]
+
+            if candidate_id:
+                target_candidates = [h for h in target_candidates if h.hypothesis_id == candidate_id]
+
+            if not target_candidates:
+                continue
+
+            # 2. Get full observations up to as_of_effective
+            base_resp = historical_behaviour_service.get_historical_behaviour_analytics(
+                instrument=sym,
+                timeframe=tf_normalized,
+                forward_window=horizon,
+                as_of=as_of_effective,
+                limit=10000,
+                candles=candles,
+                observations=observations,
+            )
+
+            # 3. Extract Monitoring observations: strictly candidate_as_of < observation_time <= as_of
+            sym_monitoring_obs = [
+                o for o in base_resp.observations
+                if o.observation_time > cand_as_of_effective and o.observation_time <= as_of_effective
+            ]
+
+            def get_group_key(obs: HistoricalBehaviourObservation) -> Tuple[str, str, str, str]:
+                inst = (obs.instrument or getattr(obs.candle_observation, "instrument", sym) or sym).upper()
+                tf = (obs.timeframe or getattr(obs.candle_observation, "timeframe", tf_normalized) or tf_normalized).upper()
+                c_obs = obs.candle_observation
+                beh = c_obs.rejection_observation.value
+                regime = c_obs.market_regime_context or "UNKNOWN"
+                struct = c_obs.support_resistance_interaction.value
+                ctx = f"{regime}+{struct}"
+                return inst, tf, beh, ctx
+
+            # Group monitoring observations
+            mon_groups: Dict[Tuple[str, str, str, str], List[HistoricalBehaviourObservation]] = {}
+            for o in sym_monitoring_obs:
+                k = get_group_key(o)
+                mon_groups.setdefault(k, []).append(o)
+
+            # 4. For each candidate, evaluate monitoring persistence
+            for cand in target_candidates:
+                cand_k = (cand.instrument.upper(), cand.timeframe.upper(), cand.behaviour, cand.context)
+                matched_obs = mon_groups.get(cand_k, [])
+
+                # Sort strictly by (observation_time, observation_id)
+                sorted_matched = self.sort_observations_chronologically(matched_obs)
+
+                mon_total = len(sorted_matched)
+                total_monitoring_obs_count += mon_total
+
+                # Separate by data quality for the specific horizon
+                valid_mon: List[HistoricalBehaviourObservation] = []
+                incomplete_mon: List[HistoricalBehaviourObservation] = []
+                invalid_mon: List[HistoricalBehaviourObservation] = []
+
+                for o in sorted_matched:
+                    fw = o.forward_windows.get(horizon)
+                    if fw and fw.data_quality == DataQuality.VALID:
+                        valid_mon.append(o)
+                    elif fw and fw.data_quality == DataQuality.INCOMPLETE:
+                        incomplete_mon.append(o)
+                    else:
+                        invalid_mon.append(o)
+
+                n_valid = len(valid_mon)
+                n_incomplete = len(incomplete_mon)
+                n_invalid = len(invalid_mon)
+
+                total_valid_monitoring_obs_count += n_valid
+                total_incomplete_monitoring_obs_count += n_incomplete
+
+                mon_adequacy = self.evaluate_sample_adequacy(n_valid)
+
+                # Compute descriptive statistics on valid observations only
+                mon_stats = None
+                mon_stability = None
+                if n_valid > 0:
+                    mon_stats, _, _ = historical_behaviour_service.calculate_descriptive_statistics(
+                        valid_mon, horizon=horizon
+                    )
+                    mon_stability = self.analyze_group_stability(valid_mon, horizon=horizon)
+
+                mon_start = sorted_matched[0].observation_time if sorted_matched else None
+                mon_end = sorted_matched[-1].observation_time if sorted_matched else None
+                ids_sample = self.get_deterministic_observation_ids_sample(sorted_matched)
+
+                # Formulate structured limitations
+                mon_limitations = [
+                    "Descriptive historical candidate monitoring only; no causal inference.",
+                    "Candidate identity and wording formulated strictly from historical Discovery data.",
+                    "Zero execution directives, signals, scores, or advice.",
+                ]
+                if n_valid == 0:
+                    mon_limitations.append("No valid outcome observations accumulated yet in monitoring window.")
+                elif n_valid < self.MIN_CANDIDATE_QUALIFICATION_SAMPLE:
+                    mon_limitations.append(f"Limited monitoring sample size (N={n_valid} < 30).")
+
+                if n_incomplete > 0:
+                    mon_limitations.append(f"{n_incomplete} observation(s) currently incomplete (forward horizon pending).")
+
+                # Overall data quality for this monitoring record
+                rec_dq = (
+                    DataQuality.VALID
+                    if n_valid > 0
+                    else (DataQuality.INCOMPLETE if n_incomplete > 0 else DataQuality.VALID)
+                )
+
+                rec = CandidateMonitoring(
+                    candidate_id=cand.hypothesis_id,
+                    candidate_as_of=cand_as_of_effective,
+                    instrument=cand.instrument,
+                    timeframe=cand.timeframe,
+                    horizon=cand.horizon,
+                    behaviour_identity=cand.behaviour,
+                    context_identity=cand.context,
+                    candidate_wording=cand.descriptive_observation,
+                    discovery_sample_size=cand.discovery_sample_size,
+                    discovery_metrics=cand.discovery_metrics,
+                    validation_sample_size=cand.validation_sample_size,
+                    validation_metrics=cand.validation_metrics,
+                    qualification_status=cand.status,
+                    candidate_limitations=cand.limitations,
+                    monitoring_start=mon_start,
+                    monitoring_end=mon_end,
+                    monitoring_total_observations=mon_total,
+                    monitoring_sample_size=n_valid,
+                    monitoring_incomplete_observations=n_incomplete,
+                    monitoring_invalid_observations=n_invalid,
+                    monitoring_sample_adequacy=mon_adequacy,
+                    monitoring_data_quality=rec_dq,
+                    monitoring_metrics=mon_stats,
+                    monitoring_stability=mon_stability,
+                    observation_ids_sample=ids_sample,
+                    methodology_version=self.RESEARCH_METHODOLOGY_VERSION,
+                    monitoring_limitations=mon_limitations,
+                )
+                all_monitoring_records.append(rec)
+
+        # Deterministic sorting: (instrument, timeframe, candidate_id)
+        sorted_records = sorted(
+            all_monitoring_records,
+            key=lambda m: (m.instrument.upper(), m.timeframe.upper(), m.candidate_id),
+        )
+
+        resp_limitations = [
+            "Descriptive paper-only research monitoring.",
+            "Contains zero automated execution directives or signals.",
+            "All candidate definitions remain strictly frozen at candidate_as_of.",
+        ]
+
+        return CandidateMonitoringResponse(
+            experiment_name="HISTORICAL_CANDIDATE_MONITORING",
+            experiment_version=self.EXPERIMENT_VERSION,
+            phase_1_version=self.PHASE_1_VERSION,
+            phase_2_version=self.PHASE_2_VERSION,
+            phase_3_version=self.RESEARCH_METHODOLOGY_VERSION,
+            as_of=as_of_effective,
+            candidate_as_of=cand_as_of_effective,
+            query_parameters=query_params,
+            total_candidates=len(sorted_records),
+            total_monitoring_observations=total_monitoring_obs_count,
+            total_valid_monitoring_observations=total_valid_monitoring_obs_count,
+            total_incomplete_monitoring_observations=total_incomplete_monitoring_obs_count,
+            monitoring_records=sorted_records,
+            limitations=resp_limitations,
         )
 
 

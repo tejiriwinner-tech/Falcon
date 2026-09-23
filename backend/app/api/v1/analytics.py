@@ -28,6 +28,7 @@ from app.schemas.historical_behaviour import (
     HistoricalBehaviourSummaryResponse,
 )
 from app.schemas.historical_findings import (
+    CandidateMonitoringResponse,
     HistoricalFindingsResponse,
     HistoricalHypothesesResponse,
     HistoricalStabilityResponse,
@@ -289,6 +290,30 @@ def get_historical_hypotheses(
         horizon=horizon,
         as_of=as_of,
         sample_adequacy=sample_adequacy,
+    )
+
+
+@router.get("/candlestick-behaviour/monitoring", response_model=CandidateMonitoringResponse)
+def get_historical_monitoring(
+    instrument: Optional[str] = None,
+    timeframe: Optional[str] = None,
+    horizon: int = 5,
+    candidate_id: Optional[str] = None,
+    candidate_as_of: Optional[datetime] = None,
+    as_of: Optional[datetime] = None,
+):
+    """
+    Returns descriptive monitoring and persistence analysis for Phase 3 candidate hypotheses (Phase 3B).
+    Evaluates subsequent observations occurring strictly after candidate_as_of.
+    Stateless, read-only, non-ranking, and contains zero execution directives.
+    """
+    return historical_findings_service.get_historical_monitoring(
+        instrument=instrument,
+        timeframe=timeframe,
+        horizon=horizon,
+        candidate_id=candidate_id,
+        candidate_as_of=candidate_as_of,
+        as_of=as_of,
     )
 
 
