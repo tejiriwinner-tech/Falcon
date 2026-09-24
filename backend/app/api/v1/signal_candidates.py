@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from app.core.engines.market_state_engine import MarketStateEngine
 from app.core.engines.strategy_engine import StrategyEngine
 from app.core.engines.signal_generation_engine import SignalGenerationEngine
+from app.core.services.research_promotion_service import research_promotion_service
 from app.schemas.signal_candidate import SignalCandidate, SignalCandidateListResponse
 
 router = APIRouter()
@@ -19,7 +20,10 @@ def get_signal_candidates():
     """
     market_state = market_state_engine.get_market_state()
     strategies = strategy_engine.get_strategies()
-    candidates = signal_generation_engine.generate_candidates(market_state, strategies)
+    research_contexts = research_promotion_service.get_active_promoted_contexts()
+    candidates = signal_generation_engine.generate_candidates(
+        market_state, strategies, research_contexts=research_contexts
+    )
     return SignalCandidateListResponse(
         candidates=candidates,
         lastUpdated=datetime.now(timezone.utc)
@@ -33,7 +37,10 @@ def get_signal_candidate(candidate_id: str):
     """
     market_state = market_state_engine.get_market_state()
     strategies = strategy_engine.get_strategies()
-    candidates = signal_generation_engine.generate_candidates(market_state, strategies)
+    research_contexts = research_promotion_service.get_active_promoted_contexts()
+    candidates = signal_generation_engine.generate_candidates(
+        market_state, strategies, research_contexts=research_contexts
+    )
     for candidate in candidates:
         if candidate.id == candidate_id:
             return candidate

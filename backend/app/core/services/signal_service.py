@@ -189,17 +189,15 @@ class SignalService:
                 if is_approved and is_ready and not is_expired:
                     lot_size = ExecutionSettings().default_lot_size
 
-                    decision, reservation = signal_authorization_service.authorize_candidate(
+                    decision = signal_authorization_service.evaluate_candidate(
                         candidate=cand,
                         signal_id=item["signal_id"],
                         lot_size=lot_size,
-                        strategy_id=cand.strategyId,
                     )
                     if decision.allowed:
                         if symbol not in seen_symbols:
                             seen_symbols.add(symbol)
                             item["is_guardian_authorized"] = True
-                            item["reservation"] = reservation
                             item["lot_size"] = lot_size
                             curated_active.append(item)
                     else:
@@ -267,7 +265,7 @@ class SignalService:
             if strategy and strategy.preferredSessions
             else "London / New York / Asian"
         )
-        timeframe = strategy.bestTimeframe if strategy else "M15"
+        timeframe = strategy.bestTimeframe if strategy else "1h"
 
         # Check for sniper pattern
         pattern_reason = next(
@@ -324,34 +322,8 @@ class SignalService:
                 f"{be_rule} "
                 f"Active Window: {preferred_session}. Valid until {valid_until.strftime('%H:%M UTC')}."
             )
-            # Auto-queue active order for MT5 execution bridge
-            try:
-                from app.services.execution.order_execution_service import order_execution_service
-                from app.schemas.execution_order import ExecutionOrderCreate, OrderAction
-                existing_orders = order_execution_service.list_orders(limit=25)
-                already_queued = any(
-                    o.symbol == candidate.symbol.upper()
-                    and o.action.value == candidate.direction.value.upper()
-                    and abs(o.entry_price - candidate.entryPrice) < (0.0002 if "USD" in candidate.symbol and "XAU" not in candidate.symbol else 0.5)
-                    for o in existing_orders
-                )
-                if not already_queued:
-                    order_in = ExecutionOrderCreate(
-                        signal_id=signal_id,
-                        symbol=candidate.symbol,
-                        action=OrderAction.BUY if candidate.direction.value.upper() == "BUY" else OrderAction.SELL,
-                        lot_size=lot_size or 0.01,
-                        entry_price=candidate.entryPrice,
-                        stop_loss=candidate.stopLoss,
-                        take_profit=candidate.takeProfit,
-                        strategy_name=setup_pattern,
-                        confidence=candidate.confidence,
-                        comment=f"Falcon {setup_pattern[:15]}",
-                    )
-                    order_execution_service.create_order(order_in)
-                    logger.info(f"Auto-dispatched active signal #{signal_id} ({candidate.symbol}) to MT5 execution queue")
-            except Exception as ex:
-                logger.warning(f"Could not auto-queue signal #{signal_id} to MT5: {ex}")
+            # Note: Signal generation is informational and manual execution guidance only.
+            # Normal signal generation never auto-dispatches execution orders.
         elif is_expired:
             status = "EXPIRED"
             analysis = (

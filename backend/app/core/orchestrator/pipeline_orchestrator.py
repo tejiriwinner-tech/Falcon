@@ -13,6 +13,7 @@ from app.core.engines.decision_engine import DecisionEngine
 from app.core.engines.market_state_engine import FALCON_WATCHLIST
 from app.core.repository.mission_repository import mission_repository
 from app.core.services.market_history_service import market_history_service
+from app.core.services.research_promotion_service import research_promotion_service
 from app.services.alerts.telegram_alert_service import telegram_alert_service
 
 from app.schemas.mission_report import (
@@ -98,7 +99,10 @@ class PipelineOrchestrator:
         sig_start = time.time()
         sig_started_at = datetime.now(timezone.utc)
         strategies = self._strategy_engine.get_strategies()
-        candidates = self._signal_engine.generate_candidates(market_state, strategies)
+        research_contexts = research_promotion_service.get_active_promoted_contexts()
+        candidates = self._signal_engine.generate_candidates(
+            market_state, strategies, research_contexts=research_contexts
+        )
         sig_end = time.time()
         signal_duration_ms = max(1, int((sig_end - sig_start) * 1000))
         sig_completed_at = datetime.now(timezone.utc)

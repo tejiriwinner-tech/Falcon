@@ -89,6 +89,161 @@ class SignalAuthorizationService:
             active_cycle=cycle, filter_by_cycle=True, session=session, execution_mode=execution_mode
         )
 
+    def evaluate_candidate(
+        self,
+        candidate: SignalCandidate,
+        signal_id: Optional[int] = None,
+        lot_size: Optional[Decimal | float] = None,
+        session: Optional[object] = None,
+        execution_mode: Optional[str] = "LIVE",
+    ) -> CapitalGuardianDecision:
+        """
+        Pure read-only evaluation of a candidate signal against Capital Guardian invariants.
+        Does NOT insert or mutate trade_journal or consume persistent capital reservations.
+        """
+        if lot_size is None:
+            from app.schemas.execution_order import ExecutionSettings
+            lot_size = ExecutionSettings().default_lot_size
+
+        proposal = ProposedTradeInput(
+            symbol=candidate.symbol.upper(),
+            direction=candidate.direction.value.upper(),
+            entryPrice=Decimal(str(candidate.entryPrice)),
+            stopLoss=Decimal(str(candidate.stopLoss)),
+            takeProfit=Decimal(str(candidate.takeProfit)),
+            lotSize=Decimal(str(lot_size)),
+            riskReward=Decimal(str(round(candidate.riskReward, 2)))
+            if candidate.riskReward
+            else None,
+        )
+
+        return self.evaluate_proposal(
+            proposal=proposal,
+            signal_id=signal_id,
+            session=session,
+            execution_mode=execution_mode,
+        )
+
+    def evaluate_proposal(
+        self,
+        proposal: ProposedTradeInput,
+        signal_id: Optional[int] = None,
+        session: Optional[object] = None,
+        execution_mode: Optional[str] = "LIVE",
+    ) -> CapitalGuardianDecision:
+        """
+        Pure read-only evaluation of a trade proposal against Capital Guardian invariants.
+        Does NOT insert into trade_journal or mutate persistent database state.
+        """
+        try:
+            # 1. Fetch active capital cycle
+            cycle = self._cycle_service.get_active_cycle(session=session)
+            if cycle is None:
+                return CapitalGuardianDecision(
+                    allowed=False,
+                    reason="No active capital cycle",
+                    state=GuardianState.HALTED,
+                    activeTradingCapital=Decimal("0.00"),
+                    protectedProfit=Decimal("0.00"),
+                    currentLiveTradeCount=0,
+                    maxLiveTradeCount=settings.MAX_SIMULTANEOUS_TRADES,
+                    currentAggregateWorstCaseLoss=Decimal("0.00"),
+                    proposedWorstCaseLoss=Decimal("0.00"),
+                    aggregateWorstCaseLossAfter=Decimal("0.00"),
+                    remainingLossCapacity=Decimal("0.00"),
+                    cycleId=None,
+                )
+
+            if cycle.status in (CapitalCycleStatus.HALTED, "HALTED"):
+                return CapitalGuardianDecision(
+                    allowed=False,
+                    reason="Active capital cycle is HALTED",
+                    state=GuardianState.HALTED,
+                    activeTradingCapital=cycle.activeTradingCapital,
+                    protectedProfit=cycle.protectedProfit,
+                    currentLiveTradeCount=0,
+                    maxLiveTradeCount=settings.MAX_SIMULTANEOUS_TRADES,
+                    currentAggregateWorstCaseLoss=Decimal("0.00"),
+                    proposedWorstCaseLoss=Decimal("0.00"),
+                    aggregateWorstCaseLossAfter=Decimal("0.00"),
+                    remainingLossCapacity=Decimal("0.00"),
+                    cycleId=cycle.cycleId,
+                )
+
+            if cycle.status not in (CapitalCycleStatus.ACTIVE, "ACTIVE"):
+                return CapitalGuardianDecision(
+                    allowed=False,
+                    reason=f"Active capital cycle has invalid status '{cycle.status}'",
+                    state=GuardianState.HALTED,
+                    activeTradingCapital=cycle.activeTradingCapital,
+                    protectedProfit=cycle.protectedProfit,
+                    currentLiveTradeCount=0,
+                    maxLiveTradeCount=settings.MAX_SIMULTANEOUS_TRADES,
+                    currentAggregateWorstCaseLoss=Decimal("0.00"),
+                    proposedWorstCaseLoss=Decimal("0.00"),
+                    aggregateWorstCaseLossAfter=Decimal("0.00"),
+                    remainingLossCapacity=Decimal("0.00"),
+                    cycleId=cycle.cycleId,
+                )
+
+            # 2. Fetch current capital-reserving trades for this execution mode
+            reserving_trades = self._guardian_service.get_capital_reserving_trades(
+                active_cycle=cycle, filter_by_cycle=True, session=session, execution_mode=execution_mode
+            )
+
+            # 3. Deduplication against existing active reservation for the exact same signal_id
+            if signal_id is not None:
+                existing_res = next(
+                    (t for t in reserving_trades if t.signalId == signal_id),
+                    None,
+                )
+                if existing_res is not None:
+                    current_loss = self._guardian_service.get_aggregate_worst_case_loss(
+                        reserving_trades
+                    )
+                    return CapitalGuardianDecision(
+                        allowed=True,
+                        reason=f"Signal #{signal_id} is already reserved in active cycle (trade #{existing_res.id})",
+                        state=GuardianState.NORMAL,
+                        activeTradingCapital=cycle.activeTradingCapital,
+                        protectedProfit=cycle.protectedProfit,
+                        currentLiveTradeCount=len(reserving_trades),
+                        maxLiveTradeCount=settings.MAX_SIMULTANEOUS_TRADES,
+                        currentAggregateWorstCaseLoss=current_loss,
+                        proposedWorstCaseLoss=Decimal("0.00"),
+                        aggregateWorstCaseLossAfter=current_loss,
+                        remainingLossCapacity=cycle.activeTradingCapital - current_loss,
+                        cycleId=cycle.cycleId,
+                    )
+
+            # 4. Evaluate proposal against Guardian invariants
+            return self._guardian_service.evaluate_proposed_trade(
+                proposal=proposal,
+                active_cycle=cycle,
+                active_trades=reserving_trades,
+                session=session,
+            )
+
+        except Exception as ex:
+            logger.error(
+                f"Fail-closed: Unexpected error during read-only Capital Guardian evaluation: {ex}",
+                exc_info=True,
+            )
+            return CapitalGuardianDecision(
+                allowed=False,
+                reason=f"Fail-closed evaluation error: {ex}",
+                state=GuardianState.HALTED,
+                activeTradingCapital=Decimal("0.00"),
+                protectedProfit=Decimal("0.00"),
+                currentLiveTradeCount=0,
+                maxLiveTradeCount=settings.MAX_SIMULTANEOUS_TRADES,
+                currentAggregateWorstCaseLoss=Decimal("0.00"),
+                proposedWorstCaseLoss=Decimal("0.00"),
+                aggregateWorstCaseLossAfter=Decimal("0.00"),
+                remainingLossCapacity=Decimal("0.00"),
+                cycleId=None,
+            )
+
     def authorize_candidate(
         self,
         candidate: SignalCandidate,

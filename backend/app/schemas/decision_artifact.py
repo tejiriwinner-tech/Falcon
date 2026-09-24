@@ -7,6 +7,7 @@ from app.schemas.signal_candidate import CandidateStatus
 from app.schemas.validation_result import ValidationStatus
 from app.schemas.risk_assessment import RiskLevel, RiskAssessmentStatus
 from app.schemas.execution_readiness import ExecutionReadinessStatus
+from app.schemas.research_promotion import ResearchSignalContext
 
 class DecisionRecommendation(str, Enum):
     BUY = "BUY"
@@ -103,6 +104,13 @@ class DecisionArtifact(BaseModel):
     pipelineSummary: DecisionPipelineSummary
     marketSnapshot: DecisionMarketSnapshot
     
+    # Canonical Trade Parameters (Phase 5B)
+    symbol: Optional[str] = None
+    entryPrice: Optional[float] = None
+    stopLoss: Optional[float] = None
+    takeProfit: Optional[float] = None
+    researchContext: Optional[ResearchSignalContext] = None
+
     # Metadata
     artifactType: str = "DecisionArtifact"
     pipelineStage: str = "DECISION"

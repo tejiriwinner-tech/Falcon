@@ -379,6 +379,10 @@ class DecisionArtifact {
   final List<DecisionFactor> watchItems;
   final DecisionPipelineSummary pipelineSummary;
   final DecisionMarketSnapshot marketSnapshot;
+  final String? symbol;
+  final double? entryPrice;
+  final double? stopLoss;
+  final double? takeProfit;
   final String artifactType;
   final String pipelineStage;
   final String pipelineVersion;
@@ -410,6 +414,10 @@ class DecisionArtifact {
     required this.watchItems,
     required this.pipelineSummary,
     required this.marketSnapshot,
+    this.symbol,
+    this.entryPrice,
+    this.stopLoss,
+    this.takeProfit,
     this.artifactType = 'DecisionArtifact',
     this.pipelineStage = 'DECISION',
     this.pipelineVersion = '1.0',
@@ -455,6 +463,10 @@ class DecisionArtifact {
           [],
       pipelineSummary: DecisionPipelineSummary.fromJson(json['pipelineSummary'] ?? {}),
       marketSnapshot: DecisionMarketSnapshot.fromJson(json['marketSnapshot'] ?? {}),
+      symbol: json['symbol'],
+      entryPrice: (json['entryPrice'] as num?)?.toDouble(),
+      stopLoss: (json['stopLoss'] as num?)?.toDouble(),
+      takeProfit: (json['takeProfit'] as num?)?.toDouble(),
       artifactType: json['artifactType'] ?? 'DecisionArtifact',
       pipelineStage: json['pipelineStage'] ?? 'DECISION',
       pipelineVersion: json['pipelineVersion'] ?? '1.0',
@@ -489,6 +501,10 @@ class DecisionArtifact {
       'watchItems': watchItems.map((x) => x.toJson()).toList(),
       'pipelineSummary': pipelineSummary.toJson(),
       'marketSnapshot': marketSnapshot.toJson(),
+      'symbol': symbol,
+      'entryPrice': entryPrice,
+      'stopLoss': stopLoss,
+      'takeProfit': takeProfit,
       'artifactType': artifactType,
       'pipelineStage': pipelineStage,
       'pipelineVersion': pipelineVersion,

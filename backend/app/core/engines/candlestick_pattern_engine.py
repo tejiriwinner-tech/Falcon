@@ -100,35 +100,38 @@ class CandlestickPatternEngine:
 
     def analyze_patterns(
         self,
-        candles_5m: List[CandleBar],
+        candles_5m: Optional[List[CandleBar]] = None,
         candles_15m: Optional[List[CandleBar]] = None,
         ema_20: Optional[float] = None,
         key_resistance: Optional[float] = None,
         key_support: Optional[float] = None,
+        candles_1h: Optional[List[CandleBar]] = None,
     ) -> List[SniperPatternResult]:
         """
-        Runs comprehensive scan across 5m and 15m candles.
-        Returns detected patterns sorted by highest conviction score.
+        Runs comprehensive scan across available candle sequences.
+        Operates directly on canonical 1h candles if lower-timeframe data is absent,
+        ensuring truthful timeframe provenance without relabeling or fabricating bars.
         """
         results: List[SniperPatternResult] = []
 
-        if not candles_5m or len(candles_5m) < 3:
+        primary_candles = candles_5m or candles_1h
+        if not primary_candles or len(primary_candles) < 3:
             return results
 
-        c_curr = candles_5m[-1]
-        c_prev = candles_5m[-2]
-        c_prev2 = candles_5m[-3] if len(candles_5m) >= 3 else None
+        c_curr = primary_candles[-1]
+        c_prev = primary_candles[-2]
+        c_prev2 = primary_candles[-3] if len(primary_candles) >= 3 else None
 
         # 1. Headway Reversal Patterns (Single and Multi-Bar)
         self._detect_headway_reversals(c_curr, c_prev, c_prev2, results)
 
         # 2. Rayner Teo Sniper Patterns
         self._detect_rayner_sniper_patterns(
-            candles_5m, ema_20, key_resistance, key_support, results
+            primary_candles, ema_20, key_resistance, key_support, results
         )
 
-        # 3. BrokerXplorer 15M / 5M Multi-Timeframe Confirmation
-        if candles_15m and len(candles_15m) >= 2:
+        # 3. Multi-Timeframe Confirmation ONLY if genuine 15m AND 5m candles exist
+        if candles_5m and candles_15m and len(candles_15m) >= 2:
             self._detect_15m_5m_alignment(candles_5m, candles_15m, results)
 
         # Sort results by conviction score descending

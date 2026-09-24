@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional, Union, Dict
+from typing import Any, Dict, List, Optional, Tuple, Union
 from app.schemas.market_state import MarketState
 from app.schemas.strategy import StrategyItem, StrategyStatus
 from app.schemas.signal_candidate import (
@@ -22,6 +22,73 @@ class SignalGenerationEngine:
     def __init__(self):
         self.version = "2.0.0"
         self.pattern_engine = CandlestickPatternEngine()
+
+    @staticmethod
+    def _calculate_trade_levels(
+        direction: CandidateDirection,
+        current_price: float,
+        atr: Optional[float] = None,
+        symbol: str = "EURUSD",
+        adaptive_mult: float = 1.0,
+        pattern_details: Optional[Dict[str, Any]] = None,
+        rr: float = 2.0,
+    ) -> Tuple[float, float, float]:
+        """
+        Calculates entry, stopLoss, and takeProfit using dynamic 1.5 * ATR fallback or pattern swing stops.
+        Returns: (entry_price, stop_loss, take_profit)
+        """
+        raw_symbol = (symbol or "").upper()
+        dec_places = 2 if ("XAU" in raw_symbol or "GOLD" in raw_symbol or current_price > 500) else (3 if "JPY" in raw_symbol else 5)
+
+        # Dynamic ATR-derived fallback stop distance: 1.5 * ATR (Phase 5B)
+        if atr is not None and atr > 0:
+            base_stop_dist = round(1.5 * atr * adaptive_mult, dec_places)
+        elif current_price > 0:
+            base_stop_dist = round(1.5 * (current_price * 0.002) * adaptive_mult, dec_places)
+        else:
+            base_stop_dist = 0.0020
+
+        # Minimum distance safety bound
+        min_dist = 0.50 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.05 if "JPY" in raw_symbol else 0.0005)
+        if base_stop_dist < min_dist:
+            base_stop_dist = min_dist
+
+        sniper_stop = None
+        sniper_target = None
+        if pattern_details:
+            if direction == CandidateDirection.BUY and "swing_low" in pattern_details:
+                sniper_stop = pattern_details["swing_low"]
+            elif direction == CandidateDirection.SELL and "swing_high" in pattern_details:
+                sniper_stop = pattern_details["swing_high"]
+            if "target_price" in pattern_details:
+                sniper_target = pattern_details["target_price"]
+            elif sniper_stop is not None:
+                risk_d = abs(current_price - sniper_stop)
+                sniper_target = current_price + (risk_d * rr) if direction == CandidateDirection.BUY else current_price - (risk_d * rr)
+
+        if sniper_stop is not None and sniper_target is not None:
+            if adaptive_mult > 1.05:
+                raw_risk = abs(current_price - sniper_stop)
+                pad = raw_risk * (adaptive_mult - 1.0)
+                if direction == CandidateDirection.BUY:
+                    stop_loss = round(sniper_stop - pad, dec_places)
+                else:
+                    stop_loss = round(sniper_stop + pad, dec_places)
+            else:
+                stop_loss = round(sniper_stop, dec_places)
+            take_profit = round(sniper_target, dec_places)
+        else:
+            if direction == CandidateDirection.BUY:
+                stop_loss = round(current_price - base_stop_dist, dec_places)
+                take_profit = round(current_price + (base_stop_dist * rr), dec_places)
+            elif direction == CandidateDirection.SELL:
+                stop_loss = round(current_price + base_stop_dist, dec_places)
+                take_profit = round(current_price - (base_stop_dist * rr), dec_places)
+            else:
+                stop_loss = round(current_price - base_stop_dist, dec_places)
+                take_profit = round(current_price + (base_stop_dist * rr), dec_places)
+
+        return (current_price, stop_loss, take_profit)
 
     @staticmethod
     def attach_research_context(
@@ -117,22 +184,19 @@ class SignalGenerationEngine:
             (s.symbol if s.symbol != "ALL" else "XAU/USD").replace("/", "")
             for s in active_strategies
         }
-        cached_bars_5m = {}
-        cached_bars_15m = {}
+        cached_bars_1h = {}
 
         def _load_bars(sym):
             try:
-                b5 = market_history_service.get_bars(sym, timeframe="5m", limit=15) or market_history_service.get_bars(sym, limit=15)
-                b15 = market_history_service.get_bars(sym, timeframe="15m", limit=15) or market_history_service.get_bars(sym, limit=15)
-                return sym, b5, b15
+                b1h = market_history_service.get_bars(sym, timeframe="1h", limit=25)
+                return sym, b1h
             except Exception:
-                return sym, [], []
+                return sym, []
 
         if unique_symbols:
             with ThreadPoolExecutor(max_workers=min(len(unique_symbols), 4)) as executor:
-                for sym, b5, b15 in executor.map(_load_bars, unique_symbols):
-                    cached_bars_5m[sym] = b5
-                    cached_bars_15m[sym] = b15
+                for sym, b1h in executor.map(_load_bars, unique_symbols):
+                    cached_bars_1h[sym] = b1h
 
         for i, strategy in enumerate(active_strategies, 1):
             started_at = datetime.now(timezone.utc)
@@ -231,22 +295,17 @@ class SignalGenerationEngine:
                 asset_trend = "Neutral"
 
             # ── 2. Candlestick Pattern & Sniper Analysis ──────────────────────
-            bars_5m = cached_bars_5m.get(canonical_symbol, [])
-            bars_15m = cached_bars_15m.get(canonical_symbol, [])
+            bars_1h = cached_bars_1h.get(canonical_symbol, [])
 
-            candles_5m = [
+            candles_1h = [
                 CandleBar(open=b.open, high=b.high, low=b.low, close=b.close, volume=b.volume)
-                for b in bars_5m
-            ]
-            candles_15m = [
-                CandleBar(open=b.open, high=b.high, low=b.low, close=b.close, volume=b.volume)
-                for b in bars_15m
+                for b in bars_1h
             ]
 
             # Append live bar if available
-            if candles_5m and entry_price > 0:
-                last_c = candles_5m[-1]
-                candles_5m.append(CandleBar(
+            if candles_1h and entry_price > 0:
+                last_c = candles_1h[-1]
+                candles_1h.append(CandleBar(
                     open=last_c.close,
                     high=max(last_c.close, entry_price),
                     low=min(last_c.close, entry_price),
@@ -256,19 +315,31 @@ class SignalGenerationEngine:
             ema_20 = None
             key_res = None
             key_sup = None
-            if candles_5m and len(candles_5m) >= 5:
-                closes = [c.close for c in candles_5m]
+            if candles_1h and len(candles_1h) >= 5:
+                closes = [c.close for c in candles_1h]
                 ema_20 = sum(closes[-5:]) / 5.0
-                key_res = max(c.high for c in candles_5m[-10:])
-                key_sup = min(c.low for c in candles_5m[-10:])
+                key_res = max(c.high for c in candles_1h[-10:])
+                key_sup = min(c.low for c in candles_1h[-10:])
 
             detected_patterns = self.pattern_engine.analyze_patterns(
-                candles_5m=candles_5m,
-                candles_15m=candles_15m,
+                candles_1h=candles_1h,
                 ema_20=ema_20,
                 key_resistance=key_res,
                 key_support=key_sup
             )
+
+            # Compute authentic ATR from indicators or canonical bars
+            atr_val = next((ind.value for ind in sym_indicators if ind.name == "ATR"), None)
+            if atr_val is None and len(bars_1h) >= 2:
+                tr_list = []
+                for idx in range(1, len(bars_1h)):
+                    prev_c = bars_1h[idx - 1].close
+                    b = bars_1h[idx]
+                    tr = max(b.high - b.low, abs(b.high - prev_c), abs(b.low - prev_c))
+                    tr_list.append(tr)
+                recent_tr = tr_list[-14:] if len(tr_list) >= 14 else tr_list
+                if recent_tr:
+                    atr_val = sum(recent_tr) / len(recent_tr)
 
             sniper_pattern = detected_patterns[0] if detected_patterns else None
             strat_type_val = strategy.type.value if hasattr(strategy.type, 'value') else str(strategy.type)
@@ -447,40 +518,27 @@ class SignalGenerationEngine:
             tuning_profile = adaptive_tuning_engine.get_strategy_tuning(strategy.id, raw_symbol, as_of=eval_time)
             adaptive_mult = tuning_profile.adaptive_stop_multiplier
 
-            if "XAU" in raw_symbol or "GOLD" in raw_symbol:
-                base_stop_dist = round(11.50 * vol_mult * adaptive_mult, 2)
-            elif "JPY" in raw_symbol:
-                base_stop_dist = round(0.45 * vol_mult * adaptive_mult, 3)
-            elif "GBP" in raw_symbol:
-                base_stop_dist = round(0.0035 * vol_mult * adaptive_mult, 5)
-            else:
-                base_stop_dist = round(0.0028 * vol_mult * adaptive_mult, 5)
-
-            if sniper_stop is not None and sniper_target is not None:
-                # If adaptive multiplier is expanded (>1.0), apply protective padding to sniper stop as well
-                if adaptive_mult > 1.05:
-                    raw_risk = abs(entry_price - sniper_stop)
-                    pad = raw_risk * (adaptive_mult - 1.0)
-                    if direction == CandidateDirection.BUY:
-                        stop_loss = round(sniper_stop - pad, 5)
-                    else:
-                        stop_loss = round(sniper_stop + pad, 5)
-                else:
-                    stop_loss = sniper_stop
-                take_profit = sniper_target
-                risk_dist = abs(entry_price - stop_loss)
-                if risk_dist > 1e-6:
-                    rr = round(abs(take_profit - entry_price) / risk_dist, 2)
-            else:
+            pattern_details = {}
+            if sniper_stop is not None:
                 if direction == CandidateDirection.BUY:
-                    stop_loss = round(entry_price - base_stop_dist, 5)
-                    take_profit = round(entry_price + (base_stop_dist * rr), 5)
-                elif direction == CandidateDirection.SELL:
-                    stop_loss = round(entry_price + base_stop_dist, 5)
-                    take_profit = round(entry_price - (base_stop_dist * rr), 5)
+                    pattern_details["swing_low"] = sniper_stop
                 else:
-                    stop_loss = round(entry_price - base_stop_dist, 5)
-                    take_profit = round(entry_price + (base_stop_dist * rr), 5)
+                    pattern_details["swing_high"] = sniper_stop
+            if sniper_target is not None:
+                pattern_details["target_price"] = sniper_target
+
+            entry_price, stop_loss, take_profit = self._calculate_trade_levels(
+                direction=direction,
+                current_price=entry_price,
+                atr=atr_val,
+                symbol=raw_symbol,
+                adaptive_mult=adaptive_mult,
+                pattern_details=pattern_details if (sniper_stop or sniper_target) else None,
+                rr=rr,
+            )
+            risk_dist = abs(entry_price - stop_loss)
+            if risk_dist > 1e-6:
+                rr = round(abs(take_profit - entry_price) / risk_dist, 2)
 
             if adaptive_mult > 1.05:
                 reasons.append(CandidateReason(
@@ -496,6 +554,7 @@ class SignalGenerationEngine:
             duration_ms = max(1, int((now_utc - started_at).total_seconds() * 1000))
             completed_at = now_utc
 
+            dec_places = 2 if ("JPY" in raw_symbol or "XAU" in raw_symbol or "GOLD" in raw_symbol or entry_price > 100) else 4
             market_snapshot = CandidateMarketSnapshot(
                 trend=asset_trend,
                 volatility=volatility,
@@ -503,7 +562,9 @@ class SignalGenerationEngine:
                 spread=spread,
                 newsImpact=news_impact,
                 marketSentiment=market_sentiment,
-                marketConfidence=market_confidence
+                marketConfidence=market_confidence,
+                atr=round(atr_val, dec_places) if atr_val is not None else None,
+                rsi=round(rsi_val, 2) if rsi_val is not None else None,
             )
 
             # Strict 5-tuple research context resolution (Phase 4C Section 8)

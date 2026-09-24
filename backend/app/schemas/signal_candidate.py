@@ -44,6 +44,7 @@ class CandidateMarketSnapshot(BaseModel):
     marketSentiment: str
     marketConfidence: int
     atr: Optional[float] = None
+    rsi: Optional[float] = None
 
 class SignalCandidate(BaseModel):
     id: str

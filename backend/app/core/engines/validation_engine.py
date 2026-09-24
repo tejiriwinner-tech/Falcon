@@ -69,15 +69,24 @@ class ValidationEngine:
 
             # 3. RSI Validation (Weight: 15, Mandatory: Yes)
             # Confirms RSI indicator is within healthy non-exhaustion boundary (30.0 - 70.0)
-            rsi_val = float(getattr(candidate.marketSnapshot, "rsi", 50.0))
-            rsi_passed = 30.0 <= rsi_val <= 70.0
+            rsi_raw = getattr(candidate.marketSnapshot, "rsi", None) if candidate.marketSnapshot else None
+            if rsi_raw is not None:
+                rsi_val = float(rsi_raw)
+                rsi_passed = 30.0 <= rsi_val <= 70.0
+                rsi_desc = f"Ensures RSI ({rsi_val:.1f}) is within normal operating range (30-70)."
+                rsi_score = 15 if rsi_passed else 0
+            else:
+                rsi_passed = False
+                rsi_desc = "RSI indicator telemetry unavailable; failed to verify healthy non-exhaustion boundary."
+                rsi_score = 0
+
             check_rsi = ValidationCheck(
                 title="RSI Validation",
-                description=f"Ensures RSI ({rsi_val:.1f}) is within normal operating range (30-70).",
+                description=rsi_desc,
                 passed=rsi_passed,
                 mandatory=True,
                 weight=15,
-                scoreAwarded=15 if rsi_passed else 0
+                scoreAwarded=rsi_score
             )
 
             # 4. Session Match (Weight: 10, Mandatory: Yes)

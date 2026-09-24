@@ -255,8 +255,24 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
                 ),
                 child: Column(
                   children: [
+                    if (d.symbol != null && d.symbol!.isNotEmpty) ...[
+                      _buildParamRow('Symbol', d.symbol!),
+                      const SizedBox(height: 6),
+                    ],
                     _buildParamRow('Action', action),
                     const SizedBox(height: 6),
+                    if (d.entryPrice != null) ...[
+                      _buildParamRow('Entry Price', d.entryPrice!.toStringAsFixed(d.entryPrice! > 100 ? 2 : 4)),
+                      const SizedBox(height: 6),
+                    ],
+                    if (d.stopLoss != null) ...[
+                      _buildParamRow('Stop Loss', d.stopLoss!.toStringAsFixed(d.stopLoss! > 100 ? 2 : 4)),
+                      const SizedBox(height: 6),
+                    ],
+                    if (d.takeProfit != null) ...[
+                      _buildParamRow('Take Profit', d.takeProfit!.toStringAsFixed(d.takeProfit! > 100 ? 2 : 4)),
+                      const SizedBox(height: 6),
+                    ],
                     _buildParamRow('Strategy', '${d.strategyName} v${d.strategyVersion}'),
                     const SizedBox(height: 6),
                     _buildParamRow('Decision ID', d.id),
@@ -315,7 +331,11 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
                         final summaryText = [
                           'Falcon Decision Summary',
                           '',
+                          if (d.symbol != null && d.symbol!.isNotEmpty) 'Symbol: ${d.symbol}',
                           'Action: ${d.recommendation.name}',
+                          if (d.entryPrice != null) 'Entry Price: ${d.entryPrice}',
+                          if (d.stopLoss != null) 'Stop Loss: ${d.stopLoss}',
+                          if (d.takeProfit != null) 'Take Profit: ${d.takeProfit}',
                           'Strategy: ${d.strategyName} v${d.strategyVersion}',
                           'Decision ID: ${d.id}',
                           'Confidence: ${d.decisionConfidence.toInt()}%',

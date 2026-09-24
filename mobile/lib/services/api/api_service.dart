@@ -560,50 +560,5 @@ class ApiService {
       throw Exception('Runtime events fetch failed: $e');
     }
   }
-
-  // ── MetaTrader 5 (MT5) Execution ──────────────────────────────────────────
-
-  /// POST /execution/orders — submit a trade order to MT5.
-  Future<Map<String, dynamic>> executeOrder({
-    required String symbol,
-    required String action,
-    double lotSize = 0.01,
-    required double entryPrice,
-    required double stopLoss,
-    required double takeProfit,
-    String strategyName = 'Falcon Mobile 1-Tap',
-    int confidence = 80,
-  }) async {
-    final url = '$baseUrl/execution/orders';
-    print('Calling executeOrder: $url');
-    try {
-      final response = await http
-          .post(
-            Uri.parse(url),
-            headers: {'Content-Type': 'application/json'},
-            body: jsonEncode({
-              'symbol': symbol,
-              'action': action.toUpperCase(),
-              'lot_size': lotSize,
-              'order_type': 'MARKET',
-              'entry_price': entryPrice,
-              'stop_loss': stopLoss,
-              'take_profit': takeProfit,
-              'strategy_name': strategyName,
-              'confidence': confidence,
-              'comment': 'Falcon 1-Tap',
-            }),
-          )
-          .timeout(const Duration(seconds: timeoutSeconds));
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        return jsonDecode(response.body) as Map<String, dynamic>;
-      }
-      throw Exception('Execute order error: ${response.statusCode}');
-    } on TimeoutException {
-      throw Exception('Request timed out after $timeoutSeconds seconds.');
-    } catch (e) {
-      throw Exception('Order execution failed: $e');
-    }
-  }
 }
 

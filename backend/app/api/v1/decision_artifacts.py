@@ -8,6 +8,7 @@ from app.core.engines.validation_engine import ValidationEngine
 from app.core.engines.risk_engine import RiskEngine
 from app.core.engines.execution_readiness_engine import ExecutionReadinessEngine
 from app.core.engines.decision_engine import DecisionEngine
+from app.core.services.research_promotion_service import research_promotion_service
 
 from app.schemas.decision_artifact import (
     DecisionArtifact,
@@ -34,7 +35,10 @@ def get_decision_artifacts():
     """
     market_state = market_state_engine.get_market_state()
     strategies = strategy_engine.get_strategies()
-    candidates = signal_generation_engine.generate_candidates(market_state, strategies)
+    research_contexts = research_promotion_service.get_active_promoted_contexts()
+    candidates = signal_generation_engine.generate_candidates(
+        market_state, strategies, research_contexts=research_contexts
+    )
     validations = validation_engine.validate_candidates(candidates, strategies, market_state)
     assessments = risk_engine.assess_all(validations, candidates, strategies, market_state)
     readiness_items = execution_readiness_engine.evaluate_execution_readiness(
