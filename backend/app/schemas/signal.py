@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
+from app.schemas.research_promotion import ResearchSignalContext
 
 class SignalItem(BaseModel):
     id: int
@@ -19,6 +20,7 @@ class SignalItem(BaseModel):
     strategyVersion: str
     adaptiveRuleVersion: Optional[str] = None
     adaptiveStopMultiplier: Optional[float] = None
+    researchContext: Optional[ResearchSignalContext] = None
     dataAgeSeconds: int
     triggerCondition: Optional[str] = None
     validUntil: Optional[datetime] = None

@@ -29,10 +29,12 @@ from app.schemas.historical_behaviour import (
 )
 from app.schemas.historical_findings import (
     CandidateMonitoringResponse,
+    ForwardValidationResponse,
     HistoricalFindingsResponse,
     HistoricalHypothesesResponse,
     HistoricalStabilityResponse,
 )
+from app.schemas.research_promotion import ResearchPromotionResponse
 
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
@@ -314,6 +316,54 @@ def get_historical_monitoring(
         candidate_id=candidate_id,
         candidate_as_of=candidate_as_of,
         as_of=as_of,
+    )
+
+
+@router.get("/candlestick-behaviour/forward-validation", response_model=ForwardValidationResponse)
+def get_forward_validation(
+    candidate_id: Optional[str] = None,
+    instrument: Optional[str] = None,
+    timeframe: Optional[str] = None,
+    horizon: int = 5,
+    candidate_as_of: Optional[datetime] = None,
+    validation_as_of: Optional[datetime] = None,
+):
+    """
+    Returns independent paper-only forward validation and research audit for Phase 3 candidate hypotheses (Phase 3C).
+    Evaluates genuinely unseen chronological observations strictly after candidate_as_of.
+    Stateless, read-only, non-ranking, and contains zero execution directives.
+    """
+    return historical_findings_service.get_forward_validation(
+        candidate_id=candidate_id,
+        instrument=instrument,
+        timeframe=timeframe,
+        horizon=horizon,
+        candidate_as_of=candidate_as_of,
+        validation_as_of=validation_as_of,
+    )
+
+
+@router.get("/candlestick-behaviour/promotion", response_model=ResearchPromotionResponse)
+def get_research_promotion(
+    candidate_id: Optional[str] = None,
+    instrument: Optional[str] = None,
+    timeframe: Optional[str] = None,
+    horizon: int = 5,
+    candidate_as_of: Optional[datetime] = None,
+    validation_as_of: Optional[datetime] = None,
+):
+    """
+    Returns independent paper-only research promotion evaluation for Phase 3 candidate hypotheses (Phase 4B).
+    Determines whether forward-validated candidates are eligible to be exposed as informational research context.
+    Stateless, read-only, non-ranking, and contains zero execution directives or trade recommendations.
+    """
+    return historical_findings_service.get_research_promotion(
+        candidate_id=candidate_id,
+        instrument=instrument,
+        timeframe=timeframe,
+        horizon=horizon,
+        candidate_as_of=candidate_as_of,
+        validation_as_of=validation_as_of,
     )
 
 

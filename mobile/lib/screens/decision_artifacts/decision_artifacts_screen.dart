@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import '../../services/api/api_service.dart';
 import '../../models/decision_artifact.dart';
 import '../../models/validation_result.dart';
@@ -9,20 +11,32 @@ import '../../widgets/loading/placeholder_card.dart';
 import '../../core/constants/app_colors.dart';
 
 class DecisionArtifactsScreen extends StatefulWidget {
-  const DecisionArtifactsScreen({super.key});
+  final ApiService? apiService;
+  final Future<DecisionArtifactListResponse>? initialFuture;
+
+  const DecisionArtifactsScreen({
+    super.key,
+    this.apiService,
+    this.initialFuture,
+  });
 
   @override
   State<DecisionArtifactsScreen> createState() => _DecisionArtifactsScreenState();
 }
 
 class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
-  final ApiService _apiService = ApiService();
+  late final ApiService _apiService;
   late Future<DecisionArtifactListResponse> _decisionsFuture;
 
   @override
   void initState() {
     super.initState();
-    _fetchDecisions();
+    _apiService = widget.apiService ?? ApiService();
+    if (widget.initialFuture != null) {
+      _decisionsFuture = widget.initialFuture!;
+    } else {
+      _fetchDecisions();
+    }
   }
 
   void _fetchDecisions() {
@@ -95,23 +109,9 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
     }
   }
 
-  void _handleOneTapExecute(DecisionArtifact d) {
-    String symbol = 'XAUUSD';
-    final nameUpper = d.strategyName.toUpperCase();
-    if (nameUpper.contains('GBP')) {
-      symbol = 'GBPUSD';
-    } else if (nameUpper.contains('EUR')) {
-      symbol = 'EURUSD';
-    } else if (nameUpper.contains('JPY')) {
-      symbol = 'USDJPY';
-    }
-
-    final isBuy = d.recommendation == DecisionRecommendation.BUY;
-    final action = isBuy ? 'BUY' : 'SELL';
-    final lotController = TextEditingController(text: '0.01');
-    final slController = TextEditingController(text: isBuy ? '2492.00' : '2505.00');
-    final tpController = TextEditingController(text: isBuy ? '2512.00' : '2475.00');
-    final entryController = TextEditingController(text: isBuy ? '2498.50' : '2492.00');
+  void _showManualExecutionGuide(DecisionArtifact d) {
+    final recColor = _getRecommendationColor(d.recommendation);
+    final action = d.recommendation.name;
 
     showModalBottomSheet(
       context: context,
@@ -121,213 +121,258 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
       builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            return Padding(
-              padding: EdgeInsets.only(
-                left: 20,
-                right: 20,
-                top: 20,
-                bottom: MediaQuery.of(context).viewInsets.bottom + 24,
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
+        return Padding(
+          padding: EdgeInsets.only(
+            left: 20,
+            right: 20,
+            top: 20,
+            bottom: MediaQuery.of(context).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      const Icon(Icons.bolt, color: AppColors.primary, size: 24),
-                      const SizedBox(width: 8),
-                      const Text(
-                        '1-Tap Execute (MT5 Demo)',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: AppColors.textTertiary),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: (isBuy ? AppColors.success : AppColors.error).withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: (isBuy ? AppColors.success : AppColors.error).withValues(alpha: 0.3),
-                      ),
+                  const Icon(Icons.menu_book_rounded, color: AppColors.primary, size: 22),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Manual Execution Guide',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  ),
+                  const Spacer(),
+                  IconButton(
+                    icon: const Icon(Icons.close, color: AppColors.textTertiary),
+                    onPressed: () => Navigator.pop(ctx),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+
+              // Recommendation & Confidence Banner
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: recColor.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: recColor.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '$action $symbol',
+                          '$action · ${d.strategyName}',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: isBuy ? AppColors.success : AppColors.error,
+                            color: recColor,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
-                          '${d.decisionConfidence.toInt()}% Confidence',
+                          'Decision ID: ${d.id}',
                           style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
                           ),
                         ),
                       ],
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: lotController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
-                          decoration: const InputDecoration(
-                            labelText: 'Lot Size (Demo)',
-                            labelStyle: TextStyle(color: AppColors.textTertiary),
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                        ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: recColor.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: DropdownButtonFormField<String>(
-                          initialValue: symbol,
-                          dropdownColor: AppColors.surfaceLight,
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
-                          decoration: const InputDecoration(
-                            labelText: 'Asset',
-                            labelStyle: TextStyle(color: AppColors.textTertiary),
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                          items: const [
-                            DropdownMenuItem(value: 'XAUUSD', child: Text('XAUUSD (Gold)')),
-                            DropdownMenuItem(value: 'GBPUSD', child: Text('GBPUSD')),
-                            DropdownMenuItem(value: 'EURUSD', child: Text('EURUSD')),
-                            DropdownMenuItem(value: 'USDJPY', child: Text('USDJPY')),
-                          ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              setModalState(() => symbol = val);
-                            }
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextField(
-                          controller: slController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: const TextStyle(color: AppColors.error, fontSize: 13),
-                          decoration: const InputDecoration(
-                            labelText: 'Stop Loss',
-                            labelStyle: TextStyle(color: AppColors.textTertiary),
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: TextField(
-                          controller: tpController,
-                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                          style: const TextStyle(color: AppColors.success, fontSize: 13),
-                          decoration: const InputDecoration(
-                            labelText: 'Take Profit',
-                            labelStyle: TextStyle(color: AppColors.textTertiary),
-                            border: OutlineInputBorder(),
-                            isDense: true,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isBuy ? AppColors.success : AppColors.error,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      icon: const Icon(Icons.send_rounded, color: Colors.white),
-                      label: Text(
-                        'Dispatch $action Order to MT5',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
+                      child: Text(
+                        '${d.decisionConfidence.toInt()}% Confidence',
+                        style: TextStyle(
+                          fontSize: 12,
                           fontWeight: FontWeight.bold,
+                          color: recColor,
                         ),
                       ),
-                      onPressed: () async {
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Mandatory Safety Notice
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.shield_outlined, color: AppColors.warning, size: 18),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Falcon is strictly a signal-generation and decision-support system. Falcon never places automated orders to MT5 or Exness. Trades must be executed manually in your broker terminal.',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 11,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              // Captain Decision Parameters
+              const Text(
+                'Captain Decision Parameters',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceLight.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Column(
+                  children: [
+                    _buildParamRow('Action', action),
+                    const SizedBox(height: 6),
+                    _buildParamRow('Strategy', '${d.strategyName} v${d.strategyVersion}'),
+                    const SizedBox(height: 6),
+                    _buildParamRow('Decision ID', d.id),
+                    const SizedBox(height: 6),
+                    _buildParamRow('Confidence', '${d.decisionConfidence.toInt()}%'),
+                    const SizedBox(height: 6),
+                    _buildParamRow('Holding Horizon', d.recommendationDetails.expectedHolding),
+                    const SizedBox(height: 6),
+                    _buildParamRow('Risk Score', '${d.pipelineSummary.overallRiskScore.toStringAsFixed(1)} / 100'),
+                    const SizedBox(height: 6),
+                    _buildParamRow('Validation Score', '${d.pipelineSummary.validationScore.toStringAsFixed(1)} / 100'),
+                    const SizedBox(height: 6),
+                    _buildParamRow('Candidate Ref', d.candidateId.isNotEmpty ? d.candidateId : 'N/A'),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              // Price Level Handling Notice
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppColors.info.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: AppColors.info, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Canonical entry, stop-loss, and take-profit prices are established during Signal Generation. Review the active signal in the Signals tab before manual entry.',
+                        style: TextStyle(color: AppColors.info, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 18),
+
+              // Action Buttons
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppColors.primary,
+                        side: const BorderSide(color: AppColors.primary),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.copy_rounded, size: 16),
+                      label: const Text('Copy Summary', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        final summaryText = [
+                          'Falcon Decision Summary',
+                          '',
+                          'Action: ${d.recommendation.name}',
+                          'Strategy: ${d.strategyName} v${d.strategyVersion}',
+                          'Decision ID: ${d.id}',
+                          'Confidence: ${d.decisionConfidence.toInt()}%',
+                          'Holding Horizon: ${d.recommendationDetails.expectedHolding}',
+                          'Risk Score: ${d.pipelineSummary.overallRiskScore.toStringAsFixed(1)}/100',
+                          'Validation Score: ${d.pipelineSummary.validationScore.toStringAsFixed(1)}/100',
+                          'Candidate Reference: ${d.candidateId.isNotEmpty ? d.candidateId : "N/A"}',
+                          '',
+                          'Manual execution only.',
+                          'Review the active signal in the Signals tab before entering the trade.',
+                        ].join('\n');
+                        Clipboard.setData(ClipboardData(text: summaryText));
                         Navigator.pop(ctx);
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
-                            content: Text('⚡ Sending order to Falcon Cloud...'),
+                            content: Text('Decision summary copied'),
+                            backgroundColor: AppColors.surface,
+                            behavior: SnackBarBehavior.floating,
                             duration: Duration(seconds: 2),
                           ),
                         );
-                        try {
-                          final lot = double.tryParse(lotController.text) ?? 0.01;
-                          final sl = double.tryParse(slController.text) ?? 0.0;
-                          final tp = double.tryParse(tpController.text) ?? 0.0;
-                          final entry = double.tryParse(entryController.text) ?? 0.0;
-                          final res = await _apiService.executeOrder(
-                            symbol: symbol,
-                            action: action,
-                            lotSize: lot,
-                            entryPrice: entry,
-                            stopLoss: sl,
-                            takeProfit: tp,
-                            strategyName: d.strategyName,
-                            confidence: d.decisionConfidence.toInt(),
-                          );
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: AppColors.success,
-                              content: Text('✔ Order ${res['order_id']} dispatched! Check Telegram for MT5 fill.'),
-                              duration: const Duration(seconds: 4),
-                            ),
-                          );
-                        } catch (e) {
-                          if (!context.mounted) return;
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              backgroundColor: AppColors.error,
-                              content: Text('Execution failed: $e'),
-                              duration: const Duration(seconds: 4),
-                            ),
-                          );
-                        }
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.black,
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                      icon: const Icon(Icons.visibility_outlined, size: 16, color: Colors.black),
+                      label: const Text('View Signals', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                      onPressed: () {
+                        Navigator.pop(ctx);
+                        context.go('/signals');
                       },
                     ),
                   ),
                 ],
               ),
-            );
-          },
+            ],
+          ),
         );
       },
+    );
+  }
+
+  Widget _buildParamRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: AppColors.textTertiary, fontSize: 11)),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w600)),
+      ],
     );
   }
 
@@ -543,11 +588,11 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16.0),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
+      child: Material(
+        color: AppColors.surface,
+        shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(
+          side: BorderSide(
             color: recColor.withValues(alpha: 0.4),
             width: 1.5,
           ),
@@ -784,7 +829,7 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
               ),
             ),
 
-            // 1-Tap Execution on MT5 Button
+            // Manual Execution Guide Button
             if (d.recommendation == DecisionRecommendation.BUY ||
                 d.recommendation == DecisionRecommendation.SELL ||
                 d.status == DecisionStatus.APPROVED)
@@ -792,26 +837,24 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
                 child: SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: recColor,
-                      foregroundColor: Colors.black,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: recColor,
+                      side: BorderSide(color: recColor.withValues(alpha: 0.7), width: 1.5),
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      elevation: 3,
                     ),
-                    icon: const Icon(Icons.bolt, color: Colors.black, size: 20),
+                    icon: const Icon(Icons.menu_book_rounded, size: 18),
                     label: Text(
-                      '⚡ 1-Tap Execute ${d.recommendation.name} (MT5 Demo)',
+                      'Manual Execution Guide (${d.recommendation.name})',
                       style: const TextStyle(
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
-                        color: Colors.black,
                       ),
                     ),
-                    onPressed: () => _handleOneTapExecute(d),
+                    onPressed: () => _showManualExecutionGuide(d),
                   ),
                 ),
               ),

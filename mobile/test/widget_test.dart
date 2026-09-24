@@ -7,5 +7,6 @@ void main() {
     await tester.pumpWidget(const FalconApp());
     // Verify the app boots — the SplashScreen should render the app title.
     expect(find.text('Falcon'), findsOneWidget);
+    await tester.pump(const Duration(seconds: 3));
   });
 }

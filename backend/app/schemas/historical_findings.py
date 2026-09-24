@@ -348,3 +348,104 @@ class CandidateMonitoringResponse(BaseModel):
 # Type aliases for flexible contract compatibility
 CandidateMonitoringMetrics = CandidateMonitoring
 HistoricalMonitoringResponse = CandidateMonitoringResponse
+
+
+# -----------------------------------------------------------------------------
+# Phase 3C Independent Paper-Only Forward Validation Models
+# -----------------------------------------------------------------------------
+
+class ForwardValidationStatus(str, Enum):
+    """
+    Descriptive categorical status of independent paper forward validation (Phase 3C).
+    Non-ranking, non-predictive; zero trading recommendations.
+    """
+    NOT_EVALUATED = "NOT_EVALUATED"
+    NO_FORWARD_DATA = "NO_FORWARD_DATA"
+    INSUFFICIENT_DATA = "INSUFFICIENT_DATA"
+    LIMITED_DATA = "LIMITED_DATA"
+    ADEQUATE_DATA = "ADEQUATE_DATA"
+    VALIDATED_DESCRIPTIVELY = "VALIDATED_DESCRIPTIVELY"
+    DATA_QUALITY_LIMITED = "DATA_QUALITY_LIMITED"
+
+
+class ForwardValidationDataQualityCensus(BaseModel):
+    """
+    Data-quality breakdown of forward observations.
+    Excludes non-VALID observations from metrics while maintaining complete census fidelity.
+    """
+    total_observations: int = 0
+    valid_count: int = 0
+    incomplete_count: int = 0
+    invalid_count: int = 0
+    unknown_count: int = 0
+
+
+class ForwardValidationResult(BaseModel):
+    """
+    Descriptive forward validation result for a frozen candidate hypothesis (Phase 3C).
+    Evaluates genuinely unseen chronological observations (candidate_as_of < T0 <= validation_as_of).
+    Candidate identity, wording, and Discovery metrics remain strictly immutable.
+    """
+    # Frozen Candidate Hypothesis Baseline (Strictly Immutable)
+    candidate_id: str
+    candidate_as_of: datetime
+    validation_as_of: datetime
+    instrument: str
+    timeframe: str
+    horizon: int
+    behaviour_identity: str
+    context_identity: str
+    candidate_wording: str
+    discovery_sample_size: int = 0
+    discovery_metrics: Optional[DescriptiveStatistics] = None
+    validation_sample_size: int = 0
+    validation_metrics: Optional[DescriptiveStatistics] = None
+    qualification_status: HypothesisStatus = HypothesisStatus.CANDIDATE_PAPER_HYPOTHESIS
+    candidate_limitations: List[str] = Field(default_factory=list)
+    candidate_stability: Optional[GroupStabilityAnalysis] = None
+
+    # Forward Validation Period & Census (candidate_as_of < observation_time <= validation_as_of)
+    forward_validation_start: Optional[datetime] = None
+    forward_validation_end: Optional[datetime] = None
+    forward_validation_sample_size: int = 0  # Count of VALID outcome observations
+    forward_validation_sample_adequacy: SampleAdequacy = SampleAdequacy.UNKNOWN
+    data_quality_breakdown: ForwardValidationDataQualityCensus = Field(default_factory=ForwardValidationDataQualityCensus)
+
+    # Descriptive Forward Outcome Metrics (Computed on VALID observations only)
+    forward_validation_metrics: Optional[DescriptiveStatistics] = None
+    forward_validation_stability: Optional[GroupStabilityAnalysis] = None
+    forward_validation_status: ForwardValidationStatus = ForwardValidationStatus.NOT_EVALUATED
+
+    # Traceability & Provenance
+    observation_ids_sample: List[str] = Field(default_factory=list)  # max 20 deterministic IDs
+    methodology_version: str = "1.0.0"
+    validation_limitations: List[str] = Field(default_factory=list)
+
+
+class ForwardValidationResponse(BaseModel):
+    """
+    Response schema for GET /api/v1/analytics/candlestick-behaviour/forward-validation (Phase 3C).
+    Stateless, read-only, non-persistent, deterministic.
+    """
+    experiment_name: str = "INDEPENDENT_PAPER_FORWARD_VALIDATION"
+    experiment_version: str = "1.0.0"
+    phase_1_version: str = "1.0.0"
+    phase_2_version: str = "1.0.0"
+    phase_3_version: str = "1.0.0"
+    forward_validation_methodology_version: str = "1.0.0"
+    as_of: datetime
+    candidate_as_of: datetime
+    validation_as_of: datetime
+    query_parameters: Dict[str, Any] = Field(default_factory=dict)
+
+    total_candidates: int = 0
+    total_forward_observations: int = 0
+    total_valid_forward_observations: int = 0
+    total_incomplete_forward_observations: int = 0
+
+    validation_results: List[ForwardValidationResult] = Field(default_factory=list)
+    limitations: List[str] = Field(default_factory=list)
+
+
+# Type aliases for flexible contract compatibility
+ForwardValidationMetrics = ForwardValidationResult

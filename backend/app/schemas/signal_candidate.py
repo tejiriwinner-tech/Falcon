@@ -2,6 +2,7 @@ from enum import Enum
 from pydantic import BaseModel
 from datetime import datetime
 from typing import List, Optional
+from app.schemas.research_promotion import ResearchSignalContext
 
 class CandidateStatus(str, Enum):
     GENERATED = "GENERATED"
@@ -72,6 +73,8 @@ class SignalCandidate(BaseModel):
     # Adaptive tuning metadata (immutable snapshot from candidate generation)
     adaptiveRuleVersion: Optional[str] = None
     adaptiveStopMultiplier: Optional[float] = None
+    # Informational Research Promotion Context (Phase 4B)
+    researchContext: Optional[ResearchSignalContext] = None
     # Pipeline metadata — consistent with all immutable Falcon artifacts
     pipelineStage: str = "SIGNAL_GENERATION"
     pipelineVersion: str = "1.0"

@@ -408,6 +408,7 @@ class SignalService:
             strategyVersion=candidate.strategyVersion,
             adaptiveRuleVersion=getattr(candidate, "adaptiveRuleVersion", None),
             adaptiveStopMultiplier=getattr(candidate, "adaptiveStopMultiplier", None),
+            researchContext=getattr(candidate, "researchContext", None),
             dataAgeSeconds=candidate.marketDataAgeSeconds,
             triggerCondition=trigger_rule,
             validUntil=valid_until,

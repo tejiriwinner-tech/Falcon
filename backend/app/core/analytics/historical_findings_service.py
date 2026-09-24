@@ -37,6 +37,10 @@ from app.schemas.historical_findings import (
     CandidateMonitoring,
     CandidateMonitoringResponse,
     DirectionConsistency,
+    ForwardValidationDataQualityCensus,
+    ForwardValidationResponse,
+    ForwardValidationResult,
+    ForwardValidationStatus,
     GroupStabilityAnalysis,
     HistoricalFindingsResponse,
     HistoricalHypothesesResponse,
@@ -48,6 +52,12 @@ from app.schemas.historical_findings import (
     ResearchPartitionPhase,
     StabilityStatus,
     TemporalPeriod,
+)
+from app.schemas.research_promotion import (
+    PromotionStatus,
+    ResearchPromotionResult,
+    ResearchPromotionResponse,
+    ResearchSignalContext,
 )
 
 
@@ -64,7 +74,10 @@ class HistoricalFindingsService:
     # Canonical authoritative version sourcing
     PHASE_1_VERSION: str = CandlestickResearchService.EXPERIMENT_VERSION
     PHASE_2_VERSION: str = HistoricalBehaviourService.RESEARCH_METHODOLOGY_VERSION
+    PHASE_3_VERSION: str = "1.0.0"
+    PHASE_3C_VERSION: str = "1.0.0"
     RESEARCH_METHODOLOGY_VERSION: str = "1.0.0"
+    PROMOTION_METHODOLOGY_VERSION: str = "1.0.0"
 
     # Explicit methodology standards
     PARTITION_METHODOLOGY: str = "CHRONOLOGICAL_TERTILES_V1"
@@ -1164,6 +1177,585 @@ class HistoricalFindingsService:
             total_incomplete_monitoring_observations=total_incomplete_monitoring_obs_count,
             monitoring_records=sorted_records,
             limitations=resp_limitations,
+        )
+
+    def get_forward_validation(
+        self,
+        candidate_id: Optional[str] = None,
+        instrument: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        horizon: int = 5,
+        candidate_as_of: Optional[datetime] = None,
+        validation_as_of: Optional[datetime] = None,
+        candles: Optional[List[Any]] = None,
+        observations: Optional[List[HistoricalBehaviourObservation]] = None,
+    ) -> ForwardValidationResponse:
+        """
+        Phase 3C: Independent Paper-Only Forward Validation & Research Audit.
+        Evaluates frozen historical candidate hypotheses on genuinely unseen chronological
+        observations strictly after candidate_as_of (candidate_as_of < T0 <= validation_as_of).
+        Stateless, non-persistent, read-only, deterministic.
+        """
+        cand_as_of_effective = (
+            candidate_as_of
+            if candidate_as_of is not None
+            else datetime(2026, 9, 22, 0, 0, 0, tzinfo=timezone.utc)
+        )
+        if cand_as_of_effective.tzinfo is None:
+            cand_as_of_effective = cand_as_of_effective.replace(tzinfo=timezone.utc)
+
+        val_as_of_effective = (
+            validation_as_of
+            if validation_as_of is not None
+            else datetime.now(timezone.utc)
+        )
+        if val_as_of_effective.tzinfo is None:
+            val_as_of_effective = val_as_of_effective.replace(tzinfo=timezone.utc)
+
+        query_params = {
+            "instrument": instrument,
+            "timeframe": timeframe,
+            "horizon": horizon,
+            "candidate_id": candidate_id,
+            "candidate_as_of": cand_as_of_effective.isoformat(),
+            "validation_as_of": val_as_of_effective.isoformat(),
+        }
+
+        # Step 3: Handle invalid temporal ordering safely without reversing boundaries
+        if val_as_of_effective < cand_as_of_effective:
+            resp_limitations = [
+                "Descriptive paper-only forward validation.",
+                "Contains zero automated execution directives or signals.",
+                "Invalid temporal ordering: validation_as_of cannot be strictly prior to candidate_as_of.",
+            ]
+            return ForwardValidationResponse(
+                experiment_name="INDEPENDENT_PAPER_FORWARD_VALIDATION",
+                experiment_version=self.EXPERIMENT_VERSION,
+                phase_1_version=self.PHASE_1_VERSION,
+                phase_2_version=self.PHASE_2_VERSION,
+                phase_3_version=self.RESEARCH_METHODOLOGY_VERSION,
+                forward_validation_methodology_version=self.RESEARCH_METHODOLOGY_VERSION,
+                as_of=val_as_of_effective,
+                candidate_as_of=cand_as_of_effective,
+                validation_as_of=val_as_of_effective,
+                query_parameters=query_params,
+                total_candidates=0,
+                total_forward_observations=0,
+                total_valid_forward_observations=0,
+                total_incomplete_forward_observations=0,
+                validation_results=[],
+                limitations=resp_limitations,
+            )
+
+        if instrument:
+            symbols = [instrument.upper()]
+        else:
+            symbols = ["XAUUSD", "GBPUSD", "EURUSD"]
+
+        tf_normalized = timeframe.upper() if timeframe else "1H"
+
+        all_validation_results: List[ForwardValidationResult] = []
+        total_forward_obs_count = 0
+        total_valid_forward_obs_count = 0
+        total_incomplete_forward_obs_count = 0
+
+        for sym in symbols:
+            # 1. Fetch/formulate frozen candidates strictly as of candidate_as_of
+            cand_candles = None
+            if candles:
+                cand_candles = [
+                    c for c in candles
+                    if (getattr(c, "bar_time", getattr(c, "timestamp", None)) or cand_as_of_effective) <= cand_as_of_effective
+                ]
+
+            cand_obs = None
+            if observations:
+                cand_obs = [o for o in observations if o.observation_time <= cand_as_of_effective]
+
+            hyp_resp = self.get_historical_hypotheses(
+                instrument=sym,
+                timeframe=tf_normalized,
+                horizon=horizon,
+                as_of=cand_as_of_effective,
+                candles=cand_candles,
+                observations=cand_obs,
+            )
+
+            # Filter candidates: only qualified CANDIDATE_PAPER_HYPOTHESIS candidates
+            target_candidates = [
+                h for h in hyp_resp.hypotheses
+                if h.status == HypothesisStatus.CANDIDATE_PAPER_HYPOTHESIS
+            ]
+
+            if candidate_id:
+                target_candidates = [h for h in target_candidates if h.hypothesis_id == candidate_id]
+
+            if not target_candidates:
+                continue
+
+            # 2. Get full observations up to validation_as_of
+            base_resp = historical_behaviour_service.get_historical_behaviour_analytics(
+                instrument=sym,
+                timeframe=tf_normalized,
+                forward_window=horizon,
+                as_of=val_as_of_effective,
+                limit=10000,
+                candles=candles,
+                observations=observations,
+            )
+
+            # 3. Extract Forward Validation observations: strictly candidate_as_of < observation_time <= validation_as_of
+            sym_forward_obs = [
+                o for o in base_resp.observations
+                if o.observation_time > cand_as_of_effective and o.observation_time <= val_as_of_effective
+            ]
+
+            # 5-tuple key: (instrument, timeframe, behaviour, context, horizon)
+            def get_group_key(obs: HistoricalBehaviourObservation) -> Tuple[str, str, str, str, int]:
+                inst = (obs.instrument or getattr(obs.candle_observation, "instrument", sym) or sym).upper()
+                tf = (obs.timeframe or getattr(obs.candle_observation, "timeframe", tf_normalized) or tf_normalized).upper()
+                c_obs = obs.candle_observation
+                beh = c_obs.rejection_observation.value
+                regime = c_obs.market_regime_context or "UNKNOWN"
+                struct = c_obs.support_resistance_interaction.value
+                ctx = f"{regime}+{struct}"
+                return inst, tf, beh, ctx, horizon
+
+            fwd_groups: Dict[Tuple[str, str, str, str, int], List[HistoricalBehaviourObservation]] = {}
+            for o in sym_forward_obs:
+                k = get_group_key(o)
+                fwd_groups.setdefault(k, []).append(o)
+
+            # 4. For each frozen candidate, evaluate forward validation
+            for cand in target_candidates:
+                cand_k = (cand.instrument.upper(), cand.timeframe.upper(), cand.behaviour, cand.context, cand.horizon)
+                matched_obs = fwd_groups.get(cand_k, [])
+
+                # Sort strictly by (observation_time, observation_id)
+                sorted_matched = self.sort_observations_chronologically(matched_obs)
+
+                fwd_total = len(sorted_matched)
+                total_forward_obs_count += fwd_total
+
+                valid_fwd: List[HistoricalBehaviourObservation] = []
+                incomplete_fwd: List[HistoricalBehaviourObservation] = []
+                invalid_fwd: List[HistoricalBehaviourObservation] = []
+                unknown_fwd: List[HistoricalBehaviourObservation] = []
+
+                for o in sorted_matched:
+                    fw = o.forward_windows.get(horizon)
+                    if fw and fw.data_quality == DataQuality.VALID:
+                        valid_fwd.append(o)
+                    elif fw and fw.data_quality == DataQuality.INCOMPLETE:
+                        incomplete_fwd.append(o)
+                    elif fw and fw.data_quality == DataQuality.INVALID:
+                        invalid_fwd.append(o)
+                    else:
+                        unknown_fwd.append(o)
+
+                n_valid = len(valid_fwd)
+                n_incomplete = len(incomplete_fwd)
+                n_invalid = len(invalid_fwd)
+                n_unknown = len(unknown_fwd)
+
+                total_valid_forward_obs_count += n_valid
+                total_incomplete_forward_obs_count += n_incomplete
+
+                census = ForwardValidationDataQualityCensus(
+                    total_observations=fwd_total,
+                    valid_count=n_valid,
+                    incomplete_count=n_incomplete,
+                    invalid_count=n_invalid,
+                    unknown_count=n_unknown,
+                )
+
+                fwd_adequacy = self.evaluate_sample_adequacy(n_valid)
+
+                # Descriptive statistics and stability on valid forward observations only
+                fwd_stats = None
+                fwd_stability = None
+                if n_valid > 0:
+                    fwd_stats, _, _ = historical_behaviour_service.calculate_descriptive_statistics(
+                        valid_fwd, horizon=horizon
+                    )
+                    fwd_stability = self.analyze_group_stability(valid_fwd, horizon=horizon)
+
+                # Status determination
+                if fwd_total == 0:
+                    status = ForwardValidationStatus.NO_FORWARD_DATA
+                elif (n_invalid + n_unknown) > 0 and n_valid == 0:
+                    status = ForwardValidationStatus.DATA_QUALITY_LIMITED
+                elif n_valid == 0:
+                    status = ForwardValidationStatus.INSUFFICIENT_DATA
+                elif n_valid < 10:
+                    status = ForwardValidationStatus.INSUFFICIENT_DATA
+                elif n_valid < 30:
+                    status = ForwardValidationStatus.LIMITED_DATA
+                else:
+                    if fwd_stats and fwd_stats.follow_through_rate >= 0.50:
+                        status = ForwardValidationStatus.VALIDATED_DESCRIPTIVELY
+                    else:
+                        status = ForwardValidationStatus.ADEQUATE_DATA
+
+                fwd_start = sorted_matched[0].observation_time if sorted_matched else None
+                fwd_end = sorted_matched[-1].observation_time if sorted_matched else None
+                ids_sample = self.get_deterministic_observation_ids_sample(sorted_matched)
+
+                val_limitations = [
+                    "Descriptive independent paper-only forward validation; no causal inference.",
+                    "Candidate identity, wording, and Discovery metrics remain strictly frozen at candidate_as_of.",
+                    "Zero automated execution directives, signals, scores, or advice.",
+                ]
+                if n_valid == 0:
+                    val_limitations.append("No valid outcome observations accumulated yet in forward validation window.")
+                elif n_valid < self.MIN_CANDIDATE_QUALIFICATION_SAMPLE:
+                    val_limitations.append(f"Limited forward validation sample size (N={n_valid} < 30).")
+
+                if n_incomplete > 0:
+                    val_limitations.append(f"{n_incomplete} observation(s) currently incomplete (forward horizon pending).")
+
+                if fwd_stability and fwd_stability.stability_status in (StabilityStatus.MIXED, StabilityStatus.INCONSISTENT):
+                    val_limitations.append("Forward validation stability exhibits mixed or inconsistent characteristics.")
+
+                for lim in val_limitations:
+                    self.assert_no_forbidden_recommendation_terms(lim)
+
+                # Immutability verification check before building result
+                assert cand.hypothesis_id is not None
+                assert cand.descriptive_observation is not None
+                assert cand.discovery_sample_size >= 0
+
+                res = ForwardValidationResult(
+                    candidate_id=cand.hypothesis_id,
+                    candidate_as_of=cand_as_of_effective,
+                    validation_as_of=val_as_of_effective,
+                    instrument=cand.instrument,
+                    timeframe=cand.timeframe,
+                    horizon=cand.horizon,
+                    behaviour_identity=cand.behaviour,
+                    context_identity=cand.context,
+                    candidate_wording=cand.descriptive_observation,
+                    discovery_sample_size=cand.discovery_sample_size,
+                    discovery_metrics=cand.discovery_metrics,
+                    validation_sample_size=cand.validation_sample_size,
+                    validation_metrics=cand.validation_metrics,
+                    qualification_status=cand.status,
+                    candidate_limitations=cand.limitations,
+                    candidate_stability=cand.discovery_stability,
+                    forward_validation_start=fwd_start,
+                    forward_validation_end=fwd_end,
+                    forward_validation_sample_size=n_valid,
+                    forward_validation_sample_adequacy=fwd_adequacy,
+                    data_quality_breakdown=census,
+                    forward_validation_metrics=fwd_stats,
+                    forward_validation_stability=fwd_stability,
+                    forward_validation_status=status,
+                    observation_ids_sample=ids_sample,
+                    methodology_version=self.RESEARCH_METHODOLOGY_VERSION,
+                    validation_limitations=val_limitations,
+                )
+                all_validation_results.append(res)
+
+        sorted_results = sorted(
+            all_validation_results,
+            key=lambda r: (r.instrument.upper(), r.timeframe.upper(), r.candidate_id),
+        )
+
+        resp_limitations = [
+            "Descriptive independent paper-only forward validation.",
+            "Contains zero automated execution directives or signals.",
+            "All candidate definitions remain strictly frozen at candidate_as_of.",
+        ]
+        for lim in resp_limitations:
+            self.assert_no_forbidden_recommendation_terms(lim)
+
+        return ForwardValidationResponse(
+            experiment_name="INDEPENDENT_PAPER_FORWARD_VALIDATION",
+            experiment_version=self.EXPERIMENT_VERSION,
+            phase_1_version=self.PHASE_1_VERSION,
+            phase_2_version=self.PHASE_2_VERSION,
+            phase_3_version=self.RESEARCH_METHODOLOGY_VERSION,
+            forward_validation_methodology_version=self.RESEARCH_METHODOLOGY_VERSION,
+            as_of=val_as_of_effective,
+            candidate_as_of=cand_as_of_effective,
+            validation_as_of=val_as_of_effective,
+            query_parameters=query_params,
+            total_candidates=len(sorted_results),
+            total_forward_observations=total_forward_obs_count,
+            total_valid_forward_observations=total_valid_forward_obs_count,
+            total_incomplete_forward_observations=total_incomplete_forward_obs_count,
+            validation_results=sorted_results,
+            limitations=resp_limitations,
+        )
+
+    def get_research_promotion(
+        self,
+        candidate_id: Optional[str] = None,
+        instrument: Optional[str] = None,
+        timeframe: Optional[str] = None,
+        horizon: Optional[int] = None,
+        candidate_as_of: Optional[datetime] = None,
+        validation_as_of: Optional[datetime] = None,
+        observations: Optional[List[HistoricalBehaviourObservation]] = None,
+        candles: Optional[List[Any]] = None,
+    ) -> ResearchPromotionResponse:
+        """
+        Phase 4B: Research Promotion Gate & Signal Context Integration.
+        Evaluates whether frozen historical candidate hypotheses that have been independently
+        forward-validated qualify for exposure as informational research context to the signal layer.
+        Stateless, non-persistent, read-only, non-ranking, and contains zero trading directives.
+        """
+        cand_as_of_effective = (
+            candidate_as_of
+            if candidate_as_of is not None
+            else datetime(2026, 9, 22, 0, 0, 0, tzinfo=timezone.utc)
+        )
+        if cand_as_of_effective.tzinfo is None:
+            cand_as_of_effective = cand_as_of_effective.replace(tzinfo=timezone.utc)
+
+        val_as_of_effective = (
+            validation_as_of
+            if validation_as_of is not None
+            else datetime.now(timezone.utc)
+        )
+        if val_as_of_effective.tzinfo is None:
+            val_as_of_effective = val_as_of_effective.replace(tzinfo=timezone.utc)
+
+        h_val = horizon if horizon is not None else 5
+
+        query_params = {
+            "instrument": instrument,
+            "timeframe": timeframe,
+            "horizon": h_val,
+            "candidate_id": candidate_id,
+            "candidate_as_of": cand_as_of_effective.isoformat(),
+            "validation_as_of": val_as_of_effective.isoformat(),
+        }
+
+        # Handle invalid temporal ordering safely without reversing boundaries
+        if val_as_of_effective < cand_as_of_effective:
+            resp_limitations = [
+                "Descriptive research promotion gate evaluation.",
+                "Promotion eligibility is informational only and does not constitute a trading recommendation or execution directive.",
+                "Invalid temporal ordering: validation_as_of cannot be strictly prior to candidate_as_of.",
+            ]
+            for lim in resp_limitations:
+                self.assert_no_forbidden_recommendation_terms(lim)
+            return ResearchPromotionResponse(
+                experiment_name="RESEARCH_PROMOTION_GATE",
+                experiment_version=self.EXPERIMENT_VERSION,
+                phase_1_version=self.PHASE_1_VERSION,
+                phase_2_version=self.PHASE_2_VERSION,
+                phase_3_version=self.PHASE_3_VERSION,
+                phase_3c_version=self.PHASE_3C_VERSION,
+                promotion_methodology_version=self.PROMOTION_METHODOLOGY_VERSION,
+                as_of=val_as_of_effective,
+                candidate_as_of=cand_as_of_effective,
+                validation_as_of=val_as_of_effective,
+                query_parameters=query_params,
+                total_candidates=0,
+                eligible_informational_candidates=0,
+                not_eligible_candidates=0,
+                limited_data_candidates=0,
+                data_quality_limited_candidates=0,
+                temporally_unstable_candidates=0,
+                promotion_results=[],
+                limitations=resp_limitations,
+            )
+
+        # Default watchlist: EURUSD, GBPUSD, XAUUSD. USDJPY only when explicitly requested.
+        if instrument:
+            symbols = [instrument.upper()]
+        else:
+            symbols = ["EURUSD", "GBPUSD", "XAUUSD"]
+
+        tf_normalized = timeframe.upper() if timeframe else "1H"
+
+        all_promotion_results: List[ResearchPromotionResult] = []
+
+        for sym in symbols:
+            # Query authoritative Phase 3C forward validation
+            fwd_resp = self.get_forward_validation(
+                candidate_id=candidate_id,
+                instrument=sym,
+                timeframe=tf_normalized,
+                horizon=h_val,
+                candidate_as_of=cand_as_of_effective,
+                validation_as_of=val_as_of_effective,
+                candles=candles,
+                observations=observations,
+            )
+
+            for fwd_res in fwd_resp.validation_results:
+                # Exact 5-tuple identity verification
+                if (
+                    fwd_res.instrument.upper() != sym
+                    or fwd_res.timeframe.upper() != tf_normalized
+                    or fwd_res.horizon != h_val
+                ):
+                    continue
+
+                if candidate_id and fwd_res.candidate_id != candidate_id:
+                    continue
+
+                reasons: List[str] = []
+
+                # Categorical Non-Ranking Promotion Eligibility Evaluation:
+                # 1. Historical Candidate Qualification under Phase 3
+                if fwd_res.qualification_status != HypothesisStatus.CANDIDATE_PAPER_HYPOTHESIS:
+                    status = PromotionStatus.NOT_ELIGIBLE
+                    reasons.append("Candidate is not historically qualified as a paper hypothesis under Phase 3 rules.")
+                # 2. Data Quality Breakdown Check
+                elif fwd_res.data_quality_breakdown.valid_count == 0 and (
+                    fwd_res.data_quality_breakdown.invalid_count > 0 or fwd_res.data_quality_breakdown.unknown_count > 0
+                ):
+                    status = PromotionStatus.DATA_QUALITY_LIMITED
+                    reasons.append("Forward validation observations are exclusively invalid or unknown data quality.")
+                elif fwd_res.data_quality_breakdown.valid_count == 0 and fwd_res.data_quality_breakdown.incomplete_count > 0:
+                    status = PromotionStatus.INSUFFICIENT_DATA
+                    reasons.append("Forward validation observations are currently incomplete (forward horizon pending).")
+                # 3. Sample Size & Adequacy Checks
+                elif fwd_res.forward_validation_sample_size == 0:
+                    status = PromotionStatus.INSUFFICIENT_DATA
+                    reasons.append("No valid forward validation observations accumulated in the evaluation window.")
+                elif fwd_res.forward_validation_sample_size < 10:
+                    status = PromotionStatus.INSUFFICIENT_DATA
+                    reasons.append(f"Insufficient forward validation sample size (N={fwd_res.forward_validation_sample_size} < 10).")
+                elif fwd_res.forward_validation_sample_size < 30:
+                    status = PromotionStatus.LIMITED_DATA
+                    reasons.append(f"Limited forward validation sample size (N={fwd_res.forward_validation_sample_size} < 30).")
+                else:
+                    # N >= 30: Evaluate stability and forward validation status
+                    if fwd_res.forward_validation_stability and fwd_res.forward_validation_stability.stability_status in (
+                        StabilityStatus.INCONSISTENT,
+                        StabilityStatus.MIXED,
+                    ):
+                        status = PromotionStatus.TEMPORALLY_UNSTABLE
+                        reasons.append("Forward validation stability exhibits inconsistent or mixed temporal characteristics across evaluated periods.")
+                    elif fwd_res.forward_validation_status == ForwardValidationStatus.VALIDATED_DESCRIPTIVELY:
+                        status = PromotionStatus.ELIGIBLE_INFORMATIONAL
+                        reasons.append("Candidate satisfies all informational promotion eligibility requirements.")
+                    else:
+                        status = PromotionStatus.NOT_ELIGIBLE
+                        reasons.append("Forward validation outcomes do not descriptively validate historical candidate characteristics.")
+
+                # Structured limitations (MANDATORY on every promotion result)
+                promotion_limitations = [
+                    "Descriptive research promotion evaluation only; not a trading recommendation or execution directive.",
+                    "Candidate baseline definitions, wording, and historical Discovery metrics remain strictly frozen at candidate_as_of.",
+                    "Forward validation evaluates genuinely unseen chronological observations strictly after candidate_as_of.",
+                    "Falcon is strictly a signal-generation and decision-support system; all trades are executed manually by the user in their broker terminal.",
+                ]
+                if status != PromotionStatus.ELIGIBLE_INFORMATIONAL:
+                    promotion_limitations.extend(reasons)
+
+                for r in reasons:
+                    self.assert_no_forbidden_recommendation_terms(r)
+                for lim in promotion_limitations:
+                    self.assert_no_forbidden_recommendation_terms(lim)
+
+                promo_res = ResearchPromotionResult(
+                    candidate_id=fwd_res.candidate_id,
+                    candidate_as_of=fwd_res.candidate_as_of,
+                    validation_as_of=fwd_res.validation_as_of,
+                    instrument=fwd_res.instrument,
+                    timeframe=fwd_res.timeframe,
+                    horizon=fwd_res.horizon,
+                    behaviour_identity=fwd_res.behaviour_identity,
+                    context_identity=fwd_res.context_identity,
+                    candidate_wording=fwd_res.candidate_wording,
+                    discovery_sample_size=fwd_res.discovery_sample_size,
+                    discovery_metrics=fwd_res.discovery_metrics,
+                    validation_sample_size=fwd_res.validation_sample_size,
+                    validation_metrics=fwd_res.validation_metrics,
+                    qualification_status=fwd_res.qualification_status,
+                    candidate_limitations=fwd_res.candidate_limitations,
+                    candidate_stability=fwd_res.candidate_stability,
+                    forward_validation_sample_size=fwd_res.forward_validation_sample_size,
+                    forward_validation_sample_adequacy=fwd_res.forward_validation_sample_adequacy,
+                    forward_validation_metrics=fwd_res.forward_validation_metrics,
+                    forward_validation_stability=fwd_res.forward_validation_stability,
+                    forward_validation_status=fwd_res.forward_validation_status,
+                    data_quality_breakdown=fwd_res.data_quality_breakdown,
+                    promotion_status=status,
+                    promotion_methodology_version=self.PROMOTION_METHODOLOGY_VERSION,
+                    promotion_reasons=reasons,
+                    promotion_limitations=promotion_limitations,
+                )
+                all_promotion_results.append(promo_res)
+
+        sorted_results = sorted(
+            all_promotion_results,
+            key=lambda r: (r.instrument.upper(), r.timeframe.upper(), r.candidate_id),
+        )
+
+        total_cand = len(sorted_results)
+        eligible_cand = sum(1 for r in sorted_results if r.promotion_status == PromotionStatus.ELIGIBLE_INFORMATIONAL)
+        not_eligible_cand = sum(1 for r in sorted_results if r.promotion_status == PromotionStatus.NOT_ELIGIBLE)
+        limited_cand = sum(1 for r in sorted_results if r.promotion_status in (PromotionStatus.LIMITED_DATA, PromotionStatus.INSUFFICIENT_DATA))
+        data_quality_limited_cand = sum(1 for r in sorted_results if r.promotion_status == PromotionStatus.DATA_QUALITY_LIMITED)
+        temporally_unstable_cand = sum(1 for r in sorted_results if r.promotion_status == PromotionStatus.TEMPORALLY_UNSTABLE)
+
+        resp_limitations = [
+            "Descriptive research promotion gate evaluation.",
+            "Promotion eligibility is informational only and does not constitute a trading recommendation or execution directive.",
+            "All candidate definitions remain strictly frozen at candidate_as_of.",
+        ]
+        for lim in resp_limitations:
+            self.assert_no_forbidden_recommendation_terms(lim)
+
+        return ResearchPromotionResponse(
+            experiment_name="RESEARCH_PROMOTION_GATE",
+            experiment_version=self.EXPERIMENT_VERSION,
+            phase_1_version=self.PHASE_1_VERSION,
+            phase_2_version=self.PHASE_2_VERSION,
+            phase_3_version=self.PHASE_3_VERSION,
+            phase_3c_version=self.PHASE_3C_VERSION,
+            promotion_methodology_version=self.PROMOTION_METHODOLOGY_VERSION,
+            as_of=val_as_of_effective,
+            candidate_as_of=cand_as_of_effective,
+            validation_as_of=val_as_of_effective,
+            query_parameters=query_params,
+            total_candidates=total_cand,
+            eligible_informational_candidates=eligible_cand,
+            not_eligible_candidates=not_eligible_cand,
+            limited_data_candidates=limited_cand,
+            data_quality_limited_candidates=data_quality_limited_cand,
+            temporally_unstable_candidates=temporally_unstable_cand,
+            promotion_results=sorted_results,
+            limitations=resp_limitations,
+        )
+
+    @classmethod
+    def build_research_signal_context(
+        cls, promotion_result: ResearchPromotionResult
+    ) -> ResearchSignalContext:
+        """
+        Builds a read-only informational research context object from an eligible promotion result.
+        Contains zero trading directives or execution parameters.
+        """
+        note = (
+            f"Historically qualified paper candidate {promotion_result.candidate_id} "
+            f"independently forward-validated on N={promotion_result.forward_validation_sample_size} "
+            f"unseen observations ({promotion_result.instrument} {promotion_result.timeframe} H={promotion_result.horizon})."
+        )
+        cls.assert_no_forbidden_recommendation_terms(note)
+        return ResearchSignalContext(
+            candidate_id=promotion_result.candidate_id,
+            instrument=promotion_result.instrument,
+            timeframe=promotion_result.timeframe,
+            horizon=promotion_result.horizon,
+            behaviour_identity=promotion_result.behaviour_identity,
+            context_identity=promotion_result.context_identity,
+            candidate_as_of=promotion_result.candidate_as_of,
+            validation_as_of=promotion_result.validation_as_of,
+            promotion_status=promotion_result.promotion_status,
+            qualification_status=promotion_result.qualification_status,
+            forward_validation_sample_size=promotion_result.forward_validation_sample_size,
+            forward_validation_status=promotion_result.forward_validation_status,
+            methodology_version=promotion_result.promotion_methodology_version,
+            provenance_note=note,
+            limitations=list(promotion_result.promotion_limitations),
         )
 
 

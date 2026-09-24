@@ -1,6 +1,6 @@
 import json
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional
+from typing import List, Optional, Union, Dict
 from app.schemas.market_state import MarketState
 from app.schemas.strategy import StrategyItem, StrategyStatus
 from app.schemas.signal_candidate import (
@@ -15,6 +15,7 @@ from app.core.services.market_history_service import market_history_service
 from app.core.providers import provider_manager
 from app.schemas.market_quote import MarketQuote
 from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
+from app.schemas.research_promotion import ResearchSignalContext
 
 
 class SignalGenerationEngine:
@@ -22,11 +23,75 @@ class SignalGenerationEngine:
         self.version = "2.0.0"
         self.pattern_engine = CandlestickPatternEngine()
 
+    @staticmethod
+    def attach_research_context(
+        candidate: SignalCandidate,
+        research_context: Optional[ResearchSignalContext] = None,
+    ) -> SignalCandidate:
+        """
+        Purely metadata enrichment: attaches informational research context to a SignalCandidate
+        without altering recommendation, entry, stop loss, take profit, confidence, or scoring.
+        """
+        if research_context is not None:
+            candidate.researchContext = research_context
+        return candidate
+
+    @staticmethod
+    def match_research_context(
+        instrument: str,
+        timeframe: str,
+        behaviour_identity: str,
+        context_identity: str,
+        horizon: int,
+        contexts: Optional[Union[Dict, List]] = None,
+    ) -> Optional[ResearchSignalContext]:
+        """
+        Phase 4C Exact Matching Contract (Section 8).
+        Strict 5-tuple deterministic matching:
+        (instrument.upper(), timeframe.upper(), behaviour_identity, context_identity, horizon).
+
+        Fails closed: Any mismatch across the 5 dimensions returns None.
+        No fuzzy matching, no cross-instrument, no cross-timeframe, no cross-horizon,
+        no cross-context, no cross-behaviour matching.
+        """
+        if not contexts:
+            return None
+
+        if not instrument or not timeframe or not behaviour_identity or not context_identity or not horizon:
+            return None
+
+        inst_clean = instrument.replace("/", "").upper()
+        tf_clean = timeframe.upper()
+
+        # 1. Direct 5-tuple key lookup if contexts is a dict keyed by 5-tuple
+        exact_key = (inst_clean, tf_clean, behaviour_identity, context_identity, horizon)
+        if isinstance(contexts, dict) and exact_key in contexts:
+            val = contexts[exact_key]
+            if isinstance(val, ResearchSignalContext):
+                return val
+
+        # 2. Iterate through contexts (dict values or list) for an exact 5-tuple match
+        items = contexts.values() if isinstance(contexts, dict) else contexts
+        for item in items:
+            if not isinstance(item, ResearchSignalContext):
+                continue
+            if (
+                item.instrument.replace("/", "").upper() == inst_clean
+                and item.timeframe.upper() == tf_clean
+                and item.behaviour_identity == behaviour_identity
+                and item.context_identity == context_identity
+                and item.horizon == horizon
+            ):
+                return item
+
+        return None
+
     def generate_candidates(
         self,
         market_state: MarketState,
         strategies: List[StrategyItem],
         as_of: Optional[datetime] = None,
+        research_contexts: Optional[dict] = None,
     ) -> List[SignalCandidate]:
         eval_time = as_of or getattr(market_state, "timestamp", None) or datetime.now(timezone.utc)
         # 1. Filter out inactive strategies
@@ -76,6 +141,9 @@ class SignalGenerationEngine:
             # Resolve target canonical symbol
             raw_symbol = strategy.symbol if strategy.symbol != "ALL" else "XAU/USD"
             canonical_symbol = raw_symbol.replace("/", "")
+            res_ctx = None
+            if research_contexts:
+                res_ctx = research_contexts.get(canonical_symbol) or research_contexts.get(raw_symbol)
 
             price_item = market_state.prices.get(canonical_symbol)
             if price_item:
@@ -130,6 +198,7 @@ class SignalGenerationEngine:
                     marketDataAgeSeconds=data_age,
                     evaluationStartedAt=started_at,
                     evaluationCompletedAt=started_at,
+                    researchContext=res_ctx,
                     engineVersion=self.version,
                 )
                 candidates.append(insufficient_candidate)
@@ -437,6 +506,27 @@ class SignalGenerationEngine:
                 marketConfidence=market_confidence
             )
 
+            # Strict 5-tuple research context resolution (Phase 4C Section 8)
+            if research_contexts:
+                timeframe_val = (getattr(strategy, "bestTimeframe", None) or "1H").upper()
+                beh_val = pattern_name or "UNKNOWN"
+                ctx_val = (
+                    "UPTREND" if asset_trend == "Bullish"
+                    else "DOWNTREND" if asset_trend == "Bearish"
+                    else "RANGE" if asset_trend == "Neutral"
+                    else asset_trend
+                )
+                strict_match = self.match_research_context(
+                    instrument=canonical_symbol,
+                    timeframe=timeframe_val,
+                    behaviour_identity=beh_val,
+                    context_identity=ctx_val,
+                    horizon=5,
+                    contexts=research_contexts,
+                )
+                if strict_match is not None:
+                    res_ctx = strict_match
+
             candidates.append(SignalCandidate(
                 id=cand_id,
                 symbol=raw_symbol,
@@ -464,6 +554,7 @@ class SignalGenerationEngine:
                 evaluationCompletedAt=completed_at,
                 adaptiveRuleVersion=getattr(adaptive_tuning_engine, "version", "1.0.0"),
                 adaptiveStopMultiplier=adaptive_mult,
+                researchContext=res_ctx,
                 engineVersion=self.version
             ))
 

@@ -14,6 +14,14 @@ class Signal {
   final String strategyName;
   final String strategyVersion;
   final int dataAgeSeconds;
+  final String? triggerCondition;
+  final DateTime? validUntil;
+  final String? setupPattern;
+  final double? riskReward;
+  final bool isPinned;
+  final double? breakevenTrigger;
+  final double? breakevenPrice;
+  final bool isBreakeven;
 
   const Signal({
     required this.id,
@@ -31,7 +39,70 @@ class Signal {
     required this.strategyName,
     required this.strategyVersion,
     required this.dataAgeSeconds,
+    this.triggerCondition,
+    this.validUntil,
+    this.setupPattern,
+    this.riskReward,
+    this.isPinned = false,
+    this.breakevenTrigger,
+    this.breakevenPrice,
+    this.isBreakeven = false,
   });
+
+  /// Unique setup signature for strict deduplication
+  String get uniqueKey => '${symbol}_${action}_${entry.toStringAsFixed(4)}_${stopLoss.toStringAsFixed(4)}';
+
+  Signal copyWith({
+    int? id,
+    String? symbol,
+    String? action,
+    double? entry,
+    double? takeProfit,
+    double? stopLoss,
+    int? confidence,
+    String? timeframe,
+    String? status,
+    String? analysis,
+    DateTime? timestamp,
+    String? strategyId,
+    String? strategyName,
+    String? strategyVersion,
+    int? dataAgeSeconds,
+    String? triggerCondition,
+    DateTime? validUntil,
+    String? setupPattern,
+    double? riskReward,
+    bool? isPinned,
+    double? breakevenTrigger,
+    double? breakevenPrice,
+    bool? isBreakeven,
+  }) {
+    return Signal(
+      id: id ?? this.id,
+      symbol: symbol ?? this.symbol,
+      action: action ?? this.action,
+      entry: entry ?? this.entry,
+      takeProfit: takeProfit ?? this.takeProfit,
+      stopLoss: stopLoss ?? this.stopLoss,
+      confidence: confidence ?? this.confidence,
+      timeframe: timeframe ?? this.timeframe,
+      status: status ?? this.status,
+      analysis: analysis ?? this.analysis,
+      timestamp: timestamp ?? this.timestamp,
+      strategyId: strategyId ?? this.strategyId,
+      strategyName: strategyName ?? this.strategyName,
+      strategyVersion: strategyVersion ?? this.strategyVersion,
+      dataAgeSeconds: dataAgeSeconds ?? this.dataAgeSeconds,
+      triggerCondition: triggerCondition ?? this.triggerCondition,
+      validUntil: validUntil ?? this.validUntil,
+      setupPattern: setupPattern ?? this.setupPattern,
+      riskReward: riskReward ?? this.riskReward,
+      isPinned: isPinned ?? this.isPinned,
+      breakevenTrigger: breakevenTrigger ?? this.breakevenTrigger,
+      breakevenPrice: breakevenPrice ?? this.breakevenPrice,
+      isBreakeven: isBreakeven ?? this.isBreakeven,
+    );
+  }
 
   factory Signal.fromJson(Map<String, dynamic> json) {
     return Signal(
@@ -50,6 +121,22 @@ class Signal {
       strategyName: json['strategyName'] as String? ?? '',
       strategyVersion: json['strategyVersion'] as String? ?? '',
       dataAgeSeconds: json['dataAgeSeconds'] as int? ?? 0,
+      triggerCondition: json['triggerCondition'] as String?,
+      validUntil: json['validUntil'] != null
+          ? DateTime.tryParse(json['validUntil'] as String)?.toLocal()
+          : null,
+      setupPattern: json['setupPattern'] as String?,
+      riskReward: json['riskReward'] != null
+          ? (json['riskReward'] as num).toDouble()
+          : null,
+      isPinned: json['isPinned'] as bool? ?? false,
+      breakevenTrigger: json['breakevenTrigger'] != null
+          ? (json['breakevenTrigger'] as num).toDouble()
+          : null,
+      breakevenPrice: json['breakevenPrice'] != null
+          ? (json['breakevenPrice'] as num).toDouble()
+          : null,
+      isBreakeven: json['isBreakeven'] as bool? ?? false,
     );
   }
 
@@ -70,6 +157,14 @@ class Signal {
       'strategyName': strategyName,
       'strategyVersion': strategyVersion,
       'dataAgeSeconds': dataAgeSeconds,
+      'triggerCondition': triggerCondition,
+      'validUntil': validUntil?.toUtc().toIso8601String(),
+      'setupPattern': setupPattern,
+      'riskReward': riskReward,
+      'isPinned': isPinned,
+      'breakevenTrigger': breakevenTrigger,
+      'breakevenPrice': breakevenPrice,
+      'isBreakeven': isBreakeven,
     };
   }
 }
