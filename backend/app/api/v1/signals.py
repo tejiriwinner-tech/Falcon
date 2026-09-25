@@ -10,19 +10,15 @@ router = APIRouter()
 
 
 @router.get("/signals", response_model=SignalListResponse, tags=["signals"])
-async def get_signals(
+def get_signals(
     missionLimit: int = Query(
         default=5, ge=1, le=50, description="How many recent missions to project"
     )
 ):
     """
     Signals projected from the candidates and decisions of recent stored missions.
-    Resolves live market outcomes first so newly completed trades appear as WON/LOST/BREAKEVEN.
+    Pure read-only projection with zero database side-effects.
     """
-    try:
-        signal_outcome_resolver.resolve_signals()
-    except Exception:
-        pass
     return signal_service.build_signals(mission_limit=missionLimit)
 
 

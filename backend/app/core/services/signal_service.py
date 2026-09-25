@@ -114,9 +114,8 @@ class SignalService:
             logger.debug(f"Could not load resolved trades: {ex}")
 
         # Step 2: Ingest candidate setups from recent missions
-        all_missions = mission_repository.get_all_missions()
-        if all_missions:
-            missions = all_missions[-mission_limit:]
+        missions = mission_repository.get_recent_missions(limit=mission_limit)
+        if missions:
             candidate_pool: List[dict] = []
             for mission in reversed(missions):
                 try:
@@ -297,11 +296,14 @@ class SignalService:
         current_px = None
         try:
             from app.core.providers import provider_manager
-            q = provider_manager.get_market_quote(candidate.symbol)
-            if q and q.quote:
-                current_px = q.quote.lastPrice
+            raw_sym = candidate.symbol.replace("/", "").upper()
+            cached_entry = provider_manager._cache.get(raw_sym, allow_stale=True)
+            if cached_entry and hasattr(cached_entry, "data") and hasattr(cached_entry.data, "lastPrice"):
+                current_px = cached_entry.data.lastPrice
+            else:
+                current_px = candidate.entryPrice
         except Exception:
-            pass
+            current_px = candidate.entryPrice
 
         if current_px is not None and current_px > 0:
             if direction_val == "BUY" and current_px >= be_trigger:
