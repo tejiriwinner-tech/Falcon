@@ -20,6 +20,8 @@ class SignalItem(BaseModel):
     strategyVersion: str
     adaptiveRuleVersion: Optional[str] = None
     adaptiveStopMultiplier: Optional[float] = None
+    profitRecoveryMultiplier: Optional[float] = 1.0
+    recoveryStatus: Optional[str] = "BASELINE"
     researchContext: Optional[ResearchSignalContext] = None
     dataAgeSeconds: int
     triggerCondition: Optional[str] = None

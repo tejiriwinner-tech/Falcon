@@ -6,7 +6,10 @@ and fail-closed loss boundaries before signal authorization.
 
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
+import logging
 from typing import Callable, List, Optional, Set
+
+logger = logging.getLogger("falcon.capital_guardian")
 
 from app.core.config.settings import settings
 from app.core.execution.execution_mode_guard import parse_execution_mode
@@ -494,8 +497,8 @@ class CapitalGuardianService:
                 remaining_capacity,
             )
 
-        # Step 6: Enforce Absolute Worst-Case Loss Invariant
-        # current_aggregate_worst_case_loss + proposed_worst_case_loss < active_trading_capital
+        # Step 6: Enforce Worst-Case Loss Invariants
+        # Invariant 6A: current_aggregate_worst_case_loss + proposed_worst_case_loss < active_trading_capital
         agg_loss_after = current_agg_loss + proposed_loss
 
         if agg_loss_after >= active_capital:
@@ -516,6 +519,37 @@ class CapitalGuardianService:
                 remainingLossCapacity=remaining_capacity,
                 cycleId=cycle.cycleId,
             )
+
+        # Invariant 6B: Hard $20.00 entertaining loss ceiling across streak
+        # Falcon strictly cannot entertain losing more than $20.00 across any losing streak
+        max_entertaining_loss = getattr(settings, "MAX_ENTERTAINING_LOSS", Decimal("20.00"))
+        try:
+            from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
+            recovery_metrics = adaptive_tuning_engine.get_loss_recovery_metrics(
+                session=session, journal_repo=self._journal_repo
+            )
+            accumulated_streak_loss = recovery_metrics.accumulated_streak_loss
+            total_streak_exposure = accumulated_streak_loss + proposed_loss
+            if total_streak_exposure > max_entertaining_loss:
+                return CapitalGuardianDecision(
+                    allowed=False,
+                    reason=(
+                        f"Proposed trade worst-case loss (${proposed_loss:.2f}) plus accumulated streak loss (${accumulated_streak_loss:.2f}) "
+                        f"equals ${total_streak_exposure:.2f}, exceeding Falcon's strict maximum loss ceiling (${max_entertaining_loss:.2f})"
+                    ),
+                    state=GuardianState.NORMAL,
+                    activeTradingCapital=active_capital,
+                    protectedProfit=protected_profit,
+                    currentLiveTradeCount=current_count,
+                    maxLiveTradeCount=max_trades,
+                    currentAggregateWorstCaseLoss=current_agg_loss,
+                    proposedWorstCaseLoss=proposed_loss,
+                    aggregateWorstCaseLossAfter=agg_loss_after,
+                    remainingLossCapacity=remaining_capacity,
+                    cycleId=cycle.cycleId,
+                )
+        except Exception as ex:
+            logger.warning(f"Error checking streak loss ceiling in Capital Guardian: {ex}")
 
         # Step 7: Authorization Granted
         new_remaining = active_capital - agg_loss_after

@@ -74,6 +74,8 @@ class SignalCandidate(BaseModel):
     # Adaptive tuning metadata (immutable snapshot from candidate generation)
     adaptiveRuleVersion: Optional[str] = None
     adaptiveStopMultiplier: Optional[float] = None
+    profitRecoveryMultiplier: Optional[float] = 1.0
+    recoveryStatus: Optional[str] = "BASELINE"
     # Informational Research Promotion Context (Phase 4B)
     researchContext: Optional[ResearchSignalContext] = None
     # Pipeline metadata — consistent with all immutable Falcon artifacts

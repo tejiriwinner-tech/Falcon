@@ -281,5 +281,37 @@ class CapitalCycleService:
             raise RuntimeError(f"Failed to halt cycle '{cycle_id}'")
         return updated
 
+    def update_active_capital(self, amount: Decimal) -> CapitalCycleItem:
+        """
+        Updates the active trading capital for the current active cycle to any user-defined amount
+        (e.g. $50, $100, $500, $1000). If no active cycle exists, an initial cycle with this capital
+        is created.
+        """
+        if amount <= Decimal("0.00"):
+            raise ValueError("Active trading capital must be strictly positive")
+
+        active = self.get_active_cycle()
+        if not active:
+            cycles = self._repo.list_cycles()
+            next_num = len(cycles) + 1 if cycles else 1
+            next_id = f"cycle-{next_num}"
+            payload = CapitalCycleCreate(
+                cycleId=next_id,
+                cycleNumber=next_num,
+                startingCapital=amount,
+                targetCapital=max(amount * Decimal("5"), Decimal("500.00")),
+                activeTradingCapital=amount,
+                protectedProfit=Decimal("0.00"),
+                status=CapitalCycleStatus.ACTIVE,
+                startedAt=datetime.now(timezone.utc),
+            )
+            return self._repo.create_cycle(payload)
+
+        update_payload = CapitalCycleUpdate(activeTradingCapital=amount)
+        updated = self._repo.update_cycle(active.cycleId, update_payload)
+        if not updated:
+            raise RuntimeError(f"Failed to update active capital for cycle '{active.cycleId}'")
+        return updated
+
 
 capital_cycle_service = CapitalCycleService()

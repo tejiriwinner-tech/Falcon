@@ -3,8 +3,9 @@ Falcon Capital Cycle Read-Only API Endpoints (V10 Phase 2)
 Provides visibility into active cycle, cycle history, and protected profit summary.
 """
 
+from decimal import Decimal
 from typing import Optional
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
 from app.core.services.capital_cycle_service import capital_cycle_service
 from app.schemas.capital_cycle import (
@@ -20,6 +21,17 @@ router = APIRouter()
 def get_active_capital_cycle():
     """Returns the currently active capital cycle, or null if no cycle is active."""
     return capital_cycle_service.get_active_cycle()
+
+
+@router.post("/capital-cycles/set-capital", response_model=CapitalCycleItem, tags=["capital-cycles"])
+def set_active_capital(
+    amount: float = Query(..., gt=0.0, description="Set active trading capital to any amount (e.g. $100, $500, $1000)")
+):
+    """
+    Sets active trading capital for the active cycle to any user-defined amount.
+    Unlocks asset capacity (e.g. Gold, indices) without rigid micro-cycle restrictions.
+    """
+    return capital_cycle_service.update_active_capital(Decimal(str(round(amount, 2))))
 
 
 @router.get("/capital-cycles/history", response_model=CapitalCycleListResponse)

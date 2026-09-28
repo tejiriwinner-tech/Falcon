@@ -12,8 +12,10 @@ calculating real-time adaptive risk adjustments:
 import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from decimal import Decimal
 from typing import Dict, List, Optional
 
+from app.core.config.settings import settings
 from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.schemas.trade_journal import TradeJournalItem
 
@@ -32,6 +34,23 @@ class StrategyTuningProfile:
     total_evaluated: int
     rationale: str
     last_tuned_at: datetime
+    profit_recovery_multiplier: float = 1.0  # 1.0x (0 losses), 2.0x (1 loss), 4.0x (2 losses)
+    accumulated_streak_loss: float = 0.0     # Total monetary dollars lost in current active losing streak
+    recovery_status: str = "BASELINE"        # "BASELINE", "RECOVERY_2X", "RECOVERY_4X", "RECOVERY_LOCKED"
+    ai_reflection: str = ""                  # Falcon AI self-reflection and learning insight
+
+
+@dataclass
+class LossRecoveryMetrics:
+    consecutive_losses: int
+    profit_recovery_multiplier: float
+    accumulated_streak_loss: Decimal
+    recovery_status: str
+    ai_reflection: str
+    last_closed_trade_result: Optional[str] = None
+    max_entertaining_loss: Decimal = Decimal("20.00")
+    last_loss_reason: Optional[str] = None
+    last_lesson_learned: Optional[str] = None
 
 
 class AdaptiveRuleTuningEngine:
@@ -75,6 +94,8 @@ class AdaptiveRuleTuningEngine:
         recent = strat_trades[:15]
         total = len(recent)
 
+        loss_metrics = self.get_loss_recovery_metrics(strategy_id=strategy_id, as_of=as_of_utc, session=session)
+
         if total == 0:
             profile = StrategyTuningProfile(
                 strategy_id=strategy_id,
@@ -82,11 +103,15 @@ class AdaptiveRuleTuningEngine:
                 adaptive_stop_multiplier=1.0,
                 adaptive_pullback_multiplier=1.0,
                 tuning_status="OPTIMAL",
-                consecutive_losses=0,
+                consecutive_losses=loss_metrics.consecutive_losses,
                 recent_win_rate=1.0,
                 total_evaluated=0,
                 rationale="No historical losses detected. Baseline risk buffers active.",
                 last_tuned_at=as_of_utc,
+                profit_recovery_multiplier=loss_metrics.profit_recovery_multiplier,
+                accumulated_streak_loss=float(loss_metrics.accumulated_streak_loss),
+                recovery_status=loss_metrics.recovery_status,
+                ai_reflection=loss_metrics.ai_reflection,
             )
             self._profiles[f"{strategy_id}_{symbol or 'ALL'}"] = profile
             return profile
@@ -159,9 +184,120 @@ class AdaptiveRuleTuningEngine:
             total_evaluated=total,
             rationale=" ".join(rationale_parts),
             last_tuned_at=as_of_utc,
+            profit_recovery_multiplier=loss_metrics.profit_recovery_multiplier,
+            accumulated_streak_loss=float(loss_metrics.accumulated_streak_loss),
+            recovery_status=loss_metrics.recovery_status,
+            ai_reflection=loss_metrics.ai_reflection,
         )
         self._profiles[f"{strategy_id}_{symbol or 'ALL'}"] = profile
         return profile
+
+    def get_loss_recovery_metrics(
+        self,
+        strategy_id: Optional[str] = None,
+        as_of: Optional[datetime] = None,
+        session: Optional[object] = None,
+        journal_repo: Optional[object] = None,
+    ) -> LossRecoveryMetrics:
+        """
+        Calculates autonomous loss-recovery metrics across recent closed trades:
+        - 0 losses: 1.0x baseline profit target.
+        - 1 loss: 2.0x double profit target on next signal.
+        - 2 consecutive losses: 4.0x quadruple profit target on next signal.
+        - Hard ceiling: The highest amount Falcon can entertain losing is $20.00 across the streak.
+        - Any win resets the streak, multiplier (1.0x), and accumulated streak loss ($0.00).
+        """
+        if as_of is not None:
+            as_of_utc = as_of.astimezone(timezone.utc) if as_of.tzinfo else as_of.replace(tzinfo=timezone.utc)
+        else:
+            as_of_utc = datetime.now(timezone.utc)
+
+        repo = journal_repo or trade_journal_repository
+        closed_trades = repo.list_closed_trades_as_of(
+            strategy_id=strategy_id, as_of=as_of_utc, session=session
+        )
+
+        consecutive_losses = 0
+        accumulated_streak_loss = Decimal("0.00")
+        last_closed_trade_result = None
+        last_loss_reason = None
+        last_lesson_learned = None
+
+        for t in closed_trades:
+            res = (t.result or "").strip().upper()
+            if res in ("LOSS", "LOST"):
+                consecutive_losses += 1
+                loss_val = abs(Decimal(str(t.profitLoss))) if t.profitLoss else Decimal("0.00")
+                if loss_val == Decimal("0.00") and getattr(t, "initialMonetaryRisk", None):
+                    loss_val = Decimal(str(t.initialMonetaryRisk))
+                if loss_val == Decimal("0.00") and t.entryPrice and t.stopLoss:
+                    loss_val = Decimal(str(round(abs(t.entryPrice - t.stopLoss), 2)))
+                accumulated_streak_loss += loss_val
+
+                if last_loss_reason is None:
+                    last_loss_reason = t.reasonForExit
+                    last_lesson_learned = t.lessonLearned
+                if last_closed_trade_result is None:
+                    last_closed_trade_result = res
+            elif res in ("WIN", "WON"):
+                if last_closed_trade_result is None:
+                    last_closed_trade_result = res
+                break
+            elif res in ("BREAKEVEN", "BE"):
+                if last_closed_trade_result is None:
+                    last_closed_trade_result = res
+                continue
+            elif res in ("EXPIRED", "INVALIDATED"):
+                continue
+
+        max_loss = getattr(settings, "MAX_ENTERTAINING_LOSS", Decimal("20.00"))
+
+        if consecutive_losses == 0:
+            multiplier = 1.0
+            status = "BASELINE"
+            reflection = "Falcon AI: Baseline risk/reward active. Prior trades closed profitably or at breakeven."
+        elif consecutive_losses == 1:
+            multiplier = 2.0
+            status = "RECOVERY_2X"
+            diag = f" Learned from prior exit: {last_lesson_learned}" if last_lesson_learned else ""
+            reflection = (
+                f"Falcon AI Adaptation [1 Loss Detected | -${accumulated_streak_loss:.2f}]: "
+                f"Doubling profit target (2.0x) on next signal to recover prior loss in one clean execution.{diag}"
+            )
+        elif consecutive_losses == 2:
+            multiplier = 4.0
+            status = "RECOVERY_4X"
+            diag = f" Strategic diagnostic: {last_lesson_learned}" if last_lesson_learned else ""
+            reflection = (
+                f"Falcon AI Adaptation [2 Consecutive Losses | -${accumulated_streak_loss:.2f}]: "
+                f"Quadrupling profit target (4.0x) with tight structural invalidation to recover streak deficit.{diag}"
+            )
+        else:
+            multiplier = 1.0
+            status = "RECOVERY_LOCKED"
+            reflection = (
+                f"Falcon AI Circuit Breaker [{consecutive_losses} Consecutive Losses | -${accumulated_streak_loss:.2f}]: "
+                f"Maximum loss ceiling defense engaged. Multiplier locked to 1.0x baseline to preserve capital."
+            )
+
+        if accumulated_streak_loss >= max_loss:
+            status = "RECOVERY_LOCKED"
+            reflection = (
+                f"Falcon AI Circuit Breaker: Accumulated streak loss (-${accumulated_streak_loss:.2f}) "
+                f"reached or exceeded Falcon's ${max_loss:.2f} maximum entertaining loss ceiling. Circuit breaker active."
+            )
+
+        return LossRecoveryMetrics(
+            consecutive_losses=consecutive_losses,
+            profit_recovery_multiplier=multiplier,
+            accumulated_streak_loss=accumulated_streak_loss.quantize(Decimal("0.01")),
+            recovery_status=status,
+            ai_reflection=reflection,
+            last_closed_trade_result=last_closed_trade_result,
+            max_entertaining_loss=max_loss,
+            last_loss_reason=last_loss_reason,
+            last_lesson_learned=last_lesson_learned,
+        )
 
 
 adaptive_tuning_engine = AdaptiveRuleTuningEngine()

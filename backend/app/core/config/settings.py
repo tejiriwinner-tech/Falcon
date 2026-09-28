@@ -71,6 +71,7 @@ class Settings:
     CAPITAL_CYCLE_TARGET: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_TARGET", "500.00"))
     CAPITAL_CYCLE_NEXT_ALLOCATION: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_NEXT_ALLOCATION", "20.00"))
     MAX_SIMULTANEOUS_TRADES: int = int(os.getenv("MAX_SIMULTANEOUS_TRADES", "3"))
+    MAX_ENTERTAINING_LOSS: Decimal = Decimal(os.getenv("MAX_ENTERTAINING_LOSS", "20.00"))
 
     # Signal pipeline data source configuration
     # When true: TrendService and IndicatorService read from price_history via MarketHistoryAdapter

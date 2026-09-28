@@ -32,9 +32,11 @@ class SignalGenerationEngine:
         adaptive_mult: float = 1.0,
         pattern_details: Optional[Dict[str, Any]] = None,
         rr: float = 2.0,
+        recovery_mult: float = 1.0,
     ) -> Tuple[float, float, float]:
         """
         Calculates entry, stopLoss, and takeProfit using dynamic 1.5 * ATR fallback or pattern swing stops.
+        Applies recovery_mult (1.0x, 2.0x, 4.0x) to Take Profit distance for autonomous loss recovery.
         Returns: (entry_price, stop_loss, take_profit)
         """
         raw_symbol = (symbol or "").upper()
@@ -76,17 +78,25 @@ class SignalGenerationEngine:
                     stop_loss = round(sniper_stop + pad, dec_places)
             else:
                 stop_loss = round(sniper_stop, dec_places)
-            take_profit = round(sniper_target, dec_places)
+            
+            raw_reward = abs(sniper_target - current_price)
+            if recovery_mult > 1.0:
+                raw_reward = raw_reward * recovery_mult
+            if direction == CandidateDirection.BUY:
+                take_profit = round(current_price + raw_reward, dec_places)
+            else:
+                take_profit = round(current_price - raw_reward, dec_places)
         else:
+            target_dist = base_stop_dist * rr * recovery_mult
             if direction == CandidateDirection.BUY:
                 stop_loss = round(current_price - base_stop_dist, dec_places)
-                take_profit = round(current_price + (base_stop_dist * rr), dec_places)
+                take_profit = round(current_price + target_dist, dec_places)
             elif direction == CandidateDirection.SELL:
                 stop_loss = round(current_price + base_stop_dist, dec_places)
-                take_profit = round(current_price - (base_stop_dist * rr), dec_places)
+                take_profit = round(current_price - target_dist, dec_places)
             else:
                 stop_loss = round(current_price - base_stop_dist, dec_places)
-                take_profit = round(current_price + (base_stop_dist * rr), dec_places)
+                take_profit = round(current_price + target_dist, dec_places)
 
         return (current_price, stop_loss, take_profit)
 
@@ -517,6 +527,8 @@ class SignalGenerationEngine:
             # Query autonomous adaptive tuning for this strategy and asset
             tuning_profile = adaptive_tuning_engine.get_strategy_tuning(strategy.id, raw_symbol, as_of=eval_time)
             adaptive_mult = tuning_profile.adaptive_stop_multiplier
+            recovery_mult = getattr(tuning_profile, "profit_recovery_multiplier", 1.0) or 1.0
+            recovery_status = getattr(tuning_profile, "recovery_status", "BASELINE") or "BASELINE"
 
             pattern_details = {}
             if sniper_stop is not None:
@@ -535,10 +547,21 @@ class SignalGenerationEngine:
                 adaptive_mult=adaptive_mult,
                 pattern_details=pattern_details if (sniper_stop or sniper_target) else None,
                 rr=rr,
+                recovery_mult=recovery_mult,
             )
             risk_dist = abs(entry_price - stop_loss)
             if risk_dist > 1e-6:
                 rr = round(abs(take_profit - entry_price) / risk_dist, 2)
+
+            if recovery_mult > 1.05:
+                reasons.append(CandidateReason(
+                    title=f"Falcon AI Loss Recovery Active ({recovery_status})",
+                    description=(
+                        f"Profit target dynamically scaled {recovery_mult:.1f}x to recoup prior loss deficit. "
+                        f"{tuning_profile.ai_reflection}"
+                    ),
+                    passed=True
+                ))
 
             if adaptive_mult > 1.05:
                 reasons.append(CandidateReason(
@@ -615,6 +638,8 @@ class SignalGenerationEngine:
                 evaluationCompletedAt=completed_at,
                 adaptiveRuleVersion=getattr(adaptive_tuning_engine, "version", "1.0.0"),
                 adaptiveStopMultiplier=adaptive_mult,
+                profitRecoveryMultiplier=recovery_mult,
+                recoveryStatus=recovery_status,
                 researchContext=res_ctx,
                 engineVersion=self.version
             ))

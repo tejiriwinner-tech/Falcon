@@ -6,6 +6,7 @@ logger = logging.getLogger("falcon.signal_service")
 
 from app.core.repository.mission_repository import mission_repository
 from app.core.repository.trade_journal_repository import trade_journal_repository
+from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine, LossRecoveryMetrics
 from app.core.engines.strategy_engine import StrategyEngine
 from app.core.services.signal_authorization_service import signal_authorization_service
 from app.schemas.decision_artifact import DecisionArtifact, DecisionStatus
@@ -211,6 +212,9 @@ class SignalService:
                     if len(curated_watchlist) < 3:
                         curated_watchlist.append(item)
 
+            # Compute autonomous loss recovery metrics
+            recovery_metrics = adaptive_tuning_engine.get_loss_recovery_metrics()
+
             # Convert top active setups (max 3)
             active_items = [
                 self._to_signal(
@@ -220,6 +224,7 @@ class SignalService:
                     now,
                     is_active=True,
                     lot_size=item.get("lot_size"),
+                    recovery_metrics=recovery_metrics,
                 )
                 for item in curated_active[:3]
             ]
@@ -233,6 +238,7 @@ class SignalService:
                     now,
                     is_active=False,
                     guardian_reason=item.get("guardian_reason"),
+                    recovery_metrics=recovery_metrics,
                 )
                 for item in curated_watchlist[:3]
             ]
@@ -257,6 +263,7 @@ class SignalService:
         is_active: bool = False,
         lot_size: Optional[float] = None,
         guardian_reason: Optional[str] = None,
+        recovery_metrics: Optional[LossRecoveryMetrics] = None,
     ) -> SignalItem:
         strategy = self._strategy_engine.get_strategy_by_id(candidate.strategyId)
         preferred_session = (
@@ -281,15 +288,46 @@ class SignalService:
         valid_until = candidate.generatedAt + timedelta(minutes=45)
         is_expired = now > valid_until
 
-        # Calculate Breakeven targets (1:1 Risk-Reward threshold for risk-free protection)
-        risk_dist = abs(candidate.entryPrice - candidate.stopLoss)
         dec = 2 if "XAU" in candidate.symbol or candidate.entryPrice > 100 else 4
         direction_val = candidate.direction.value.upper()
+
+        # Ground entry to live market quote for INSTANT MARKET EXECUTION when ACTIVE
+        entry_price = candidate.entryPrice
+        stop_loss = candidate.stopLoss
+        take_profit = candidate.takeProfit
+
+        if is_active and not is_expired:
+            try:
+                from app.core.providers import provider_manager
+                raw_sym = candidate.symbol.replace("/", "").upper()
+                cached_entry = provider_manager._cache.get(raw_sym, allow_stale=True)
+                if cached_entry and hasattr(cached_entry, "data"):
+                    q_data = cached_entry.data
+                    live_q = None
+                    if direction_val == "BUY" and getattr(q_data, "ask", None) and q_data.ask > 0:
+                        live_q = q_data.ask
+                    elif direction_val == "SELL" and getattr(q_data, "bid", None) and q_data.bid > 0:
+                        live_q = q_data.bid
+                    elif getattr(q_data, "lastPrice", None) and q_data.lastPrice > 0:
+                        live_q = q_data.lastPrice
+                    elif getattr(q_data, "price", None) and q_data.price > 0:
+                        live_q = q_data.price
+                    
+                    if live_q is not None and live_q > 0:
+                        delta = live_q - candidate.entryPrice
+                        entry_price = round(live_q, dec)
+                        stop_loss = round(candidate.stopLoss + delta, dec)
+                        take_profit = round(candidate.takeProfit + delta, dec)
+            except Exception:
+                pass
+
+        # Calculate Breakeven targets (1:1 Risk-Reward threshold for risk-free protection)
+        risk_dist = abs(entry_price - stop_loss)
         if direction_val == "BUY":
-            be_trigger = round(candidate.entryPrice + risk_dist, dec)
+            be_trigger = round(entry_price + risk_dist, dec)
         else:
-            be_trigger = round(candidate.entryPrice - risk_dist, dec)
-        be_price = round(candidate.entryPrice, dec)
+            be_trigger = round(entry_price - risk_dist, dec)
+        be_price = round(entry_price, dec)
 
         # Determine if live market has already achieved Breakeven
         is_breakeven = False
@@ -301,9 +339,9 @@ class SignalService:
             if cached_entry and hasattr(cached_entry, "data") and hasattr(cached_entry.data, "lastPrice"):
                 current_px = cached_entry.data.lastPrice
             else:
-                current_px = candidate.entryPrice
+                current_px = entry_price
         except Exception:
-            current_px = candidate.entryPrice
+            current_px = entry_price
 
         if current_px is not None and current_px > 0:
             if direction_val == "BUY" and current_px >= be_trigger:
@@ -313,19 +351,25 @@ class SignalService:
 
         be_rule = f"BE Rule: Shift SL to Entry ({be_price}) at {be_trigger} (+1.0R risk-free)."
 
+        # Loss Recovery Metadata
+        rec_status = recovery_metrics.recovery_status if recovery_metrics else getattr(candidate, "recoveryStatus", "BASELINE")
+        rec_mult = recovery_metrics.profit_recovery_multiplier if recovery_metrics else getattr(candidate, "profitRecoveryMultiplier", 1.0)
+        rec_badge = f" [{rec_status} - {rec_mult:.0f}X TARGET]" if rec_mult and rec_mult > 1.0 else ""
+        ai_reflection = f"🧠 {recovery_metrics.ai_reflection} " if (recovery_metrics and recovery_metrics.ai_reflection) else ""
+
         if is_active and not is_expired:
             status = "ACTIVE"
+            trigger_rule = f"[MARKET EXECUTION - ENTER NOW] Enter {candidate.direction.value} at live market {entry_price:.4f} immediately."
             be_status_text = " [🛡️ BREAKEVEN LOCKED]" if is_breakeven else ""
             analysis = (
-                f"🎯 SNIPER SIGNAL ACTIVE [{setup_pattern}]{be_status_text}: "
-                f"{trigger_rule}. "
-                f"Entry: {candidate.entryPrice} | SL: {candidate.stopLoss} | "
-                f"TP: {candidate.takeProfit} (1:{candidate.riskReward:.1f} R:R). "
+                f"🎯 SNIPER SIGNAL ACTIVE [{setup_pattern}]{rec_badge}{be_status_text}: "
+                f"{trigger_rule} "
+                f"Entry: {entry_price} | SL: {stop_loss} | "
+                f"TP: {take_profit} (1:{candidate.riskReward:.1f} R:R). "
                 f"{be_rule} "
+                f"{ai_reflection}"
                 f"Active Window: {preferred_session}. Valid until {valid_until.strftime('%H:%M UTC')}."
             )
-            # Note: Signal generation is informational and manual execution guidance only.
-            # Normal signal generation never auto-dispatches execution orders.
         elif is_expired:
             status = "EXPIRED"
             analysis = (
@@ -369,9 +413,9 @@ class SignalService:
             id=signal_id,
             symbol=candidate.symbol,
             action=candidate.direction.value,
-            entry=candidate.entryPrice,
-            takeProfit=candidate.takeProfit,
-            stopLoss=candidate.stopLoss,
+            entry=entry_price,
+            takeProfit=take_profit,
+            stopLoss=stop_loss,
             confidence=candidate.confidence,
             timeframe=timeframe,
             status=status,
@@ -382,6 +426,8 @@ class SignalService:
             strategyVersion=candidate.strategyVersion,
             adaptiveRuleVersion=getattr(candidate, "adaptiveRuleVersion", None),
             adaptiveStopMultiplier=getattr(candidate, "adaptiveStopMultiplier", None),
+            profitRecoveryMultiplier=rec_mult,
+            recoveryStatus=rec_status,
             researchContext=getattr(candidate, "researchContext", None),
             dataAgeSeconds=candidate.marketDataAgeSeconds,
             triggerCondition=trigger_rule,
