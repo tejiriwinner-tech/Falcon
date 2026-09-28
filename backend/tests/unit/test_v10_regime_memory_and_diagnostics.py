@@ -1,0 +1,540 @@
+"""
+Falcon V10 Unit Tests: Regime Memory & Diagnostics Engine (Pillar 2: Cognitive Learning).
+
+Tests:
+1. Forensic Diagnostics:
+   - Institutional Liquidity Sweep: stop loss pierced by wick before directional reversal -> +35% ATR stop buffer expansion.
+   - Off-Peak Momentum Stall: exit outside London/NY sessions during low volume -> session restriction to major sessions.
+   - Macro News Volatility: exit within 15 minutes of high-impact macro news -> +15 minutes news blackout expansion.
+   - Normal Stop Out: standard structural invalidation without anomaly.
+   - Take Profit Hit: winning trade reinforces strategy parameters.
+2. Dynamic Strategy Health Scoring:
+   - BOOSTED state: win rate >= 60% and profit factor >= 1.8 -> 1.5x allocation.
+   - QUARANTINED_PAPER state: win rate < 35% or >= 3 consecutive losses -> 0.0x allocation.
+   - CAUTION state: 2 consecutive losses or sub-par metrics -> 0.5x allocation.
+   - HEALTHY state: normal baseline operations -> 1.0x allocation.
+   - Empty trade history baseline.
+3. Memory Ledger & Aggregated Summary:
+   - In-memory diagnostics recording and retrieval.
+   - Aggregated root cause distribution, lessons ledger, and strategy scorecards.
+4. Integration consistency with AdaptiveRuleTuningEngine & TradeJournal:
+   - Syncing prescribed adaptations into effective stop multipliers (+0.35x).
+   - Object-level compatibility with TradeJournalItem.
+"""
+
+from datetime import datetime, timezone, timedelta
+from decimal import Decimal
+import pytest
+
+from app.core.analytics.adaptive_tuning_engine import AdaptiveRuleTuningEngine
+from app.core.analytics.regime_memory_engine import RegimeMemoryEngine
+from app.schemas.regime_memory import (
+    DynamicAdaptation,
+    PostMortemDiagnostic,
+    RootCauseType,
+    StrategyHealthScore,
+    StrategyHealthStatus,
+)
+from app.schemas.trade_journal import TradeJournalItem
+
+
+@pytest.fixture
+def memory_engine() -> RegimeMemoryEngine:
+    engine = RegimeMemoryEngine()
+    engine.clear_memory()
+    return engine
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. Forensic Diagnostics: Liquidity Sweeps (+35% ATR Expansion)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_liquidity_sweep_diagnostic_buy_trade(memory_engine: RegimeMemoryEngine):
+    """
+    BUY trade stopped out: low price pierced stop loss (trough < stop_loss),
+    then reversed upward past entry price.
+    Must diagnose INSTITUTIONAL_LIQUIDITY_SWEEP and prescribe atr_stop_multiplier_delta = +0.35.
+    """
+    trade = {
+        "trade_id": "sweep_buy_01",
+        "symbol": "EURUSD",
+        "strategy_id": "trend_pullback",
+        "direction": "BUY",
+        "entry_price": 1.0850,
+        "stop_loss": 1.0800,
+        "take_profit": 1.0950,
+        "exit_price": 1.0798,
+        "result": "LOSS",
+        "pnl": -52.0,
+        "reason_for_exit": "Stop loss hit",
+        "close_date": datetime(2026, 9, 28, 14, 30, tzinfo=timezone.utc),  # NY/London overlap
+    }
+    context = {
+        "trough_price": 1.0795,       # Pierced 1.0800 stop loss by 5 pips
+        "post_stop_price": 1.0890,    # Reversed back up above entry (1.0850)
+        "reversal_direction": "UP",
+    }
+
+    diagnostic = memory_engine.diagnose_trade_outcome(trade_record=trade, market_context=context)
+
+    assert diagnostic.root_cause == RootCauseType.INSTITUTIONAL_LIQUIDITY_SWEEP
+    assert diagnostic.symbol == "EURUSD"
+    assert diagnostic.strategy_id == "trend_pullback"
+    assert diagnostic.outcome == "LOSS"
+    assert diagnostic.prescribed_adaptation["atr_stop_multiplier_delta"] == 0.35
+    assert diagnostic.prescribed_adaptation["action"] == "EXPAND_ATR_STOP_BUFFER"
+    assert "liquidity sweep wick" in diagnostic.lesson_learned.lower()
+
+
+def test_liquidity_sweep_diagnostic_sell_trade(memory_engine: RegimeMemoryEngine):
+    """
+    SELL trade stopped out: high price pierced stop loss (peak > stop_loss),
+    then reversed downward below entry price.
+    """
+    trade = {
+        "trade_id": "sweep_sell_01",
+        "symbol": "XAUUSD",
+        "strategy_id": "gold_breakout",
+        "direction": "SELL",
+        "entry_price": 2650.0,
+        "stop_loss": 2660.0,
+        "take_profit": 2620.0,
+        "exit_price": 2660.5,
+        "result": "LOSS",
+        "pnl": -105.0,
+        "reason_for_exit": "Stop loss hit",
+        "close_date": datetime(2026, 9, 28, 13, 0, tzinfo=timezone.utc),
+    }
+    context = {
+        "peak_price": 2662.0,         # Pierced 2660.0 stop loss
+        "post_stop_price": 2635.0,    # Reversed back down below entry (2650.0)
+        "reversal_direction": "DOWN",
+    }
+
+    diagnostic = memory_engine.diagnose_trade_outcome(trade_record=trade, market_context=context)
+
+    assert diagnostic.root_cause == RootCauseType.INSTITUTIONAL_LIQUIDITY_SWEEP
+    assert diagnostic.prescribed_adaptation["atr_stop_multiplier_delta"] == 0.35
+    assert diagnostic.prescribed_adaptation["recommended_stop_buffer"] == 1.35
+
+
+def test_liquidity_sweep_explicit_context_flag(memory_engine: RegimeMemoryEngine):
+    """Explicit liquidity_sweep flag in market context triggers sweep diagnosis."""
+    trade = {
+        "trade_id": "sweep_flag_01",
+        "symbol": "GBPUSD",
+        "strategy_id": "cable_sniper",
+        "result": "LOSS",
+        "pnl": -35.0,
+        "close_date": datetime(2026, 9, 28, 10, 0, tzinfo=timezone.utc),
+    }
+    context = {
+        "liquidity_sweep": True,
+        "swept_and_reversed": True,
+    }
+
+    diagnostic = memory_engine.diagnose_trade_outcome(trade_record=trade, market_context=context)
+    assert diagnostic.root_cause == RootCauseType.INSTITUTIONAL_LIQUIDITY_SWEEP
+    assert diagnostic.prescribed_adaptation["atr_stop_multiplier_delta"] == 0.35
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. Forensic Diagnostics: Off-Peak Momentum Stall (Session Restriction)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_off_peak_momentum_stall_diagnostic(memory_engine: RegimeMemoryEngine):
+    """
+    Trade closed during Asian dead hours (e.g. 23:30 UTC or 03:00 UTC) with low volume.
+    Must diagnose OFF_PEAK_MOMENTUM_STALL and prescribe restrict_to_major_sessions = True.
+    """
+    trade = {
+        "trade_id": "off_peak_01",
+        "symbol": "EURUSD",
+        "strategy_id": "session_scalp",
+        "result": "LOSS",
+        "pnl": -28.0,
+        "reason_for_exit": "Momentum stalled in dead zone",
+        # 23:30 UTC is outside London (07:00-16:00) and NY (12:00-21:00)
+        "close_date": datetime(2026, 9, 28, 23, 30, tzinfo=timezone.utc),
+    }
+    context = {
+        "low_volume": True,
+        "volume_percentile": 15,
+        "momentum_stalled": True,
+    }
+
+    diagnostic = memory_engine.diagnose_trade_outcome(trade_record=trade, market_context=context)
+
+    assert diagnostic.root_cause == RootCauseType.OFF_PEAK_MOMENTUM_STALL
+    assert diagnostic.prescribed_adaptation["restrict_to_major_sessions"] is True
+    assert diagnostic.prescribed_adaptation["action"] == "RESTRICT_SESSION_WINDOW"
+    assert "LONDON" in diagnostic.prescribed_adaptation["allowed_sessions"]
+    assert "NEW_YORK" in diagnostic.prescribed_adaptation["allowed_sessions"]
+    assert "off-peak" in diagnostic.lesson_learned.lower()
+
+
+def test_off_peak_explicit_asian_session_string(memory_engine: RegimeMemoryEngine):
+    """Explicit ASIAN session tag with low volume stall triggers session restriction."""
+    trade = {
+        "trade_id": "off_peak_02",
+        "symbol": "USDJPY",
+        "strategy_id": "yen_flow",
+        "result": "LOSS",
+        "pnl": -40.0,
+        "market_session": "ASIAN",
+        "close_date": datetime(2026, 9, 28, 2, 0, tzinfo=timezone.utc),
+    }
+    context = {"volume_ratio": 0.35}
+
+    diagnostic = memory_engine.diagnose_trade_outcome(trade_record=trade, market_context=context)
+    assert diagnostic.root_cause == RootCauseType.OFF_PEAK_MOMENTUM_STALL
+    assert diagnostic.prescribed_adaptation["restrict_to_major_sessions"] is True
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. Forensic Diagnostics: Macro News Volatility (Blackout Expansion)
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_macro_news_volatility_diagnostic_minutes_delta(memory_engine: RegimeMemoryEngine):
+    """
+    Trade stopped out 8 minutes before high-impact CPI release.
+    Must diagnose MACRO_NEWS_VOLATILITY and prescribe widen_news_blackout_minutes = 15.
+    """
+    trade = {
+        "trade_id": "news_cpi_01",
+        "symbol": "EURUSD",
+        "strategy_id": "macro_rider",
+        "result": "LOSS",
+        "pnl": -75.0,
+        "reason_for_exit": "Stop loss hit on erratic spread spike",
+        "close_date": datetime(2026, 9, 28, 12, 22, tzinfo=timezone.utc),
+    }
+    context = {
+        "news_event": "US CPI",
+        "news_impact": "HIGH",
+        "minutes_to_news": 8,  # Within 15 minutes window
+    }
+
+    diagnostic = memory_engine.diagnose_trade_outcome(trade_record=trade, market_context=context)
+
+    assert diagnostic.root_cause == RootCauseType.MACRO_NEWS_VOLATILITY
+    assert diagnostic.prescribed_adaptation["widen_news_blackout_minutes"] == 15
+    assert diagnostic.prescribed_adaptation["action"] == "WIDEN_NEWS_BLACKOUT"
+    assert "blackout window" in diagnostic.lesson_learned.lower()
+
+
+def test_macro_news_volatility_explicit_timestamp(memory_engine: RegimeMemoryEngine):
+    """Trade stopped out 10 minutes after scheduled FOMC interest rate decision."""
+    close_time = datetime(2026, 9, 28, 18, 10, tzinfo=timezone.utc)
+    news_time = datetime(2026, 9, 28, 18, 0, tzinfo=timezone.utc)
+
+    trade = {
+        "trade_id": "news_fomc_01",
+        "symbol": "XAUUSD",
+        "strategy_id": "gold_trend",
+        "result": "LOSS",
+        "pnl": -120.0,
+        "close_date": close_time,
+    }
+    context = {
+        "news_event": "FOMC Rate Decision",
+        "news_time": news_time,
+    }
+
+    diagnostic = memory_engine.diagnose_trade_outcome(trade_record=trade, market_context=context)
+    assert diagnostic.root_cause == RootCauseType.MACRO_NEWS_VOLATILITY
+    assert diagnostic.prescribed_adaptation["widen_news_blackout_minutes"] == 15
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. Forensic Diagnostics: Normal Stop Out & Winning Trade Hit
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_normal_stop_out_diagnostic(memory_engine: RegimeMemoryEngine):
+    """
+    Standard loss during London peak hours without sweep or macro news.
+    Must diagnose NORMAL_STOP_OUT and keep risk parameters baseline.
+    """
+    trade = {
+        "trade_id": "normal_loss_01",
+        "symbol": "EURUSD",
+        "strategy_id": "trend_pullback",
+        "result": "LOSS",
+        "pnl": -45.0,
+        "reason_for_exit": "Clean structural break",
+        "close_date": datetime(2026, 9, 28, 10, 15, tzinfo=timezone.utc),  # London peak
+    }
+    context = {
+        "volume_percentile": 80,
+    }
+
+    diagnostic = memory_engine.diagnose_trade_outcome(trade_record=trade, market_context=context)
+
+    assert diagnostic.root_cause == RootCauseType.NORMAL_STOP_OUT
+    assert diagnostic.prescribed_adaptation["action"] == "MAINTAIN_CURRENT_RISK"
+    assert diagnostic.prescribed_adaptation["atr_stop_multiplier_delta"] == 0.0
+
+
+def test_take_profit_hit_diagnostic(memory_engine: RegimeMemoryEngine):
+    """Winning trade reinforces strategy parameters."""
+    trade = {
+        "trade_id": "win_01",
+        "symbol": "EURUSD",
+        "strategy_id": "trend_pullback",
+        "result": "WIN",
+        "pnl": 95.0,
+        "close_date": datetime(2026, 9, 28, 14, 0, tzinfo=timezone.utc),
+    }
+
+    diagnostic = memory_engine.diagnose_trade_outcome(trade_record=trade)
+
+    assert diagnostic.root_cause == RootCauseType.TAKE_PROFIT_HIT
+    assert diagnostic.outcome == "WIN"
+    assert diagnostic.prescribed_adaptation["reinforce_strategy"] is True
+    assert diagnostic.prescribed_adaptation["recommended_weight"] == 1.0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. Dynamic Strategy Health Scoring
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_strategy_health_boosted_state(memory_engine: RegimeMemoryEngine):
+    """
+    Win rate >= 60% and profit factor >= 1.8 -> BOOSTED (1.5x allocation).
+    """
+    now = datetime.now(timezone.utc)
+    # 7 wins ($100 each), 3 losses ($40 each) -> Gross Profit: $700, Gross Loss: $120 -> PF = 5.83, Win Rate = 70%
+    trades = [
+        {"result": "WIN", "pnl": 100.0, "close_date": now - timedelta(hours=1)},
+        {"result": "WIN", "pnl": 100.0, "close_date": now - timedelta(hours=2)},
+        {"result": "WIN", "pnl": 100.0, "close_date": now - timedelta(hours=3)},
+        {"result": "LOSS", "pnl": -40.0, "close_date": now - timedelta(hours=4)},
+        {"result": "WIN", "pnl": 100.0, "close_date": now - timedelta(hours=5)},
+        {"result": "WIN", "pnl": 100.0, "close_date": now - timedelta(hours=6)},
+        {"result": "LOSS", "pnl": -40.0, "close_date": now - timedelta(hours=7)},
+        {"result": "WIN", "pnl": 100.0, "close_date": now - timedelta(hours=8)},
+        {"result": "WIN", "pnl": 100.0, "close_date": now - timedelta(hours=9)},
+        {"result": "LOSS", "pnl": -40.0, "close_date": now - timedelta(hours=10)},
+    ]
+
+    score = memory_engine.evaluate_strategy_health(strategy_id="elite_trend", trade_history=trades)
+
+    assert score.strategy_id == "elite_trend"
+    assert score.health_status == StrategyHealthStatus.BOOSTED
+    assert score.recommended_weight == 1.5
+    assert score.win_rate == 0.7
+    assert score.profit_factor > 1.8
+    assert score.consecutive_losses == 0
+
+
+def test_strategy_health_quarantined_consecutive_losses(memory_engine: RegimeMemoryEngine):
+    """
+    3 consecutive losses -> QUARANTINED_PAPER (0.0x live allocation).
+    """
+    now = datetime.now(timezone.utc)
+    trades = [
+        {"result": "LOSS", "pnl": -50.0, "close_date": now - timedelta(hours=1)},
+        {"result": "LOSS", "pnl": -50.0, "close_date": now - timedelta(hours=2)},
+        {"result": "LOSS", "pnl": -50.0, "close_date": now - timedelta(hours=3)},
+        {"result": "WIN", "pnl": 80.0, "close_date": now - timedelta(hours=4)},
+        {"result": "WIN", "pnl": 80.0, "close_date": now - timedelta(hours=5)},
+    ]
+
+    score = memory_engine.evaluate_strategy_health(strategy_id="struggling_breakout", trade_history=trades)
+
+    assert score.health_status == StrategyHealthStatus.QUARANTINED_PAPER
+    assert score.recommended_weight == 0.0
+    assert score.consecutive_losses == 3
+
+
+def test_strategy_health_quarantined_low_win_rate(memory_engine: RegimeMemoryEngine):
+    """
+    Win rate < 35% across 5 trades -> QUARANTINED_PAPER (0.0x live allocation).
+    """
+    now = datetime.now(timezone.utc)
+    # 1 win, 4 losses -> Win rate 20% (<35%)
+    trades = [
+        {"result": "WIN", "pnl": 60.0, "close_date": now - timedelta(hours=1)},
+        {"result": "LOSS", "pnl": -40.0, "close_date": now - timedelta(hours=2)},
+        {"result": "LOSS", "pnl": -40.0, "close_date": now - timedelta(hours=3)},
+        {"result": "LOSS", "pnl": -40.0, "close_date": now - timedelta(hours=4)},
+        {"result": "LOSS", "pnl": -40.0, "close_date": now - timedelta(hours=5)},
+    ]
+
+    score = memory_engine.evaluate_strategy_health(strategy_id="decaying_scalper", trade_history=trades)
+
+    assert score.health_status == StrategyHealthStatus.QUARANTINED_PAPER
+    assert score.recommended_weight == 0.0
+    assert score.win_rate == 0.20
+
+
+def test_strategy_health_caution_state(memory_engine: RegimeMemoryEngine):
+    """
+    2 consecutive losses -> CAUTION (0.5x allocation scale down).
+    """
+    now = datetime.now(timezone.utc)
+    trades = [
+        {"result": "LOSS", "pnl": -30.0, "close_date": now - timedelta(hours=1)},
+        {"result": "LOSS", "pnl": -30.0, "close_date": now - timedelta(hours=2)},
+        {"result": "WIN", "pnl": 50.0, "close_date": now - timedelta(hours=3)},
+        {"result": "WIN", "pnl": 50.0, "close_date": now - timedelta(hours=4)},
+    ]
+
+    score = memory_engine.evaluate_strategy_health(strategy_id="cautionary_flow", trade_history=trades)
+
+    assert score.health_status == StrategyHealthStatus.CAUTION
+    assert score.recommended_weight == 0.5
+    assert score.consecutive_losses == 2
+
+
+def test_strategy_health_healthy_baseline(memory_engine: RegimeMemoryEngine):
+    """
+    Balanced metrics (win rate 50%, profit factor 1.25, 0 consecutive losses) -> HEALTHY (1.0x).
+    """
+    now = datetime.now(timezone.utc)
+    trades = [
+        {"result": "WIN", "pnl": 50.0, "close_date": now - timedelta(hours=1)},
+        {"result": "LOSS", "pnl": -40.0, "close_date": now - timedelta(hours=2)},
+        {"result": "WIN", "pnl": 50.0, "close_date": now - timedelta(hours=3)},
+        {"result": "LOSS", "pnl": -40.0, "close_date": now - timedelta(hours=4)},
+    ]
+
+    score = memory_engine.evaluate_strategy_health(strategy_id="standard_trend", trade_history=trades)
+
+    assert score.health_status == StrategyHealthStatus.HEALTHY
+    assert score.recommended_weight == 1.0
+    assert score.win_rate == 0.5
+    assert score.consecutive_losses == 0
+
+
+def test_strategy_health_empty_history(memory_engine: RegimeMemoryEngine):
+    """Empty history defaults safely to HEALTHY baseline."""
+    score = memory_engine.evaluate_strategy_health(strategy_id="new_strat", trade_history=[])
+    assert score.health_status == StrategyHealthStatus.HEALTHY
+    assert score.recommended_weight == 1.0
+    assert score.total_trades == 0
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. Memory Ledger & Aggregation Summary
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_memory_ledger_and_summary(memory_engine: RegimeMemoryEngine):
+    """Verify recording diagnostics and generating aggregated summary."""
+    trade1 = {
+        "trade_id": "t1",
+        "symbol": "EURUSD",
+        "strategy_id": "strat_a",
+        "result": "LOSS",
+        "pnl": -50.0,
+        "close_date": datetime(2026, 9, 28, 10, 0, tzinfo=timezone.utc),
+    }
+    context1 = {"liquidity_sweep": True}
+
+    trade2 = {
+        "trade_id": "t2",
+        "symbol": "GBPUSD",
+        "strategy_id": "strat_b",
+        "result": "LOSS",
+        "pnl": -60.0,
+        "close_date": datetime(2026, 9, 28, 12, 0, tzinfo=timezone.utc),
+    }
+    context2 = {"macro_news_volatility": True}
+
+    trade3 = {
+        "trade_id": "t3",
+        "symbol": "USDJPY",
+        "strategy_id": "strat_a",
+        "result": "WIN",
+        "pnl": 120.0,
+        "close_date": datetime(2026, 9, 28, 15, 0, tzinfo=timezone.utc),
+    }
+
+    # Record all 3
+    memory_engine.diagnose_and_record(trade1, context1)
+    memory_engine.diagnose_and_record(trade2, context2)
+    memory_engine.diagnose_and_record(trade3)
+
+    # Evaluate health for both strategies
+    memory_engine.evaluate_strategy_health("strat_a", [trade1, trade3])
+    memory_engine.evaluate_strategy_health(
+        "strat_b",
+        [trade2, {"result": "LOSS", "pnl": -50}, {"result": "LOSS", "pnl": -50}],
+    )
+
+    summary = memory_engine.get_memory_summary()
+
+    assert summary["total_diagnostics"] == 3
+    assert summary["root_cause_distribution"]["INSTITUTIONAL_LIQUIDITY_SWEEP"] == 1
+    assert summary["root_cause_distribution"]["MACRO_NEWS_VOLATILITY"] == 1
+    assert summary["root_cause_distribution"]["TAKE_PROFIT_HIT"] == 1
+    assert len(summary["recent_lessons"]) == 3
+    assert "strat_b" in summary["quarantined_strategies"]
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. Integration with AdaptiveRuleTuningEngine & TradeJournal
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_sync_with_adaptive_tuning_engine(memory_engine: RegimeMemoryEngine):
+    """
+    Syncing with AdaptiveRuleTuningEngine applies the prescribed +0.35 stop delta
+    to calculate the effective adaptive stop buffer (e.g. 1.0 + 0.35 = 1.35x).
+    """
+    strategy_id = "reversal_hunter"
+
+    # Record a liquidity sweep diagnostic for this strategy
+    trade = {
+        "trade_id": "t_sweep_sync",
+        "symbol": "EURUSD",
+        "strategy_id": strategy_id,
+        "result": "LOSS",
+        "pnl": -50.0,
+        "close_date": datetime.now(timezone.utc),
+    }
+    memory_engine.diagnose_and_record(trade, market_context={"liquidity_sweep": True})
+
+    # Evaluate health
+    memory_engine.evaluate_strategy_health(strategy_id, [trade])
+
+    # Run sync
+    sync_result = memory_engine.sync_with_adaptive_tuning_engine(strategy_id=strategy_id, symbol="EURUSD")
+
+    assert sync_result["strategy_id"] == strategy_id
+    assert sync_result["atr_stop_multiplier_delta"] == 0.35
+    assert sync_result["effective_stop_multiplier"] >= 1.35
+    assert "recovery_status" in sync_result
+
+
+def test_trade_journal_item_compatibility(memory_engine: RegimeMemoryEngine):
+    """Verify diagnose_trade_outcome directly accepts a TradeJournalItem model."""
+    journal_item = TradeJournalItem(
+        id=999,
+        symbol="EURUSD",
+        direction="BUY",
+        entryPrice=1.0850,
+        exitPrice=1.0790,
+        stopLoss=1.0800,
+        takeProfit=1.0950,
+        timeframe="M15",
+        marketSession="LONDON",
+        tradeDate=datetime(2026, 9, 28, 9, 0, tzinfo=timezone.utc),
+        closeDate=datetime(2026, 9, 28, 10, 0, tzinfo=timezone.utc),
+        status="CLOSED",
+        result="LOSS",
+        profitLoss=-60.0,
+        reasonForEntry="Order block retest",
+        reasonForExit="Stop loss triggered on liquidity sweep",
+        createdAt=datetime.now(timezone.utc),
+        updatedAt=datetime.now(timezone.utc),
+    )
+
+    diagnostic = memory_engine.diagnose_trade_outcome(
+        trade_record=journal_item,
+        market_context={"post_stop_price": 1.0880, "reversal_direction": "UP"},
+    )
+
+    assert diagnostic.trade_id == "999"
+    assert diagnostic.symbol == "EURUSD"
+    assert diagnostic.root_cause == RootCauseType.INSTITUTIONAL_LIQUIDITY_SWEEP
+    assert diagnostic.prescribed_adaptation["atr_stop_multiplier_delta"] == 0.35

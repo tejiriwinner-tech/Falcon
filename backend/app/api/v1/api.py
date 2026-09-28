@@ -35,8 +35,10 @@ from app.api.v1 import orders
 from app.api.v1 import capital_cycles
 from app.api.v1 import execution
 from app.api.v1 import paper
+from app.api.v1 import copilot
 
 api_router = APIRouter()
+api_router.include_router(copilot.router)
 api_router.include_router(capital_cycles.router, tags=["capital_cycles"])
 api_router.include_router(health.router, tags=["health"])
 api_router.include_router(market_data.router, tags=["market_data"])
