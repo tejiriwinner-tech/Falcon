@@ -38,6 +38,8 @@ class StrategyTuningProfile:
     accumulated_streak_loss: float = 0.0     # Total monetary dollars lost in current active losing streak
     recovery_status: str = "BASELINE"        # "BASELINE", "RECOVERY_2X", "RECOVERY_4X", "RECOVERY_LOCKED"
     ai_reflection: str = ""                  # Falcon AI self-reflection and learning insight
+    recommended_weight: float = 1.0          # Health allocation weight (e.g. 0.0 for QUARANTINED_PAPER, 1.5 for BOOSTED)
+    health_status: str = "HEALTHY"           # "HEALTHY", "CAUTION", "QUARANTINED_PAPER", "BOOSTED"
 
 
 @dataclass
@@ -82,9 +84,13 @@ class AdaptiveRuleTuningEngine:
             as_of_utc = datetime.now(timezone.utc)
 
         # Query point-in-time closed trades (enforces status=CLOSED, close_date IS NOT NULL, close_date <= as_of_utc)
-        strat_trades = trade_journal_repository.list_closed_trades_as_of(
-            strategy_id=strategy_id, as_of=as_of_utc, session=session
-        )
+        try:
+            strat_trades = trade_journal_repository.list_closed_trades_as_of(
+                strategy_id=strategy_id, as_of=as_of_utc, session=session
+            )
+        except Exception as ex:
+            logger.warning(f"Could not list closed trades from repository: {ex}")
+            strat_trades = []
         if symbol:
             sym_trades = [t for t in strat_trades if t.symbol == symbol]
             if len(sym_trades) >= 3:
@@ -95,6 +101,26 @@ class AdaptiveRuleTuningEngine:
         total = len(recent)
 
         loss_metrics = self.get_loss_recovery_metrics(strategy_id=strategy_id, as_of=as_of_utc, session=session)
+
+        # Retrieve strategy operational health from regime memory engine
+        rec_weight = 1.0
+        health_status = "HEALTHY"
+        try:
+            from app.core.analytics.regime_memory_engine import regime_memory_engine
+            health_score = regime_memory_engine._strategy_health_cache.get(strategy_id)
+            if health_score is None and total > 0:
+                health_score = regime_memory_engine.evaluate_strategy_health(
+                    strategy_id=strategy_id, trade_history=recent, session=session
+                )
+            if health_score:
+                rec_weight = health_score.recommended_weight
+                health_status = (
+                    health_score.health_status.value
+                    if hasattr(health_score.health_status, "value")
+                    else str(health_score.health_status)
+                )
+        except Exception:
+            pass
 
         if total == 0:
             profile = StrategyTuningProfile(
@@ -112,6 +138,8 @@ class AdaptiveRuleTuningEngine:
                 accumulated_streak_loss=float(loss_metrics.accumulated_streak_loss),
                 recovery_status=loss_metrics.recovery_status,
                 ai_reflection=loss_metrics.ai_reflection,
+                recommended_weight=rec_weight,
+                health_status=health_status,
             )
             self._profiles[f"{strategy_id}_{symbol or 'ALL'}"] = profile
             return profile
@@ -188,6 +216,8 @@ class AdaptiveRuleTuningEngine:
             accumulated_streak_loss=float(loss_metrics.accumulated_streak_loss),
             recovery_status=loss_metrics.recovery_status,
             ai_reflection=loss_metrics.ai_reflection,
+            recommended_weight=rec_weight,
+            health_status=health_status,
         )
         self._profiles[f"{strategy_id}_{symbol or 'ALL'}"] = profile
         return profile
@@ -213,9 +243,13 @@ class AdaptiveRuleTuningEngine:
             as_of_utc = datetime.now(timezone.utc)
 
         repo = journal_repo or trade_journal_repository
-        closed_trades = repo.list_closed_trades_as_of(
-            strategy_id=strategy_id, as_of=as_of_utc, session=session
-        )
+        try:
+            closed_trades = repo.list_closed_trades_as_of(
+                strategy_id=strategy_id, as_of=as_of_utc, session=session
+            )
+        except Exception as ex:
+            logger.warning(f"Could not list closed trades for recovery metrics: {ex}")
+            closed_trades = []
 
         consecutive_losses = 0
         accumulated_streak_loss = Decimal("0.00")

@@ -468,7 +468,8 @@ class RegimeMemoryEngine:
     def evaluate_strategy_health(
         self,
         strategy_id: str,
-        trade_history: List[Union[Dict[str, Any], Any]],
+        trade_history: Optional[List[Union[Dict[str, Any], Any]]] = None,
+        session: Optional[object] = None,
     ) -> StrategyHealthScore:
         """
         Evaluates rolling strategy health metrics:
@@ -480,6 +481,23 @@ class RegimeMemoryEngine:
           * If consecutive_losses == 2 or (total_trades >= 3 and (win_rate < 45% or profit_factor < 1.0)) -> CAUTION (recommended_weight = 0.5)
           * Otherwise -> HEALTHY (recommended_weight = 1.0)
         """
+        if trade_history is None:
+            try:
+                from app.core.repository.trade_journal_repository import trade_journal_repository
+                trade_history = trade_journal_repository.list_closed_trades_as_of(
+                    strategy_id=strategy_id, session=session
+                )
+                if not trade_history:
+                    all_trades = trade_journal_repository.list_trades(session=session)
+                    trade_history = [
+                        t for t in all_trades
+                        if (getattr(t, "strategyId", None) or (t.get("strategyId") if isinstance(t, dict) else "") or "").lower() == strategy_id.lower()
+                        and (getattr(t, "status", None) or (t.get("status") if isinstance(t, dict) else "") or "").upper() == "CLOSED"
+                    ]
+            except Exception as ex:
+                logger.warning(f"Could not load trades from repository for strategy {strategy_id}: {ex}")
+                trade_history = []
+
         total = len(trade_history)
         if total == 0:
             score = StrategyHealthScore(
@@ -679,6 +697,12 @@ class RegimeMemoryEngine:
         Aggregates active adaptations prescribed by recent diagnostics for a strategy.
         Used by execution controllers and AdaptiveRuleTuningEngine.
         """
+        if strategy_id not in self._strategy_health_cache:
+            try:
+                self.evaluate_strategy_health(strategy_id=strategy_id)
+            except Exception:
+                pass
+
         strat_diags = self.get_diagnostics_for_strategy(strategy_id)
         if not strat_diags:
             return {

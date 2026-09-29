@@ -37,9 +37,16 @@ Tests:
    - OrderBlock, FairValueGap, LiquiditySweep, SessionLevels, CompositeConvictionScore
 """
 
+from datetime import datetime, timezone, timedelta
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
+
+from app.api.v1.api import api_router
+from app.api.v1.smc import router as smc_router
 from app.core.engines.candlestick_pattern_engine import CandleBar
 from app.core.engines.smc_structure_engine import SMCStructureEngine, _get_pip_size
+from app.core.services.market_history_service import PriceBar, market_history_service
 from app.schemas.smc_structure import (
     CompositeConvictionScore,
     ConvictionBias,
@@ -49,6 +56,8 @@ from app.schemas.smc_structure import (
     OrderBlock,
     OrderBlockType,
     SessionLevels,
+    SMCStructureResponse,
+    SMCSweepsResponse,
     SweepType,
 )
 
@@ -720,3 +729,471 @@ class TestSMCSchemaProperties:
         assert _get_pip_size("BTCUSD") == 1.0
         assert _get_pip_size("US30") == 1.0
         assert _get_pip_size("NAS100") == 1.0
+
+
+# ============================================================================
+# 6. MACRO NEWS IMPACT & GOLD/DXY INVERSE CORRELATION TESTS
+# ============================================================================
+
+class TestMacroNewsImpactAndGoldDXYCorrelation:
+    """Verifies macro news blackout penalty and symbol-aware Gold/DXY inverse correlation."""
+
+    def test_high_impact_news_within_15min_applies_penalty(self, engine: SMCStructureEngine):
+        """High-impact macro news within 15 min imposes -15 pts penalty."""
+        score_normal = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            macro_news_impact=None,
+            minutes_to_news=None,
+        )
+        score_news = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            macro_news_impact="HIGH",
+            minutes_to_news=10,
+        )
+
+        assert score_news.macro_news_penalty == 15.0
+        assert score_news.total_score == max(0.0, score_normal.total_score - 15.0)
+        assert any("news blackout penalty" in r for r in score_news.key_reasons)
+
+    def test_high_impact_news_exact_15min_boundary(self, engine: SMCStructureEngine):
+        """Exact 15-minute boundary must trigger the blackout penalty."""
+        score = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            macro_news_impact="HIGH",
+            minutes_to_news=15,
+        )
+        assert score.macro_news_penalty == 15.0
+
+    def test_high_impact_news_further_than_15min_no_penalty(self, engine: SMCStructureEngine):
+        """High impact news 16+ minutes away incurs zero penalty."""
+        score = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            macro_news_impact="HIGH",
+            minutes_to_news=16,
+        )
+        assert score.macro_news_penalty == 0.0
+
+    def test_high_impact_news_negative_minutes_past_news_no_penalty(self, engine: SMCStructureEngine):
+        """Negative minutes_to_news (e.g. -120 for past news) incurs zero penalty and no reason entry."""
+        score = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            macro_news_impact="HIGH",
+            minutes_to_news=-120,
+        )
+        assert score.macro_news_penalty == 0.0
+        assert not any("news blackout penalty" in r for r in score.key_reasons)
+
+    def test_medium_and_low_impact_news_no_penalty(self, engine: SMCStructureEngine):
+        """Medium or Low impact news within 10 min does not trigger blackout penalty."""
+        score_med = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            macro_news_impact="MEDIUM",
+            minutes_to_news=5,
+        )
+        assert score_med.macro_news_penalty == 0.0
+
+        score_low = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            macro_news_impact="LOW",
+            minutes_to_news=5,
+        )
+        assert score_low.macro_news_penalty == 0.0
+
+    def test_gold_dxy_bullish_penalizes_long_gold(self, engine: SMCStructureEngine):
+        """Bullish DXY opposes Long Gold -> penalizes by -10 pts (correlation_score = 0.0)."""
+        score = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            dxy_trend="BULLISH",
+            symbol="XAUUSD",
+        )
+        assert score.correlation_score == 0.0
+        assert any("Bullish DXY penalizes Long Gold" in r for r in score.key_reasons)
+
+    def test_gold_dxy_bearish_boosts_long_gold(self, engine: SMCStructureEngine):
+        """Bearish DXY confirms Long Gold -> boosts by +10 pts (correlation_score = 20.0)."""
+        score = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            dxy_trend="BEARISH",
+            symbol="GOLD",
+        )
+        assert score.correlation_score == 20.0
+        assert any("Bearish DXY boosts Long Gold" in r for r in score.key_reasons)
+
+    def test_gold_dxy_bullish_boosts_short_gold(self, engine: SMCStructureEngine):
+        """Bullish DXY reinforces Short Gold -> boosts by +10 pts (correlation_score = 20.0)."""
+        score = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="SELL",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            dxy_trend="BULLISH",
+            symbol="XAUUSD",
+        )
+        assert score.correlation_score == 20.0
+        assert any("Bullish DXY boosts Short Gold" in r for r in score.key_reasons)
+
+    def test_gold_dxy_bearish_penalizes_short_gold(self, engine: SMCStructureEngine):
+        """Bearish DXY opposes Short Gold -> penalizes by -10 pts (correlation_score = 0.0)."""
+        score = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="SELL",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            dxy_trend="BEARISH",
+            symbol="GOLD",
+        )
+        assert score.correlation_score == 0.0
+        assert any("Bearish DXY penalizes Short Gold" in r for r in score.key_reasons)
+
+    def test_gold_neutral_and_unassigned_dxy(self, engine: SMCStructureEngine):
+        """Neutral or missing DXY provides baseline 10.0 pts correlation score for Gold."""
+        score_neutral = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            dxy_trend="NEUTRAL",
+            symbol="XAUUSD",
+        )
+        assert score_neutral.correlation_score == 10.0
+
+        score_none = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="LONDON_OPEN",
+            spread_pips=1.0,
+            dxy_trend=None,
+            symbol="XAUUSD",
+        )
+        assert score_none.correlation_score == 10.0
+
+    def test_score_bounded_between_zero_and_hundred(self, engine: SMCStructureEngine):
+        """Ensures that compounding penalties keep score bounded at 0.0, and confluence caps at 100.0."""
+        score_low = engine.calculate_composite_conviction(
+            smc_blocks=[],
+            fvgs=[],
+            sweeps=[],
+            pattern_direction="BUY",
+            session="OFF_HOURS",  # 5 pts
+            spread_pips=8.0,      # -25 pts penalty
+            dxy_trend="BULLISH",  # 0 pts
+            macro_news_impact="HIGH",
+            minutes_to_news=5,    # -15 pts penalty
+            symbol="XAUUSD",
+        )
+        assert score_low.total_score >= 0.0
+        assert score_low.total_score <= 100.0
+
+
+# ============================================================================
+# 7. SESSION LEVELS EXTRACTION TESTS
+# ============================================================================
+
+class TestComputeSessionLevels:
+    """Verifies automated extraction of Asian, London, and NY high/low levels."""
+
+    def test_extract_asian_london_ny_session_levels(self, engine: SMCStructureEngine):
+        """Extracts Asian (00-07 UTC), London (07-12 UTC), and NY (12-20 UTC) ranges."""
+        base_date = datetime(2026, 9, 29, 0, 0, tzinfo=timezone.utc)
+        candles = []
+
+        # Asian: hours 0..6
+        for h in range(7):
+            candles.append(
+                PriceBar(
+                    symbol="EURUSD",
+                    timeframe="1h",
+                    bar_time=base_date + timedelta(hours=h),
+                    open=1.0800 + h * 0.0005,
+                    high=1.0850,
+                    low=1.0790,
+                    close=1.0820,
+                    volume=100.0,
+                    provider="test",
+                )
+            )
+
+        # London: hours 7..11
+        for h in range(7, 12):
+            candles.append(
+                PriceBar(
+                    symbol="EURUSD",
+                    timeframe="1h",
+                    bar_time=base_date + timedelta(hours=h),
+                    open=1.0820,
+                    high=1.0890,
+                    low=1.0810,
+                    close=1.0870,
+                    volume=150.0,
+                    provider="test",
+                )
+            )
+
+        # NY: hours 12..19
+        for h in range(12, 20):
+            candles.append(
+                PriceBar(
+                    symbol="EURUSD",
+                    timeframe="1h",
+                    bar_time=base_date + timedelta(hours=h),
+                    open=1.0870,
+                    high=1.0920,
+                    low=1.0840,
+                    close=1.0900,
+                    volume=200.0,
+                    provider="test",
+                )
+            )
+
+        sess_levels = engine.compute_session_levels(candles)
+
+        assert sess_levels.asian_high == 1.0850
+        assert sess_levels.asian_low == 1.0790
+        assert sess_levels.london_high == 1.0890
+        assert sess_levels.london_low == 1.0810
+        assert sess_levels.ny_high == 1.0920
+        assert sess_levels.ny_low == 1.0840
+
+        # By default primary is Asian range for SMC sweep referencing
+        assert sess_levels.session_name == "ASIAN"
+        assert sess_levels.high == 1.0850
+        assert sess_levels.low == 1.0790
+        assert "ASIAN" in sess_levels.sessions
+        assert "LONDON" in sess_levels.sessions
+        assert "NEW_YORK" in sess_levels.sessions
+
+    def test_compute_session_levels_with_explicit_session_selection(self, engine: SMCStructureEngine):
+        """Allows explicit selection of London or NY as primary session bounds."""
+        base_date = datetime(2026, 9, 29, 0, 0, tzinfo=timezone.utc)
+        candles = [
+            PriceBar(
+                symbol="EURUSD",
+                timeframe="1h",
+                bar_time=base_date + timedelta(hours=2),
+                open=1.0800,
+                high=1.0850,
+                low=1.0790,
+                close=1.0820,
+                volume=100.0,
+                provider="test",
+            ),
+            PriceBar(
+                symbol="EURUSD",
+                timeframe="1h",
+                bar_time=base_date + timedelta(hours=8),
+                open=1.0820,
+                high=1.0890,
+                low=1.0810,
+                close=1.0870,
+                volume=150.0,
+                provider="test",
+            ),
+        ]
+
+        sess_london = engine.compute_session_levels(candles, session_name="LONDON")
+        assert sess_london.session_name == "LONDON"
+        assert sess_london.high == 1.0890
+        assert sess_london.low == 1.0810
+        assert sess_london.asian_high == 1.0850
+
+    def test_compute_session_levels_empty_candles(self, engine: SMCStructureEngine):
+        """Gracefully returns empty SessionLevels on empty input."""
+        res = engine.compute_session_levels([])
+        assert res.session_name == "NONE"
+        assert res.high == 0.0
+        assert res.low == 0.0
+
+    def test_compute_session_levels_defensive_none_candle_attributes(self, engine: SMCStructureEngine):
+        """Defensively handles candles where high or low attributes are explicitly None."""
+        class MockCandle:
+            bar_time = datetime(2026, 9, 29, 2, 0, tzinfo=timezone.utc)
+            open = 1.0800
+            high = None
+            low = None
+            close = 1.0820
+
+        res = engine.compute_session_levels([MockCandle()])
+        assert res.high == 0.0
+        assert res.low == 0.0
+
+    def test_session_levels_integration_with_sweep_detector(self, engine: SMCStructureEngine):
+        """Ensures SessionLevels from compute_session_levels directly feeds sweep detection."""
+        base_date = datetime(2026, 9, 29, 0, 0, tzinfo=timezone.utc)
+        asian_bars = [
+            PriceBar(
+                symbol="EURUSD",
+                timeframe="1h",
+                bar_time=base_date + timedelta(hours=3),
+                open=1.0820,
+                high=1.0850,
+                low=1.0800,
+                close=1.0830,
+                volume=100.0,
+                provider="test",
+            )
+        ]
+        sess_levels = engine.compute_session_levels(asian_bars)
+
+        # London Judas sweep candle sweeping Asian low (1.0800) with low=1.0780 and close=1.0810
+        london_sweep_candle = CandleBar(
+            open=1.0820,
+            high=1.0830,
+            low=1.0780,
+            close=1.0810,
+            timestamp=base_date + timedelta(hours=8),
+        )
+
+        sweeps = engine.detect_session_liquidity_sweeps([london_sweep_candle], sess_levels, "EURUSD")
+        assert len(sweeps) == 1
+        assert sweeps[0].sweep_type == SweepType.LOW_SWEEP
+        assert sweeps[0].swept_level == 1.0800
+        assert sweeps[0].sweep_wick_extreme == 1.0780
+
+
+# ============================================================================
+# 8. SMC REST ENDPOINTS TESTS (R4 READ-ONLY COMPLIANCE)
+# ============================================================================
+
+class TestSMCRESTEndpoints:
+    """Verifies SMC REST API endpoints and strict R4 read-only adherence."""
+
+    @pytest.fixture(autouse=True)
+    def mock_history_bars(self, monkeypatch):
+        """Prevents remote database network calls during API unit tests."""
+        monkeypatch.setattr(market_history_service, "get_bars", lambda *args, **kwargs: [])
+
+    @pytest.fixture
+    def client(self) -> TestClient:
+        app = FastAPI()
+        app.include_router(smc_router, prefix="/api/v1")
+        return TestClient(app)
+
+    def test_router_included_in_main_api_router(self):
+        """Verifies smc router is properly mounted in app.api.v1.api.api_router."""
+        found = any(
+            getattr(route, "original_router", None) is smc_router
+            or getattr(route, "router", None) is smc_router
+            or (hasattr(route, "path") and "/smc" in getattr(route, "path", ""))
+            for route in api_router.routes
+        )
+        assert found, "SMC router must be included in api_router"
+
+    def test_smc_structure_endpoint_read_only(self, client: TestClient):
+        """GET /api/v1/smc/structure returns 200 and SMCStructureResponse schema."""
+        response = client.get("/api/v1/smc/structure?symbol=EURUSD&timeframe=15m")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["symbol"] == "EURUSD"
+        assert data["timeframe"] == "15m"
+        assert "order_blocks" in data
+        assert "fair_value_gaps" in data
+        assert "total_order_blocks" in data
+        assert "total_fair_value_gaps" in data
+
+    def test_smc_sweeps_endpoint_read_only(self, client: TestClient):
+        """GET /api/v1/smc/sweeps returns 200 and SMCSweepsResponse schema."""
+        response = client.get("/api/v1/smc/sweeps?symbol=EURUSD&timeframe=15m")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["symbol"] == "EURUSD"
+        assert "sweeps" in data
+        assert "total_sweeps" in data
+        assert "high_sweeps" in data
+        assert "low_sweeps" in data
+
+    def test_smc_conviction_endpoint_default(self, client: TestClient):
+        """GET /api/v1/smc/conviction returns 200 and CompositeConvictionScore schema."""
+        response = client.get("/api/v1/smc/conviction?symbol=EURUSD&direction=BUY")
+        assert response.status_code == 200
+        data = response.json()
+        assert "total_score" in data
+        assert "bias" in data
+        assert "smc_alignment_score" in data
+        assert "session_timing_score" in data
+        assert "correlation_score" in data
+        assert "spread_penalty" in data
+        assert "macro_news_penalty" in data
+        assert "key_reasons" in data
+        assert 0.0 <= data["total_score"] <= 100.0
+
+    def test_smc_conviction_endpoint_with_macro_news_and_gold(self, client: TestClient):
+        """GET /api/v1/smc/conviction handles macro news blackout and Gold/DXY parameters."""
+        response = client.get(
+            "/api/v1/smc/conviction?symbol=XAUUSD&direction=BUY&macro_news_impact=HIGH&minutes_to_news=10&dxy_trend=BULLISH"
+        )
+        assert response.status_code == 200
+        data = response.json()
+        assert data["macro_news_penalty"] == 15.0
+        assert data["correlation_score"] == 0.0  # Bullish DXY penalizes Long Gold by -10 pts
+        assert any("news blackout penalty" in r for r in data["key_reasons"])
+        assert any("Bullish DXY penalizes Long Gold" in r for r in data["key_reasons"])
+
+    def test_smc_conviction_endpoint_negative_minutes_rejected(self, client: TestClient):
+        """GET /api/v1/smc/conviction with negative minutes_to_news is rejected with 422 Unprocessable Entity."""
+        response = client.get("/api/v1/smc/conviction?minutes_to_news=-120")
+        assert response.status_code == 422
+
+    def test_smc_endpoints_r4_read_only_compliance(self, client: TestClient):
+        """Strictly enforces Requirement R4: All endpoints are GET-only, POST/PUT/DELETE return 405 Method Not Allowed."""
+        resp_post_struct = client.post("/api/v1/smc/structure", json={})
+        assert resp_post_struct.status_code == 405
+
+        resp_post_sweeps = client.post("/api/v1/smc/sweeps", json={})
+        assert resp_post_sweeps.status_code == 405
+
+        resp_post_conv = client.post("/api/v1/smc/conviction", json={})
+        assert resp_post_conv.status_code == 405
+

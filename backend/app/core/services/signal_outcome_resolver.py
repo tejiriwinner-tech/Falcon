@@ -16,15 +16,18 @@ import logging
 import threading
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Union
 
 from sqlalchemy import text
 
+from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
+from app.core.analytics.regime_memory_engine import regime_memory_engine, _extract_val
 from app.core.database import database_enabled, get_session
 from app.core.providers import provider_manager
 from app.core.repository.mission_repository import mission_repository
 from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.core.services.signal_service import signal_service
+from app.schemas.regime_memory import PostMortemDiagnostic
 from app.schemas.signal_outcome import SignalOutcomeItem, SignalResolutionSummary
 from app.schemas.trade_journal import TradeJournalCreate, TradeJournalItem, TradeJournalUpdate
 
@@ -116,6 +119,90 @@ class SignalOutcomeResolver:
         outcomes = sorted(self._resolved_cache.values(), key=lambda x: x.resolvedAt, reverse=True)
         return outcomes[:limit]
 
+    def resolve_trade_outcome(
+        self,
+        trade: Union[TradeJournalItem, Dict[str, Any]],
+        market_context: Optional[Dict[str, Any]] = None,
+        session: Optional[object] = None,
+    ) -> PostMortemDiagnostic:
+        """
+        Forensically resolve closed trade outcome and trigger closed-loop learning:
+        1. Invokes regime_memory_engine.diagnose_and_record(trade, market_context).
+        2. Populates trade.reasonForExit and trade.lessonLearned directly from the forensic diagnostic.
+        3. Persists diagnostic outcomes to trade journal repository if trade record exists.
+        4. Triggers regime_memory_engine.evaluate_strategy_health(strategy_id) (quarantines underperforming
+           strategies with win rate < 35% or >= 3 consecutive losses to QUARANTINED_PAPER, and boosts
+           resilient strategies with win rate >= 60% and PF >= 1.8 to BOOSTED).
+        5. Synchronizes with AdaptiveRuleTuningEngine and coordinates loss-recovery metrics
+           (1 loss = 2.0x, 2 losses = 4.0x, hard $20 ceiling, reset on win).
+        """
+        ctx = market_context or {}
+
+        # 1. Forensic Diagnosis & Record in Regime Memory Ledger
+        diagnostic = regime_memory_engine.diagnose_and_record(trade_record=trade, market_context=ctx)
+
+        # 2. Populate reasonForExit and lessonLearned directly from forensic diagnostic result
+        reason_exit = diagnostic.rationale
+        lesson = diagnostic.lesson_learned
+
+        if isinstance(trade, dict):
+            trade["reasonForExit"] = reason_exit
+            trade["lessonLearned"] = lesson
+            trade["reason_for_exit"] = reason_exit
+            trade["lesson_learned"] = lesson
+        else:
+            if hasattr(trade, "reasonForExit"):
+                trade.reasonForExit = reason_exit
+            if hasattr(trade, "lessonLearned"):
+                trade.lessonLearned = lesson
+
+        # 3. Update database repository if trade has an existing ID
+        trade_id = _extract_val(trade, "id", "trade_id")
+        if trade_id is not None:
+            try:
+                tid = int(trade_id)
+                existing = trade_journal_repository.get_trade(tid, session=session)
+                if existing:
+                    update_kwargs: Dict[str, Any] = {
+                        "reasonForExit": reason_exit,
+                        "lessonLearned": lesson,
+                    }
+                    raw_res = _extract_val(trade, "result", "outcome")
+                    if raw_res and existing.status != "CLOSED":
+                        update_kwargs["status"] = "CLOSED"
+                        update_kwargs["result"] = raw_res
+                    trade_journal_repository.update_trade(
+                        tid, TradeJournalUpdate(**update_kwargs), session=session
+                    )
+            except Exception as ex:
+                logger.warning(f"Could not persist diagnostic updates for trade #{trade_id}: {ex}")
+
+        # 4. Trigger strategy health evaluation
+        strategy_id = str(_extract_val(trade, "strategy_id", "strategyId", default="unknown"))
+        symbol = str(_extract_val(trade, "symbol", default="ALL")).upper()
+
+        if strategy_id and strategy_id.lower() != "unknown":
+            try:
+                regime_memory_engine.evaluate_strategy_health(strategy_id=strategy_id, session=session)
+            except Exception as ex:
+                logger.warning(f"Error evaluating strategy health for '{strategy_id}': {ex}")
+
+        # 5. Synchronize with AdaptiveRuleTuningEngine
+        try:
+            regime_memory_engine.sync_with_adaptive_tuning_engine(
+                strategy_id=strategy_id, symbol=symbol, tuning_engine=adaptive_tuning_engine
+            )
+            adaptive_tuning_engine.get_strategy_tuning(
+                strategy_id=strategy_id, symbol=symbol, session=session
+            )
+            adaptive_tuning_engine.get_loss_recovery_metrics(
+                strategy_id=strategy_id, session=session
+            )
+        except Exception as ex:
+            logger.warning(f"Error synchronizing adaptive tuning for strategy '{strategy_id}': {ex}")
+
+        return diagnostic
+
     def resolve_signals(self, force_simulate: bool = False) -> SignalResolutionSummary:
         """
         Scan active signals and mission candidates against real-time quotes.
@@ -124,7 +211,7 @@ class SignalOutcomeResolver:
         Protected by PostgreSQL advisory lock (8882026) and thread lock for concurrency.
         """
         with self._lock:
-            if database_enabled():
+            if trade_journal_repository.persistent and database_enabled():
                 with get_session() as session:
                     with session.begin():
                         self._acquire_advisory_lock_if_postgres(session)
@@ -227,7 +314,7 @@ class SignalOutcomeResolver:
             # -------------------------------------------------------------
             if trade_status in ("OPEN", "FILLED"):
                 # If unexecuted (fillPrice is None and fillTime is None), classify forensically (Section 7, 8, 9)
-                if trade.fillPrice is None and trade.fillTime is None and not (trade.notes and "ticket #" in trade.notes.lower()):
+                if not force_simulate and trade.fillPrice is None and trade.fillTime is None and not (trade.notes and "ticket #" in trade.notes.lower()):
                     classification = classify_record(trade, all_stored_trades)
                     if classification == LifecycleClassification.DUPLICATE_SPECULATIVE_EXECUTION:
                         if elapsed_seconds > 45 * 60:
@@ -259,14 +346,20 @@ class SignalOutcomeResolver:
 
             quote_resp = provider_manager.get_market_quote(symbol)
             if not quote_resp or not quote_resp.quote:
-                open_count += 1
-                continue
-
-            quote = quote_resp.quote
-            current_price = quote.lastPrice
-            bid = quote.bidAsk.bid
-            ask = quote.bidAsk.ask
-            spread = quote.bidAsk.spread
+                if not force_simulate:
+                    open_count += 1
+                    continue
+                current_price = entry
+                bid = entry - 0.0001
+                ask = entry + 0.0001
+                spread = 0.0002
+                quote = None
+            else:
+                quote = quote_resp.quote
+                current_price = quote.lastPrice
+                bid = quote.bidAsk.bid
+                ask = quote.bidAsk.ask
+                spread = quote.bidAsk.spread
 
             result: Optional[str] = None
             exit_price = current_price
@@ -329,32 +422,7 @@ class SignalOutcomeResolver:
                                 logger.warning(f"Error updating open trade excursion for trade #{trade.id}: {ex}")
                 continue
 
-            # Step 4: Automated Root-Cause Post-Mortem Diagnostic
-            if result == "LOSS":
-                losses_count += 1
-                is_spread_spike = (
-                    ("XAU" in symbol and spread >= 0.35)
-                    or ("EUR" in symbol and spread >= 0.0003)
-                    or ("GBP" in symbol and spread >= 0.00035)
-                    or spread > 2.5
-                )
-                is_off_peak = trade.marketSession.lower() in ["asian", "tokyo", "sydney", "off-peak"]
-
-                if is_spread_spike:
-                    reason_exit = f"Stop Loss hit at {exit_price:.4f}. Spread widened to {spread:.4f} during volatility surge."
-                    lesson = "Spread expansion triggered premature stop-out. Widen structural volatility buffers during session transitions."
-                elif is_off_peak:
-                    reason_exit = f"Stop Loss hit at {exit_price:.4f}. Off-peak session liquidity drought caused momentum stall."
-                    lesson = "Filter out aggressive breakouts outside London/New York peak overlap hours."
-                else:
-                    reason_exit = f"Stop Loss hit at {exit_price:.4f}. Institutional counter-trend order flow broke key structural level."
-                    lesson = "Breakout failed to sustain volume; preserve capital and require multi-timeframe trend confirmation."
-            else:
-                wins_count += 1
-                reason_exit = f"Take Profit target reached cleanly at {exit_price:.4f}."
-                lesson = "Optimal alignment between institutional trend, momentum, and session liquidity."
-
-            # Step 5: Calculate PnL and update Trade Journal to CLOSED
+            # Step 4: Calculate PnL and excursion metrics
             risk_dist = abs(entry - stop_loss)
             reward_dist = abs(take_profit - entry)
             risk_reward = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 1.0
@@ -372,13 +440,9 @@ class SignalOutcomeResolver:
                 pnl = round(reward_dist * multiplier, 2)
 
             # Phase 5A / Blocker 1: Authoritative Realized R Multiple Calculation
-            # Realized R = actual realized monetary P/L / preserved authoritative initial monetary risk
-            # Strict Safety: If authoritative initial risk is unavailable, realized_r_multiple MUST remain None (NULL).
-            # Do NOT independently recalculate initial risk at close.
             realized_r = None
             initial_risk = getattr(trade, "initialMonetaryRisk", None)
             if initial_risk is not None and float(initial_risk) > 0:
-                # Monetary PnL calculation: for standard Falcon micro-lot (0.01 lot = 1,000 units on FX, 1 oz on Gold)
                 if "XAU" in symbol or "GOLD" in symbol:
                     monetary_pnl = round(price_delta * 1.0, 2)
                 elif "JPY" in symbol:
@@ -400,6 +464,47 @@ class SignalOutcomeResolver:
                 exit_price=exit_price,
                 close_time=now,
             )
+
+            # Step 5: Closed-Loop Autonomous Forensic Diagnostics via Regime Memory Engine
+            if result == "LOSS":
+                losses_count += 1
+            else:
+                wins_count += 1
+
+            market_context = {
+                "spread": spread,
+                "bid": bid,
+                "ask": ask,
+                "current_price": current_price,
+                "session": trade.marketSession or "",
+                "peak_price": peak_val,
+                "trough_price": trough_val,
+                "exit_price": exit_price,
+                "post_stop_price": current_price,
+            }
+
+            trade_diag_data = trade.model_dump() if hasattr(trade, "model_dump") else dict(trade)
+            trade_diag_data.update({
+                "exit_price": exit_price,
+                "exitPrice": exit_price,
+                "close_date": now,
+                "closeDate": now,
+                "status": "CLOSED",
+                "result": result,
+                "profit_loss": pnl,
+                "profitLoss": pnl,
+                "peak_price": peak_val,
+                "trough_price": trough_val,
+            })
+
+            diagnostic = self.resolve_trade_outcome(
+                trade=trade_diag_data,
+                market_context=market_context,
+                session=session,
+            )
+
+            reason_exit = diagnostic.rationale
+            lesson = diagnostic.lesson_learned
 
             trade_update = TradeJournalUpdate(
                 exitPrice=exit_price,
@@ -423,7 +528,18 @@ class SignalOutcomeResolver:
 
             try:
                 trade_journal_repository.update_trade(trade.id, trade_update, session=session)
+                trade.reasonForExit = reason_exit
+                trade.lessonLearned = lesson
+                trade.status = "CLOSED"
+                trade.result = result
                 resolved_count += 1
+
+                strat_id = trade.strategyId or "unknown"
+                if strat_id and strat_id.lower() != "unknown":
+                    try:
+                        regime_memory_engine.evaluate_strategy_health(strategy_id=strat_id, session=session)
+                    except Exception as ex:
+                        logger.warning(f"Error evaluating strategy health for '{strat_id}': {ex}")
 
                 sig_identifier = trade.signalId or trade.id
                 outcome_item = SignalOutcomeItem(

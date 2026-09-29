@@ -26,8 +26,10 @@ from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 import pytest
 
-from app.core.analytics.adaptive_tuning_engine import AdaptiveRuleTuningEngine
-from app.core.analytics.regime_memory_engine import RegimeMemoryEngine
+from app.core.analytics.adaptive_tuning_engine import AdaptiveRuleTuningEngine, adaptive_tuning_engine
+from app.core.analytics.regime_memory_engine import RegimeMemoryEngine, regime_memory_engine
+from app.core.repository.trade_journal_repository import trade_journal_repository
+from app.core.services.signal_outcome_resolver import signal_outcome_resolver
 from app.schemas.regime_memory import (
     DynamicAdaptation,
     PostMortemDiagnostic,
@@ -35,7 +37,18 @@ from app.schemas.regime_memory import (
     StrategyHealthScore,
     StrategyHealthStatus,
 )
-from app.schemas.trade_journal import TradeJournalItem
+from app.schemas.trade_journal import TradeJournalCreate, TradeJournalItem
+
+
+@pytest.fixture(autouse=True)
+def clean_journal():
+    from app.core.repository.trade_journal_repository import InMemoryTradeJournalStorage
+    original_storage = trade_journal_repository._storage
+    trade_journal_repository._storage = InMemoryTradeJournalStorage()
+    trade_journal_repository.clear()
+    yield
+    trade_journal_repository.clear()
+    trade_journal_repository._storage = original_storage
 
 
 @pytest.fixture
@@ -538,3 +551,353 @@ def test_trade_journal_item_compatibility(memory_engine: RegimeMemoryEngine):
     assert diagnostic.symbol == "EURUSD"
     assert diagnostic.root_cause == RootCauseType.INSTITUTIONAL_LIQUIDITY_SWEEP
     assert diagnostic.prescribed_adaptation["atr_stop_multiplier_delta"] == 0.35
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. Closed-Loop Diagnostics via SignalOutcomeResolver
+# ─────────────────────────────────────────────────────────────────────────────
+
+def test_signal_outcome_resolver_invokes_diagnose_and_record_on_sweep_loss(memory_engine: RegimeMemoryEngine):
+    """
+    Verify signal_outcome_resolver.resolve_trade_outcome:
+    1. Invokes regime_memory_engine.diagnose_and_record().
+    2. Directly populates reasonForExit and lessonLearned on trade.
+    3. Prescribes +35% ATR stop buffer expansion for liquidity sweeps.
+    """
+    trade = TradeJournalItem(
+        id=7771,
+        symbol="EURUSD",
+        direction="BUY",
+        entryPrice=1.0850,
+        exitPrice=1.0798,
+        stopLoss=1.0800,
+        takeProfit=1.0950,
+        timeframe="M15",
+        marketSession="LONDON",
+        tradeDate=datetime(2026, 9, 28, 14, 0, tzinfo=timezone.utc),
+        closeDate=datetime(2026, 9, 28, 14, 30, tzinfo=timezone.utc),
+        status="CLOSED",
+        result="LOSS",
+        profitLoss=-52.0,
+        reasonForEntry="Demand zone tap",
+        createdAt=datetime.now(timezone.utc),
+        updatedAt=datetime.now(timezone.utc),
+    )
+    context = {
+        "trough_price": 1.0795,
+        "post_stop_price": 1.0890,
+        "reversal_direction": "UP",
+    }
+
+    diag = signal_outcome_resolver.resolve_trade_outcome(trade=trade, market_context=context)
+
+    assert diag.root_cause == RootCauseType.INSTITUTIONAL_LIQUIDITY_SWEEP
+    assert diag.prescribed_adaptation["atr_stop_multiplier_delta"] == 0.35
+    assert trade.reasonForExit == diag.rationale
+    assert trade.lessonLearned == diag.lesson_learned
+    assert "liquidity sweep wick" in trade.lessonLearned.lower()
+
+    # Verify ledger recorded diagnostic
+    assert memory_engine.get_memory_summary()["total_diagnostics"] >= 1
+
+
+def test_signal_outcome_resolver_invokes_diagnose_and_record_on_win(memory_engine: RegimeMemoryEngine):
+    """
+    Verify signal_outcome_resolver.resolve_trade_outcome for a winning trade:
+    1. Root cause diagnosed as TAKE_PROFIT_HIT.
+    2. Directly populates reasonForExit and lessonLearned.
+    3. Reinforces strategy baseline.
+    """
+    trade = TradeJournalItem(
+        id=7772,
+        symbol="GBPUSD",
+        strategyId="cable_trend",
+        direction="BUY",
+        entryPrice=1.2800,
+        exitPrice=1.2860,
+        stopLoss=1.2770,
+        takeProfit=1.2860,
+        timeframe="M15",
+        marketSession="LONDON",
+        tradeDate=datetime(2026, 9, 28, 9, 0, tzinfo=timezone.utc),
+        closeDate=datetime(2026, 9, 28, 10, 15, tzinfo=timezone.utc),
+        status="CLOSED",
+        result="WIN",
+        profitLoss=60.0,
+        reasonForEntry="Bullish order block",
+        createdAt=datetime.now(timezone.utc),
+        updatedAt=datetime.now(timezone.utc),
+    )
+
+    diag = signal_outcome_resolver.resolve_trade_outcome(trade=trade)
+
+    assert diag.root_cause == RootCauseType.TAKE_PROFIT_HIT
+    assert diag.outcome == "WIN"
+    assert trade.reasonForExit == diag.rationale
+    assert trade.lessonLearned == diag.lesson_learned
+    assert "conviction reinforced" in trade.lessonLearned.lower()
+
+
+def test_signal_outcome_resolver_quarantines_underperforming_strategy(memory_engine: RegimeMemoryEngine):
+    """
+    Strategies with win rate < 35% or >= 3 consecutive losses are quarantined
+    to paper evaluation mode (QUARANTINED_PAPER, weight = 0.0x).
+    """
+    now = datetime.now(timezone.utc)
+    strat_id = "failing_scalp"
+
+    # Pre-populate repository with 3 consecutive losses
+    trade_journal_repository.clear()
+    for i in range(3):
+        trade_journal_repository.create_trade(TradeJournalCreate(
+            strategyId=strat_id,
+            symbol="EURUSD",
+            direction="BUY",
+            entryPrice=1.0850,
+            exitPrice=1.0800,
+            stopLoss=1.0800,
+            takeProfit=1.0950,
+            timeframe="M15",
+            marketSession="LONDON",
+            tradeDate=now - timedelta(hours=4 - i),
+            closeDate=now - timedelta(hours=3 - i),
+            status="CLOSED",
+            result="LOSS",
+            profitLoss=-50.0,
+            reasonForEntry="Scalp setup",
+        ))
+
+    # Fourth trade triggers outcome resolution
+    last_trade = trade_journal_repository.list_trades()[0]
+    signal_outcome_resolver.resolve_trade_outcome(trade=last_trade)
+
+    # Verify strategy health is QUARANTINED_PAPER
+    health_score = memory_engine._strategy_health_cache.get(strat_id)
+    assert health_score is not None
+    assert health_score.health_status == StrategyHealthStatus.QUARANTINED_PAPER
+    assert health_score.recommended_weight == 0.0
+    assert health_score.consecutive_losses >= 3
+
+    # Verify AdaptiveRuleTuningEngine tuning profile reflects quarantine
+    tuning_profile = adaptive_tuning_engine.get_strategy_tuning(strategy_id=strat_id)
+    assert tuning_profile.recommended_weight == 0.0
+    assert tuning_profile.health_status == "QUARANTINED_PAPER"
+
+
+def test_signal_outcome_resolver_boosts_resilient_strategy(memory_engine: RegimeMemoryEngine):
+    """
+    Strategies with win rate >= 60% and PF >= 1.8 are boosted
+    (BOOSTED, weight = 1.5x).
+    """
+    now = datetime.now(timezone.utc)
+    strat_id = "resilient_sniper"
+
+    # Pre-populate repository with 7 wins ($100 each) and 3 losses ($40 each) -> 70% win rate, PF = 5.83
+    trade_journal_repository.clear()
+    # Losses first
+    for i in range(3):
+        trade_journal_repository.create_trade(TradeJournalCreate(
+            strategyId=strat_id,
+            symbol="EURUSD",
+            direction="BUY",
+            entryPrice=1.0850,
+            exitPrice=1.0810,
+            stopLoss=1.0810,
+            takeProfit=1.0950,
+            timeframe="M15",
+            marketSession="LONDON",
+            tradeDate=now - timedelta(hours=10 - i),
+            closeDate=now - timedelta(hours=9 - i),
+            status="CLOSED",
+            result="LOSS",
+            profitLoss=-40.0,
+            reasonForEntry="Breakout setup",
+        ))
+    # Wins latest
+    for i in range(7):
+        trade_journal_repository.create_trade(TradeJournalCreate(
+            strategyId=strat_id,
+            symbol="EURUSD",
+            direction="BUY",
+            entryPrice=1.0850,
+            exitPrice=1.0950,
+            stopLoss=1.0810,
+            takeProfit=1.0950,
+            timeframe="M15",
+            marketSession="LONDON",
+            tradeDate=now - timedelta(hours=7 - i),
+            closeDate=now - timedelta(hours=6 - i),
+            status="CLOSED",
+            result="WIN",
+            profitLoss=100.0,
+            reasonForEntry="Breakout setup",
+        ))
+
+    last_trade = trade_journal_repository.list_trades()[0]
+    signal_outcome_resolver.resolve_trade_outcome(trade=last_trade)
+
+    health_score = memory_engine._strategy_health_cache.get(strat_id)
+    assert health_score is not None
+    assert health_score.health_status == StrategyHealthStatus.BOOSTED
+    assert health_score.recommended_weight == 1.5
+    assert health_score.win_rate >= 0.60
+    assert health_score.profit_factor >= 1.8
+
+    tuning_profile = adaptive_tuning_engine.get_strategy_tuning(strategy_id=strat_id)
+    assert tuning_profile.recommended_weight == 1.5
+    assert tuning_profile.health_status == "BOOSTED"
+
+
+def test_loss_recovery_progression_and_ceiling_maintained(memory_engine: RegimeMemoryEngine):
+    """
+    Verify loss-recovery progression across streak:
+    - 1 loss = 2.0x target (RECOVERY_2X)
+    - 2 losses = 4.0x target (RECOVERY_4X)
+    - hard $20.00 ceiling = RECOVERY_LOCKED when accumulated streak loss >= $20.00
+    - immediate reset on win = 1.0x target (BASELINE, $0.00 streak loss).
+    """
+    now = datetime.now(timezone.utc)
+    strat_id = "recovery_progression_strat"
+    trade_journal_repository.clear()
+
+    # Step 1: 1 Loss of $6.00 -> 2.0x target
+    trade_1 = trade_journal_repository.create_trade(TradeJournalCreate(
+        strategyId=strat_id,
+        symbol="EURUSD",
+        direction="BUY",
+        entryPrice=1.0850,
+        stopLoss=1.0790,
+        takeProfit=1.0950,
+        timeframe="M15",
+        marketSession="LONDON",
+        tradeDate=now - timedelta(hours=3),
+        closeDate=now - timedelta(hours=2),
+        status="CLOSED",
+        result="LOSS",
+        profitLoss=-6.00,
+        reasonForEntry="Order block tap",
+    ))
+    signal_outcome_resolver.resolve_trade_outcome(trade=trade_1)
+
+    metrics_1 = adaptive_tuning_engine.get_loss_recovery_metrics(strategy_id=strat_id)
+    assert metrics_1.consecutive_losses == 1
+    assert metrics_1.profit_recovery_multiplier == 2.0
+    assert metrics_1.recovery_status == "RECOVERY_2X"
+    assert metrics_1.accumulated_streak_loss == Decimal("6.00")
+
+    # Step 2: Second consecutive loss of $7.00 -> 4.0x target
+    trade_2 = trade_journal_repository.create_trade(TradeJournalCreate(
+        strategyId=strat_id,
+        symbol="EURUSD",
+        direction="SELL",
+        entryPrice=1.0800,
+        stopLoss=1.0870,
+        takeProfit=1.0700,
+        timeframe="M15",
+        marketSession="LONDON",
+        tradeDate=now - timedelta(hours=2),
+        closeDate=now - timedelta(hours=1),
+        status="CLOSED",
+        result="LOSS",
+        profitLoss=-7.00,
+        reasonForEntry="Rejection block",
+    ))
+    signal_outcome_resolver.resolve_trade_outcome(trade=trade_2)
+
+    metrics_2 = adaptive_tuning_engine.get_loss_recovery_metrics(strategy_id=strat_id)
+    assert metrics_2.consecutive_losses == 2
+    assert metrics_2.profit_recovery_multiplier == 4.0
+    assert metrics_2.recovery_status == "RECOVERY_4X"
+    assert metrics_2.accumulated_streak_loss == Decimal("13.00")
+
+    # Step 3: Third loss pushing past $20.00 ceiling ($13 + $8 = $21 > $20)
+    trade_3 = trade_journal_repository.create_trade(TradeJournalCreate(
+        strategyId=strat_id,
+        symbol="EURUSD",
+        direction="BUY",
+        entryPrice=1.0800,
+        stopLoss=1.0720,
+        takeProfit=1.0900,
+        timeframe="M15",
+        marketSession="LONDON",
+        tradeDate=now - timedelta(minutes=50),
+        closeDate=now - timedelta(minutes=30),
+        status="CLOSED",
+        result="LOSS",
+        profitLoss=-8.00,
+        reasonForEntry="Breakout",
+    ))
+    signal_outcome_resolver.resolve_trade_outcome(trade=trade_3)
+
+    metrics_3 = adaptive_tuning_engine.get_loss_recovery_metrics(strategy_id=strat_id)
+    assert metrics_3.accumulated_streak_loss >= Decimal("20.00")
+    assert metrics_3.recovery_status == "RECOVERY_LOCKED"
+
+    # Step 4: Subsequent win immediately resets multiplier to 1.0x and streak loss to $0.00
+    trade_win = trade_journal_repository.create_trade(TradeJournalCreate(
+        strategyId=strat_id,
+        symbol="EURUSD",
+        direction="BUY",
+        entryPrice=1.0800,
+        stopLoss=1.0750,
+        takeProfit=1.0950,
+        timeframe="M15",
+        marketSession="LONDON",
+        tradeDate=now - timedelta(minutes=20),
+        closeDate=now - timedelta(minutes=5),
+        status="CLOSED",
+        result="WIN",
+        profitLoss=25.00,
+        reasonForEntry="Recovery trade execution",
+    ))
+    signal_outcome_resolver.resolve_trade_outcome(trade=trade_win)
+
+    metrics_win = adaptive_tuning_engine.get_loss_recovery_metrics(strategy_id=strat_id)
+    assert metrics_win.consecutive_losses == 0
+    assert metrics_win.profit_recovery_multiplier == 1.0
+    assert metrics_win.recovery_status == "BASELINE"
+    assert metrics_win.accumulated_streak_loss == Decimal("0.00")
+
+
+def test_signal_outcome_resolver_execute_resolve_signals_end_to_end(memory_engine: RegimeMemoryEngine):
+    """
+    Test that resolve_signals() automatically scans active open trades,
+    detects breach / simulated exit, diagnoses root cause via regime memory engine,
+    and updates reasonForExit and lessonLearned in the repository.
+    """
+    now = datetime.now(timezone.utc)
+    trade_journal_repository.clear()
+
+    # Create an active open trade
+    created_trade = trade_journal_repository.create_trade(TradeJournalCreate(
+        signalId=9001,
+        strategyId="smc_breaker",
+        symbol="EURUSD",
+        direction="BUY",
+        entryPrice=1.0850,
+        stopLoss=1.0800,
+        takeProfit=1.0950,
+        fillPrice=1.0850,
+        fillTime=now - timedelta(minutes=20),
+        timeframe="M15",
+        marketSession="LONDON",
+        tradeDate=now - timedelta(minutes=20),
+        status="OPEN",
+        result="OPEN",
+        reasonForEntry="Institutional order block tap",
+    ))
+
+    # Run resolve_signals with force_simulate=True
+    summary = signal_outcome_resolver.resolve_signals(force_simulate=True)
+    assert summary.resolvedCount >= 1
+
+    # Fetch updated trade from repository
+    updated = trade_journal_repository.get_trade(created_trade.id)
+    assert updated is not None
+    assert updated.status == "CLOSED"
+    assert updated.reasonForExit is not None and len(updated.reasonForExit) > 0
+    assert updated.lessonLearned is not None and len(updated.lessonLearned) > 0
+
+    # Verify diagnostic was recorded in memory ledger
+    assert memory_engine.get_memory_summary()["total_diagnostics"] >= 1
+

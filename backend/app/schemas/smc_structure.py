@@ -11,7 +11,7 @@ Defines canonical Pydantic models for Smart Money Concepts (SMC) & Institutional
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -159,17 +159,24 @@ class SessionLevels(BaseModel):
     """
     model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
 
-    session_name: str = Field(..., description="Session identifier (e.g., ASIAN, LONDON, NEW_YORK)")
-    high: float = Field(..., description="Session high boundary")
-    low: float = Field(..., description="Session low boundary")
-    open_price: float = Field(..., description="Session opening price")
-    close_price: float = Field(..., description="Session closing price")
+    session_name: str = Field(default="ASIAN", description="Session identifier (e.g., ASIAN, LONDON, NEW_YORK)")
+    high: float = Field(default=0.0, description="Session high boundary")
+    low: float = Field(default=0.0, description="Session low boundary")
+    open_price: float = Field(default=0.0, description="Session opening price")
+    close_price: float = Field(default=0.0, description="Session closing price")
     start_time: Optional[Union[datetime, int, float, str]] = Field(
         default=None, description="Session opening timestamp"
     )
     end_time: Optional[Union[datetime, int, float, str]] = Field(
         default=None, description="Session closing timestamp"
     )
+    asian_high: Optional[float] = Field(default=None, description="Asian session high boundary (00:00-07:00 UTC)")
+    asian_low: Optional[float] = Field(default=None, description="Asian session low boundary (00:00-07:00 UTC)")
+    london_high: Optional[float] = Field(default=None, description="London session high boundary (07:00-12:00 UTC)")
+    london_low: Optional[float] = Field(default=None, description="London session low boundary (07:00-12:00 UTC)")
+    ny_high: Optional[float] = Field(default=None, description="New York session high boundary (12:00-20:00 UTC)")
+    ny_low: Optional[float] = Field(default=None, description="New York session low boundary (12:00-20:00 UTC)")
+    sessions: Optional[Dict[str, Any]] = Field(default=None, description="Detailed dictionary of individual session levels")
 
     @property
     def session_range(self) -> float:
@@ -197,6 +204,7 @@ class CompositeConvictionScore(BaseModel):
     - Institutional Session Timing & Killzones
     - Macro & DXY correlation
     - Live spread frictions and penalties
+    - Macro high-impact news blackout window penalty (-15 pts)
     """
     model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
 
@@ -206,5 +214,34 @@ class CompositeConvictionScore(BaseModel):
     session_timing_score: float = Field(..., description="Session timing and killzone contribution")
     correlation_score: float = Field(..., description="DXY/Macro correlation confluence contribution")
     spread_penalty: float = Field(..., description="Spread deduction penalty")
+    macro_news_penalty: float = Field(default=0.0, description="Macro high-impact news blackout penalty deduction")
+    symbol: Optional[str] = Field(default=None, description="Instrument identifier (e.g. EURUSD, XAUUSD)")
     bias: ConvictionBias = Field(..., description="BULLISH, BEARISH, or NEUTRAL")
     key_reasons: List[str] = Field(default_factory=list, description="Key institutional rationale bullet points")
+
+
+class SMCStructureResponse(BaseModel):
+    """Read-only response for institutional SMC market structure."""
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
+
+    symbol: str = Field(..., description="Instrument identifier")
+    timeframe: str = Field(..., description="Timeframe")
+    order_blocks: List[OrderBlock] = Field(default_factory=list, description="Detected Order Blocks")
+    fair_value_gaps: List[FairValueGap] = Field(default_factory=list, description="Detected Fair Value Gaps")
+    session_levels: Optional[SessionLevels] = Field(default=None, description="Extracted session levels")
+    total_order_blocks: int = Field(default=0, description="Total count of detected order blocks")
+    total_fair_value_gaps: int = Field(default=0, description="Total count of detected fair value gaps")
+    unmitigated_order_blocks: int = Field(default=0, description="Count of unmitigated order blocks")
+    unmitigated_fair_value_gaps: int = Field(default=0, description="Count of unmitigated fair value gaps")
+
+
+class SMCSweepsResponse(BaseModel):
+    """Read-only response for session liquidity sweeps."""
+    model_config = ConfigDict(arbitrary_types_allowed=True, populate_by_name=True)
+
+    symbol: str = Field(..., description="Instrument identifier")
+    session_levels: Optional[SessionLevels] = Field(default=None, description="Reference session levels")
+    sweeps: List[LiquiditySweep] = Field(default_factory=list, description="Detected liquidity sweeps")
+    total_sweeps: int = Field(default=0, description="Total count of detected liquidity sweeps")
+    high_sweeps: int = Field(default=0, description="Count of buy-side / high sweeps")
+    low_sweeps: int = Field(default=0, description="Count of sell-side / low sweeps")

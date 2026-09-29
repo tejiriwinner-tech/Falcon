@@ -10,8 +10,8 @@ Implements deterministic algorithms for Smart Money Concepts (SMC) & Institution
    DXY/macro correlation, and live spreads.
 """
 
-from datetime import datetime
-from typing import Any, List, Optional, Union
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Union
 
 from app.core.engines.candlestick_pattern_engine import CandleBar
 from app.schemas.smc_structure import (
@@ -346,6 +346,195 @@ class SMCStructureEngine:
 
         return sweeps
 
+    def compute_session_levels(
+        self,
+        candles: List[Any],
+        session_name: Optional[str] = None,
+    ) -> SessionLevels:
+        """
+        Extracts institutional Asian (00:00-07:00 UTC), London (07:00-12:00 UTC),
+        and New York (12:00-20:00 UTC) session levels (high/low/open/close) from
+        candle timestamps.
+        
+        Args:
+            candles: List of PriceBar or CandleBar objects with timestamp/bar_time.
+            session_name: Optional specific session to return as primary (e.g. 'ASIAN', 'LONDON', 'NEW_YORK').
+            
+        Returns:
+            SessionLevels instance populated with Asian, London, and NY session bounds.
+        """
+        if not candles:
+            return SessionLevels(session_name="NONE", high=0.0, low=0.0, open_price=0.0, close_price=0.0)
+
+        def _get_ohlc_time(c):
+            t = getattr(c, "bar_time", None) or getattr(c, "timestamp", None) or getattr(c, "time", None)
+            if t is None and isinstance(c, dict):
+                t = c.get("bar_time") or c.get("timestamp") or c.get("time")
+
+            dt = None
+            if isinstance(t, datetime):
+                dt = t if t.tzinfo is not None else t.replace(tzinfo=timezone.utc)
+                dt = dt.astimezone(timezone.utc)
+            elif isinstance(t, (int, float)):
+                ts = t / 1000.0 if t > 1e11 else float(t)
+                try:
+                    dt = datetime.fromtimestamp(ts, tz=timezone.utc)
+                except (ValueError, OSError):
+                    dt = None
+            elif isinstance(t, str):
+                for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y-%m-%dT%H:%M:%S%z"):
+                    try:
+                        parsed = datetime.strptime(t, fmt)
+                        dt = parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+                        dt = dt.astimezone(timezone.utc)
+                        break
+                    except ValueError:
+                        continue
+                if dt is None:
+                    try:
+                        parsed = datetime.fromisoformat(t)
+                        dt = parsed if parsed.tzinfo is not None else parsed.replace(tzinfo=timezone.utc)
+                        dt = dt.astimezone(timezone.utc)
+                    except ValueError:
+                        pass
+
+            op = getattr(c, "open", None) if getattr(c, "open", None) is not None else getattr(c, "open_price", 0.0)
+            hi = getattr(c, "high", None)
+            hi_val = float(hi) if hi is not None else 0.0
+            lo = getattr(c, "low", None)
+            lo_val = float(lo) if lo is not None else 0.0
+            cl = getattr(c, "close", None) if getattr(c, "close", None) is not None else getattr(c, "close_price", 0.0)
+            if isinstance(c, dict):
+                op = c.get("open", op)
+                hi_dict = c.get("high")
+                if hi_dict is not None:
+                    hi_val = float(hi_dict)
+                lo_dict = c.get("low")
+                if lo_dict is not None:
+                    lo_val = float(lo_dict)
+                cl = c.get("close", cl)
+
+            return dt, float(op if op is not None else 0.0), hi_val, lo_val, float(cl if cl is not None else 0.0)
+
+        parsed_bars = []
+        for c in candles:
+            dt, op, hi, lo, cl = _get_ohlc_time(c)
+            if dt is not None:
+                parsed_bars.append((dt, op, hi, lo, cl))
+
+        if not parsed_bars:
+            first_c = candles[0]
+            _, op, hi, lo, cl = _get_ohlc_time(first_c)
+            all_hi = max(_get_ohlc_time(c)[2] for c in candles)
+            all_lo = min(_get_ohlc_time(c)[3] for c in candles)
+            return SessionLevels(
+                session_name="ASIAN",
+                high=all_hi,
+                low=all_lo,
+                open_price=op,
+                close_price=_get_ohlc_time(candles[-1])[4],
+            )
+
+        parsed_bars.sort(key=lambda x: x[0])
+        latest_date = parsed_bars[-1][0].date()
+
+        asian_bars = [b for b in parsed_bars if b[0].date() == latest_date and 0 <= b[0].hour < 7]
+        if not asian_bars:
+            all_asian = [b for b in parsed_bars if 0 <= b[0].hour < 7]
+            if all_asian:
+                last_asian_date = all_asian[-1][0].date()
+                asian_bars = [b for b in all_asian if b[0].date() == last_asian_date]
+
+        london_bars = [b for b in parsed_bars if b[0].date() == latest_date and 7 <= b[0].hour < 12]
+        if not london_bars:
+            all_london = [b for b in parsed_bars if 7 <= b[0].hour < 12]
+            if all_london:
+                last_london_date = all_london[-1][0].date()
+                london_bars = [b for b in all_london if b[0].date() == last_london_date]
+
+        ny_bars = [b for b in parsed_bars if b[0].date() == latest_date and 12 <= b[0].hour < 20]
+        if not ny_bars:
+            all_ny = [b for b in parsed_bars if 12 <= b[0].hour < 20]
+            if all_ny:
+                last_ny_date = all_ny[-1][0].date()
+                ny_bars = [b for b in all_ny if b[0].date() == last_ny_date]
+
+        def _build_sub_level(name: str, bars):
+            if not bars:
+                return None
+            hi = max(b[2] for b in bars)
+            lo = min(b[3] for b in bars)
+            op = bars[0][1]
+            cl = bars[-1][4]
+            st = bars[0][0]
+            et = bars[-1][0]
+            return SessionLevels(
+                session_name=name,
+                high=round(hi, 5),
+                low=round(lo, 5),
+                open_price=round(op, 5),
+                close_price=round(cl, 5),
+                start_time=st,
+                end_time=et,
+            )
+
+        asian_level = _build_sub_level("ASIAN", asian_bars)
+        london_level = _build_sub_level("LONDON", london_bars)
+        ny_level = _build_sub_level("NEW_YORK", ny_bars)
+
+        sessions_dict: Dict[str, Any] = {}
+        if asian_level:
+            sessions_dict["ASIAN"] = asian_level
+        if london_level:
+            sessions_dict["LONDON"] = london_level
+        if ny_level:
+            sessions_dict["NEW_YORK"] = ny_level
+
+        primary = None
+        if session_name:
+            clean_name = session_name.strip().upper()
+            if "LONDON" in clean_name and london_level:
+                primary = london_level
+            elif any(k in clean_name for k in ["NY", "NEW_YORK"]) and ny_level:
+                primary = ny_level
+            elif "ASIAN" in clean_name and asian_level:
+                primary = asian_level
+
+        if primary is None:
+            primary = asian_level or london_level or ny_level
+
+        if primary is None:
+            all_hi = max(b[2] for b in parsed_bars)
+            all_lo = min(b[3] for b in parsed_bars)
+            all_op = parsed_bars[0][1]
+            all_cl = parsed_bars[-1][4]
+            primary = SessionLevels(
+                session_name="ALL",
+                high=round(all_hi, 5),
+                low=round(all_lo, 5),
+                open_price=round(all_op, 5),
+                close_price=round(all_cl, 5),
+                start_time=parsed_bars[0][0],
+                end_time=parsed_bars[-1][0],
+            )
+
+        return SessionLevels(
+            session_name=primary.session_name,
+            high=primary.high,
+            low=primary.low,
+            open_price=primary.open_price,
+            close_price=primary.close_price,
+            start_time=primary.start_time,
+            end_time=primary.end_time,
+            asian_high=asian_level.high if asian_level else None,
+            asian_low=asian_level.low if asian_level else None,
+            london_high=london_level.high if london_level else None,
+            london_low=london_level.low if london_level else None,
+            ny_high=ny_level.high if ny_level else None,
+            ny_low=ny_level.low if ny_level else None,
+            sessions=sessions_dict,
+        )
+
     def calculate_composite_conviction(
         self,
         smc_blocks: List[OrderBlock],
@@ -355,6 +544,9 @@ class SMCStructureEngine:
         session: str,
         spread_pips: float,
         dxy_trend: Optional[str] = None,
+        macro_news_impact: Optional[str] = None,
+        minutes_to_news: Optional[int] = None,
+        symbol: Optional[str] = None,
     ) -> CompositeConvictionScore:
         """
         Synthesizes a 0-100 Composite Conviction Score and directional bias.
@@ -377,9 +569,13 @@ class SMCStructureEngine:
            - DXY inversely confirming EUR/GBP/Gold (+20 pts)
            - Macro alignment or neutral (+10 pts)
            - Conflicting macro trend (0 pts)
+           - Gold/DXY inverse correlation: Bullish DXY penalizes Long Gold by -10 pts or boosts Short Gold by +10 pts;
+             Bearish DXY boosts Long Gold by +10 pts or penalizes Short Gold by -10 pts.
         5. Spread Penalty (0-25 pts deduction):
            - Tight spread <= 1.2 pips: 0 deduction
            - Wider spreads scale penalty progressively
+        6. Macro News Blackout Penalty (0-15 pts deduction):
+           - High-impact news within 15 min imposes -15 pts penalty.
         
         Args:
             smc_blocks: List of detected OrderBlock objects.
@@ -389,6 +585,9 @@ class SMCStructureEngine:
             session: Current session name (e.g. 'LONDON_OPEN', 'NEW_YORK', 'ASIAN').
             spread_pips: Current live spread in pips.
             dxy_trend: Optional trend of US Dollar Index ('BULLISH', 'BEARISH', 'NEUTRAL').
+            macro_news_impact: Optional macro news impact ('HIGH', 'MEDIUM', 'LOW').
+            minutes_to_news: Optional minutes remaining to nearest economic news release.
+            symbol: Optional instrument identifier (e.g. 'XAUUSD', 'EURUSD').
             
         Returns:
             CompositeConvictionScore instance.
@@ -536,35 +735,79 @@ class SMCStructureEngine:
             key_reasons.append(f"Session Timing: Off-peak hours ({session}) (+5 pts)")
 
         # 5. Correlation Score (0-20)
+        is_gold = False
+        if symbol:
+            sym_clean = symbol.strip().upper().replace("/", "").replace(" ", "")
+            if sym_clean in ["XAUUSD", "GOLD"] or "XAU" in sym_clean or "GOLD" in sym_clean:
+                is_gold = True
+
         correlation_score = 10.0  # default baseline
-        if dxy_trend:
-            dxy_clean = dxy_trend.strip().upper()
-            if is_bullish:
-                if dxy_clean in ["BEARISH", "DOWN", "FALLING", "WEAK"]:
-                    correlation_score = 20.0
-                    key_reasons.append("Macro Correlation: Bearish DXY inversely reinforces EUR/Gold long (+20 pts)")
-                elif dxy_clean in ["BULLISH", "UP", "RISING", "STRONG"]:
-                    correlation_score = 0.0
-                    key_reasons.append("Macro Headwind: Bullish DXY opposes long position (0 pts)")
+        if is_gold:
+            if dxy_trend:
+                dxy_clean = dxy_trend.strip().upper()
+                if is_bullish:
+                    if dxy_clean in ["BULLISH", "UP", "RISING", "STRONG"]:
+                        correlation_score = 0.0
+                        key_reasons.append(
+                            "Gold/DXY Inverse Correlation: Bullish DXY penalizes Long Gold by -10 pts (0 pts)"
+                        )
+                    elif dxy_clean in ["BEARISH", "DOWN", "FALLING", "WEAK"]:
+                        correlation_score = 20.0
+                        key_reasons.append(
+                            "Gold/DXY Inverse Correlation: Bearish DXY boosts Long Gold by +10 pts (+20 pts)"
+                        )
+                    else:
+                        correlation_score = 10.0
+                        key_reasons.append(f"Gold/DXY Correlation: DXY neutral/sideways ({dxy_trend}) (+10 pts)")
+                elif is_bearish:
+                    if dxy_clean in ["BULLISH", "UP", "RISING", "STRONG"]:
+                        correlation_score = 20.0
+                        key_reasons.append(
+                            "Gold/DXY Inverse Correlation: Bullish DXY boosts Short Gold by +10 pts (+20 pts)"
+                        )
+                    elif dxy_clean in ["BEARISH", "DOWN", "FALLING", "WEAK"]:
+                        correlation_score = 0.0
+                        key_reasons.append(
+                            "Gold/DXY Inverse Correlation: Bearish DXY penalizes Short Gold by -10 pts (0 pts)"
+                        )
+                    else:
+                        correlation_score = 10.0
+                        key_reasons.append(f"Gold/DXY Correlation: DXY neutral/sideways ({dxy_trend}) (+10 pts)")
                 else:
                     correlation_score = 10.0
-                    key_reasons.append(f"Macro Correlation: DXY neutral/sideways ({dxy_trend}) (+10 pts)")
-            elif is_bearish:
-                if dxy_clean in ["BULLISH", "UP", "RISING", "STRONG"]:
-                    correlation_score = 20.0
-                    key_reasons.append("Macro Correlation: Bullish DXY reinforces EUR/Gold short (+20 pts)")
-                elif dxy_clean in ["BEARISH", "DOWN", "FALLING", "WEAK"]:
-                    correlation_score = 0.0
-                    key_reasons.append("Macro Headwind: Bearish DXY opposes short position (0 pts)")
-                else:
-                    correlation_score = 10.0
-                    key_reasons.append(f"Macro Correlation: DXY neutral/sideways ({dxy_trend}) (+10 pts)")
+                    key_reasons.append(f"Gold/DXY Correlation: DXY trend {dxy_trend} (+10 pts)")
             else:
                 correlation_score = 10.0
-                key_reasons.append(f"Macro Correlation: DXY trend {dxy_trend} (+10 pts)")
+                key_reasons.append("Gold/DXY Correlation: DXY unassigned, neutral baseline (+10 pts)")
         else:
-            correlation_score = 10.0
-            key_reasons.append("Macro Correlation: DXY unassigned, neutral baseline (+10 pts)")
+            if dxy_trend:
+                dxy_clean = dxy_trend.strip().upper()
+                if is_bullish:
+                    if dxy_clean in ["BEARISH", "DOWN", "FALLING", "WEAK"]:
+                        correlation_score = 20.0
+                        key_reasons.append("Macro Correlation: Bearish DXY inversely reinforces EUR/Gold long (+20 pts)")
+                    elif dxy_clean in ["BULLISH", "UP", "RISING", "STRONG"]:
+                        correlation_score = 0.0
+                        key_reasons.append("Macro Headwind: Bullish DXY opposes long position (0 pts)")
+                    else:
+                        correlation_score = 10.0
+                        key_reasons.append(f"Macro Correlation: DXY neutral/sideways ({dxy_trend}) (+10 pts)")
+                elif is_bearish:
+                    if dxy_clean in ["BULLISH", "UP", "RISING", "STRONG"]:
+                        correlation_score = 20.0
+                        key_reasons.append("Macro Correlation: Bullish DXY reinforces EUR/Gold short (+20 pts)")
+                    elif dxy_clean in ["BEARISH", "DOWN", "FALLING", "WEAK"]:
+                        correlation_score = 0.0
+                        key_reasons.append("Macro Headwind: Bearish DXY opposes short position (0 pts)")
+                    else:
+                        correlation_score = 10.0
+                        key_reasons.append(f"Macro Correlation: DXY neutral/sideways ({dxy_trend}) (+10 pts)")
+                else:
+                    correlation_score = 10.0
+                    key_reasons.append(f"Macro Correlation: DXY trend {dxy_trend} (+10 pts)")
+            else:
+                correlation_score = 10.0
+                key_reasons.append("Macro Correlation: DXY unassigned, neutral baseline (+10 pts)")
 
         # 6. Live Spread Penalty (0-25 deduction)
         if spread_pips <= 1.2:
@@ -580,8 +823,24 @@ class SMCStructureEngine:
             spread_penalty = round(min(25.0, 10.0 + (spread_pips - 4.0) * 5.0), 1)
             key_reasons.append(f"Execution Caution: Wide spread {spread_pips:.1f} pips (-{spread_penalty:.1f} pts)")
 
-        # 7. Total Conviction Score & Directional Bias
-        raw_total = smc_score + sniper_score + session_score + correlation_score - spread_penalty
+        # 7. Macro High-Impact News Blackout Penalty (0-15 deduction)
+        macro_news_penalty = 0.0
+        if macro_news_impact and macro_news_impact.strip().upper() == "HIGH":
+            if minutes_to_news is not None and 0 <= minutes_to_news <= 15:
+                macro_news_penalty = 15.0
+                key_reasons.append(
+                    f"Macro Event Risk: High-impact news in {minutes_to_news}m applies -15 pts news blackout penalty"
+                )
+
+        # 8. Total Conviction Score & Directional Bias
+        raw_total = (
+            smc_score
+            + sniper_score
+            + session_score
+            + correlation_score
+            - spread_penalty
+            - macro_news_penalty
+        )
         total_score = max(0.0, min(100.0, round(raw_total, 1)))
 
         if total_score >= 60.0:
@@ -608,6 +867,8 @@ class SMCStructureEngine:
             session_timing_score=round(session_score, 1),
             correlation_score=round(correlation_score, 1),
             spread_penalty=round(spread_penalty, 1),
+            macro_news_penalty=round(macro_news_penalty, 1),
+            symbol=symbol,
             bias=bias,
             key_reasons=key_reasons,
         )

@@ -36,8 +36,10 @@ from app.api.v1 import capital_cycles
 from app.api.v1 import execution
 from app.api.v1 import paper
 from app.api.v1 import copilot
+from app.api.v1 import smc
 
 api_router = APIRouter()
+api_router.include_router(smc.router, tags=["smc"])
 api_router.include_router(copilot.router)
 api_router.include_router(capital_cycles.router, tags=["capital_cycles"])
 api_router.include_router(health.router, tags=["health"])
