@@ -364,6 +364,65 @@ class BriefingService:
         self._latest_briefing = briefing
         return briefing
 
+    async def dispatch_briefing_to_telegram(
+        self,
+        briefing: Optional[IntelligenceBriefing] = None,
+        briefing_type: str = "latest",
+        custom_chat_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """
+        Formats and dispatches an intelligence briefing directly to Telegram via TelegramAlertService.
+        """
+        from app.services.alerts.telegram_alert_service import telegram_alert_service
+
+        if briefing is None:
+            b_lower = briefing_type.lower()
+            if "london" in b_lower:
+                briefing = self.generate_london_open_briefing()
+            elif "daily" in b_lower:
+                briefing = self.generate_daily_review_briefing()
+            else:
+                briefing = self.get_latest_briefing()
+
+        is_london = briefing.briefing_type == BriefingType.LONDON_OPEN
+        badge = "🌅 <b>LONDON OPEN INTELLIGENCE BRIEFING</b>" if is_london else "🌙 <b>DAILY PERFORMANCE REVIEW</b>"
+
+        lines = [
+            "🦅 <b>FALCON AI TRADING INTELLIGENCE</b>",
+            badge,
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            f"📝 <b>Summary:</b> {briefing.summary}",
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "💡 <b>Key Tactical Insights:</b>",
+        ]
+        for insight in (briefing.key_insights or [])[:5]:
+            lines.append(f"• {insight}")
+
+        risk = briefing.risk_state or {}
+        mult = risk.get("recovery_multiplier", 1.0)
+        status = risk.get("recovery_status", "BASELINE")
+        headroom = risk.get("loss_ceiling_headroom", 20.0)
+        streak = risk.get("consecutive_losses", 0)
+
+        lines.extend([
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━",
+            "🛡️ <b>Capital Guardian & Streak Status:</b>",
+            f"• Target Multiplier: <b>{mult:.1f}x</b> ({status})",
+            f"• Loss Ceiling Headroom: <b>${float(headroom):.2f}</b> under $20 hard ceiling",
+            f"• Consecutive Losses: <b>{streak}</b>",
+        ])
+
+        html_text = "\n".join(lines)
+        delivered = await telegram_alert_service.send_message(html_text, custom_chat_id=custom_chat_id)
+        return {
+            "delivered": delivered,
+            "briefing_type": briefing.briefing_type.value,
+            "title": briefing.title,
+            "generated_at": briefing.generated_at,
+            "telegram_configured": telegram_alert_service.is_configured,
+        }
+
+
     # ── Internal Helpers ─────────────────────────────────────────────────────
 
     def _extract_price(self, quotes: Dict[str, Any], *symbols: str, fallback: float) -> float:

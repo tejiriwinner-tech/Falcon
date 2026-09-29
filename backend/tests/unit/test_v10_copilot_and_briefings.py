@@ -358,3 +358,21 @@ class TestCopilotApiEndpoints:
         assert data["briefing_type"] in ("LONDON_OPEN", "DAILY_REVIEW")
         assert "title" in data
         assert "formatted_text" in data
+
+    def test_api_dispatch_briefing_to_telegram(self, client: TestClient, monkeypatch):
+        """POST /api/v1/copilot/briefings/dispatch-telegram dispatches formatted briefing."""
+        from app.services.alerts.telegram_alert_service import telegram_alert_service
+
+        async def mock_send(msg, custom_chat_id=None):
+            return True
+
+        monkeypatch.setattr(telegram_alert_service, "send_message", mock_send)
+
+        res = client.post("/api/v1/copilot/briefings/dispatch-telegram?briefing_type=london-open")
+        assert res.status_code == 200
+
+        data = res.json()
+        assert data["delivered"] is True
+        assert data["briefing_type"] == "LONDON_OPEN"
+        assert "Falcon London Open" in data["title"]
+

@@ -53,3 +53,19 @@ def get_latest_briefing() -> IntelligenceBriefing:
     Retrieves the most recent scheduled briefing, or generates a London Open briefing if none exists.
     """
     return briefing_service.get_latest_briefing()
+
+
+@router.post("/briefings/dispatch-telegram")
+async def dispatch_briefing_to_telegram(
+    briefing_type: str = "latest",
+    custom_chat_id: str = None,
+):
+    """
+    Formats and delivers the specified intelligence briefing (london-open, daily-review, or latest)
+    directly to Telegram subscribers via the live TelegramAlertService bridge.
+    """
+    return await briefing_service.dispatch_briefing_to_telegram(
+        briefing_type=briefing_type,
+        custom_chat_id=custom_chat_id,
+    )
+
