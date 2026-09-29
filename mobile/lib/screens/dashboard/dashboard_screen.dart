@@ -246,6 +246,8 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                           subtitle: "Real-time engine logs & checklists",
                         ),
                         const SizedBox(height: 12),
+                        _buildFalconCopilotCard(),
+                        const SizedBox(height: 12),
                         _buildMissionControlCard(),
                         const SizedBox(height: 12),
                         _buildPerformanceAnalyticsCard(),
@@ -376,6 +378,59 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
             ),
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildFalconCopilotCard() {
+    return GestureDetector(
+      onTap: () => context.push('/copilot'),
+      child: AppCard(
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.2),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+              ),
+              child: const Icon(
+                Icons.auto_awesome,
+                color: AppColors.primary,
+                size: 28,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  Text(
+                    'Falcon AI Co-Pilot & Briefings',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Conversational Q&A, SMC structure & session briefings',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.primary,
+            ),
+          ],
+        ),
       ),
     );
   }

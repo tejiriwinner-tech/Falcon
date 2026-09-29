@@ -27,6 +27,7 @@ import '../../screens/calibration/calibration_screen.dart';
 import '../../screens/providers/providers_screen.dart';
 import '../../screens/market_quotes/market_quotes_screen.dart';
 import '../../screens/runtime/runtime_screen.dart';
+import '../../screens/copilot/copilot_screen.dart';
 import '../constants/app_colors.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -144,6 +145,10 @@ class AppRouter {
           GoRoute(
             path: '/runtime',
             builder: (context, state) => const RuntimeScreen(),
+          ),
+          GoRoute(
+            path: '/copilot',
+            builder: (context, state) => const CopilotScreen(),
           ),
           GoRoute(
             path: '/settings',

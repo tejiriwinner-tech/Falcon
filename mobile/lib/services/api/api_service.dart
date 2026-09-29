@@ -30,6 +30,7 @@ import '../../models/provider_models.dart' hide LegacyMarketQuote;
 import '../../models/market_quote.dart';
 import '../../models/dashboard.dart';
 import '../../models/intelligence.dart';
+import '../../models/copilot_models.dart';
 import '../cache/cache_service.dart';
 
 
@@ -558,6 +559,122 @@ class ApiService {
       throw Exception('Request timed out after $timeoutSeconds seconds.');
     } catch (e) {
       throw Exception('Runtime events fetch failed: $e');
+    }
+  }
+
+  // ── Pillar 1 & 3 — Falcon AI Co-Pilot, Briefings & SMC Structure ───────
+
+  /// POST /copilot/query — Ask Falcon AI Co-Pilot a natural language question.
+  Future<CopilotQueryResponse> queryCopilot(String query, {String? symbol}) async {
+    final url = '$baseUrl/copilot/query';
+    print('Calling: $url');
+    try {
+      final body = jsonEncode({
+        'query': query,
+        if (symbol != null && symbol.isNotEmpty) 'symbol': symbol,
+      });
+      final response = await http
+          .post(
+            Uri.parse(url),
+            headers: {'Content-Type': 'application/json'},
+            body: body,
+          )
+          .timeout(const Duration(seconds: timeoutSeconds));
+
+      if (response.statusCode == 200) {
+        return CopilotQueryResponse.fromJson(
+          jsonDecode(response.body) as Map<String, dynamic>,
+        );
+      }
+      throw Exception('Copilot query error: ${response.statusCode} - ${response.reasonPhrase}');
+    } on TimeoutException {
+      throw Exception('Request timed out after $timeoutSeconds seconds.');
+    } catch (e) {
+      throw Exception('Copilot query failed: $e');
+    }
+  }
+
+  /// GET /copilot/briefings/latest — Fetch the most recently generated intelligence briefing.
+  Future<IntelligenceBriefing> getLatestBriefing() async {
+    return _get<IntelligenceBriefing>(
+      '/copilot/briefings/latest',
+      IntelligenceBriefing.fromJson,
+    );
+  }
+
+  /// GET /copilot/briefings/london-open — Fetch the London Open institutional briefing.
+  Future<IntelligenceBriefing> getLondonOpenBriefing() async {
+    return _get<IntelligenceBriefing>(
+      '/copilot/briefings/london-open',
+      IntelligenceBriefing.fromJson,
+    );
+  }
+
+  /// GET /copilot/briefings/daily-review — Fetch the Daily Review forensic briefing.
+  Future<IntelligenceBriefing> getDailyReviewBriefing() async {
+    return _get<IntelligenceBriefing>(
+      '/copilot/briefings/daily-review',
+      IntelligenceBriefing.fromJson,
+    );
+  }
+
+  /// POST /copilot/briefings/dispatch-telegram — Send briefing directly to live Telegram channel.
+  Future<Map<String, dynamic>> dispatchBriefingToTelegram({
+    String briefingType = 'latest',
+  }) async {
+    final url = '$baseUrl/copilot/briefings/dispatch-telegram?briefing_type=$briefingType';
+    print('Calling: $url');
+    try {
+      final response = await http
+          .post(Uri.parse(url))
+          .timeout(const Duration(seconds: timeoutSeconds));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      throw Exception('Telegram dispatch error: ${response.statusCode}');
+    } on TimeoutException {
+      throw Exception('Request timed out after $timeoutSeconds seconds.');
+    } catch (e) {
+      throw Exception('Telegram dispatch failed: $e');
+    }
+  }
+
+  /// GET /smc/structure — Fetch SMC institutional order blocks and fair value gaps.
+  Future<SMCStructureData> getSMCStructure({
+    String symbol = 'EURUSD',
+    String timeframe = '15m',
+  }) async {
+    return _get<SMCStructureData>(
+      '/smc/structure?symbol=$symbol&timeframe=$timeframe',
+      SMCStructureData.fromJson,
+    );
+  }
+
+  /// GET /smc/conviction — Calculate SMC composite conviction score (0-100%).
+  Future<Map<String, dynamic>> getSMCConviction({
+    String symbol = 'EURUSD',
+    String direction = 'BUY',
+    String? session,
+    double? spreadPips,
+  }) async {
+    var url = '$baseUrl/smc/conviction?symbol=$symbol&direction=$direction';
+    if (session != null) url += '&session=$session';
+    if (spreadPips != null) url += '&spread_pips=$spreadPips';
+    print('Calling: $url');
+    try {
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: timeoutSeconds));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body) as Map<String, dynamic>;
+      }
+      throw Exception('SMC conviction error: ${response.statusCode}');
+    } on TimeoutException {
+      throw Exception('Request timed out after $timeoutSeconds seconds.');
+    } catch (e) {
+      throw Exception('SMC conviction fetch failed: $e');
     }
   }
 }
