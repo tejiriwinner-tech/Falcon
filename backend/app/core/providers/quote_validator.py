@@ -11,7 +11,12 @@ from app.schemas.market_quote import MarketQuote, QuoteStatus
 class QuoteValidator:
     """Validates quote payloads and emits event bus notifications on validation failure."""
 
-    def validate(self, quote_data: Dict[str, Any], requested_symbol: str) -> Tuple[bool, Optional[str]]:
+    def validate(
+        self,
+        quote_data: Dict[str, Any],
+        requested_symbol: str,
+        max_age_seconds: Optional[float] = None,
+    ) -> Tuple[bool, Optional[str]]:
         """Validate raw dictionary before converting or storing as MarketQuote.
 
         Returns (is_valid, failure_reason).
@@ -52,15 +57,27 @@ class QuoteValidator:
             return False, "Missing timestamp"
 
         # Check timestamp parsing
+        parsed_ts = None
         if isinstance(ts, str):
             try:
                 parsed_ts = datetime.fromisoformat(ts)
             except ValueError:
                 return False, "Unparseable timestamp format"
-        elif not isinstance(ts, datetime):
+        elif isinstance(ts, datetime):
+            parsed_ts = ts
+        else:
             return False, "Invalid timestamp type"
 
+        if max_age_seconds is not None and parsed_ts is not None:
+            now = datetime.now(timezone.utc)
+            if parsed_ts.tzinfo is None:
+                parsed_ts = parsed_ts.replace(tzinfo=timezone.utc)
+            age = (now - parsed_ts).total_seconds()
+            if age > max_age_seconds:
+                return False, f"Quote is objectively stale ({age:.1f}s > {max_age_seconds}s)"
+
         return True, None
+
 
     def emit_failure_event(self, provider_id: str, symbol: str, reason: str) -> None:
         """Publish QuoteValidationFailed to event bus."""

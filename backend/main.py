@@ -11,6 +11,7 @@ from app.core.repository.mission_repository import mission_repository
 from app.core.services.market_data_scheduler import market_data_scheduler
 from app.services.scheduler.scheduler_service import scheduler_service
 from app.services.scheduler.learning_scheduler_service import learning_scheduler_service
+from app.core.services.briefing_service import briefing_service
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
@@ -84,6 +85,13 @@ async def startup_event():
         logging.getLogger(__name__).info("Autonomous learning scheduler started")
     except Exception as e:
         logging.getLogger(__name__).warning("Autonomous learning scheduler start error: %s", e)
+
+    # Warm Falcon AI Co-Pilot & scheduled briefings cache
+    try:
+        briefing_service.warm_cache()
+        logging.getLogger(__name__).info("Falcon Intelligence briefing cache warmed")
+    except Exception as e:
+        logging.getLogger(__name__).warning("Briefing cache warming error: %s", e)
 
 
 @app.on_event("shutdown")

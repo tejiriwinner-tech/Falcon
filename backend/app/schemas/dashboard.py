@@ -40,6 +40,17 @@ class AnalyticsSummary(BaseModel):
     lastUpdated: datetime
 
 
+class DashboardInstrumentContext(BaseModel):
+    symbol: str
+    canonicalSymbol: str
+    instrumentType: str
+    assetClass: str
+    exchange: str
+    displayName: str
+    pipSize: float
+    precision: int
+
+
 class DashboardResponse(BaseModel):
     summary: DashboardSummary
     marketQuotes: List[MarketQuote]
@@ -59,5 +70,9 @@ class DashboardResponse(BaseModel):
 
     # Phase 4.3.9 — runtime observability metrics
     runtimeMetrics: Optional[RuntimeMetrics] = None
+
+    # Requirement 11 & 12 — Instrument contexts and validation warnings
+    instrumentContexts: List[DashboardInstrumentContext] = Field(default=[])
+    instrumentValidationWarnings: List[str] = Field(default=[])
 
     generatedAt: datetime = Field(default_factory=lambda: __import__('datetime').datetime.now(__import__('datetime').timezone.utc))

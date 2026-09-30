@@ -10,6 +10,7 @@ Phase 4.3.8 hardening:
   - Cold vs warm timing tracked in get_performance_metrics().
 """
 import json
+import logging
 import time
 import threading
 from concurrent.futures import Future
@@ -33,8 +34,20 @@ from app.schemas.market_quote import (
     MarketQuoteResponse,
 )
 
+logger = logging.getLogger(__name__)
+
 # Statuses that mean "skip this provider entirely — no network call"
 _SKIP_STATUSES = {ProviderStatus.RATE_LIMITED, ProviderStatus.OFFLINE}
+
+# Instrument-aware provider routing matrix (canonical -> ordered allowed providers)
+_INSTRUMENT_PROVIDER_ROUTE: Dict[str, List[str]] = {
+    "XAUUSD": ["twelve_data", "alpha_vantage", "mock_provider"],
+    "GBPUSD": ["twelve_data", "fmp", "alpha_vantage", "mock_provider"],
+    "EURUSD": ["twelve_data", "fmp", "alpha_vantage", "mock_provider"],
+}
+_DEFAULT_PROVIDER_ROUTE: List[str] = ["twelve_data", "fmp", "alpha_vantage", "mock_provider"]
+
+_EVT_PROVIDER_SKIPPED_UNSUPPORTED = "ProviderSkippedUnsupported"
 
 
 class ProviderManager:
@@ -120,6 +133,29 @@ class ProviderManager:
     # Internal fetch with state-aware skip + adaptive TTL
     # ──────────────────────────────────────────────────────────────────
 
+    def _compute_quote_age_seconds(self, ts: Any) -> float:
+        try:
+            if isinstance(ts, str):
+                ts = datetime.fromisoformat(ts)
+            if isinstance(ts, datetime):
+                if ts.tzinfo is None:
+                    ts = ts.replace(tzinfo=timezone.utc)
+                age = (datetime.now(timezone.utc) - ts).total_seconds()
+                return max(0.0, age)
+        except Exception:
+            pass
+        return 0.0
+
+    def _get_candidate_providers(self, canonical: str) -> List[Any]:
+        allowed_route = _INSTRUMENT_PROVIDER_ROUTE.get(canonical, _DEFAULT_PROVIDER_ROUTE)
+        all_live = self._registry.get_by_capability(ProviderCapability.LIVE_PRICE)
+        live_map = {p.provider_id: p for p in all_live}
+        candidates = []
+        for pid in allowed_route:
+            if pid in live_map:
+                candidates.append(live_map[pid])
+        return candidates
+
     def _fetch_from_providers(self, canonical: str) -> Optional[MarketQuoteResponse]:
         """Query providers in priority order.
 
@@ -128,7 +164,20 @@ class ProviderManager:
              skipped without calling fetch(), preserving latency budget.
           2. Adaptive TTL: the TTL stored in cache reflects provider reliability.
         """
-        providers = self._registry.get_by_capability(ProviderCapability.LIVE_PRICE)
+        # Emit event for any registered LIVE_PRICE provider not in allowed route
+        allowed_route = _INSTRUMENT_PROVIDER_ROUTE.get(canonical, _DEFAULT_PROVIDER_ROUTE)
+        all_live = self._registry.get_by_capability(ProviderCapability.LIVE_PRICE)
+        for p in all_live:
+            if p.provider_id not in allowed_route:
+                evt = {
+                    "eventName": _EVT_PROVIDER_SKIPPED_UNSUPPORTED,
+                    "providerId": p.provider_id,
+                    "symbol": canonical,
+                    "timestamp": datetime.now(timezone.utc).isoformat(),
+                }
+                logger.info(json.dumps(evt))
+
+        providers = self._get_candidate_providers(canonical)
         attempted_failed_providers: List[str] = []
 
         for idx, provider in enumerate(providers):
@@ -180,6 +229,7 @@ class ProviderManager:
                 )
 
             # ── Build immutable MarketQuote ────────────────────────────
+            freshness = self._compute_quote_age_seconds(raw_data.get("timestamp"))
             quote = MarketQuote(
                 symbol=canonical,
                 bidAsk=BidAsk(
@@ -199,7 +249,7 @@ class ProviderManager:
                 providerName=p_name,
                 quoteStatus=QuoteStatus.LIVE,
                 marketStatus=MarketStatus.OPEN,
-                freshnessSeconds=0.0,
+                freshnessSeconds=freshness,
             )
 
             # ── Adaptive TTL ───────────────────────────────────────────

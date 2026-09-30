@@ -14,7 +14,14 @@ from app.core.engines.strategy_engine import StrategyEngine
 from app.core.services.session_budget_manager import session_budget_manager
 from app.core.services.signal_service import signal_service
 from app.core.services.news_service import build_news_response
-from app.schemas.dashboard import DashboardResponse, DashboardSummary, AnalyticsSummary
+from app.core.instruments.instrument_registry import instrument_registry
+from app.core.instruments.instrument_validator import instrument_validator
+from app.schemas.dashboard import (
+    DashboardResponse,
+    DashboardSummary,
+    AnalyticsSummary,
+    DashboardInstrumentContext,
+)
 from app.schemas.market_quote import MarketQuote
 from app.schemas.mission_report import MissionSummary
 from app.schemas.provider_models import ProviderSummary, ProviderStatus, ProviderHealthDetail
@@ -466,6 +473,32 @@ class DashboardService:
             avgWarmRequestMs=summary_dict.get("avgResponseTimeMs", 0.0) / 2.0 if summary_dict.get("avgResponseTimeMs") else 0.0,
         )
 
+        # Populate instrument contexts and validation warnings
+        instrument_contexts: List[DashboardInstrumentContext] = []
+        for quote in market_quotes:
+            meta = instrument_registry.get_instrument(quote.symbol)
+            if meta:
+                instrument_contexts.append(DashboardInstrumentContext(
+                    symbol=quote.symbol,
+                    canonicalSymbol=meta.canonicalSymbol,
+                    instrumentType=meta.instrumentType.value if hasattr(meta.instrumentType, "value") else str(meta.instrumentType),
+                    assetClass=meta.assetClass.value if hasattr(meta.assetClass, "value") else str(meta.assetClass),
+                    exchange=meta.exchange.value if hasattr(meta.exchange, "value") else str(meta.exchange),
+                    displayName=meta.displayName,
+                    pipSize=meta.pipSize,
+                    precision=meta.precision,
+                ))
+
+        validation_warnings: List[str] = []
+        try:
+            validation_log = instrument_validator.get_validation_log()
+            for entry in validation_log[-100:]:
+                if not entry.get("isValid", True) and entry.get("warning"):
+                    if entry["warning"] not in validation_warnings:
+                        validation_warnings.append(entry["warning"])
+        except Exception:
+            pass
+
         response = DashboardResponse(
             summary=summary,
             marketQuotes=market_quotes,
@@ -492,6 +525,8 @@ class DashboardService:
             decision=decision_obj,
             providerHealth=provider_health,
             runtimeMetrics=runtime_metrics,
+            instrumentContexts=instrument_contexts,
+            instrumentValidationWarnings=validation_warnings,
         )
         self._cached_dashboard = response
         self._cached_dashboard_at = now_mono

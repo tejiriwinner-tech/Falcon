@@ -35,7 +35,11 @@ from app.schemas.runtime import (
     ProviderHealthTrends,
     HealthTrendData,
     RuntimeResilienceExportResponse,
+    RuntimeInstrumentsResponse,
+    InstrumentDetail,
+    ProviderCoverageItem,
 )
+
 
 router = APIRouter(prefix="/runtime", tags=["runtime"])
 
@@ -311,3 +315,56 @@ def get_resilience_export():
             "Content-Type": "application/json",
         },
     )
+
+
+@router.get("/instruments", response_model=RuntimeInstrumentsResponse)
+def get_runtime_instruments():
+    """
+    Return complete instrument registry with provider mappings,
+    availability status, and usage analytics.
+    """
+    from app.core.instruments import instrument_registry
+
+    now = datetime.now(timezone.utc)
+    instruments_data = []
+
+    for instrument in instrument_registry.all_instruments():
+        provider_coverage = []
+        for provider_id, provider_symbol in instrument.providerMappings.items():
+            # Determine provider availability based on health
+            provider_snapshot = provider_registry.get_snapshot(provider_id)
+            is_available = (
+                provider_snapshot is not None
+                and provider_snapshot.metadata.status.value in ["ONLINE", "DEGRADED"]
+            )
+
+            provider_coverage.append(
+                ProviderCoverageItem(
+                    providerId=provider_id,
+                    providerSymbol=provider_symbol,
+                    isAvailable=is_available,
+                    lastQuoteAt=None,
+                )
+            )
+
+        instruments_data.append(
+            InstrumentDetail(
+                canonicalSymbol=instrument.canonicalSymbol,
+                displayName=instrument.displayName,
+                instrumentType=instrument.instrumentType.value,
+                assetClass=instrument.assetClass.value,
+                exchange=instrument.exchange.value,
+                currency=instrument.currency,
+                pipSize=instrument.pipSize,
+                precision=instrument.precision,
+                providerCoverage=provider_coverage,
+                active=instrument.active,
+            )
+        )
+
+    return RuntimeInstrumentsResponse(
+        instruments=instruments_data,
+        totalInstruments=len(instruments_data),
+        generatedAt=now,
+    )
+

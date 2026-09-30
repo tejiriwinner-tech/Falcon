@@ -44,7 +44,9 @@ class ApiService {
     // Production 24/7 Fly.io Cloud Backend
     return 'https://falcon-api-tejiri.fly.dev/api/v1';
   }
-  static const int timeoutSeconds = 300; // Increased to 5 minutes for slow backend
+  static const int timeoutSeconds = 15; // Fast failover timeout (15s)
+  static const int briefingTimeoutSeconds = 10;
+  static const int copilotTimeoutSeconds = 12;
 
   // Simple in-memory cache to reduce server load
   static final Map<String, dynamic> _cache = {};
@@ -64,7 +66,12 @@ class ApiService {
     _isOfflineMode = value;
   }
 
-  Future<T> _get<T>(String endpoint, T Function(Map<String, dynamic>) fromJson) async {
+  Future<T> _get<T>(
+    String endpoint,
+    T Function(Map<String, dynamic>) fromJson, {
+    int? timeoutSecondsOverride,
+  }) async {
+    final effectiveTimeout = timeoutSecondsOverride ?? timeoutSeconds;
     final url = '$baseUrl$endpoint';
     
     // Check offline mode cache
@@ -102,7 +109,7 @@ class ApiService {
     try {
       final response = await http
           .get(Uri.parse(url))
-          .timeout(const Duration(seconds: timeoutSeconds));
+          .timeout(Duration(seconds: effectiveTimeout));
 
       print("Status Code: ${response.statusCode}");
       if (response.body.length > 500) {
@@ -178,8 +185,9 @@ class ApiService {
         }
       }
       
-      throw Exception('Request timed out after $timeoutSeconds seconds. Server is unreachable.');
-    } on FormatException catch (e) {
+      throw Exception('Request timed out after $effectiveTimeout seconds. Server is unreachable.');
+    }
+ on FormatException catch (e) {
       print("FormatException ($url): $e");
       throw Exception('Invalid data received from server.');
     } catch (e) {
@@ -579,7 +587,7 @@ class ApiService {
             headers: {'Content-Type': 'application/json'},
             body: body,
           )
-          .timeout(const Duration(seconds: timeoutSeconds));
+          .timeout(const Duration(seconds: copilotTimeoutSeconds));
 
       if (response.statusCode == 200) {
         return CopilotQueryResponse.fromJson(
@@ -588,7 +596,7 @@ class ApiService {
       }
       throw Exception('Copilot query error: ${response.statusCode} - ${response.reasonPhrase}');
     } on TimeoutException {
-      throw Exception('Request timed out after $timeoutSeconds seconds.');
+      throw Exception('Request timed out after $copilotTimeoutSeconds seconds.');
     } catch (e) {
       throw Exception('Copilot query failed: $e');
     }
@@ -599,6 +607,7 @@ class ApiService {
     return _get<IntelligenceBriefing>(
       '/copilot/briefings/latest',
       IntelligenceBriefing.fromJson,
+      timeoutSecondsOverride: briefingTimeoutSeconds,
     );
   }
 
@@ -607,6 +616,7 @@ class ApiService {
     return _get<IntelligenceBriefing>(
       '/copilot/briefings/london-open',
       IntelligenceBriefing.fromJson,
+      timeoutSecondsOverride: briefingTimeoutSeconds,
     );
   }
 
@@ -615,6 +625,7 @@ class ApiService {
     return _get<IntelligenceBriefing>(
       '/copilot/briefings/daily-review',
       IntelligenceBriefing.fromJson,
+      timeoutSecondsOverride: briefingTimeoutSeconds,
     );
   }
 
@@ -627,14 +638,14 @@ class ApiService {
     try {
       final response = await http
           .post(Uri.parse(url))
-          .timeout(const Duration(seconds: timeoutSeconds));
+          .timeout(const Duration(seconds: briefingTimeoutSeconds));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
       throw Exception('Telegram dispatch error: ${response.statusCode}');
     } on TimeoutException {
-      throw Exception('Request timed out after $timeoutSeconds seconds.');
+      throw Exception('Request timed out after $briefingTimeoutSeconds seconds.');
     } catch (e) {
       throw Exception('Telegram dispatch failed: $e');
     }
@@ -648,6 +659,7 @@ class ApiService {
     return _get<SMCStructureData>(
       '/smc/structure?symbol=$symbol&timeframe=$timeframe',
       SMCStructureData.fromJson,
+      timeoutSecondsOverride: briefingTimeoutSeconds,
     );
   }
 
@@ -665,17 +677,18 @@ class ApiService {
     try {
       final response = await http
           .get(Uri.parse(url))
-          .timeout(const Duration(seconds: timeoutSeconds));
+          .timeout(const Duration(seconds: briefingTimeoutSeconds));
 
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
       throw Exception('SMC conviction error: ${response.statusCode}');
     } on TimeoutException {
-      throw Exception('Request timed out after $timeoutSeconds seconds.');
+      throw Exception('Request timed out after $briefingTimeoutSeconds seconds.');
     } catch (e) {
       throw Exception('SMC conviction fetch failed: $e');
     }
   }
+
 }
 

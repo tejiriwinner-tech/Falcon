@@ -195,3 +195,35 @@ class RuntimeResilienceExportResponse(BaseModel):
     recoveryStatistics: Dict[str, Any]
     recentTimeline: List[Dict[str, Any]]
     eventCounts: Dict[str, int]
+
+
+# ── Phase 4.3.11 — Instrument Registry Observability ──────────────────
+
+class ProviderCoverageItem(BaseModel):
+    """Provider coverage information for an instrument."""
+    providerId: str
+    providerSymbol: str
+    isAvailable: bool
+    lastQuoteAt: Optional[datetime] = None
+
+
+class InstrumentDetail(BaseModel):
+    """Detailed instrument specification and provider coverage."""
+    canonicalSymbol: str
+    displayName: str
+    instrumentType: str
+    assetClass: str
+    exchange: str
+    currency: str
+    pipSize: float
+    precision: int
+    providerCoverage: List[ProviderCoverageItem] = []
+    active: bool = True
+
+
+class RuntimeInstrumentsResponse(BaseModel):
+    """Response for GET /runtime/instruments."""
+    instruments: List[InstrumentDetail]
+    totalInstruments: int
+    generatedAt: datetime
+
