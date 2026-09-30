@@ -1,0 +1,627 @@
+<USER_REQUEST>
+FALCON V10 — FLUTTER PRODUCTION DATA & DEMO/MOCK EXECUTION UI AUDIT
+
+ROLE
+You are acting as a senior Flutter/mobile production auditor for Falcon V10.
+
+OBJECTIVE
+Perform a forensic audit of the Flutter application to determine why the Captain's Decision Engine screen is displaying apparent demo/mock execution data instead of clearly traceable production Falcon data.
+
+IMPORTANT:
+This is an AUDIT + CONTROLLED UI REPAIR task.
+
+DO NOT blindly modify the backend.
+DO NOT modify Falcon's research methodology.
+DO NOT modify SignalService.
+DO NOT modify CapitalGuardianService.
+DO NOT modify Captain decision logic.
+DO NOT modify OrderExecutionService.
+DO NOT add broker execution.
+DO NOT connect Falcon to MT5.
+DO NOT create an APK release yet.
+
+The screenshot currently shows:
+
+- "Captain's Decision Engine"
+- "1-Tap Execute (MT5 Demo)"
+- "SELL XAUUSD"
+- "85% Confidence"
+- "Lot Size (Demo)"
+- "0.01"
+- "XAUUSD (Gold)"
+- Stop Loss "2505.00"
+- Take Profit "2475.00"
+- "Dispatch SELL Order to MT5"
+
+These values must be traced to their actual source.
+
+==================================================
+1. FALCON V10 OPERATING MODEL — NON-NEGOTIABLE
+==================================================
+
+Falcon is a SIGNAL-GENERATION and DECISION-SUPPORT system.
+
+Falcon does NOT execute trades through a broker.
+
+The intended architecture is:
+
+REAL MARKET DATA
+    ↓
+SIGNAL GENERATION
+    ↓
+VALIDATION
+    ↓
+RISK / CAPITAL GUARDIAN
+    ↓
+CAPTAIN DECISION
+    ↓
+SIGNAL PRESENTED TO USER
+    ↓
+USER MANUALLY EXECUTES IN MT5 / EXNESS
+
+Therefore:
+
+- No automatic broker execution.
+- No MT5 order dispatch.
+- No order_send.
+- No order_modify.
+- No order_close.
+- No MetaTrader5 initialization from the production Falcon backend.
+- The mobile application must not imply that Falcon is dispatching orders to MT5.
+
+==================================================
+2. FIRST: FORENSIC AUDIT ONLY
+==================================================
+
+Before changing any code, inspect the complete Flutter project.
+
+Identify:
+
+A. Captain's Decision Engine screen/widget.
+
+B. The source of every displayed value:
+   - action / BUY / SELL
+   - symbol
+   - confidence
+   - entry price
+   - stop loss
+   - take profit
+   - lot size
+   - risk score
+   - validation score
+   - execution readiness
+   - supporting factors
+
+C. Every API/repository/provider/service that feeds the screen.
+
+D. Every mock/demo/static/fallback source.
+
+Search the entire Flutter project for terms such as:
+
+- "MT5 Demo"
+- "1-Tap Execute"
+- "Lot Size (Demo)"
+- "Dispatch SELL Order to MT5"
+- "XAUUSD"
+- "85%"
+- "0.01"
+- "2505.00"
+- "2475.00"
+- "SELL"
+- "mock"
+- "demo"
+- "fake"
+- "dummy"
+- "sample"
+- "hardcoded"
+- "testSignal"
+- "demoSignal"
+- "mockSignal"
+- "Mock"
+- "Demo"
+- "TODO"
+- "fallback"
+
+Also inspect:
+
+- Flutter repositories
+- API clients
+- DTOs/models
+- providers
+- Riverpod/Bloc/Provider/GetX state
+- local JSON fixtures
+- seeded/demo data
+- constants
+- fallback objects
+- development-only flags
+- environment configuration
+- API base URL configuration
+- authentication state
+- Captain decision response parsing
+
+DO NOT assume the values are mock simply because they look static.
+
+PROVE their source.
+
+==================================================
+3. TRACE THE DATA END-TO-END
+==================================================
+
+Produce an exact data-flow map:
+
+Backend/API endpoint
+        ↓
+HTTP client
+        ↓
+Repository/service
+        ↓
+DTO/model
+        ↓
+state management
+        ↓
+Captain Decision Engine screen
+        ↓
+displayed value
+
+For each displayed value, classify it as exactly one of:
+
+1. LIVE PRODUCTION API DATA
+2. DERIVED FROM LIVE PRODUCTION API DATA
+3. LOCAL CALCULATION
+4. HARDCODED
+5. MOCK/DEMO FIXTURE
+6. FALLBACK VALUE
+7. UNKNOWN — REQUIRES FURTHER TRACE
+
+Do not guess.
+
+==================================================
+4. CHECK PRODUCTION API CONNECTIVITY
+==================================================
+
+Inspect the Flutter configuration and determine:
+
+- Production API base URL
+- Development API base URL
+- Whether the app is actually pointing to Fly.io
+- Whether an environment variable controls the API endpoint
+- Whether a local/demo endpoint is being used
+- Whether mock mode is enabled
+- Whether a fallback response is being silently substituted after API failure
+
+The production Falcon API is:
+
+https://falcon-api-tejiri.fly.dev
+
+Verify which API endpoints the Captain screen actually consumes.
+
+IMPORTANT:
+
+Do not change API URLs unless the audit proves the current configuration is incorrect.
+
+==================================================
+5. AUDIT THE CAPTAIN SCREEN
+==================================================
+
+Determine whether the Captain's Decision Engine currently displays:
+
+A. Real Captain response data
+
+OR
+
+B. Mock/demo values
+
+OR
+
+C. A mixture of production and mock values.
+
+Pay special attention to the screenshot values:
+
+SELL XAUUSD
+85% Confidence
+0.01
+2505.00 SL
+2475.00 TP
+
+Trace each one individually.
+
+If even one of these values is hardcoded/mock, identify the exact file, class, method, and line/section responsible.
+
+==================================================
+6. AUDIT THE "1-TAP EXECUTE" FEATURE
+==================================================
+
+This is CRITICAL.
+
+Determine exactly what happens when:
+
+"Dispatch SELL Order to MT5"
+
+is pressed.
+
+Trace the entire call chain.
+
+Determine whether it:
+
+- calls a backend endpoint
+- calls OrderExecutionService
+- invokes an MT5 API
+- invokes a local MT5 integration
+- sends a network request
+- merely displays a demo confirmation
+- does nothing
+- uses mocked execution
+- uses another execution mechanism
+
+DO NOT CLICK/EXECUTE A REAL ORDER.
+
+Do not send any broker request.
+
+Do not initialize MetaTrader5.
+
+This must remain a static/code-level audit.
+
+==================================================
+7. PRODUCTION SAFETY REQUIREMENT
+==================================================
+
+The final Falcon mobile architecture must NOT contain a production action that claims to dispatch a real MT5 order.
+
+Replace the conceptual flow with:
+
+CAPTAIN DECISION
+    ↓
+SIGNAL DETAILS
+    ↓
+MANUAL EXECUTION
+
+The user should manually open MT5/Exness.
+
+The app may provide:
+
+- Copy trade parameters
+- Copy symbol
+- Copy entry
+- Copy stop loss
+- Copy take profit
+- Copy risk information
+- Open instructions
+- View signal details
+
+But NOT:
+
+- Dispatch Order
+- Execute Trade
+- Send to MT5
+- 1-Tap Execute
+- Auto Trade
+- Broker Execute
+
+unless such functionality is explicitly authorized in a future architecture change.
+
+==================================================
+8. IMPORTANT: DO NOT DESTROY EXISTING REAL DATA
+==================================================
+
+Do not replace real API-driven Captain data with newly invented values.
+
+Do not create new fake signals.
+
+Do not "fix" the screen by hardcoding realistic-looking numbers.
+
+Do not invent confidence values.
+
+Do not invent SL/TP.
+
+Do not invent lot sizes.
+
+If production data is unavailable, display an explicit state such as:
+
+"Production signal unavailable"
+
+or an appropriate existing empty/error state.
+
+Do NOT silently fall back to demo trading data.
+
+==================================================
+9. MOCK/DATA FALLBACK POLICY
+==================================================
+
+If the current application contains demo data, determine whether it is:
+
+A. Required for automated tests only
+B. Used by development/demo mode
+C. Accidentally active in production
+D. Used as a fallback when the API fails
+
+Preserve test fixtures if they are legitimately required by tests.
+
+But ensure production mode cannot silently display mock trading information as if it were a real Falcon decision.
+
+If a fallback exists, make the production behavior explicit:
+
+API unavailable
+    ↓
+NO REAL SIGNAL AVAILABLE
+
+NOT:
+
+API unavailable
+    ↓
+DISPLAY DEMO SELL XAUUSD
+
+==================================================
+10. UI REPAIR REQUIREMENTS
+==================================================
+
+If the audit confirms the screenshot is driven by demo/mock data, make the MINIMUM necessary Flutter changes.
+
+Required production behavior:
+
+The Captain screen must clearly distinguish:
+
+REAL PRODUCTION DATA
+from
+DEMO/TEST DATA.
+
+Remove misleading production UI such as:
+
+"1-Tap Execute (MT5 Demo)"
+"Lot Size (Demo)"
+"Dispatch SELL Order to MT5"
+
+Replace with a manual-execution presentation.
+
+For example:
+
+"Manual Execution"
+
+"Open MT5 / Exness and enter these parameters manually."
+
+Then display only actual signal values received from the production Falcon API.
+
+A suitable action may be:
+
+"Copy Trade Parameters"
+
+which copies the actual returned parameters without executing anything.
+
+Do not redesign the entire application.
+
+Do not add unnecessary features.
+
+==================================================
+11. DO NOT MODIFY THE FALCON BACKEND
+==================================================
+
+Unless the audit discovers an actual API contract mismatch that makes the Flutter application incapable of consuming the existing production response, do not modify backend code.
+
+The following backend systems are OUT OF SCOPE:
+
+- SignalService
+- SignalAuthorizationService
+- CapitalGuardianService
+- Captain
+- OrderExecutionService
+- HistoricalFindingsService
+- CandlestickResearchService
+- HistoricalBehaviourService
+- research methodology
+- capital accounting
+- database schema
+- Alembic migrations
+- broker integration
+
+If a backend issue is discovered, STOP and report it rather than silently changing it.
+
+==================================================
+12. TESTING REQUIREMENTS
+==================================================
+
+After any approved Flutter UI/data changes:
+
+Run the existing Flutter test suite.
+
+Also add focused tests where appropriate for:
+
+1. Production API response is displayed correctly.
+2. Mock/demo fixture cannot silently appear in production mode.
+3. API failure does not display fake trading data.
+4. Captain signal fields map correctly.
+5. Symbol is not hardcoded.
+6. Confidence is not hardcoded.
+7. Stop loss is not hardcoded.
+8. Take profit is not hardcoded.
+9. Lot size is not hardcoded.
+10. No MT5 execution action is triggered.
+11. No broker execution API is called.
+12. Manual copy action does not execute a trade.
+
+Use mocks only inside tests.
+
+==================================================
+13. STATIC SAFETY AUDIT
+==================================================
+
+Search the Flutter project for:
+
+- MT5 execution calls
+- broker execution endpoints
+- order dispatch methods
+- "executeOrder"
+- "sendOrder"
+- "placeOrder"
+- "orderSend"
+- "dispatchOrder"
+- "MetaTrader5"
+- "mt5"
+- "broker"
+- "OrderExecutionService"
+
+Classify each occurrence.
+
+The objective is NOT necessarily to delete every reference immediately.
+
+Determine whether each reference is:
+
+- documentation
+- UI/demo code
+- test code
+- dead code
+- real production execution code
+
+Real production execution must be identified explicitly.
+
+==================================================
+14. GIT SAFETY
+==================================================
+
+Before modification:
+
+Run:
+
+git status
+git branch --show-current
+git log -5 --oneline
+
+Record the current commit.
+
+After modification:
+
+Run:
+
+git diff --stat
+git diff
+
+Verify only intended Flutter files changed.
+
+Do not commit unrelated files.
+
+Do not modify generated files unless required.
+
+==================================================
+15. APK REQUIREMENT
+==================================================
+
+DO NOT generate or release a new APK yet.
+
+First provide the audit and local verification results.
+
+Only after the production data path is confirmed and demo execution UI is safely removed/replaced should a separate APK release phase be authorized.
+
+==================================================
+16. REQUIRED FINAL REPORT
+==================================================
+
+At the end, produce:
+
+# FALCON V10 — FLUTTER PRODUCTION DATA & DEMO UI AUDIT REPORT
+
+## A. Current Git Commit
+
+## B. Captain Screen Location
+
+## C. Production API Endpoint
+
+## D. Data Flow
+
+## E. Displayed Value Provenance
+
+Use a table:
+
+| Field | Displayed Value | Source File | Source Method | Classification |
+|------|------|------|------|------|
+| Action | ... | ... | ... | LIVE/MOCK/etc |
+| Symbol | ... | ... | ... | ... |
+| Confidence | ... | ... | ... | ... |
+| Entry | ... | ... | ... | ... |
+| Stop Loss | ... | ... | ... | ... |
+| Take Profit | ... | ... | ... | ... |
+| Lot Size | ... | ... | ... | ... |
+
+## F. Mock/Demo Sources Found
+
+List exact files and locations.
+
+## G. MT5/Execution Audit
+
+Explain exactly what "Dispatch SELL Order to MT5" currently does.
+
+Confirm whether any real broker execution can occur.
+
+## H. Production API Connectivity
+
+Report:
+
+- Base URL
+- Endpoint
+- HTTP status if safely tested
+- Response mapping
+- Authentication requirements
+- Fallback behavior
+
+Do not expose secrets or tokens.
+
+## I. Changes Made
+
+If changes were required, list only the exact files changed.
+
+If no changes were made, explicitly state:
+
+"NO CODE CHANGES — AUDIT ONLY"
+
+## J. Test Results
+
+Report exact commands and results.
+
+## K. Safety Verification
+
+Explicitly report:
+
+- Broker calls: 0
+- MT5 initialization: 0
+- Real order dispatch during audit: 0
+- Database migrations: 0
+- Backend modifications: 0 unless explicitly justified
+
+## L. APK Decision
+
+Do NOT release an APK in this phase.
+
+State whether the Flutter app is:
+
+1. READY FOR NEXT APK RELEASE PHASE
+2. BLOCKED — MOCK DATA STILL PRESENT
+3. BLOCKED — PRODUCTION API CONTRACT ISSUE
+4. BLOCKED — EXECUTION SAFETY ISSUE
+
+==================================================
+FINAL RULE
+==================================================
+
+DO NOT assume the screenshot is fake.
+
+DO NOT assume it is real.
+
+TRACE IT.
+
+PROVE WHERE EVERY DISPLAYED VALUE COMES FROM.
+
+The primary goal is to eliminate ambiguity between:
+
+REAL FALCON PRODUCTION SIGNAL DATA
+
+and
+
+DEMO/MOCK DATA.
+
+The secondary goal is to ensure Falcon remains a manual-execution decision-support system and never silently dispatches trades to MT5.
+
+START WITH AUDIT.
+DO NOT DEPLOY.
+DO NOT BUILD APK.
+DO NOT EXECUTE ANY TRADE.
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-23T12:54:26+01:00.
+</ADDITIONAL_METADATA>

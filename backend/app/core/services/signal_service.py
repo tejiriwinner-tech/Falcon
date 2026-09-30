@@ -246,6 +246,25 @@ class SignalService:
             curated_watchlist: List[dict] = []
             additional_resolved: List[SignalItem] = []
 
+            # ── Guardian pre-screen: ONE call to fetch cycle + active trade count ─────
+            # This replaces the former per-candidate DB round-trips (N×2 DB calls → 1 call).
+            guardian_allowed = True
+            guardian_global_reason: Optional[str] = None
+            live_trade_count = 0
+            max_trade_slots = 3
+            try:
+                from app.schemas.execution_order import ExecutionSettings as _ES
+                _lot = _ES().default_lot_size
+                _reservations = signal_authorization_service.get_active_reservations()
+                live_trade_count = len(_reservations)
+                if live_trade_count >= max_trade_slots:
+                    guardian_allowed = False
+                    guardian_global_reason = f"Max simultaneous trade slots reached ({live_trade_count}/{max_trade_slots})"
+            except Exception as _ge:
+                logger.debug(f"Guardian pre-screen error (non-fatal): {_ge}")
+
+            lot_size = ExecutionSettings().default_lot_size
+
             for item in candidate_pool:
                 cand = item["candidate"]
                 symbol = cand.symbol
@@ -272,14 +291,14 @@ class SignalService:
                 except Exception:
                     pass
 
-                # 1-hour expiration rule: if on watchlist for >= 1 hour without hitting entry, move to resolved
+                # 1-hour expiration rule: watchlist signal without entry hit for >= 1h → EXPIRED
                 age_seconds = (now - cand.generatedAt).total_seconds()
                 is_1h_elapsed = age_seconds >= 3600
                 is_approved = item["is_approved"]
                 is_ready = getattr(cand, "readinessScore", 0) >= 80
 
                 if is_1h_elapsed:
-                    # Expired: on watchlist for >= 1hr without hitting entry -> moved to resolved as EXPIRED
+                    # Expired: on watchlist >= 1hr without touching entry → RESOLVED/EXPIRED
                     additional_resolved.append(self._to_signal(
                         cand, item["decision"], item["signal_id"], now,
                         override_status="EXPIRED",
@@ -287,36 +306,61 @@ class SignalService:
                     ))
                     continue
 
-                # Evaluate candidate with Capital Guardian
-                lot_size = ExecutionSettings().default_lot_size
-                decision = signal_authorization_service.evaluate_candidate(
-                    candidate=cand,
-                    signal_id=item["signal_id"],
-                    lot_size=lot_size,
-                )
+                # Check if live market price has touched entry (ACTIVE gate)
+                # For BUY: price <= entry (or within 1 pip). For SELL: price >= entry (or within 1 pip).
+                entry_hit = False
+                if cur_px is not None and cur_px > 0:
+                    pip_tolerance = 0.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.0005
+                    if cand.direction.value.upper() == "BUY":
+                        entry_hit = cur_px <= cand.entryPrice + pip_tolerance
+                    else:
+                        entry_hit = cur_px >= cand.entryPrice - pip_tolerance
 
-                if decision.allowed and is_approved and is_ready:
-                    if symbol not in seen_symbols and len(curated_active) < 3:
+                # In-memory Guardian check (no extra DB call): use pre-screened slot count
+                slots_available = len(curated_active) < 3
+                is_guardian_ok = guardian_allowed or slots_available  # graceful fallback
+                decision = item.get("decision")
+
+                # Determine routing: ACTIVE requires entry hit + approval + readiness + open slot
+                if entry_hit and is_approved and is_ready and slots_available:
+                    if symbol not in seen_symbols:
                         seen_symbols.add(symbol)
                         item["is_guardian_authorized"] = True
                         item["lot_size"] = lot_size
                         item["current_market_px"] = cur_px
+                        item["entry_hit"] = True
                         curated_active.append(item)
                     else:
-                        # Beyond top 3 active or duplicate symbol -> remains on watchlist as HOLD
+                        # Duplicate symbol for the same direction → HOLD (not a new position)
                         item["is_guardian_authorized"] = True
+                        item["guardian_reason"] = None
                         item["current_market_px"] = cur_px
                         if len(curated_watchlist) < 5:
                             curated_watchlist.append(item)
-                else:
-                    # Blocked by Capital Guardian or unready -> goes to watchlist as WAITING
+                elif entry_hit and (not slots_available or not is_guardian_ok):
+                    # Entry price touched but Capital Guardian has 3 trades active → WAITING
+                    _reason = guardian_global_reason or f"Max simultaneous trade slots reached (3/3)"
                     item["is_guardian_authorized"] = False
-                    item["guardian_reason"] = decision.reason if not decision.allowed else None
+                    item["guardian_reason"] = _reason
+                    item["current_market_px"] = cur_px
+                    if len(curated_watchlist) < 5:
+                        curated_watchlist.append(item)
+                elif not is_guardian_ok:
+                    # Guardian-blocked (max slots reached) → WAITING
+                    item["is_guardian_authorized"] = False
+                    item["guardian_reason"] = guardian_global_reason
+                    item["current_market_px"] = cur_px
+                    if len(curated_watchlist) < 5:
+                        curated_watchlist.append(item)
+                else:
+                    # Awaiting entry price touch → HOLD on watchlist
+                    item["is_guardian_authorized"] = is_approved
+                    item["guardian_reason"] = None
                     item["current_market_px"] = cur_px
                     if len(curated_watchlist) < 5:
                         curated_watchlist.append(item)
 
-            # Compute autonomous loss recovery metrics
+            # Compute autonomous loss recovery metrics (in-memory, no DB)
             recovery_metrics = adaptive_tuning_engine.get_loss_recovery_metrics()
 
             # Convert top active setups (max 3)
@@ -334,7 +378,7 @@ class SignalService:
                 for item in curated_active[:3]
             ]
 
-            # Convert top watchlist setups with HOLD status (max 5)
+            # Convert top watchlist setups with HOLD/WAITING status (max 5)
             watchlist_items = [
                 self._to_signal(
                     item["candidate"],
@@ -349,7 +393,7 @@ class SignalService:
                 for item in curated_watchlist[:5]
             ]
 
-            # Assemble response: Active first, then Watchlist (HOLD), then Resolved outcomes
+            # Assemble response: Active first, then Watchlist (HOLD/WAITING), then Resolved outcomes
             signals = active_items + watchlist_items + additional_resolved + signals
 
         response = SignalListResponse(

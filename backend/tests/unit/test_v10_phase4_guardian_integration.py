@@ -501,10 +501,35 @@ def test_signal_service_guardian_hard_gate(test_setup):
         "decisions": [c[1] for c in candidates],
     }
 
+    # Mock provider_manager._cache so cur_px equals entryPrice for each candidate
+    # This triggers entry_hit=True for BUY signals (cur_px <= entryPrice + tolerance).
+    from unittest.mock import MagicMock as _MagicMock
+
+    def _make_cache_entry(price):
+        entry = _MagicMock()
+        entry.data = _MagicMock()
+        entry.data.lastPrice = price
+        return entry
+
+    price_map = {
+        "EURUSD": 1.1000,
+        "GBPUSD": 1.2500,
+        "XAUUSD": 2000.0,
+        "USDJPY": 150.0,
+        "BTCUSD": 60000.0,
+    }
+
+    cache_mock = _MagicMock()
+    cache_mock.get = lambda sym, allow_stale=False: _make_cache_entry(price_map[sym]) if sym in price_map else None
+
+    pm_mock = _MagicMock()
+    pm_mock._cache = cache_mock
+
     with patch("app.core.services.signal_service.mission_repository.get_all_missions", return_value=[mock_mission]), \
          patch("app.core.services.signal_service.mission_repository.get_mission_artifacts", return_value=artifacts_mock), \
          patch("app.core.services.signal_service.trade_journal_repository", test_setup["journal_repo"]), \
-         patch("app.core.services.signal_service.signal_authorization_service", test_setup["auth_service"]):
+         patch("app.core.services.signal_service.signal_authorization_service", test_setup["auth_service"]), \
+         patch("app.core.providers.provider_manager", pm_mock):
 
         resp = sig_service.build_signals(mission_limit=5)
 
@@ -514,7 +539,7 @@ def test_signal_service_guardian_hard_gate(test_setup):
         # Exactly 3 became ACTIVE (the 3-trade limit)
         assert len(active_signals) == 3
 
-        # Remaining became WAITING with Guardian explanation
+        # Remaining became WAITING with Guardian explanation (slots full)
         assert len(waiting_signals) >= 1
         assert any("Capital Guardian" in (s.analysis or "") for s in waiting_signals)
 

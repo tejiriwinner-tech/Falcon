@@ -1,0 +1,628 @@
+<USER_REQUEST>
+# FALCON V10 — PHASE 4
+
+## Capital Guardian → Signal Authorization Hard-Gate Integration
+
+Phase 3 has been independently verified and approved.
+
+Phase 3 verification:
+
+* Capital Guardian implemented and isolated.
+* 3-trade maximum enforced.
+* Worst-case monetary loss calculated internally.
+* Protected profit excluded from active capital.
+* Strict capital-preservation invariant enforced.
+* Unsupported monetary conversion fails closed.
+* Arbitrary caller-supplied monetaryRisk cannot bypass validation.
+* 23/23 Phase 3 tests passed.
+* 45/45 combined V10 regression tests passed.
+* No production trades or database records were modified.
+
+Now implement **PHASE 4 ONLY**.
+
+---
+
+## PRIMARY OBJECTIVE
+
+Connect the existing Capital Guardian to Falcon's existing **signal authorization path** so that a proposed trade cannot become an authorized/live signal unless the Capital Guardian explicitly permits it.
+
+The Guardian must become a **hard safety gate**.
+
+Do NOT redesign Falcon's strategies, indicators, Captain logic, execution lifecycle, or position sizing.
+
+---
+
+# 1. FIRST: INSPECT THE EXISTING AUTHORIZATION FLOW
+
+Before changing code, trace the complete path:
+
+Market data
+→ Market State
+→ Strategy Engine
+→ Signal Generation
+→ Validation
+→ Risk
+→ Captain
+→ Signal Service / authorization
+→ Execution
+
+Identify the **single authoritative point** where a candidate/proposed trade is converted into an authorized signal that can eventually create capital-reserving exposure.
+
+Also identify whether there are multiple independent signal-generation paths.
+
+Known architecture includes:
+
+* `pipeline_orchestrator.py`
+* `signal_generation_engine.py`
+* `signal_service.py`
+* existing validation/risk services
+* execution lifecycle
+* Captain decision engine
+
+There may also be legacy signal paths.
+
+Do NOT assume one path without inspecting the repository.
+
+---
+
+# 2. GUARDIAN MUST RUN ON EVERY CAPITAL-RESERVING AUTHORIZATION PATH
+
+For every path capable of producing a trade that could become:
+
+* PENDING
+* OPEN
+* FILLED
+
+the Capital Guardian must be evaluated before authorization.
+
+A signal must NOT be authorized if Guardian returns:
+
+* `allowed = false`
+* Guardian state = `HALTED`
+* Guardian evaluation raises an exception
+* required risk inputs are missing
+* monetary risk cannot be calculated
+* active capital cannot be determined
+* existing exposure cannot be determined
+* any Guardian dependency is unavailable
+
+All such cases must **fail closed**.
+
+Never convert a Guardian failure into:
+
+* WAIT
+* reduced-risk trade
+* guessed risk
+* fallback monetaryRisk
+* bypass
+* "allow anyway"
+
+---
+
+# 3. DO NOT TRUST CALLER-SUPPLIED MONETARY RISK
+
+The Phase 3 rule remains absolute.
+
+Do NOT allow:
+
+```text
+monetaryRisk = small arbitrary value
+```
+
+to bypass the Guardian.
+
+The authorization integration must supply the actual:
+
+* symbol
+* direction
+* entry price
+* stop-loss
+* quantity and/or lot size
+
+required by the Phase 3 Guardian.
+
+Use the Guardian's own verified monetary-risk calculation.
+
+Do not reimplement monetary-risk calculation in Phase 4.
+
+---
+
+# 4. PRESERVE EXISTING SIGNAL LOGIC
+
+Do NOT modify:
+
+* strategy algorithms
+* indicators
+* RSI
+* EMA
+* ATR
+* liquidity detection
+* order blocks
+* FVG logic
+* candlestick logic
+* Captain conviction calculations
+* BUY/SELL/WAIT logic
+* existing strategy scoring
+* existing news/session filters
+* existing execution lifecycle
+
+Phase 4 is an authorization safety integration only.
+
+The intended flow is:
+
+```text
+Existing Falcon Signal Pipeline
+        ↓
+Existing Validation
+        ↓
+Existing Captain Decision
+        ↓
+PROPOSED TRADE
+        ↓
+CAPITAL GUARDIAN
+        ↓
+   ┌───────────────┐
+   │               │
+ ALLOW           REJECT
+   │               │
+   ↓               ↓
+Authorized      Not Authorized
+Signal          / Fail Closed
+```
+
+---
+
+# 5. CONCURRENCY / RACE CONDITION MUST BE ANALYZED BEFORE IMPLEMENTATION
+
+This is critical.
+
+A simple sequence like:
+
+```text
+Request A → Guardian sees 2 trades → ALLOW
+Request B → Guardian sees 2 trades → ALLOW
+Request A → creates trade
+Request B → creates trade
+```
+
+could produce 4 simultaneous trades.
+
+That would violate the Phase 3 invariant.
+
+Therefore inspect the existing transaction and persistence architecture and determine how authorization can safely prevent this race.
+
+Investigate:
+
+* SQLAlchemy transaction boundaries
+* PostgreSQL transaction behavior
+* existing repository transactions
+* whether row-level locks are already used
+* whether the application can run multiple Fly.io instances/processes
+* whether authorization and trade creation occur in the same transaction
+* whether an existing lock/reservation mechanism can be reused
+
+### Do NOT invent an unsafe locking mechanism.
+
+If true atomic authorization + reservation is possible using existing infrastructure, implement it.
+
+If it requires a schema change, STOP and report that a migration is required rather than silently creating one.
+
+If cross-instance concurrency cannot be safely guaranteed with the current schema/architecture, document the limitation and implement the safest fail-closed behavior possible.
+
+Do not claim the 3-trade guarantee is race-safe unless the implementation actually proves it.
+
+---
+
+# 6. ACTIVE CAPITAL CYCLE REQUIREMENT
+
+Before allowing a trade:
+
+* active cycle must exist
+* active cycle status must be valid for trading
+* active trading capital must be > 0
+* protected profit must remain excluded
+* Guardian must evaluate against active-cycle capital only
+
+Do NOT automatically create a capital cycle.
+
+Do NOT automatically start Cycle 1.
+
+Do NOT transfer protected profit into active capital.
+
+Do NOT alter the capital-cycle accounting service.
+
+If there is no active cycle:
+
+```text
+REJECT / FAIL CLOSED
+```
+
+---
+
+# 7. THREE-TRADE LIMIT
+
+The Guardian remains authoritative.
+
+Maximum:
+
+```text
+3 simultaneous capital-reserving trades
+```
+
+Count:
+
+* PENDING
+* OPEN
+* FILLED
+
+Exclude:
+
+* CLOSED
+* EXPIRED
+* INVALIDATED
+
+Do not create a second independent trade-counting implementation.
+
+Use the Phase 3 Guardian.
+
+---
+
+# 8. CAPITAL PRESERVATION
+
+The Phase 3 invariant remains unchanged:
+
+```text
+existing worst-case loss
++
+proposed worst-case loss
+<
+active trading capital
+```
+
+Strict inequality must remain.
+
+Therefore:
+
+```text
+aggregate == active capital → REJECT
+aggregate > active capital → REJECT
+aggregate < active capital → potentially ALLOW
+```
+
+Protected profit is never included.
+
+Do not introduce a percentage-risk limit.
+
+Do not introduce:
+
+* 1%
+* 2%
+* 5%
+* Kelly
+* martingale
+* fixed fractional risk
+* arbitrary drawdown percentages
+
+---
+
+# 9. GUARDIAN STATE MACHINE
+
+Do not invent new thresholds.
+
+For Phase 4:
+
+* `NORMAL` may authorize if all Guardian conditions pass.
+* `HALTED` must reject.
+* `CAUTION`, `PROTECTED`, and `COOLDOWN` remain reserved policy states unless existing documented behavior already defines them.
+
+Do not create arbitrary meanings for those states.
+
+---
+
+# 10. ERROR HANDLING
+
+Any Guardian exception during authorization must result in:
+
+```text
+NOT AUTHORIZED
+```
+
+with a clear reason recorded/logged.
+
+Never:
+
+```text
+except:
+    continue
+```
+
+Never silently swallow Guardian errors.
+
+Do not expose sensitive internals in public API responses.
+
+---
+
+# 11. DUPLICATE / REPEATED SIGNALS
+
+Inspect existing deduplication behavior.
+
+Do not create a new broad deduplication system unless required for Guardian safety.
+
+However, ensure that Guardian integration does not cause duplicate authorization calls to accidentally create multiple reservations.
+
+If the existing system can emit the same proposed trade repeatedly, document the current behavior.
+
+Do not change post-closure deduplication rules in this phase unless directly required for safety.
+
+---
+
+# 12. LEGACY SIGNAL PATH
+
+Inspect the legacy signal generator:
+
+`app/services/signals/signal_generator.py`
+
+and scheduler:
+
+`app/services/scheduler/market_scheduler.py`
+
+Determine whether either can independently create capital-reserving exposure.
+
+If yes, they must also pass through the same authoritative Guardian gate.
+
+If they are inactive/dead code, do not refactor them. Document their status.
+
+There must not be an alternate live path that can bypass the Guardian.
+
+---
+
+# 13. CYCLE ASSOCIATION LIMITATION
+
+Phase 3 established that `trade_journal` does not currently contain `cycle_id`.
+
+Do NOT add a migration in Phase 4 merely to solve this.
+
+Continue using the Phase 3 conservative exposure mechanism.
+
+However:
+
+* never claim timestamp filtering is true cycle ownership
+* never ignore ambiguous exposure
+* fail closed if exposure cannot be safely determined
+
+If this limitation materially prevents safe authorization, STOP and report it rather than weakening the Guardian.
+
+---
+
+# 14. NO PRODUCTION TRADING BEHAVIOR CHANGE DURING TESTING
+
+Tests must use:
+
+* mocks
+* dependency injection
+* isolated repositories
+* test database
+* in-memory repositories
+
+Do not create real production trades.
+
+Do not fabricate production capital-cycle records.
+
+Do not alter historical production journal records.
+
+Do not run live execution as part of testing.
+
+---
+
+# 15. REQUIRED TESTS
+
+Add focused Phase 4 tests.
+
+At minimum:
+
+### Guardian authorization
+
+1. Guardian ALLOW → signal authorized.
+2. Guardian REJECT → signal not authorized.
+3. Guardian HALTED → signal rejected.
+4. Guardian exception → fail closed.
+5. No active cycle → rejected.
+6. Active capital = 0 → rejected.
+7. Protected profit cannot increase authorization capacity.
+8. 3 existing capital-reserving trades → rejected.
+9. Existing exposure + proposed risk == active capital → rejected.
+10. Existing exposure + proposed risk > active capital → rejected.
+11. Existing exposure + proposed risk < active capital → allowed, assuming all other conditions pass.
+
+### Risk integrity
+
+12. Arbitrary caller monetaryRisk cannot bypass Guardian.
+13. Unsupported currency conversion rejects.
+14. Missing entry rejects.
+15. Missing stop-loss rejects.
+16. Invalid BUY/SL relationship rejects.
+17. Invalid SELL/SL relationship rejects.
+
+### Lifecycle
+
+18. PENDING counts as reservation.
+19. OPEN counts as reservation.
+20. FILLED counts as reservation.
+21. CLOSED does not count.
+22. EXPIRED does not count.
+23. INVALIDATED does not count.
+
+### Concurrency
+
+24. Explicitly test the chosen authorization/reservation mechanism against two simultaneous authorization attempts.
+
+If true atomic protection cannot be tested, document exactly why.
+
+---
+
+# 16. API / RESPONSE COMPATIBILITY
+
+Do not unnecessarily change existing signal API schemas.
+
+If authorization rejection must be surfaced, preserve existing response structures wherever possible.
+
+Use existing:
+
+* WAIT
+* NO_TRADE
+* rejection
+* validation error
+
+semantics only if they already exist and accurately represent the Guardian rejection.
+
+Do not reinterpret Guardian rejection as a valid trade signal.
+
+---
+
+# 17. LOGGING / AUDITABILITY
+
+Every Guardian rejection at authorization should provide an internal structured reason containing enough information to diagnose:
+
+* Guardian state
+* active cycle ID
+* active trading capital
+* current reservation count
+* current aggregate worst-case loss
+* proposed worst-case loss
+* remaining loss capacity
+* rejection reason
+
+Do not log secrets or credentials.
+
+Do not expose unnecessary internal financial details to unauthenticated public clients.
+
+---
+
+# 18. DATABASE SAFETY
+
+Before implementation:
+
+```text
+git status
+```
+
+During Phase 4:
+
+* no Alembic migration unless explicitly proven unavoidable
+* no destructive SQL
+* no production data mutation
+* no historical trade modification
+* no automatic cycle creation
+
+If a schema change is genuinely required for concurrency-safe reservation, STOP and report:
+
+```text
+PHASE 4 BLOCKED — MIGRATION REQUIRED FOR SAFE ATOMIC RESERVATION
+```
+
+Do not create that migration without approval.
+
+---
+
+# 19. REGRESSION TESTS
+
+Run:
+
+```text
+tests/unit/test_v10_phase1_schema.py
+tests/unit/test_v10_phase2_capital_cycle.py
+tests/unit/test_v10_phase3_capital_guardian.py
+```
+
+plus all new Phase 4 tests.
+
+Report exact counts.
+
+Also run relevant existing signal-generation/service tests affected by the integration.
+
+---
+
+# 20. REQUIRED FINAL REPORT
+
+Do NOT modify unrelated files.
+
+Report:
+
+### A. Authorization Path
+
+Exact file/method where Guardian was integrated.
+
+### B. All Live Signal Paths
+
+List every path capable of producing capital-reserving exposure and whether Guardian protects it.
+
+### C. Guardian Invocation
+
+Show the exact inputs passed into the Guardian.
+
+### D. Fail-Closed Behavior
+
+Show what happens for Guardian errors/unavailability.
+
+### E. Concurrency Safety
+
+Explain exactly how two simultaneous authorization attempts are prevented from exceeding the 3-trade limit.
+
+If not fully solved, state the limitation explicitly.
+
+### F. Capital Preservation
+
+Confirm strict:
+
+```text
+existing loss + proposed loss < active capital
+```
+
+### G. Protected Profit
+
+Confirm protected profit cannot be used for trading authorization.
+
+### H. Cycle Handling
+
+Confirm no automatic cycle creation and explain the current cycle-association limitation.
+
+### I. Legacy Paths
+
+Confirm whether legacy signal/scheduler paths can bypass Guardian.
+
+### J. Database Safety
+
+Confirm migrations/data modifications.
+
+### K. Tests
+
+Report exact test counts.
+
+### L. Git Diff
+
+List every modified/untracked file.
+
+### M. Remaining Limitations
+
+List only genuine limitations.
+
+---
+
+# FINAL STATUS
+
+At the end output exactly one:
+
+`PHASE 4 VERIFIED — READY FOR PHASE 5`
+
+OR
+
+`PHASE 4 BLOCKED — DO NOT PROCEED`
+
+Do not declare Phase 4 verified if concurrency safety remains materially unresolved.
+
+Do not proceed to Phase 5 automatically.
+
+</USER_REQUEST>
+<ADDITIONAL_METADATA>
+The current local time is: 2026-09-18T15:21:45+01:00.
+</ADDITIONAL_METADATA>

@@ -32207,3 +32207,747 @@ WHERE mission_artifacts.mission_id = %(mission_id_1)s::VARCHAR AND mission_artif
 2026-09-10 12:16:19,148 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9902 GBP/USD BUY) -> WIN (+100.00)
 2026-09-10 12:16:19,154 - falcon.signal_outcome_resolver - INFO - Ingested new signal #9903 (XAU/USD BUY) as OPEN
 2026-09-10 12:16:19,154 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9903 XAU/USD BUY) -> LOSS (-100.00)
+2026-09-30 11:14:29,108 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:14:29.108714+00:00"}
+2026-09-30 11:14:29,109 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:14:29,113 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:14:30,490 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:14:30,493 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:14:30.493259+00:00"}
+2026-09-30 11:14:30,494 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:14:30.494210+00:00"}
+2026-09-30 11:14:30,495 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 2/65, Day: 2/780
+2026-09-30 11:14:30,496 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-30 11:14:33,255 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=EURUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:14:33,256 - falcon.providers.fmp - INFO - [Financial Modeling Prep] EURUSD Quote: 1.13614
+2026-09-30 11:14:47,761 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 3/65, Day: 3/780
+2026-09-30 11:14:47,762 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:14:49,021 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:15:33,551 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:33,583 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/query
+2026-09-30 11:15:35,144 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/query - Status: 200 - Time: 1.5617s
+2026-09-30 11:15:35,168 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/query "HTTP/1.1 200 OK"
+2026-09-30 11:15:35,173 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:35,176 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/query
+2026-09-30 11:15:37,928 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/query - Status: 200 - Time: 2.7519s
+2026-09-30 11:15:37,934 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/query "HTTP/1.1 200 OK"
+2026-09-30 11:15:37,949 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:37,958 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/london-open
+2026-09-30 11:15:37,966 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/london-open - Status: 200 - Time: 0.0090s
+2026-09-30 11:15:37,972 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/london-open "HTTP/1.1 200 OK"
+2026-09-30 11:15:37,979 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:37,982 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/daily-review
+2026-09-30 11:15:37,986 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/daily-review - Status: 200 - Time: 0.0038s
+2026-09-30 11:15:37,990 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/daily-review "HTTP/1.1 200 OK"
+2026-09-30 11:15:37,996 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:37,999 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/london-open
+2026-09-30 11:15:38,002 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/london-open - Status: 200 - Time: 0.0028s
+2026-09-30 11:15:38,005 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/london-open "HTTP/1.1 200 OK"
+2026-09-30 11:15:38,006 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,008 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/latest
+2026-09-30 11:15:38,011 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/latest - Status: 200 - Time: 0.0028s
+2026-09-30 11:15:38,014 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/latest "HTTP/1.1 200 OK"
+2026-09-30 11:15:38,019 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,022 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/briefings/dispatch-telegram
+2026-09-30 11:15:38,024 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/briefings/dispatch-telegram - Status: 200 - Time: 0.0020s
+2026-09-30 11:15:38,026 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/briefings/dispatch-telegram?briefing_type=london-open "HTTP/1.1 200 OK"
+2026-09-30 11:15:38,255 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,276 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/structure?symbol=EURUSD&timeframe=15m "HTTP/1.1 200 OK"
+2026-09-30 11:15:38,282 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,310 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/sweeps?symbol=EURUSD&timeframe=15m "HTTP/1.1 200 OK"
+2026-09-30 11:15:38,315 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,343 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/conviction?symbol=EURUSD&direction=BUY "HTTP/1.1 200 OK"
+2026-09-30 11:15:38,358 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,377 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/conviction?symbol=XAUUSD&direction=BUY&macro_news_impact=HIGH&minutes_to_news=10&dxy_trend=BULLISH "HTTP/1.1 200 OK"
+2026-09-30 11:15:38,382 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,407 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/conviction?minutes_to_news=-120 "HTTP/1.1 422 Unprocessable Entity"
+2026-09-30 11:15:38,412 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,427 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/smc/structure "HTTP/1.1 405 Method Not Allowed"
+2026-09-30 11:15:38,428 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,431 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/smc/sweeps "HTTP/1.1 405 Method Not Allowed"
+2026-09-30 11:15:38,432 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:38,434 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/smc/conviction "HTTP/1.1 405 Method Not Allowed"
+2026-09-30 11:15:38,574 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9001 EURUSD BUY) -> WIN (+100.00)
+2026-09-30 11:15:55,323 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:15:55,326 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/capital-cycles/set-capital
+2026-09-30 11:16:01,550 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/capital-cycles/set-capital - Status: 200 - Time: 6.2239s
+2026-09-30 11:16:01,554 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/capital-cycles/set-capital?amount=250.00 "HTTP/1.1 200 OK"
+2026-09-30 11:16:02,223 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #101 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:16:02,228 - falcon.signal_authorization_service - ERROR - Capital Guardian authorization failed closed: DB Write Crash
+2026-09-30 11:16:02,232 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #200 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:16:02,234 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #201 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $4.00/$20.00
+2026-09-30 11:16:02,235 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #202 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $6.00/$20.00
+2026-09-30 11:16:02,237 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,370 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,371 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,372 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,373 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,374 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,375 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,412 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #301 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:16:02,413 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #302 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:16:02,414 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #303 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:16:02,415 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,420 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade causes aggregate worst-case loss ($25.00) to equal or exceed active trading capital ($20.00) (Live trades: 0/3, Agg Loss: $0.00 + $25.00 vs $20.00)
+2026-09-30 11:16:02,430 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Active trading capital is zero or negative (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $0.00)
+2026-09-30 11:16:02,434 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Missing instrument symbol (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,438 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid trade direction 'HOLD': must be 'BUY' or 'SELL' (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,460 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Missing or invalid entry price: must be strictly positive (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,465 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid stop loss for BUY trade: stop loss (1.1050) must be strictly below entry price (1.1000) (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,490 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid stop loss for SELL trade: stop loss (1.0950) must be strictly above entry price (1.1000) (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,494 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Monetary loss cannot be reliably calculated: Monetary loss cannot be reliably calculated: instrument 'XYZABC' is not registered in Falcon (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,497 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Monetary loss cannot be reliably calculated: Unverified monetaryRisk input rejected: arbitrary caller-supplied monetaryRisk cannot bypass validation (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:16:02,503 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #601 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:16:02,503 - falcon.signal_authorization_service - INFO - Signal #601 already has active reservation #1. Returning existing reservation.
+2026-09-30 11:16:02,508 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #701 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:16:02,509 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #702 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $5.00/$20.00
+2026-09-30 11:16:06,590 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:16:06.590399+00:00"}
+2026-09-30 11:16:06,590 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:16:06,593 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:16:08,075 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:16:08,078 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:16:08.078057+00:00"}
+2026-09-30 11:16:08,078 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:16:08.078313+00:00"}
+2026-09-30 11:16:08,078 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 2/65, Day: 2/780
+2026-09-30 11:16:08,079 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-30 11:16:10,232 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=EURUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:16:10,234 - falcon.providers.fmp - INFO - [Financial Modeling Prep] EURUSD Quote: 1.13636
+2026-09-30 11:16:10,236 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:16:10.236648+00:00"}
+2026-09-30 11:16:10,237 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:16:10.237011+00:00"}
+2026-09-30 11:16:10,237 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 3/65, Day: 3/780
+2026-09-30 11:16:10,519 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=GBPUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:16:10,528 - falcon.providers.fmp - INFO - [Financial Modeling Prep] GBPUSD Quote: 1.32858
+2026-09-30 11:16:10,624 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #801 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:16:10,624 - falcon.execution.service - INFO - Order created and queued: ord-2aca59dd (BUY 0.01 EURUSD)
+2026-09-30 11:16:10,625 - falcon.execution.service - INFO - Order ord-2aca59dd recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-09-30 11:16:10,625 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:16:11,274 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:16:11,718 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001D222AB6CF0>
+2026-09-30 11:16:11,719 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001D222EB4690> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:16:11,958 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001D222AAB390>
+2026-09-30 11:16:11,959 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:16:11,959 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:16:11,959 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:16:11,960 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:16:11,960 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:16:12,247 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:16:12 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1547'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:16:12,247 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:16:12,248 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:16:12,248 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:16:12,249 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:16:12,250 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:16:12,251 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:16:12,252 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:16:12,253 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:16:12,265 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1001 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:16:12,266 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1002 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:16:12,267 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1003 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:16:12,269 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:16:12,269 - falcon.execution.service - WARNING - Order ord-e5958d74 rejected by Capital Guardian: Maximum simultaneous capital-reserving trades (3) reached
+2026-09-30 11:16:12,274 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1101 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:16:12,275 - falcon.execution.service - INFO - Order created and queued: ord-4a171652 (BUY 0.01 EURUSD)
+2026-09-30 11:16:12,275 - falcon.execution.service - INFO - Order ord-4a171652 recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-09-30 11:16:12,275 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:16:12,862 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:16:13,310 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001D2231D4A50>
+2026-09-30 11:16:13,310 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001D2231DE030> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:16:13,515 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001D223116060>
+2026-09-30 11:16:13,517 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:16:13,517 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:16:13,518 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:16:13,518 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:16:13,518 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:16:13,741 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:16:13 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1547'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:16:13,741 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:16:13,741 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:16:13,741 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:16:13,742 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:16:13,742 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:16:13,743 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:16:13,744 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:16:13,744 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:16:13,746 - falcon.execution.service - INFO - Order ord-4a171652 executed by MT5. Ticket #1234567 @ 1.1002
+2026-09-30 11:16:13,746 - falcon.execution.service - INFO - Updated reservation #1 to OPEN for order ord-4a171652
+2026-09-30 11:16:13,747 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:16:14,296 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:16:14,759 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001D223117490>
+2026-09-30 11:16:14,759 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001D2231DD450> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:16:14,961 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000001D2226A2C30>
+2026-09-30 11:16:14,963 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:16:14,964 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:16:14,964 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:16:14,964 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:16:14,965 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:16:15,234 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:16:15 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1580'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:16:15,234 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:16:15,235 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:16:15,235 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:16:15,236 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:16:15,237 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:16:15,238 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:16:15,240 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:16:15,240 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:16:15,245 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1201 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:16:15,246 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1202 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:16:15,246 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1203 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:16:15,253 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:16:15,257 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1301 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:16:15,258 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1302 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:16:15,260 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1303 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:16:38,875 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:16:38.875728+00:00"}
+2026-09-30 11:16:38,876 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:16:38,880 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:16:40,235 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:16:40,238 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:16:40.238631+00:00"}
+2026-09-30 11:16:40,239 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:16:40.239321+00:00"}
+2026-09-30 11:16:40,239 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 2/65, Day: 2/780
+2026-09-30 11:16:40,240 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-30 11:16:41,874 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=EURUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:16:41,875 - falcon.providers.fmp - INFO - [Financial Modeling Prep] EURUSD Quote: 1.13613
+2026-09-30 11:16:41,876 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:16:41.876275+00:00"}
+2026-09-30 11:16:41,876 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:16:41.876517+00:00"}
+2026-09-30 11:16:41,876 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 3/65, Day: 3/780
+2026-09-30 11:16:42,141 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=GBPUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:16:42,142 - falcon.providers.fmp - INFO - [Financial Modeling Prep] GBPUSD Quote: 1.32881
+2026-09-30 11:19:18,244 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:18.244814+00:00"}
+2026-09-30 11:19:18,246 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:19:18,250 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:19:19,739 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:19:19,754 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:19:19.754251+00:00"}
+2026-09-30 11:19:19,755 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:19:19.755367+00:00"}
+2026-09-30 11:19:19,756 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 2/65, Day: 2/780
+2026-09-30 11:19:19,758 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-30 11:19:22,525 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=EURUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:19:22,527 - falcon.providers.fmp - INFO - [Financial Modeling Prep] EURUSD Quote: 1.13604
+2026-09-30 11:19:22,537 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:19:22.536956+00:00"}
+2026-09-30 11:19:22,538 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:19:22.538055+00:00"}
+2026-09-30 11:19:22,538 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 3/65, Day: 3/780
+2026-09-30 11:19:22,883 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=GBPUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:19:22,885 - falcon.providers.fmp - INFO - [Financial Modeling Prep] GBPUSD Quote: 1.32881
+2026-09-30 11:19:50,355 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:50.355734+00:00"}
+2026-09-30 11:19:50,356 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:19:50,360 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:19:51,594 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 429 257
+2026-09-30 11:19:51,603 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:51.603226+00:00"}
+2026-09-30 11:19:51,605 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:19:51.605158+00:00"}
+2026-09-30 11:19:51,605 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:19:51.605805+00:00"}
+2026-09-30 11:19:51,606 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 2/65, Day: 2/780
+2026-09-30 11:19:51,612 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-30 11:19:53,304 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=EURUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:19:53,305 - falcon.providers.fmp - INFO - [Financial Modeling Prep] EURUSD Quote: 1.13606
+2026-09-30 11:19:53,310 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.310445+00:00"}
+2026-09-30 11:19:53,312 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.312636+00:00"}
+2026-09-30 11:19:53,314 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.313979+00:00"}
+2026-09-30 11:19:53,315 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:19:53.315424+00:00"}
+2026-09-30 11:19:53,316 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:19:53.315963+00:00"}
+2026-09-30 11:19:53,316 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 3/65, Day: 3/780
+2026-09-30 11:19:53,576 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=GBPUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:19:53,577 - falcon.providers.fmp - INFO - [Financial Modeling Prep] GBPUSD Quote: 1.32881
+2026-09-30 11:19:53,578 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.578267+00:00"}
+2026-09-30 11:19:53,578 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.578893+00:00"}
+2026-09-30 11:19:53,579 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.579518+00:00"}
+2026-09-30 11:19:53,580 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.580176+00:00"}
+2026-09-30 11:19:53,580 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.580711+00:00"}
+2026-09-30 11:19:53,581 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.581644+00:00"}
+2026-09-30 11:19:53,582 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:19:53.582198+00:00"}
+2026-09-30 11:20:30,033 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:20:30.033084+00:00"}
+2026-09-30 11:20:30,033 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:20:30,037 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:20:31,467 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:20:31,471 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:20:31.471654+00:00"}
+2026-09-30 11:20:31,472 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:20:31.472582+00:00"}
+2026-09-30 11:20:31,472 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 2/65, Day: 2/780
+2026-09-30 11:20:31,474 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-30 11:20:33,502 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=EURUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:20:33,503 - falcon.providers.fmp - INFO - [Financial Modeling Prep] EURUSD Quote: 1.1359
+2026-09-30 11:20:33,507 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:20:33.507153+00:00"}
+2026-09-30 11:20:33,507 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:20:33.507416+00:00"}
+2026-09-30 11:20:33,507 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 3/65, Day: 3/780
+2026-09-30 11:20:33,772 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=GBPUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:20:33,773 - falcon.providers.fmp - INFO - [Financial Modeling Prep] GBPUSD Quote: 1.32888
+2026-09-30 11:21:16,536 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:21:16.535862+00:00"}
+2026-09-30 11:21:16,538 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:21:16,549 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:21:18,092 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:21:18,096 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:21:18.096427+00:00"}
+2026-09-30 11:21:18,097 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:21:18.097312+00:00"}
+2026-09-30 11:21:18,097 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 2/65, Day: 2/780
+2026-09-30 11:21:18,099 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-30 11:21:19,729 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=EURUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:21:19,731 - falcon.providers.fmp - INFO - [Financial Modeling Prep] EURUSD Quote: 1.13594
+2026-09-30 11:21:19,736 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:21:19.736035+00:00"}
+2026-09-30 11:21:19,736 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:21:19.736565+00:00"}
+2026-09-30 11:21:19,736 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 3/65, Day: 3/780
+2026-09-30 11:21:19,996 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=GBPUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:21:19,999 - falcon.providers.fmp - INFO - [Financial Modeling Prep] GBPUSD Quote: 1.32919
+2026-09-30 11:22:33,863 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:22:33.862933+00:00"}
+2026-09-30 11:22:33,863 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:22:33,866 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:22:35,227 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:22:35,230 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:22:35.230317+00:00"}
+2026-09-30 11:22:35,231 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:22:35.231029+00:00"}
+2026-09-30 11:22:35,231 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 2/65, Day: 2/780
+2026-09-30 11:22:35,232 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-30 11:22:37,126 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=EURUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:22:37,126 - falcon.providers.fmp - INFO - [Financial Modeling Prep] EURUSD Quote: 1.136
+2026-09-30 11:22:37,129 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:22:37.129105+00:00"}
+2026-09-30 11:22:37,129 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:22:37.129331+00:00"}
+2026-09-30 11:22:37,129 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 3/65, Day: 3/780
+2026-09-30 11:22:37,413 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=GBPUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:22:37,414 - falcon.providers.fmp - INFO - [Financial Modeling Prep] GBPUSD Quote: 1.32934
+2026-09-30 11:28:22,588 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:28:22,591 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:28:23,987 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:28:23,990 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:28:23.990908+00:00"}
+2026-09-30 11:28:23,991 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:28:23.991336+00:00"}
+2026-09-30 11:28:23,992 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 2/65, Day: 2/780
+2026-09-30 11:28:23,994 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): financialmodelingprep.com:443
+2026-09-30 11:28:25,748 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=GBPUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:28:25,749 - falcon.providers.fmp - INFO - [Financial Modeling Prep] GBPUSD Quote: 1.32955
+2026-09-30 11:28:25,750 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:28:25.750408+00:00"}
+2026-09-30 11:28:25,751 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:28:25.751596+00:00"}
+2026-09-30 11:28:25,751 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:28:25.751880+00:00"}
+2026-09-30 11:28:25,752 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 3/65, Day: 3/780
+2026-09-30 11:28:26,022 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=USDJPY&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:28:26,028 - falcon.providers.fmp - INFO - [Financial Modeling Prep] USDJPY Quote: 156.945
+2026-09-30 11:28:26,029 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:28:26.029367+00:00"}
+2026-09-30 11:28:26,029 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-09-30T10:28:26.029537+00:00"}
+2026-09-30 11:28:26,029 - falcon.session_budget - DEBUG - API call recorded for [fmp] — Hour: 4/65, Day: 4/780
+2026-09-30 11:28:26,310 - urllib3.connectionpool - DEBUG - https://financialmodelingprep.com:443 "GET /stable/quote?symbol=BTCUSD&apikey=3K1CvmHyfBPOWvK9dup1KOcEiAXrA7Xb HTTP/1.1" 200 None
+2026-09-30 11:28:26,311 - falcon.providers.fmp - INFO - [Financial Modeling Prep] BTCUSD Quote: 83758.9
+2026-09-30 11:30:00,666 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:30:00,670 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/capital-cycles/set-capital
+2026-09-30 11:30:06,581 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/capital-cycles/set-capital - Status: 200 - Time: 5.9105s
+2026-09-30 11:30:06,583 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/capital-cycles/set-capital?amount=250.00 "HTTP/1.1 200 OK"
+2026-09-30 11:30:07,242 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:30:07,264 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/structure?symbol=EURUSD&timeframe=15m "HTTP/1.1 200 OK"
+2026-09-30 11:30:07,269 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:30:07,290 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/sweeps?symbol=EURUSD&timeframe=15m "HTTP/1.1 200 OK"
+2026-09-30 11:30:07,298 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:30:07,320 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/conviction?symbol=EURUSD&direction=BUY "HTTP/1.1 200 OK"
+2026-09-30 11:30:07,327 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:30:07,341 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/conviction?symbol=XAUUSD&direction=BUY&macro_news_impact=HIGH&minutes_to_news=10&dxy_trend=BULLISH "HTTP/1.1 200 OK"
+2026-09-30 11:30:07,346 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:30:07,363 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/conviction?minutes_to_news=-120 "HTTP/1.1 422 Unprocessable Entity"
+2026-09-30 11:30:07,369 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:30:07,385 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/smc/structure "HTTP/1.1 405 Method Not Allowed"
+2026-09-30 11:30:07,386 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:30:07,389 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/smc/sweeps "HTTP/1.1 405 Method Not Allowed"
+2026-09-30 11:30:07,390 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:30:07,394 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/smc/conviction "HTTP/1.1 405 Method Not Allowed"
+2026-09-30 11:30:07,526 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:30:07,536 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:30:10,080 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:30:10,084 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9001 EURUSD BUY) -> WIN (+100.00)
+2026-09-30 11:31:02,606 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 2/65, Day: 2/780
+2026-09-30 11:31:02,608 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:31:03,943 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:31:13,100 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:31:13.100375+00:00"}
+2026-09-30 11:31:13,101 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 3/65, Day: 3/780
+2026-09-30 11:31:13,106 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:31:14,392 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:31:19,455 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:19,461 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/query
+2026-09-30 11:31:19,469 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/query - Status: 200 - Time: 0.0080s
+2026-09-30 11:31:19,473 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/query "HTTP/1.1 200 OK"
+2026-09-30 11:31:19,481 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:19,483 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/query
+2026-09-30 11:31:21,665 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/query - Status: 200 - Time: 2.1815s
+2026-09-30 11:31:21,671 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/query "HTTP/1.1 200 OK"
+2026-09-30 11:31:21,682 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:21,689 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/london-open
+2026-09-30 11:31:21,698 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/london-open - Status: 200 - Time: 0.0094s
+2026-09-30 11:31:21,704 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/london-open "HTTP/1.1 200 OK"
+2026-09-30 11:31:21,713 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:21,716 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/daily-review
+2026-09-30 11:31:21,719 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/daily-review - Status: 200 - Time: 0.0033s
+2026-09-30 11:31:21,722 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/daily-review "HTTP/1.1 200 OK"
+2026-09-30 11:31:21,727 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:21,730 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/london-open
+2026-09-30 11:31:21,732 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/london-open - Status: 200 - Time: 0.0019s
+2026-09-30 11:31:21,735 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/london-open "HTTP/1.1 200 OK"
+2026-09-30 11:31:21,736 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:21,738 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/latest
+2026-09-30 11:31:21,740 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/latest - Status: 200 - Time: 0.0023s
+2026-09-30 11:31:21,743 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/latest "HTTP/1.1 200 OK"
+2026-09-30 11:31:21,750 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:21,753 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/briefings/dispatch-telegram
+2026-09-30 11:31:21,755 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/briefings/dispatch-telegram - Status: 200 - Time: 0.0019s
+2026-09-30 11:31:21,758 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/briefings/dispatch-telegram?briefing_type=london-open "HTTP/1.1 200 OK"
+2026-09-30 11:31:21,868 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #101 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:31:21,873 - falcon.signal_authorization_service - ERROR - Capital Guardian authorization failed closed: DB Write Crash
+2026-09-30 11:31:21,877 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #200 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:31:21,879 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #201 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $4.00/$20.00
+2026-09-30 11:31:21,881 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #203 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $6.00/$20.00
+2026-09-30 11:31:21,882 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,884 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,885 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,887 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,888 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,889 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,890 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,896 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #301 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:31:21,897 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #302 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:31:21,899 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #303 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:31:21,900 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,904 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade causes aggregate worst-case loss ($25.00) to equal or exceed active trading capital ($20.00) (Live trades: 0/3, Agg Loss: $0.00 + $25.00 vs $20.00)
+2026-09-30 11:31:21,915 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Active trading capital is zero or negative (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $0.00)
+2026-09-30 11:31:21,920 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Missing instrument symbol (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,924 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid trade direction 'HOLD': must be 'BUY' or 'SELL' (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,928 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Missing or invalid entry price: must be strictly positive (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,933 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid stop loss for BUY trade: stop loss (1.1050) must be strictly below entry price (1.1000) (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,937 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid stop loss for SELL trade: stop loss (1.0950) must be strictly above entry price (1.1000) (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,941 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Monetary loss cannot be reliably calculated: Monetary loss cannot be reliably calculated: instrument 'XYZABC' is not registered in Falcon (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,946 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Monetary loss cannot be reliably calculated: Unverified monetaryRisk input rejected: arbitrary caller-supplied monetaryRisk cannot bypass validation (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:31:21,951 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #601 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:31:21,952 - falcon.signal_authorization_service - INFO - Signal #601 already has active reservation #1. Returning existing reservation.
+2026-09-30 11:31:21,957 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #701 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:31:21,958 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #702 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $5.00/$20.00
+2026-09-30 11:31:22,768 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #801 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:31:22,769 - falcon.execution.service - INFO - Order created and queued: ord-4a70f496 (BUY 0.01 EURUSD)
+2026-09-30 11:31:22,770 - falcon.execution.service - INFO - Order ord-4a70f496 recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-09-30 11:31:22,771 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:23,353 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:31:23,828 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x00000263EA629FD0>
+2026-09-30 11:31:23,829 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x00000263EAA76990> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:31:24,028 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x00000263EA3ACF50>
+2026-09-30 11:31:24,032 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:31:24,033 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:31:24,034 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:31:24,035 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:31:24,035 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:31:24,264 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:31:24 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1547'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:31:24,266 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:31:24,267 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:31:24,268 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:31:24,271 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:31:24,272 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:31:24,275 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:31:24,277 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:31:24,278 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:31:24,300 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1001 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:31:24,302 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1002 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:31:24,304 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1003 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:31:24,307 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:31:24,308 - falcon.execution.service - WARNING - Order ord-d973d87c rejected by Capital Guardian: Maximum simultaneous capital-reserving trades (3) reached
+2026-09-30 11:31:24,315 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1101 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:31:24,316 - falcon.execution.service - INFO - Order created and queued: ord-d2f648ac (BUY 0.01 EURUSD)
+2026-09-30 11:31:24,316 - falcon.execution.service - INFO - Order ord-d2f648ac recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-09-30 11:31:24,317 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:24,789 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:31:25,259 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x00000263EA3AD450>
+2026-09-30 11:31:25,259 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x00000263EBD73930> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:31:25,505 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x00000263EBD60180>
+2026-09-30 11:31:25,506 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:31:25,506 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:31:25,506 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:31:25,507 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:31:25,507 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:31:25,825 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:31:25 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1547'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:31:25,826 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:31:25,826 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:31:25,826 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:31:25,827 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:31:25,827 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:31:25,829 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:31:25,830 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:31:25,830 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:31:25,833 - falcon.execution.service - INFO - Order ord-d2f648ac executed by MT5. Ticket #1234567 @ 1.1002
+2026-09-30 11:31:25,833 - falcon.execution.service - INFO - Updated reservation #1 to OPEN for order ord-d2f648ac
+2026-09-30 11:31:25,833 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:31:26,294 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:31:26,738 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x00000263EBD616E0>
+2026-09-30 11:31:26,738 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x00000263EBD73F70> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:31:26,943 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x00000263EA1F1250>
+2026-09-30 11:31:26,944 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:31:26,944 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:31:26,944 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:31:26,945 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:31:26,946 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:31:27,225 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:31:27 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1580'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:31:27,226 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:31:27,226 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:31:27,226 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:31:27,227 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:31:27,228 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:31:27,230 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:31:27,233 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:31:27,235 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:31:27,252 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1201 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:31:27,255 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1202 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:31:27,260 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1203 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:31:27,262 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:31:27,268 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1301 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:31:27,270 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1302 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:31:27,272 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1303 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:33:03,271 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:03,275 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/capital-cycles/set-capital
+2026-09-30 11:33:10,288 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/capital-cycles/set-capital - Status: 200 - Time: 7.0130s
+2026-09-30 11:33:10,292 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/capital-cycles/set-capital?amount=250.00 "HTTP/1.1 200 OK"
+2026-09-30 11:33:25,346 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #101 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:33:25,352 - falcon.signal_authorization_service - ERROR - Capital Guardian authorization failed closed: DB Write Crash
+2026-09-30 11:33:25,356 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #200 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:33:25,357 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #201 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $4.00/$20.00
+2026-09-30 11:33:25,359 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #204 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $6.00/$20.00
+2026-09-30 11:33:25,360 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,361 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,362 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,363 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,363 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,364 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,365 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,371 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #301 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:33:25,372 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #302 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:33:25,373 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #303 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:33:25,374 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,377 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade causes aggregate worst-case loss ($25.00) to equal or exceed active trading capital ($20.00) (Live trades: 0/3, Agg Loss: $0.00 + $25.00 vs $20.00)
+2026-09-30 11:33:25,388 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Active trading capital is zero or negative (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $0.00)
+2026-09-30 11:33:25,392 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Missing instrument symbol (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,395 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid trade direction 'HOLD': must be 'BUY' or 'SELL' (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,398 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Missing or invalid entry price: must be strictly positive (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,401 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid stop loss for BUY trade: stop loss (1.1050) must be strictly below entry price (1.1000) (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,404 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid stop loss for SELL trade: stop loss (1.0950) must be strictly above entry price (1.1000) (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,407 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Monetary loss cannot be reliably calculated: Monetary loss cannot be reliably calculated: instrument 'XYZABC' is not registered in Falcon (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,412 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Monetary loss cannot be reliably calculated: Unverified monetaryRisk input rejected: arbitrary caller-supplied monetaryRisk cannot bypass validation (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:33:25,416 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #601 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:33:25,416 - falcon.signal_authorization_service - INFO - Signal #601 already has active reservation #1. Returning existing reservation.
+2026-09-30 11:33:25,420 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #701 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:33:25,421 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #702 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $5.00/$20.00
+2026-09-30 11:33:29,371 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #801 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:33:29,372 - falcon.execution.service - INFO - Order created and queued: ord-446a0fd5 (BUY 0.01 EURUSD)
+2026-09-30 11:33:29,372 - falcon.execution.service - INFO - Order ord-446a0fd5 recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-09-30 11:33:29,372 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:29,957 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:33:30,471 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000017ED546CC20>
+2026-09-30 11:33:30,471 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x0000017ED5072B70> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:33:30,659 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000017ED5474190>
+2026-09-30 11:33:30,660 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:33:30,661 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:33:30,661 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:33:30,661 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:33:30,661 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:33:30,957 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:33:30 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1547'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:33:30,960 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:33:30,961 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:33:30,962 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:33:30,965 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:33:30,967 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:33:30,970 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:33:30,973 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:33:30,974 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:33:30,989 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1001 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:33:30,990 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1002 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:33:30,991 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1003 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:33:30,993 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:33:30,993 - falcon.execution.service - WARNING - Order ord-512ad8d6 rejected by Capital Guardian: Maximum simultaneous capital-reserving trades (3) reached
+2026-09-30 11:33:30,998 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1101 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:33:30,999 - falcon.execution.service - INFO - Order created and queued: ord-1515b481 (BUY 0.01 EURUSD)
+2026-09-30 11:33:31,000 - falcon.execution.service - INFO - Order ord-1515b481 recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-09-30 11:33:31,000 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:31,495 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:33:31,928 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000017ED5475BD0>
+2026-09-30 11:33:31,929 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x0000017ED5468B90> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:33:32,120 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000017ED5087A80>
+2026-09-30 11:33:32,122 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:33:32,123 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:33:32,123 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:33:32,123 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:33:32,124 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:33:32,357 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:33:32 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1547'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:33:32,358 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:33:32,358 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:33:32,359 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:33:32,362 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:33:32,362 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:33:32,365 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:33:32,370 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:33:32,371 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:33:32,375 - falcon.execution.service - INFO - Order ord-1515b481 executed by MT5. Ticket #1234567 @ 1.1002
+2026-09-30 11:33:32,376 - falcon.execution.service - INFO - Updated reservation #1 to OPEN for order ord-1515b481
+2026-09-30 11:33:32,376 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:32,884 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:33:34,489 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000017ED5490510>
+2026-09-30 11:33:34,489 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x0000017ED54685F0> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:33:34,676 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000017ED4CC3530>
+2026-09-30 11:33:34,678 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:33:34,679 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:33:34,679 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:33:34,680 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:33:34,680 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:33:34,905 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:33:34 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1580'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:33:34,905 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:33:34,906 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:33:34,906 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:33:34,907 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:33:34,908 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:33:34,909 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:33:34,910 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:33:34,910 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:33:34,919 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1201 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:33:34,920 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1202 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:33:34,922 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1203 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:33:34,924 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:33:34,928 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1301 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:33:34,930 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1302 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:33:34,932 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1303 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:33:50,824 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:50,827 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/capital-cycles/set-capital
+2026-09-30 11:33:55,513 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/capital-cycles/set-capital - Status: 200 - Time: 4.6866s
+2026-09-30 11:33:55,517 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/capital-cycles/set-capital?amount=250.00 "HTTP/1.1 200 OK"
+2026-09-30 11:33:55,640 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:55,654 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/structure?symbol=EURUSD&timeframe=15m "HTTP/1.1 200 OK"
+2026-09-30 11:33:55,657 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:55,671 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/sweeps?symbol=EURUSD&timeframe=15m "HTTP/1.1 200 OK"
+2026-09-30 11:33:55,674 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:55,691 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/conviction?symbol=EURUSD&direction=BUY "HTTP/1.1 200 OK"
+2026-09-30 11:33:55,694 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:55,708 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/conviction?symbol=XAUUSD&direction=BUY&macro_news_impact=HIGH&minutes_to_news=10&dxy_trend=BULLISH "HTTP/1.1 200 OK"
+2026-09-30 11:33:55,711 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:55,721 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/smc/conviction?minutes_to_news=-120 "HTTP/1.1 422 Unprocessable Entity"
+2026-09-30 11:33:55,725 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:55,737 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/smc/structure "HTTP/1.1 405 Method Not Allowed"
+2026-09-30 11:33:55,738 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:55,740 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/smc/sweeps "HTTP/1.1 405 Method Not Allowed"
+2026-09-30 11:33:55,741 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:33:55,744 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/smc/conviction "HTTP/1.1 405 Method Not Allowed"
+2026-09-30 11:33:55,810 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 1/65, Day: 1/780
+2026-09-30 11:33:55,815 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:33:57,101 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=EUR%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:33:57,104 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #9001 EURUSD BUY) -> WIN (+100.00)
+2026-09-30 11:34:30,004 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 2/65, Day: 2/780
+2026-09-30 11:34:30,006 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:34:31,591 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=GBP%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:34:39,634 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-09-30T10:34:39.634693+00:00"}
+2026-09-30 11:34:39,635 - falcon.session_budget - DEBUG - API call recorded for [twelve_data] — Hour: 3/65, Day: 3/780
+2026-09-30 11:34:39,636 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api.twelvedata.com:443
+2026-09-30 11:34:40,950 - urllib3.connectionpool - DEBUG - https://api.twelvedata.com:443 "GET /quote?symbol=XAU%2FUSD&apikey=1009afe60cf24d72bdd9590e974aef77 HTTP/1.1" 200 None
+2026-09-30 11:34:45,787 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:45,791 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/query
+2026-09-30 11:34:45,796 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/query - Status: 200 - Time: 0.0054s
+2026-09-30 11:34:45,799 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/query "HTTP/1.1 200 OK"
+2026-09-30 11:34:45,803 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:45,807 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/query
+2026-09-30 11:34:47,759 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/query - Status: 200 - Time: 1.9519s
+2026-09-30 11:34:47,762 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/query "HTTP/1.1 200 OK"
+2026-09-30 11:34:47,769 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:47,771 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/london-open
+2026-09-30 11:34:47,775 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/london-open - Status: 200 - Time: 0.0038s
+2026-09-30 11:34:47,778 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/london-open "HTTP/1.1 200 OK"
+2026-09-30 11:34:47,785 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:47,788 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/daily-review
+2026-09-30 11:34:47,792 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/daily-review - Status: 200 - Time: 0.0039s
+2026-09-30 11:34:47,795 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/daily-review "HTTP/1.1 200 OK"
+2026-09-30 11:34:47,802 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:47,806 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/london-open
+2026-09-30 11:34:47,809 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/london-open - Status: 200 - Time: 0.0028s
+2026-09-30 11:34:47,812 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/london-open "HTTP/1.1 200 OK"
+2026-09-30 11:34:47,813 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:47,816 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/latest
+2026-09-30 11:34:47,819 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/latest - Status: 200 - Time: 0.0030s
+2026-09-30 11:34:47,823 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/latest "HTTP/1.1 200 OK"
+2026-09-30 11:34:47,828 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:47,831 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/briefings/dispatch-telegram
+2026-09-30 11:34:47,833 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/briefings/dispatch-telegram - Status: 200 - Time: 0.0021s
+2026-09-30 11:34:47,836 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/briefings/dispatch-telegram?briefing_type=london-open "HTTP/1.1 200 OK"
+2026-09-30 11:34:47,953 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #101 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:34:47,963 - falcon.signal_authorization_service - ERROR - Capital Guardian authorization failed closed: DB Write Crash
+2026-09-30 11:34:47,987 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #200 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:34:47,988 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #201 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $4.00/$20.00
+2026-09-30 11:34:48,004 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #202 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $6.00/$20.00
+2026-09-30 11:34:48,005 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,006 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,011 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,012 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,013 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,015 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,016 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $6.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,021 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #301 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:34:48,023 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #302 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:34:48,024 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #303 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:34:48,025 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,030 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade causes aggregate worst-case loss ($25.00) to equal or exceed active trading capital ($20.00) (Live trades: 0/3, Agg Loss: $0.00 + $25.00 vs $20.00)
+2026-09-30 11:34:48,041 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Active trading capital is zero or negative (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $0.00)
+2026-09-30 11:34:48,045 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Missing instrument symbol (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,053 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid trade direction 'HOLD': must be 'BUY' or 'SELL' (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,057 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Missing or invalid entry price: must be strictly positive (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,061 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid stop loss for BUY trade: stop loss (1.1050) must be strictly below entry price (1.1000) (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,064 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Invalid stop loss for SELL trade: stop loss (1.0950) must be strictly above entry price (1.1000) (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,068 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Monetary loss cannot be reliably calculated: Monetary loss cannot be reliably calculated: instrument 'XYZABC' is not registered in Falcon (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,073 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Monetary loss cannot be reliably calculated: Unverified monetaryRisk input rejected: arbitrary caller-supplied monetaryRisk cannot bypass validation (Live trades: 0/3, Agg Loss: $0.00 + $0.00 vs $20.00)
+2026-09-30 11:34:48,078 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #601 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:34:48,078 - falcon.signal_authorization_service - INFO - Signal #601 already has active reservation #1. Returning existing reservation.
+2026-09-30 11:34:48,084 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #701 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $2.00/$20.00
+2026-09-30 11:34:48,086 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #702 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $5.00/$20.00
+2026-09-30 11:34:48,729 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #801 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:34:48,730 - falcon.execution.service - INFO - Order created and queued: ord-2719891d (BUY 0.01 EURUSD)
+2026-09-30 11:34:48,730 - falcon.execution.service - INFO - Order ord-2719891d recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-09-30 11:34:48,731 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:49,358 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:34:49,871 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000002A43BE39940>
+2026-09-30 11:34:49,871 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000002A43BEC3F70> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:34:50,053 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000002A43BBBD450>
+2026-09-30 11:34:50,054 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:34:50,056 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:34:50,056 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:34:50,057 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:34:50,057 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:34:50,304 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:34:50 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1547'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:34:50,304 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:34:50,305 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:34:50,305 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:34:50,307 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:34:50,307 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:34:50,308 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:34:50,309 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:34:50,309 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:34:50,319 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1001 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:34:50,321 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1002 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:34:50,323 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1003 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:34:50,325 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:34:50,325 - falcon.execution.service - WARNING - Order ord-21531dc2 rejected by Capital Guardian: Maximum simultaneous capital-reserving trades (3) reached
+2026-09-30 11:34:50,329 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1101 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-09-30 11:34:50,330 - falcon.execution.service - INFO - Order created and queued: ord-5d0476be (BUY 0.01 EURUSD)
+2026-09-30 11:34:50,331 - falcon.execution.service - INFO - Order ord-5d0476be recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-09-30 11:34:50,331 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:50,937 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:34:51,410 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000002A43BBBD090>
+2026-09-30 11:34:51,410 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000002A43D23B7F0> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:34:51,610 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000002A43D2CC180>
+2026-09-30 11:34:51,611 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:34:51,612 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:34:51,612 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:34:51,613 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:34:51,613 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:34:51,846 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:34:51 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1547'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:34:51,847 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:34:51,847 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:34:51,848 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:34:51,849 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:34:51,849 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:34:51,850 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:34:51,851 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:34:51,851 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:34:51,853 - falcon.execution.service - INFO - Order ord-5d0476be executed by MT5. Ticket #1234567 @ 1.1002
+2026-09-30 11:34:51,854 - falcon.execution.service - INFO - Updated reservation #1 to OPEN for order ord-5d0476be
+2026-09-30 11:34:51,854 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-09-30 11:34:52,414 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-09-30 11:34:52,877 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000002A43D2CD6E0>
+2026-09-30 11:34:52,878 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000002A441234730> server_hostname='api.telegram.org' timeout=15.0
+2026-09-30 11:34:53,083 - httpcore.connection - DEBUG - start_tls.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x000002A43BA69130>
+2026-09-30 11:34:53,084 - httpcore.http11 - DEBUG - send_request_headers.started request=<Request [b'POST']>
+2026-09-30 11:34:53,084 - httpcore.http11 - DEBUG - send_request_headers.complete
+2026-09-30 11:34:53,084 - httpcore.http11 - DEBUG - send_request_body.started request=<Request [b'POST']>
+2026-09-30 11:34:53,085 - httpcore.http11 - DEBUG - send_request_body.complete
+2026-09-30 11:34:53,085 - httpcore.http11 - DEBUG - receive_response_headers.started request=<Request [b'POST']>
+2026-09-30 11:34:53,448 - httpcore.http11 - DEBUG - receive_response_headers.complete return_value=(b'HTTP/1.1', 200, b'OK', [(b'Server', b'nginx/1.30.1'), (b'Date', b'Wed, 30 Sep 2026 10:34:53 GMT'), (b'Content-Type', b'application/json'), (b'Content-Length', b'1580'), (b'Connection', b'keep-alive'), (b'Strict-Transport-Security', b'max-age=31536000; includeSubDomains; preload'), (b'Access-Control-Allow-Origin', b'*'), (b'Access-Control-Allow-Methods', b'GET, POST, OPTIONS'), (b'Access-Control-Expose-Headers', b'Content-Length,Content-Type,Date,Server,Connection')])
+2026-09-30 11:34:53,448 - httpx - INFO - HTTP Request: POST https://api.telegram.org/bot8881419951:AAGWkYdkoaWHhGeJy1sHvL28OifAH27ZgcQ/sendMessage "HTTP/1.1 200 OK"
+2026-09-30 11:34:53,448 - httpcore.http11 - DEBUG - receive_response_body.started request=<Request [b'POST']>
+2026-09-30 11:34:53,448 - httpcore.http11 - DEBUG - receive_response_body.complete
+2026-09-30 11:34:53,449 - httpcore.http11 - DEBUG - response_closed.started
+2026-09-30 11:34:53,449 - httpcore.http11 - DEBUG - response_closed.complete
+2026-09-30 11:34:53,450 - falcon.alerts.telegram - INFO - Telegram alert delivered successfully
+2026-09-30 11:34:53,451 - httpcore.connection - DEBUG - close.started
+2026-09-30 11:34:53,451 - httpcore.connection - DEBUG - close.complete
+2026-09-30 11:34:53,457 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1201 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:34:53,459 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1202 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:34:53,460 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1203 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00
+2026-09-30 11:34:53,461 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $3.00 + $0.00 vs $20.00)
+2026-09-30 11:34:53,465 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #1301 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $1.00/$20.00
+2026-09-30 11:34:53,466 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #1302 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $2.00/$20.00
+2026-09-30 11:34:53,468 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #1303 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $3.00/$20.00

@@ -105,15 +105,29 @@ class BriefingService:
         now: datetime,
         quotes: Dict[str, Any],
     ) -> IntelligenceBriefing:
-        # Populate with real-time live quotes if quotes dictionary is empty
+        # Populate with real-time live quotes if quotes dictionary is empty.
+        # Strategy: read in-memory stale cache first (microseconds), then live fetch as fallback.
         if not quotes:
             try:
                 from app.core.providers import provider_manager
                 for sym, key in [("EURUSD", "EUR/USD"), ("GBPUSD", "GBP/USD"), ("XAUUSD", "XAU/USD")]:
-                    q_resp = provider_manager.get_market_quote(sym)
-                    if q_resp and q_resp.quote and q_resp.quote.lastPrice > 0:
-                        quotes[key] = q_resp.quote.lastPrice
-                        quotes[sym] = q_resp.quote.lastPrice
+                    # Fast path: use stale-allowed cached price (zero network I/O)
+                    try:
+                        cached_entry = provider_manager._cache.get(sym, allow_stale=True)
+                        if cached_entry and hasattr(cached_entry, "data") and getattr(cached_entry.data, "lastPrice", None):
+                            quotes[key] = cached_entry.data.lastPrice
+                            quotes[sym] = cached_entry.data.lastPrice
+                            continue
+                    except Exception:
+                        pass
+                    # Slow path: live HTTP fetch only when cache is empty
+                    try:
+                        q_resp = provider_manager.get_market_quote(sym)
+                        if q_resp and q_resp.quote and q_resp.quote.lastPrice > 0:
+                            quotes[key] = q_resp.quote.lastPrice
+                            quotes[sym] = q_resp.quote.lastPrice
+                    except Exception as e:
+                        logger.debug(f"Live quote fetch failed for {sym}: {e}")
             except Exception as e:
                 logger.debug(f"Failed to fetch live quotes for briefing: {e}")
 
