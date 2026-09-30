@@ -81,11 +81,13 @@ from app.schemas.signal_candidate import (
 )
 from app.schemas.trade_journal import TradeJournalCreate, TradeJournalUpdate
 from app.core.instruments.instrument_registry import instrument_registry
+from app.core.repository.signal_signature_repository import signal_signature_repository
 
 
 @pytest.fixture
 def test_setup():
     """Provides isolated in-memory repositories and services for Phase 4 testing."""
+    signal_signature_repository.clear()
     cycle_storage = InMemoryCapitalCycleStorage()
     journal_storage = InMemoryTradeJournalStorage()
 

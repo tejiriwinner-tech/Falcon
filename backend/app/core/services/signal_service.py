@@ -4,8 +4,14 @@ from typing import List, Optional, Set, Tuple
 
 logger = logging.getLogger("falcon.signal_service")
 
+import app.core.providers as providers
 from app.core.repository.mission_repository import mission_repository
 from app.core.repository.trade_journal_repository import trade_journal_repository
+from app.core.repository.signal_signature_repository import (
+    signal_signature_repository,
+    format_signature_key,
+    parse_signature_key,
+)
 from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine, LossRecoveryMetrics
 from app.core.engines.strategy_engine import StrategyEngine
 from app.core.services.signal_authorization_service import signal_authorization_service
@@ -45,7 +51,8 @@ class SignalService:
     - HOLD: Setup is on watchlist awaiting live market price to touch canonical entry.
     - ACTIVE: Live market touched entry price. Holds until TP or SL is hit (no 3-slot active cap).
     - EXPIRED: Watchlist setup reached 1-hour timeout without price reaching entry.
-    - DEDUPLICATION: Complete historical memory prevents re-generating or duplicating triggered/completed setups.
+    - DEDUPLICATION: Complete historical memory persists in PostgreSQL/Supabase and memory,
+      preventing re-generating or duplicating triggered/completed setups across server restarts.
     """
 
     _cache_response: Optional[SignalListResponse] = None
@@ -56,13 +63,22 @@ class SignalService:
         self._strategy_engine = StrategyEngine()
         self._cache_response = None
         self._cache_time = None
-        self._historical_triggered_signatures: Set[Tuple[str, str, float, float, float]] = set()
+        self._historical_triggered_signatures: Set[Tuple[str, str, float, float, float]] = set(
+            signal_signature_repository.get_resolved_signatures()
+        )
 
     def build_signals(self, mission_limit: int = 5, force_refresh: bool = False) -> SignalListResponse:
         now = datetime.now(timezone.utc)
         if not force_refresh and self._cache_response and self._cache_time:
             if (now - self._cache_time).total_seconds() < self.CACHE_TTL_SECONDS:
                 return self._cache_response
+
+        # Refresh persisted historically resolved/completed signatures from repository (DB / memory)
+        try:
+            persisted_sigs = signal_signature_repository.get_resolved_signatures()
+            self._historical_triggered_signatures.update(persisted_sigs)
+        except Exception as ex:
+            logger.debug(f"Could not load persisted signatures: {ex}")
 
         signals: List[SignalItem] = []
         seen_signatures: Set[Tuple[str, str, float, float, float]] = set(self._historical_triggered_signatures)
@@ -86,6 +102,12 @@ class SignalService:
                 )
                 seen_signatures.add(sig_key)
                 self._historical_triggered_signatures.add(sig_key)
+                try:
+                    signal_signature_repository.record_signature(
+                        ot.symbol, ot.direction, ot.entryPrice, ot.stopLoss, ot.takeProfit, status="ACTIVE"
+                    )
+                except Exception:
+                    pass
 
                 dec = 2 if "XAU" in ot.symbol or ot.entryPrice > 100 else 4
                 risk_d = abs(ot.entryPrice - ot.stopLoss)
@@ -162,6 +184,13 @@ class SignalService:
                         f"{ct.exitPrice or ct.stopLoss:.4f} (-{abs(ct.profitLoss):.1f} pts). "
                         f"Capital defended."
                     )
+
+                try:
+                    signal_signature_repository.record_signature(
+                        ct.symbol, ct.direction, ct.entryPrice, ct.stopLoss, ct.takeProfit, status=outcome_status
+                    )
+                except Exception:
+                    pass
 
                 dec = 2 if "XAU" in ct.symbol or ct.entryPrice > 100 else 4
                 risk_d = abs(ct.entryPrice - ct.stopLoss)
@@ -286,16 +315,16 @@ class SignalService:
                     # Deduplication & Historical Memory: setup was already processed / triggered / completed
                     continue
                 seen_signatures.add(sig_key)
-                self._historical_triggered_signatures.add(sig_key)
 
                 # Fast in-memory quote lookup for display context (zero network blocking)
                 cur_px = None
                 try:
-                    from app.core.providers import provider_manager
                     raw_sym = symbol.replace("/", "").upper()
-                    cached_entry = provider_manager._cache.get(raw_sym, allow_stale=True)
-                    if cached_entry and hasattr(cached_entry, "data") and getattr(cached_entry.data, "lastPrice", None):
-                        cur_px = cached_entry.data.lastPrice
+                    pm = getattr(providers, "provider_manager", None)
+                    if pm is not None and hasattr(pm, "_cache"):
+                        cached_entry = pm._cache.get(raw_sym, allow_stale=True)
+                        if cached_entry and hasattr(cached_entry, "data") and getattr(cached_entry.data, "lastPrice", None):
+                            cur_px = cached_entry.data.lastPrice
                 except Exception:
                     pass
 
@@ -307,6 +336,13 @@ class SignalService:
 
                 if is_1h_elapsed:
                     # Expired: on watchlist >= 1hr without touching entry -> RESOLVED/EXPIRED
+                    self._historical_triggered_signatures.add(sig_key)
+                    try:
+                        signal_signature_repository.record_signature(
+                            symbol, direction_str, cand.entryPrice, cand.stopLoss, cand.takeProfit, status="EXPIRED"
+                        )
+                    except Exception:
+                        pass
                     additional_resolved.append(self._to_signal(
                         cand, item["decision"], item["signal_id"], now,
                         override_status="EXPIRED",
@@ -332,11 +368,23 @@ class SignalService:
                     item["lot_size"] = lot_size
                     item["current_market_px"] = cur_px
                     item["entry_hit"] = True
+                    try:
+                        signal_signature_repository.record_signature(
+                            symbol, direction_str, cand.entryPrice, cand.stopLoss, cand.takeProfit, status="ACTIVE"
+                        )
+                    except Exception:
+                        pass
                     curated_active.append(item)
                 else:
                     item["is_guardian_authorized"] = is_approved
                     item["guardian_reason"] = None
                     item["current_market_px"] = cur_px
+                    try:
+                        signal_signature_repository.record_signature(
+                            symbol, direction_str, cand.entryPrice, cand.stopLoss, cand.takeProfit, status="HOLD"
+                        )
+                    except Exception:
+                        pass
                     curated_watchlist.append(item)
 
             # Compute autonomous loss recovery metrics (in-memory, no DB)

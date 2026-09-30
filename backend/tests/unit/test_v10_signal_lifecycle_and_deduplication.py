@@ -16,6 +16,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from app.core.services.signal_service import SignalService, canonical_signal_signature
+from app.core.repository.signal_signature_repository import signal_signature_repository
 from app.schemas.signal_candidate import (
     SignalCandidate,
     CandidateStatus,
@@ -29,6 +30,7 @@ from app.schemas.trade_journal import TradeJournalItem
 
 @pytest.fixture
 def signal_setup():
+    signal_signature_repository.clear()
     sig_service = SignalService()
     # Reset historical signatures for test isolation
     sig_service._historical_triggered_signatures.clear()

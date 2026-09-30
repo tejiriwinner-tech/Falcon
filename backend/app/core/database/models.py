@@ -211,3 +211,21 @@ Index(
     sqlite_where=(CapitalCycleRecord.status == "ACTIVE"),
 )
 
+
+class SignalSignatureRecord(Base):
+    __tablename__ = "signal_signatures"
+
+    signature: Mapped[str] = mapped_column(String(128), primary_key=True)
+    symbol: Mapped[str] = mapped_column(String(32), nullable=False)
+    direction: Mapped[str] = mapped_column(String(8), nullable=False)
+    entry_price: Mapped[float] = mapped_column(Float, nullable=False)
+    stop_loss: Mapped[float] = mapped_column(Float, nullable=False)
+    take_profit: Mapped[float] = mapped_column(Float, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+
+Index("ix_signal_signatures_symbol", SignalSignatureRecord.symbol)
+Index("ix_signal_signatures_status", SignalSignatureRecord.status)
+

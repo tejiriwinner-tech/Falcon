@@ -12,6 +12,7 @@ from app.core.services.market_data_scheduler import market_data_scheduler
 from app.services.scheduler.scheduler_service import scheduler_service
 from app.services.scheduler.learning_scheduler_service import learning_scheduler_service
 from app.core.services.briefing_service import briefing_service
+from app.core.services.watchlist_poller_service import watchlist_poller_service
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 
@@ -61,7 +62,7 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize recovery manager, market data scheduler, and signal scheduler on startup."""
+    """Initialize recovery manager, market data scheduler, signal scheduler, and watchlist poller on startup."""
     storage = "Postgres (Supabase)" if mission_repository.persistent else "in-memory (no DATABASE_URL)"
     logging.getLogger(__name__).info("Mission repository storage: %s", storage)
     
@@ -86,6 +87,13 @@ async def startup_event():
     except Exception as e:
         logging.getLogger(__name__).warning("Autonomous learning scheduler start error: %s", e)
 
+    # Start background watchlist price poller
+    try:
+        await watchlist_poller_service.start()
+        logging.getLogger(__name__).info("Watchlist price poller started")
+    except Exception as e:
+        logging.getLogger(__name__).warning("Watchlist price poller start error: %s", e)
+
     # Warm Falcon AI Co-Pilot & scheduled briefings cache
     try:
         briefing_service.warm_cache()
@@ -96,7 +104,11 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """Stop all background schedulers and managers on shutdown."""
+    """Stop all background schedulers, pollers, and managers on shutdown."""
+    try:
+        await watchlist_poller_service.stop()
+    except Exception:
+        pass
     try:
         await learning_scheduler_service.stop()
     except Exception:
