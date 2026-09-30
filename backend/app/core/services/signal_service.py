@@ -52,13 +52,11 @@ class SignalService:
     _cache_time: Optional[datetime] = None
     CACHE_TTL_SECONDS: float = 30.0
 
-    # Historical deduplication memory across requests in the service lifecycle
-    _historical_triggered_signatures: Set[Tuple[str, str, float, float, float]] = set()
-
     def __init__(self) -> None:
         self._strategy_engine = StrategyEngine()
         self._cache_response = None
         self._cache_time = None
+        self._historical_triggered_signatures: Set[Tuple[str, str, float, float, float]] = set()
 
     def build_signals(self, mission_limit: int = 5, force_refresh: bool = False) -> SignalListResponse:
         now = datetime.now(timezone.utc)

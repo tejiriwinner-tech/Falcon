@@ -40,14 +40,14 @@ def get_signal_candidates():
     # Fast path: check repository for recent stored mission candidates (LIMIT 3)
     missions = None
     try:
-        all_m = mission_repository.get_all_missions()
-        if all_m:
-            missions = all_m[-3:]
+        missions = mission_repository.get_recent_missions(limit=3)
     except Exception:
         pass
     if not missions:
         try:
-            missions = mission_repository.get_recent_missions(limit=3)
+            all_m = mission_repository.get_all_missions()
+            if all_m:
+                missions = all_m[-3:]
         except Exception:
             missions = []
 
