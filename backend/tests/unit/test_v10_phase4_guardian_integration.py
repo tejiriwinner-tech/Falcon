@@ -501,8 +501,7 @@ def test_signal_service_guardian_hard_gate(test_setup):
         "decisions": [c[1] for c in candidates],
     }
 
-    # Mock provider_manager._cache so cur_px equals entryPrice for each candidate
-    # This triggers entry_hit=True for BUY signals (cur_px <= entryPrice + tolerance).
+    # Mock provider_manager._cache so cur_px matches entry for first 3 symbols, and away for others
     from unittest.mock import MagicMock as _MagicMock
 
     def _make_cache_entry(price):
@@ -511,12 +510,14 @@ def test_signal_service_guardian_hard_gate(test_setup):
         entry.data.lastPrice = price
         return entry
 
+    # EURUSD, GBPUSD, XAUUSD are at entry (triggering entry_hit=True)
+    # USDJPY and BTCUSD are away from entry (staying on watchlist in HOLD status)
     price_map = {
         "EURUSD": 1.1000,
         "GBPUSD": 1.2500,
         "XAUUSD": 2000.0,
-        "USDJPY": 150.0,
-        "BTCUSD": 60000.0,
+        "USDJPY": 155.0,     # Far above entry 150.0 for BUY -> not hit -> HOLD
+        "BTCUSD": 65000.0,   # Far above entry 60000.0 for BUY -> not hit -> HOLD
     }
 
     cache_mock = _MagicMock()
@@ -531,17 +532,19 @@ def test_signal_service_guardian_hard_gate(test_setup):
          patch("app.core.services.signal_service.signal_authorization_service", test_setup["auth_service"]), \
          patch("app.core.providers.provider_manager", pm_mock):
 
-        resp = sig_service.build_signals(mission_limit=5)
+        resp = sig_service.build_signals(mission_limit=5, force_refresh=True)
 
         active_signals = [s for s in resp.signals if s.status == "ACTIVE"]
-        waiting_signals = [s for s in resp.signals if s.status == "WAITING"]
+        hold_signals = [s for s in resp.signals if s.status == "HOLD"]
 
-        # Exactly 3 became ACTIVE (the 3-trade limit)
+        # The 3 setups touching entry become ACTIVE (no 3-cap blocking other triggers)
         assert len(active_signals) == 3
+        assert set(s.symbol for s in active_signals) == {"EURUSD", "GBPUSD", "XAUUSD"}
 
-        # Remaining became WAITING with Guardian explanation (slots full)
-        assert len(waiting_signals) >= 1
-        assert any("Capital Guardian" in (s.analysis or "") for s in waiting_signals)
+        # The 2 setups awaiting entry remain on Watchlist in HOLD status
+        assert len(hold_signals) == 2
+        assert set(s.symbol for s in hold_signals) == {"USDJPY", "BTCUSD"}
+
 
 
 # 23 & 24. Gated MT5 order dispatch & exact lot size evaluation

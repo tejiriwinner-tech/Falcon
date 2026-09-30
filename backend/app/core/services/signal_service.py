@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime, timezone, timedelta
-from typing import List, Optional
+from typing import List, Optional, Set, Tuple
 
 logger = logging.getLogger("falcon.signal_service")
 
@@ -15,18 +15,45 @@ from app.schemas.signal_candidate import SignalCandidate, CandidateStatus, Candi
 from app.schemas.signal import SignalItem, SignalListResponse
 
 
+def canonical_signal_signature(
+    symbol: str,
+    direction: str,
+    entry_price: float,
+    stop_loss: float,
+    take_profit: float,
+) -> Tuple[str, str, float, float, float]:
+    """
+    Computes a canonical unique signature for a trade setup level.
+    Used for historical deduplication and lifecycle state tracking.
+    """
+    sym = (symbol or "").replace("/", "").upper()
+    dir_str = (direction or "").upper()
+    return (
+        sym,
+        dir_str,
+        round(float(entry_price or 0.0), 4),
+        round(float(stop_loss or 0.0), 4),
+        round(float(take_profit or 0.0), 4),
+    )
+
+
 class SignalService:
     """
     Curates, ranks, and serves high-conviction sniper trading signals.
-    Enforces quality over quantity:
+    Enforces quality, authentic SMC price triggers, and complete lifecycle deduplication:
     - Filters out low confidence (< 80%) and unconfirmed setups.
-    - Attaches precise sniper entry rules, invalidation levels, and timeframes.
-    - Decoupled across assets and active market sessions.
+    - HOLD: Setup is on watchlist awaiting live market price to touch canonical entry.
+    - ACTIVE: Live market touched entry price. Holds until TP or SL is hit (no 3-slot active cap).
+    - EXPIRED: Watchlist setup reached 1-hour timeout without price reaching entry.
+    - DEDUPLICATION: Complete historical memory prevents re-generating or duplicating triggered/completed setups.
     """
 
     _cache_response: Optional[SignalListResponse] = None
     _cache_time: Optional[datetime] = None
     CACHE_TTL_SECONDS: float = 30.0
+
+    # Historical deduplication memory across requests in the service lifecycle
+    _historical_triggered_signatures: Set[Tuple[str, str, float, float, float]] = set()
 
     def __init__(self) -> None:
         self._strategy_engine = StrategyEngine()
@@ -40,7 +67,7 @@ class SignalService:
                 return self._cache_response
 
         signals: List[SignalItem] = []
-        seen_signatures = set()
+        seen_signatures: Set[Tuple[str, str, float, float, float]] = set(self._historical_triggered_signatures)
 
         # Step 1: Query TradeJournal for OPEN active trades and recently RESOLVED trades
         try:
@@ -52,16 +79,16 @@ class SignalService:
                 if (t.status or "").upper() in ("OPEN", "FILLED")
             ]
             for ot in open_trades:
-                sig_key = (
+                sig_key = canonical_signal_signature(
                     ot.symbol,
-                    ot.direction.upper(),
-                    round(ot.entryPrice, 4),
-                    round(ot.stopLoss, 4),
-                    round(ot.takeProfit, 4),
+                    ot.direction,
+                    ot.entryPrice,
+                    ot.stopLoss,
+                    ot.takeProfit,
                 )
-                if sig_key in seen_signatures:
-                    continue
                 seen_signatures.add(sig_key)
+                self._historical_triggered_signatures.add(sig_key)
+
                 dec = 2 if "XAU" in ot.symbol or ot.entryPrice > 100 else 4
                 risk_d = abs(ot.entryPrice - ot.stopLoss)
                 be_trig = ot.entryPrice + risk_d if ot.direction.upper() == "BUY" else ot.entryPrice - risk_d
@@ -99,17 +126,16 @@ class SignalService:
                 and (t.result or "").upper() in ("WIN", "WON", "LOSS", "LOST", "BREAKEVEN", "BE", "EXPIRED", "INVALIDATED")
             ]
             closed_trades.sort(key=lambda t: t.closeDate or t.tradeDate, reverse=True)
-            for ct in closed_trades[:5]:
-                sig_key = (
+            for ct in closed_trades[:10]:
+                sig_key = canonical_signal_signature(
                     ct.symbol,
-                    ct.direction.upper(),
-                    round(ct.entryPrice, 4),
-                    round(ct.stopLoss, 4),
-                    round(ct.takeProfit, 4),
+                    ct.direction,
+                    ct.entryPrice,
+                    ct.stopLoss,
+                    ct.takeProfit,
                 )
-                if sig_key in seen_signatures:
-                    continue
                 seen_signatures.add(sig_key)
+                self._historical_triggered_signatures.add(sig_key)
 
                 res_str = (ct.result or "").upper()
                 if res_str in ("WIN", "WON"):
@@ -241,27 +267,9 @@ class SignalService:
             # Sort candidate pool by conviction score descending
             candidate_pool.sort(key=lambda x: x["conviction_score"], reverse=True)
 
-            seen_symbols = set()
             curated_active: List[dict] = []
             curated_watchlist: List[dict] = []
             additional_resolved: List[SignalItem] = []
-
-            # ── Guardian pre-screen: ONE call to fetch cycle + active trade count ─────
-            # This replaces the former per-candidate DB round-trips (N×2 DB calls → 1 call).
-            guardian_allowed = True
-            guardian_global_reason: Optional[str] = None
-            live_trade_count = 0
-            max_trade_slots = 3
-            try:
-                from app.schemas.execution_order import ExecutionSettings as _ES
-                _lot = _ES().default_lot_size
-                _reservations = signal_authorization_service.get_active_reservations()
-                live_trade_count = len(_reservations)
-                if live_trade_count >= max_trade_slots:
-                    guardian_allowed = False
-                    guardian_global_reason = f"Max simultaneous trade slots reached ({live_trade_count}/{max_trade_slots})"
-            except Exception as _ge:
-                logger.debug(f"Guardian pre-screen error (non-fatal): {_ge}")
 
             lot_size = ExecutionSettings().default_lot_size
 
@@ -269,16 +277,18 @@ class SignalService:
                 cand = item["candidate"]
                 symbol = cand.symbol
                 direction_str = cand.direction.value if hasattr(cand.direction, "value") else str(cand.direction)
-                sig_key = (
+                sig_key = canonical_signal_signature(
                     symbol,
                     direction_str,
-                    round(cand.entryPrice, 4),
-                    round(cand.stopLoss, 4),
-                    round(cand.takeProfit, 4),
+                    cand.entryPrice,
+                    cand.stopLoss,
+                    cand.takeProfit,
                 )
                 if sig_key in seen_signatures:
+                    # Deduplication & Historical Memory: setup was already processed / triggered / completed
                     continue
                 seen_signatures.add(sig_key)
+                self._historical_triggered_signatures.add(sig_key)
 
                 # Fast in-memory quote lookup for display context (zero network blocking)
                 cur_px = None
@@ -291,14 +301,14 @@ class SignalService:
                 except Exception:
                     pass
 
-                # 1-hour expiration rule: watchlist signal without entry hit for >= 1h → EXPIRED
+                # 1-hour expiration rule: watchlist signal without entry hit for >= 1h -> EXPIRED
                 age_seconds = (now - cand.generatedAt).total_seconds()
                 is_1h_elapsed = age_seconds >= 3600
                 is_approved = item["is_approved"]
                 is_ready = getattr(cand, "readinessScore", 0) >= 80
 
                 if is_1h_elapsed:
-                    # Expired: on watchlist >= 1hr without touching entry → RESOLVED/EXPIRED
+                    # Expired: on watchlist >= 1hr without touching entry -> RESOLVED/EXPIRED
                     additional_resolved.append(self._to_signal(
                         cand, item["decision"], item["signal_id"], now,
                         override_status="EXPIRED",
@@ -316,54 +326,25 @@ class SignalService:
                     else:
                         entry_hit = cur_px >= cand.entryPrice - pip_tolerance
 
-                # In-memory Guardian check (no extra DB call): use pre-screened slot count
-                slots_available = len(curated_active) < 3
-                is_guardian_ok = guardian_allowed or slots_available  # graceful fallback
-                decision = item.get("decision")
-
-                # Determine routing: ACTIVE requires entry hit + approval + readiness + open slot
-                if entry_hit and is_approved and is_ready and slots_available:
-                    if symbol not in seen_symbols:
-                        seen_symbols.add(symbol)
-                        item["is_guardian_authorized"] = True
-                        item["lot_size"] = lot_size
-                        item["current_market_px"] = cur_px
-                        item["entry_hit"] = True
-                        curated_active.append(item)
-                    else:
-                        # Duplicate symbol for the same direction → HOLD (not a new position)
-                        item["is_guardian_authorized"] = True
-                        item["guardian_reason"] = None
-                        item["current_market_px"] = cur_px
-                        if len(curated_watchlist) < 5:
-                            curated_watchlist.append(item)
-                elif entry_hit and (not slots_available or not is_guardian_ok):
-                    # Entry price touched but Capital Guardian has 3 trades active → WAITING
-                    _reason = guardian_global_reason or f"Max simultaneous trade slots reached (3/3)"
-                    item["is_guardian_authorized"] = False
-                    item["guardian_reason"] = _reason
+                # Lifecycle Routing:
+                # 1. Price touches entry & setup approved + ready -> ACTIVE (no artificial 3-slot cap)
+                # 2. Price has not yet touched entry -> Watchlist in HOLD status
+                if entry_hit and is_approved and is_ready:
+                    item["is_guardian_authorized"] = True
+                    item["lot_size"] = lot_size
                     item["current_market_px"] = cur_px
-                    if len(curated_watchlist) < 5:
-                        curated_watchlist.append(item)
-                elif not is_guardian_ok:
-                    # Guardian-blocked (max slots reached) → WAITING
-                    item["is_guardian_authorized"] = False
-                    item["guardian_reason"] = guardian_global_reason
-                    item["current_market_px"] = cur_px
-                    if len(curated_watchlist) < 5:
-                        curated_watchlist.append(item)
+                    item["entry_hit"] = True
+                    curated_active.append(item)
                 else:
-                    # Awaiting entry price touch → HOLD on watchlist
                     item["is_guardian_authorized"] = is_approved
                     item["guardian_reason"] = None
                     item["current_market_px"] = cur_px
-                    if len(curated_watchlist) < 5:
-                        curated_watchlist.append(item)
+                    curated_watchlist.append(item)
 
             # Compute autonomous loss recovery metrics (in-memory, no DB)
             recovery_metrics = adaptive_tuning_engine.get_loss_recovery_metrics()
 
-            # Convert top active setups (max 3)
+            # Convert all active setups (no 3-slot cap)
             active_items = [
                 self._to_signal(
                     item["candidate"],
@@ -375,10 +356,10 @@ class SignalService:
                     recovery_metrics=recovery_metrics,
                     current_market_px=item.get("current_market_px"),
                 )
-                for item in curated_active[:3]
+                for item in curated_active
             ]
 
-            # Convert top watchlist setups with HOLD/WAITING status (max 5)
+            # Convert watchlist setups with HOLD status
             watchlist_items = [
                 self._to_signal(
                     item["candidate"],
@@ -390,10 +371,10 @@ class SignalService:
                     recovery_metrics=recovery_metrics,
                     current_market_px=item.get("current_market_px"),
                 )
-                for item in curated_watchlist[:5]
+                for item in curated_watchlist
             ]
 
-            # Assemble response: Active first, then Watchlist (HOLD/WAITING), then Resolved outcomes
+            # Assemble response: Active first, then Watchlist (HOLD), then Resolved outcomes
             signals = active_items + watchlist_items + additional_resolved + signals
 
         response = SignalListResponse(
@@ -572,8 +553,6 @@ class SignalService:
         digits = "".join(char for char in mission_id if char.isdigit())
         mission_number = int(digits) if digits else 0
         return mission_number * 100 + index + 1
-
-    get_signals = build_signals
 
 
 signal_service = SignalService()

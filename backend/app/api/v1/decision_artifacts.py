@@ -1,6 +1,10 @@
-from fastapi import APIRouter, HTTPException
+import logging
 from datetime import datetime, timezone
+from typing import List, Optional
 
+from fastapi import APIRouter, HTTPException
+
+from app.core.repository.mission_repository import mission_repository
 from app.core.engines.market_state_engine import MarketStateEngine
 from app.core.engines.strategy_engine import StrategyEngine
 from app.core.engines.signal_generation_engine import SignalGenerationEngine
@@ -14,9 +18,10 @@ from app.schemas.decision_artifact import (
     DecisionArtifact,
     DecisionArtifactListResponse,
     DecisionSummary,
-    DecisionRecommendation
+    DecisionRecommendation,
 )
 
+logger = logging.getLogger("falcon.decision_artifacts")
 router = APIRouter()
 
 market_state_engine = MarketStateEngine()
@@ -27,27 +32,12 @@ risk_engine = RiskEngine()
 execution_readiness_engine = ExecutionReadinessEngine()
 decision_engine = DecisionEngine()
 
-@router.get("/decision-artifacts", response_model=DecisionArtifactListResponse)
-def get_decision_artifacts():
-    """
-    Runs the complete 5-stage Falcon intelligence pipeline up to the Decision stage.
-    Returns the list of DecisionArtifacts and calculated summary.
-    """
-    market_state = market_state_engine.get_market_state()
-    strategies = strategy_engine.get_strategies()
-    research_contexts = research_promotion_service.get_active_promoted_contexts()
-    candidates = signal_generation_engine.generate_candidates(
-        market_state, strategies, research_contexts=research_contexts
-    )
-    validations = validation_engine.validate_candidates(candidates, strategies, market_state)
-    assessments = risk_engine.assess_all(validations, candidates, strategies, market_state)
-    readiness_items = execution_readiness_engine.evaluate_execution_readiness(
-        assessments, validations, candidates, strategies, market_state
-    )
-    decisions = decision_engine.generate_decisions(
-        readiness_items, assessments, validations, candidates, strategies, market_state
-    )
+_cache_response: Optional[DecisionArtifactListResponse] = None
+_cache_time: Optional[datetime] = None
+CACHE_TTL_SECONDS: float = 30.0
 
+
+def _build_summary(decisions: List[DecisionArtifact]) -> DecisionSummary:
     total = len(decisions)
     buy_cnt = sum(1 for d in decisions if d.recommendation == DecisionRecommendation.BUY)
     sell_cnt = sum(1 for d in decisions if d.recommendation == DecisionRecommendation.SELL)
@@ -60,7 +50,7 @@ def get_decision_artifacts():
     low_conf = min(confidences, default=0.0)
     avg_conf = round(sum(confidences) / total, 1) if total > 0 else 0.0
 
-    summary = DecisionSummary(
+    return DecisionSummary(
         totalDecisions=total,
         buyCount=buy_cnt,
         sellCount=sell_cnt,
@@ -69,14 +59,92 @@ def get_decision_artifacts():
         noTradeCount=no_trade_cnt,
         highestConfidence=high_conf,
         lowestConfidence=low_conf,
-        averageConfidence=avg_conf
+        averageConfidence=avg_conf,
     )
 
-    return DecisionArtifactListResponse(
+
+@router.get("/decision-artifacts", response_model=DecisionArtifactListResponse)
+def get_decision_artifacts():
+    """
+    Returns stored DecisionArtifacts from recent missions along with calculated summary.
+    If no stored missions exist, executes the intelligence pipeline and caches the result.
+    """
+    global _cache_response, _cache_time
+    now = datetime.now(timezone.utc)
+
+    # Fast path: check repository for recent stored mission decisions
+    missions = None
+    try:
+        all_m = mission_repository.get_all_missions()
+        if all_m:
+            missions = all_m[-5:]
+    except Exception:
+        pass
+    if not missions:
+        try:
+            missions = mission_repository.get_recent_missions(limit=5)
+        except Exception:
+            missions = []
+
+    decisions: List[DecisionArtifact] = []
+    if missions:
+        mission_ids = [m.id for m in missions]
+        if hasattr(mission_repository, "get_all_mission_artifacts_bulk"):
+            try:
+                bulk = mission_repository.get_all_mission_artifacts_bulk(mission_ids) or {}
+                for m in reversed(missions):
+                    art = bulk.get(m.id) or {}
+                    decisions.extend(art.get("decisions", []))
+            except Exception:
+                pass
+        if not decisions:
+            for m in reversed(missions):
+                art = mission_repository.get_mission_artifacts(m.id) or {}
+                decisions.extend(art.get("decisions", []))
+
+    if decisions:
+        summary = _build_summary(decisions)
+        return DecisionArtifactListResponse(
+            decisions=decisions,
+            summary=summary,
+            lastUpdated=now,
+        )
+
+    # In-memory cache fallback if repository has no stored missions
+    if _cache_response and _cache_time:
+        if (now - _cache_time).total_seconds() < CACHE_TTL_SECONDS:
+            return _cache_response
+
+    # Cold fallback: compute via engines
+    try:
+        market_state = market_state_engine.get_market_state()
+        strategies = strategy_engine.get_strategies()
+        research_contexts = research_promotion_service.get_active_promoted_contexts()
+        candidates = signal_generation_engine.generate_candidates(
+            market_state, strategies, research_contexts=research_contexts
+        )
+        validations = validation_engine.validate_candidates(candidates, strategies, market_state)
+        assessments = risk_engine.assess_all(validations, candidates, strategies, market_state)
+        readiness_items = execution_readiness_engine.evaluate_execution_readiness(
+            assessments, validations, candidates, strategies, market_state
+        )
+        decisions = decision_engine.generate_decisions(
+            readiness_items, assessments, validations, candidates, strategies, market_state
+        )
+    except Exception as exc:
+        logger.warning(f"Error computing decision artifacts: {exc}")
+        decisions = []
+
+    summary = _build_summary(decisions)
+    response = DecisionArtifactListResponse(
         decisions=decisions,
         summary=summary,
-        lastUpdated=datetime.now(timezone.utc)
+        lastUpdated=now,
     )
+    _cache_response = response
+    _cache_time = now
+    return response
+
 
 @router.get("/decision-artifacts/{decision_id}", response_model=DecisionArtifact)
 def get_decision_artifact_by_id(decision_id: str):
