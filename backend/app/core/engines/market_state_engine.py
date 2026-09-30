@@ -234,6 +234,8 @@ class MarketStateEngine:
     # Public API — targeted snapshot for specific symbols
     # ──────────────────────────────────────────────────────────────────────────
 
+    _cached_snapshots: Dict[str, tuple] = {}
+
     def get_market_snapshot(self, symbols: List[str]) -> MarketState:
         """Fetch live quotes for the given symbols and return a normalized MarketState.
 
@@ -244,6 +246,13 @@ class MarketStateEngine:
         - Freshness gate sets quoteStatus and overallMarketConfidence deterministically.
         """
         now = datetime.now(timezone.utc)
+        cache_key = ",".join(sorted(symbols))
+        cached = self._cached_snapshots.get(cache_key)
+        if cached:
+            cached_time, cached_state = cached
+            if (now - cached_time).total_seconds() < 30.0:
+                return cached_state
+
         prices: Dict[str, MarketPrice] = {}
         primary_quote: Optional[MarketQuote] = None
         primary_freshness: float = 0.0
@@ -413,4 +422,5 @@ class MarketStateEngine:
         )
 
         event_bus.publish(MarketStateUpdated())
+        self._cached_snapshots[cache_key] = (now, state)
         return state
