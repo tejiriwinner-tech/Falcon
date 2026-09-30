@@ -24,21 +24,79 @@ class SignalService:
     - Decoupled across assets and active market sessions.
     """
 
+    _cache_response: Optional[SignalListResponse] = None
+    _cache_time: Optional[datetime] = None
+    CACHE_TTL_SECONDS: float = 30.0
+
     def __init__(self) -> None:
         self._strategy_engine = StrategyEngine()
+        self._cache_response = None
+        self._cache_time = None
 
-    def build_signals(self, mission_limit: int = 5) -> SignalListResponse:
+    def build_signals(self, mission_limit: int = 5, force_refresh: bool = False) -> SignalListResponse:
         now = datetime.now(timezone.utc)
+        if not force_refresh and self._cache_response and self._cache_time:
+            if (now - self._cache_time).total_seconds() < self.CACHE_TTL_SECONDS:
+                return self._cache_response
+
         signals: List[SignalItem] = []
         seen_signatures = set()
 
-        # Step 1: Query TradeJournal for recently RESOLVED trades (WON, LOST, BREAKEVEN)
-        # These are authoritative completed trade outcomes.
+        # Step 1: Query TradeJournal for OPEN active trades and recently RESOLVED trades
         try:
+            all_journal_trades = trade_journal_repository.list_trades()
+
+            # Active open positions from TradeJournal
+            open_trades = [
+                t for t in all_journal_trades
+                if (t.status or "").upper() in ("OPEN", "FILLED")
+            ]
+            for ot in open_trades:
+                sig_key = (
+                    ot.symbol,
+                    ot.direction.upper(),
+                    round(ot.entryPrice, 4),
+                    round(ot.stopLoss, 4),
+                    round(ot.takeProfit, 4),
+                )
+                if sig_key in seen_signatures:
+                    continue
+                seen_signatures.add(sig_key)
+                dec = 2 if "XAU" in ot.symbol or ot.entryPrice > 100 else 4
+                risk_d = abs(ot.entryPrice - ot.stopLoss)
+                be_trig = ot.entryPrice + risk_d if ot.direction.upper() == "BUY" else ot.entryPrice - risk_d
+                active_signal = SignalItem(
+                    id=ot.signalId or ot.id,
+                    symbol=ot.symbol,
+                    action=ot.direction.upper(),
+                    entry=ot.entryPrice,
+                    takeProfit=ot.takeProfit,
+                    stopLoss=ot.stopLoss,
+                    confidence=ot.confidence or 85,
+                    timeframe=ot.timeframe or "M15",
+                    status="ACTIVE",
+                    analysis=f"🎯 ACTIVE (IN POSITION) [{ot.notes or 'Falcon Trade'}]: Live market in position from entry {ot.entryPrice:.4f}. Holding until Take Profit ({ot.takeProfit:.4f}) or Stop Loss ({ot.stopLoss:.4f}).",
+                    timestamp=ot.tradeDate,
+                    strategyId=ot.strategyId or "falcon-opt",
+                    strategyName=ot.notes or "Falcon Strategy",
+                    strategyVersion="4.2",
+                    dataAgeSeconds=0,
+                    triggerCondition=f"Enter {ot.direction.upper()} at {ot.entryPrice:.4f}",
+                    validUntil=ot.tradeDate + timedelta(hours=8),
+                    setupPattern=ot.notes or "Sniper Setup",
+                    riskReward=ot.riskReward,
+                    isPinned=False,
+                    breakevenTrigger=round(be_trig, dec),
+                    breakevenPrice=round(ot.entryPrice, dec),
+                    isBreakeven=False,
+                )
+                signals.append(active_signal)
+
+            # Resolved trades (WON, LOST, BREAKEVEN, EXPIRED)
             closed_trades = [
-                t for t in trade_journal_repository.list_trades()
-                if t.status.upper() in ("CLOSED", "EXPIRED", "INVALIDATED")
-                and t.result.upper() in ("WIN", "WON", "LOSS", "LOST", "BREAKEVEN", "BE", "EXPIRED", "INVALIDATED")
+                t for t in all_journal_trades
+                if (t.status or "").upper() in ("CLOSED", "EXPIRED", "INVALIDATED")
+                and (t.result or "").upper() in ("WIN", "WON", "LOSS", "LOST", "BREAKEVEN", "BE", "EXPIRED", "INVALIDATED")
             ]
             closed_trades.sort(key=lambda t: t.closeDate or t.tradeDate, reverse=True)
             for ct in closed_trades[:5]:
@@ -53,7 +111,7 @@ class SignalService:
                     continue
                 seen_signatures.add(sig_key)
 
-                res_str = ct.result.upper()
+                res_str = (ct.result or "").upper()
                 if res_str in ("WIN", "WON"):
                     outcome_status = "WON"
                     analysis_msg = (
@@ -67,7 +125,7 @@ class SignalService:
                         f"🛡️ CAPITAL DEFENDED [BREAKEVEN]: Market reached +1.0R excursion, "
                         f"stop shifted to entry ({ct.entryPrice:.4f}); exited with zero loss."
                     )
-                elif res_str in ("EXPIRED", "INVALIDATED") or ct.status.upper() == "EXPIRED":
+                elif res_str in ("EXPIRED", "INVALIDATED") or (ct.status or "").upper() == "EXPIRED":
                     outcome_status = "EXPIRED"
                     analysis_msg = (
                         f"⏳ UNTRIGGERED SETUP [EXPIRED]: Market moved away without reaching "
@@ -112,15 +170,38 @@ class SignalService:
                 )
                 signals.append(resolved_signal)
         except Exception as ex:
-            logger.debug(f"Could not load resolved trades: {ex}")
+            logger.debug(f"Could not load trade journal records: {ex}")
 
         # Step 2: Ingest candidate setups from recent missions
-        missions = mission_repository.get_recent_missions(limit=mission_limit)
+        missions = None
+        try:
+            # Check get_all_missions first (honoring test mocks if present)
+            all_m = mission_repository.get_all_missions()
+            if all_m:
+                missions = all_m[-mission_limit:]
+        except Exception:
+            pass
+        if not missions:
+            try:
+                missions = mission_repository.get_recent_missions(limit=mission_limit)
+            except Exception:
+                missions = []
+
         if missions:
+            mission_ids = [m.id for m in missions]
+            bulk_artifacts = {}
+            if hasattr(mission_repository, "get_all_mission_artifacts_bulk"):
+                try:
+                    bulk_artifacts = mission_repository.get_all_mission_artifacts_bulk(mission_ids) or {}
+                except Exception:
+                    bulk_artifacts = {}
+
             candidate_pool: List[dict] = []
             for mission in reversed(missions):
                 try:
-                    artifacts = mission_repository.get_mission_artifacts(mission.id)
+                    artifacts = bulk_artifacts.get(mission.id)
+                    if not artifacts:
+                        artifacts = mission_repository.get_mission_artifacts(mission.id) or {}
                     candidates: List[SignalCandidate] = artifacts.get("candidates", [])
                     decisions: List[DecisionArtifact] = artifacts.get("decisions", [])
                     by_candidate = {d.candidateId: d for d in decisions}
@@ -163,6 +244,7 @@ class SignalService:
             seen_symbols = set()
             curated_active: List[dict] = []
             curated_watchlist: List[dict] = []
+            additional_resolved: List[SignalItem] = []
 
             for item in candidate_pool:
                 cand = item["candidate"]
@@ -175,41 +257,63 @@ class SignalService:
                     round(cand.stopLoss, 4),
                     round(cand.takeProfit, 4),
                 )
-                # Skip if already closed in TradeJournal or duplicate in this batch
                 if sig_key in seen_signatures:
                     continue
                 seen_signatures.add(sig_key)
 
-                # Check expiration: valid for 45 minutes
-                valid_until = cand.generatedAt + timedelta(minutes=45)
-                is_expired = now > valid_until
+                # Fast in-memory quote lookup for display context (zero network blocking)
+                cur_px = None
+                try:
+                    from app.core.providers import provider_manager
+                    raw_sym = symbol.replace("/", "").upper()
+                    cached_entry = provider_manager._cache.get(raw_sym, allow_stale=True)
+                    if cached_entry and hasattr(cached_entry, "data") and getattr(cached_entry.data, "lastPrice", None):
+                        cur_px = cached_entry.data.lastPrice
+                except Exception:
+                    pass
+
+                # 1-hour expiration rule: if on watchlist for >= 1 hour without hitting entry, move to resolved
+                age_seconds = (now - cand.generatedAt).total_seconds()
+                is_1h_elapsed = age_seconds >= 3600
                 is_approved = item["is_approved"]
                 is_ready = getattr(cand, "readinessScore", 0) >= 80
 
-                if is_approved and is_ready and not is_expired:
-                    lot_size = ExecutionSettings().default_lot_size
+                if is_1h_elapsed:
+                    # Expired: on watchlist for >= 1hr without hitting entry -> moved to resolved as EXPIRED
+                    additional_resolved.append(self._to_signal(
+                        cand, item["decision"], item["signal_id"], now,
+                        override_status="EXPIRED",
+                        current_market_px=cur_px,
+                    ))
+                    continue
 
-                    decision = signal_authorization_service.evaluate_candidate(
-                        candidate=cand,
-                        signal_id=item["signal_id"],
-                        lot_size=lot_size,
-                    )
-                    if decision.allowed:
-                        if symbol not in seen_symbols:
-                            seen_symbols.add(symbol)
-                            item["is_guardian_authorized"] = True
-                            item["lot_size"] = lot_size
-                            curated_active.append(item)
+                # Evaluate candidate with Capital Guardian
+                lot_size = ExecutionSettings().default_lot_size
+                decision = signal_authorization_service.evaluate_candidate(
+                    candidate=cand,
+                    signal_id=item["signal_id"],
+                    lot_size=lot_size,
+                )
+
+                if decision.allowed and is_approved and is_ready:
+                    if symbol not in seen_symbols and len(curated_active) < 3:
+                        seen_symbols.add(symbol)
+                        item["is_guardian_authorized"] = True
+                        item["lot_size"] = lot_size
+                        item["current_market_px"] = cur_px
+                        curated_active.append(item)
                     else:
-                        # Hard safety gate: rejected by Capital Guardian!
-                        item["is_guardian_authorized"] = False
-                        item["guardian_reason"] = decision.reason
-                        if len(curated_watchlist) < 3:
+                        # Beyond top 3 active or duplicate symbol -> remains on watchlist as HOLD
+                        item["is_guardian_authorized"] = True
+                        item["current_market_px"] = cur_px
+                        if len(curated_watchlist) < 5:
                             curated_watchlist.append(item)
-                elif not is_expired:
+                else:
+                    # Blocked by Capital Guardian or unready -> goes to watchlist as WAITING
                     item["is_guardian_authorized"] = False
-                    # Valid pending setup on watchlist
-                    if len(curated_watchlist) < 3:
+                    item["guardian_reason"] = decision.reason if not decision.allowed else None
+                    item["current_market_px"] = cur_px
+                    if len(curated_watchlist) < 5:
                         curated_watchlist.append(item)
 
             # Compute autonomous loss recovery metrics
@@ -225,11 +329,12 @@ class SignalService:
                     is_active=True,
                     lot_size=item.get("lot_size"),
                     recovery_metrics=recovery_metrics,
+                    current_market_px=item.get("current_market_px"),
                 )
                 for item in curated_active[:3]
             ]
 
-            # Convert top watchlist setups (max 3)
+            # Convert top watchlist setups with HOLD status (max 5)
             watchlist_items = [
                 self._to_signal(
                     item["candidate"],
@@ -239,20 +344,24 @@ class SignalService:
                     is_active=False,
                     guardian_reason=item.get("guardian_reason"),
                     recovery_metrics=recovery_metrics,
+                    current_market_px=item.get("current_market_px"),
                 )
-                for item in curated_watchlist[:3]
+                for item in curated_watchlist[:5]
             ]
 
-            # Assemble response: Active first, then Watchlist, then Resolved outcomes
-            signals = active_items + watchlist_items + signals
+            # Assemble response: Active first, then Watchlist (HOLD), then Resolved outcomes
+            signals = active_items + watchlist_items + additional_resolved + signals
 
-        return SignalListResponse(
+        response = SignalListResponse(
             signals=signals,
             lastUpdated=now,
             dataAgeSeconds=min(
                 (signal.dataAgeSeconds for signal in signals), default=0
             ),
         )
+        self._cache_response = response
+        self._cache_time = datetime.now(timezone.utc)
+        return response
 
     def _to_signal(
         self,
@@ -261,9 +370,11 @@ class SignalService:
         signal_id: int,
         now: datetime,
         is_active: bool = False,
+        override_status: Optional[str] = None,
         lot_size: Optional[float] = None,
         guardian_reason: Optional[str] = None,
         recovery_metrics: Optional[LossRecoveryMetrics] = None,
+        current_market_px: Optional[float] = None,
     ) -> SignalItem:
         strategy = self._strategy_engine.get_strategy_by_id(candidate.strategyId)
         preferred_session = (
@@ -285,41 +396,16 @@ class SignalService:
             setup_pattern = candidate.strategyName
             trigger_rule = f"Enter on confirmed {candidate.direction.value} candle close. Invalidation at {candidate.stopLoss}."
 
-        valid_until = candidate.generatedAt + timedelta(minutes=45)
+        valid_until = candidate.generatedAt + timedelta(hours=1)
         is_expired = now > valid_until
 
         dec = 2 if "XAU" in candidate.symbol or candidate.entryPrice > 100 else 4
         direction_val = candidate.direction.value.upper()
 
-        # Ground entry to live market quote for INSTANT MARKET EXECUTION when ACTIVE
+        # Strict adherence: preserve authentic candidate entry, stop loss, and take profit (no artificial shifting)
         entry_price = candidate.entryPrice
         stop_loss = candidate.stopLoss
         take_profit = candidate.takeProfit
-
-        if is_active and not is_expired:
-            try:
-                from app.core.providers import provider_manager
-                raw_sym = candidate.symbol.replace("/", "").upper()
-                cached_entry = provider_manager._cache.get(raw_sym, allow_stale=True)
-                if cached_entry and hasattr(cached_entry, "data"):
-                    q_data = cached_entry.data
-                    live_q = None
-                    if direction_val == "BUY" and getattr(q_data, "ask", None) and q_data.ask > 0:
-                        live_q = q_data.ask
-                    elif direction_val == "SELL" and getattr(q_data, "bid", None) and q_data.bid > 0:
-                        live_q = q_data.bid
-                    elif getattr(q_data, "lastPrice", None) and q_data.lastPrice > 0:
-                        live_q = q_data.lastPrice
-                    elif getattr(q_data, "price", None) and q_data.price > 0:
-                        live_q = q_data.price
-                    
-                    if live_q is not None and live_q > 0:
-                        delta = live_q - candidate.entryPrice
-                        entry_price = round(live_q, dec)
-                        stop_loss = round(candidate.stopLoss + delta, dec)
-                        take_profit = round(candidate.takeProfit + delta, dec)
-            except Exception:
-                pass
 
         # Calculate Breakeven targets (1:1 Risk-Reward threshold for risk-free protection)
         risk_dist = abs(entry_price - stop_loss)
@@ -331,18 +417,7 @@ class SignalService:
 
         # Determine if live market has already achieved Breakeven
         is_breakeven = False
-        current_px = None
-        try:
-            from app.core.providers import provider_manager
-            raw_sym = candidate.symbol.replace("/", "").upper()
-            cached_entry = provider_manager._cache.get(raw_sym, allow_stale=True)
-            if cached_entry and hasattr(cached_entry, "data") and hasattr(cached_entry.data, "lastPrice"):
-                current_px = cached_entry.data.lastPrice
-            else:
-                current_px = entry_price
-        except Exception:
-            current_px = entry_price
-
+        current_px = current_market_px or entry_price
         if current_px is not None and current_px > 0:
             if direction_val == "BUY" and current_px >= be_trigger:
                 is_breakeven = True
@@ -357,9 +432,20 @@ class SignalService:
         rec_badge = f" [{rec_status} - {rec_mult:.0f}X TARGET]" if rec_mult and rec_mult > 1.0 else ""
         ai_reflection = f"🧠 {recovery_metrics.ai_reflection} " if (recovery_metrics and recovery_metrics.ai_reflection) else ""
 
-        if is_active and not is_expired:
+        # Determine authoritative display status
+        if override_status:
+            status = override_status
+        elif is_active:
             status = "ACTIVE"
-            trigger_rule = f"[MARKET EXECUTION - ENTER NOW] Enter {candidate.direction.value} at live market {entry_price:.4f} immediately."
+        elif is_expired:
+            status = "EXPIRED"
+        elif guardian_reason:
+            status = "WAITING"
+        else:
+            status = "HOLD"
+
+        if status == "ACTIVE":
+            trigger_rule = f"[MARKET EXECUTION - ENTER NOW] [ACTIVE IN POSITION] Price touched entry at {entry_price:.4f}. Holding until Take Profit ({take_profit:.4f}) or Stop Loss ({stop_loss:.4f})."
             be_status_text = " [🛡️ BREAKEVEN LOCKED]" if is_breakeven else ""
             analysis = (
                 f"🎯 SNIPER SIGNAL ACTIVE [{setup_pattern}]{rec_badge}{be_status_text}: "
@@ -368,46 +454,43 @@ class SignalService:
                 f"TP: {take_profit} (1:{candidate.riskReward:.1f} R:R). "
                 f"{be_rule} "
                 f"{ai_reflection}"
-                f"Active Window: {preferred_session}. Valid until {valid_until.strftime('%H:%M UTC')}."
+                f"Active Window: {preferred_session}."
             )
-        elif is_expired:
-            status = "EXPIRED"
-            analysis = (
-                f"⌛ EXPIRED [{setup_pattern}]: Entry window expired at {valid_until.strftime('%H:%M UTC')}. "
-                f"Setup is outside optimal session window."
-            )
-        else:
-            status = "WAITING"
-            rec_details = getattr(decision, "recommendationDetails", None) if decision else None
-            if rec_details and getattr(rec_details, "recommendation", None):
-                decision_rec = getattr(rec_details.recommendation, "value", str(rec_details.recommendation))
-            elif decision and getattr(decision, "recommendation", None):
-                decision_rec = getattr(decision.recommendation, "value", str(decision.recommendation))
-            else:
-                decision_rec = "WAIT"
-
-            reason_details = ""
-            if guardian_reason:
-                reason_details = f"Capital Guardian: {guardian_reason}"
-            elif rec_details and getattr(rec_details, "description", None):
-                reason_details = rec_details.description
-            elif candidate.reasons:
-                failed_reasons = [r.description for r in candidate.reasons if not r.passed]
-                if failed_reasons:
-                    reason_details = failed_reasons[0].replace("\n", " ")
-            
-            if not reason_details:
-                reason_details = f"Awaiting confirmed candle close trigger and execution readiness >= 80%."
-
+        elif status == "WAITING":
             spread_val = f"Live Spread: {candidate.marketSnapshot.spread:.2f} pips." if candidate.marketSnapshot and candidate.marketSnapshot.spread else ""
-
+            guard_text = f"Capital Guardian: {guardian_reason}. " if guardian_reason else ""
             analysis = (
-                f"⏳ WATCHLIST HUNTING [{setup_pattern}] (Status: {decision_rec}): "
-                f"{trigger_rule} "
-                f"Pending condition: {reason_details} {spread_val} "
-                f"{be_rule} "
+                f"⏳ WATCHLIST WAITING [{setup_pattern}]: "
+                f"{guard_text}{spread_val}"
+                f"Awaiting Capital Guardian clearance and entry trigger. "
                 f"Do not enter MT5 order until status turns ACTIVE."
             )
+        elif status == "HOLD":
+            spread_val = f"Live Spread: {candidate.marketSnapshot.spread:.2f} pips." if candidate.marketSnapshot and candidate.marketSnapshot.spread else ""
+            analysis = (
+                f"⏳ WATCHLIST HOLD [{setup_pattern}]: "
+                f"Awaiting market entry touch at {entry_price:.4f}. Current market: {current_px:.4f}. "
+                f"SL: {stop_loss:.4f} | TP: {take_profit:.4f} (1:{candidate.riskReward:.1f} R:R). "
+                f"{spread_val}"
+                f"Valid for 1h on watchlist. Do not enter MT5 order until status turns ACTIVE."
+            )
+        elif status == "EXPIRED":
+            analysis = (
+                f"⏳ UNTRIGGERED SETUP [EXPIRED]: Signal validity window (1h) elapsed on watchlist without "
+                f"hitting entry price ({entry_price:.4f}). Order auto-canceled cleanly without risk."
+            )
+        elif status in ("WON", "WIN"):
+            analysis = (
+                f"🏆 TARGET ACHIEVED [WON]: Take Profit hit cleanly at {take_profit:.4f}. "
+                f"R:R 1:{candidate.riskReward:.1f} secured."
+            )
+        elif status in ("LOST", "LOSS"):
+            analysis = (
+                f"🛑 STOPPED OUT [LOST]: Invalidation boundary hit at {stop_loss:.4f}. "
+                f"Capital defended."
+            )
+        else:
+            analysis = f"Setup {setup_pattern} in state {status}."
 
         return SignalItem(
             id=signal_id,

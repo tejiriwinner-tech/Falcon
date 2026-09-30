@@ -26,8 +26,8 @@ class _SignalCardState extends State<SignalCard> {
   bool get _isLost => widget.signal.status.toUpperCase() == 'LOST' || widget.signal.status.toUpperCase() == 'LOSS';
   bool get _isBreakeven => widget.signal.status.toUpperCase() == 'BREAKEVEN' || widget.signal.status.toUpperCase() == 'BE';
   bool get _isExpired => widget.signal.status.toUpperCase() == 'EXPIRED' || widget.signal.status.toUpperCase() == 'INVALIDATED';
-  bool get _isPending => widget.signal.status.toUpperCase() == 'PENDING';
-  bool get _isActive => widget.signal.status.toUpperCase() == 'ACTIVE' || widget.signal.status.toUpperCase() == 'OPEN';
+  bool get _isHold => widget.signal.status.toUpperCase() == 'HOLD' || widget.signal.status.toUpperCase() == 'WAITING' || widget.signal.status.toUpperCase() == 'PENDING';
+  bool get _isActive => widget.signal.status.toUpperCase() == 'ACTIVE' || widget.signal.status.toUpperCase() == 'OPEN' || widget.signal.status.toUpperCase() == 'FILLED';
   bool get _isBuy => widget.signal.action == 'BUY';
 
   String get _directionBadgeText {
@@ -35,9 +35,8 @@ class _SignalCardState extends State<SignalCard> {
     if (_isLost) return '🛑 STOPPED OUT (LOST)';
     if (_isBreakeven) return '🛡️ BREAKEVEN (\$0.00)';
     if (_isExpired) return '⏳ EXPIRED (UNTRIGGERED)';
-    if (_isPending) return _isBuy ? '⏳ PENDING (BUY)' : '⏳ PENDING (SELL)';
-    if (_isActive) return _isBuy ? '🟢 BUY NOW' : '🔴 SELL NOW';
-    return _isBuy ? '⏳ WATCHLIST (BUY)' : '⏳ WATCHLIST (SELL)';
+    if (_isActive) return _isBuy ? '🟢 ACTIVE (BUY)' : '🔴 ACTIVE (SELL)';
+    return _isBuy ? '⏳ HOLD (BUY)' : '⏳ HOLD (SELL)';
   }
 
   Color get _directionColor {
@@ -45,7 +44,7 @@ class _SignalCardState extends State<SignalCard> {
     if (_isLost) return AppColors.error;
     if (_isBreakeven) return AppColors.info;
     if (_isExpired) return AppColors.textTertiary;
-    if (_isPending) return AppColors.warning;
+    if (_isHold) return AppColors.warning;
     if (_isActive) return _isBuy ? AppColors.success : AppColors.error;
     return AppColors.warning;
   }
@@ -55,7 +54,7 @@ class _SignalCardState extends State<SignalCard> {
     if (_isLost) return AppColors.error;
     if (_isBreakeven) return AppColors.info;
     if (_isExpired) return AppColors.textTertiary;
-    if (_isPending) return AppColors.warning;
+    if (_isHold) return AppColors.warning;
     if (_isActive) return AppColors.success;
     return AppColors.warning;
   }
@@ -585,6 +584,34 @@ class _SignalCardState extends State<SignalCard> {
                       ),
                     ),
                   ],
+                ),
+              )
+            else if (_isHold)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.hourglass_top_rounded, size: 14, color: AppColors.warning),
+                      const SizedBox(width: 8),
+                      Text(
+                        '⏳ STATUS: HOLD (AWAITING ENTRY AT ${_formatPriceNumber(widget.signal.entry)})',
+                        style: const TextStyle(
+                          color: AppColors.warning,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.8,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
 

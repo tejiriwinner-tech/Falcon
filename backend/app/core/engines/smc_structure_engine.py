@@ -63,16 +63,26 @@ class SMCStructureEngine:
         now = datetime.now(timezone.utc)
         pip = _get_pip_size(sym)
 
+        # Resolve live reference price from provider cache / API
+        live_ref = None
+        try:
+            from app.core.providers import provider_manager
+            q_resp = provider_manager.get_market_quote(sym)
+            if q_resp and q_resp.quote and q_resp.quote.lastPrice > 0:
+                live_ref = q_resp.quote.lastPrice
+        except Exception:
+            pass
+
         if "XAU" in sym or "GOLD" in sym:
-            ref = 2650.00
+            ref = live_ref if (live_ref and live_ref > 1000.0) else 4185.00
             bull_ob = OrderBlock(
                 symbol=sym,
                 timeframe=timeframe,
                 block_type=OrderBlockType.BULLISH,
-                high=ref - 5.0,
-                low=ref - 8.0,
-                open_price=ref - 5.5,
-                close_price=ref - 7.5,
+                high=round(ref - 5.0, 2),
+                low=round(ref - 8.0, 2),
+                open_price=round(ref - 5.5, 2),
+                close_price=round(ref - 7.5, 2),
                 volume=12500.0,
                 is_mitigated=False,
                 formed_at=now.isoformat(),
@@ -81,10 +91,10 @@ class SMCStructureEngine:
                 symbol=sym,
                 timeframe=timeframe,
                 block_type=OrderBlockType.BEARISH,
-                high=ref + 10.0,
-                low=ref + 7.0,
-                open_price=ref + 7.5,
-                close_price=ref + 9.5,
+                high=round(ref + 10.0, 2),
+                low=round(ref + 7.0, 2),
+                open_price=round(ref + 7.5, 2),
+                close_price=round(ref + 9.5, 2),
                 volume=14200.0,
                 is_mitigated=False,
                 formed_at=now.isoformat(),
@@ -93,15 +103,15 @@ class SMCStructureEngine:
                 symbol=sym,
                 timeframe=timeframe,
                 gap_type=FairValueGapType.BULLISH,
-                top=ref - 2.0,
-                bottom=ref - 4.5,
+                top=round(ref - 2.0, 2),
+                bottom=round(ref - 4.5, 2),
                 size_pips=25.0,
                 is_mitigated=False,
                 bar1_time=now.isoformat(),
                 bar3_time=now.isoformat(),
             )
         elif "GBP" in sym:
-            ref = 1.2940
+            ref = live_ref if (live_ref and 0.5 < live_ref < 3.0) else 1.3270
             bull_ob = OrderBlock(
                 symbol=sym,
                 timeframe=timeframe,
@@ -138,7 +148,7 @@ class SMCStructureEngine:
                 bar3_time=now.isoformat(),
             )
         else:  # EURUSD and general Forex default
-            ref = 1.0850
+            ref = live_ref if (live_ref and 0.5 < live_ref < 3.0) else 1.1350
             bull_ob = OrderBlock(
                 symbol=sym,
                 timeframe=timeframe,

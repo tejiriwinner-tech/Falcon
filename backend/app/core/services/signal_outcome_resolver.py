@@ -265,24 +265,24 @@ class SignalOutcomeResolver:
             elapsed_seconds = (now - t_date).total_seconds()
 
             # -------------------------------------------------------------
-            # Case 1: PENDING Reservation Lifecycle (Section 5 & 6)
+            # Case 1: PENDING / HOLD Watchlist Lifecycle (1h Expiration & Live Entry Hit Activation)
             # -------------------------------------------------------------
-            if trade_status == "PENDING":
-                # Expiration: 45 minutes elapsed without execution
-                if elapsed_seconds > 45 * 60:
+            if trade_status in ("PENDING", "HOLD", "WAITING"):
+                # Expiration: 1 hour (60 minutes) elapsed on watchlist without hitting entry price
+                if elapsed_seconds > 60 * 60:
                     trade_update = TradeJournalUpdate(
                         status="EXPIRED",
                         result="EXPIRED",
                         closeDate=now,
-                        reasonForExit="Signal validity window (45m) elapsed without execution",
-                        notes=f"{trade.notes or 'Falcon'} | Auto-expired unexecuted reservation",
+                        reasonForExit="Signal validity window (1h) elapsed on watchlist without hitting entry price",
+                        notes=f"{trade.notes or 'Falcon'} | Auto-expired from watchlist after 1h",
                     )
                     trade_journal_repository.update_trade(trade.id, trade_update, session=session)
                     resolved_count += 1
-                    logger.info(f"Expired unexecuted PENDING reservation #{trade.id} (Signal #{trade.signalId})")
+                    logger.info(f"Expired unexecuted watchlist signal #{trade.id} (Signal #{trade.signalId}) after 1h")
                     continue
 
-                # Pre-entry Invalidation: Authoritative market data check (Section 6)
+                # Authoritative market data check
                 quote_resp = provider_manager.get_market_quote(trade.symbol)
                 if quote_resp and quote_resp.quote and quote_resp.quote.lastPrice > 0:
                     cur_px = quote_resp.quote.lastPrice
@@ -305,7 +305,28 @@ class SignalOutcomeResolver:
                         logger.info(f"Invalidated unexecuted PENDING reservation #{trade.id} (Signal #{trade.signalId})")
                         continue
 
-                # Within 45m and SL not breached: remain PENDING to preserve user's execution window
+                    # Check if live price hit entry price
+                    entry_hit = False
+                    if trade.direction.upper() == "BUY":
+                        if cur_px <= trade.entryPrice or abs(cur_px - trade.entryPrice) <= (trade.entryPrice * 0.0003):
+                            entry_hit = True
+                    elif trade.direction.upper() == "SELL":
+                        if cur_px >= trade.entryPrice or abs(cur_px - trade.entryPrice) <= (trade.entryPrice * 0.0003):
+                            entry_hit = True
+
+                    if entry_hit:
+                        trade_update = TradeJournalUpdate(
+                            status="OPEN",
+                            fillPrice=trade.entryPrice,
+                            fillTime=now,
+                            notes=f"{trade.notes or 'Falcon'} | Activated - Market hit entry price {trade.entryPrice}",
+                        )
+                        trade_journal_repository.update_trade(trade.id, trade_update, session=session)
+                        logger.info(f"Signal #{trade.signalId or trade.id} reached entry price {trade.entryPrice} -> Activated to OPEN/ACTIVE")
+                        open_count += 1
+                        continue
+
+                # Within 1h and entry not hit: remain HOLD/PENDING on watchlist
                 open_count += 1
                 continue
 

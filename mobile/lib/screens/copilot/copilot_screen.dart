@@ -163,24 +163,24 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           : 'Daily performance review loaded with benchmark risk guardrails and recovery headroom.',
       marketLevels: {
         'EUR/USD': {
-          'current_price': 1.0850,
-          'asian_high': 1.0865,
-          'asian_low': 1.0830,
-          'range_pips': 35.0,
+          'current_price': 1.1350,
+          'asian_high': 1.1375,
+          'asian_low': 1.1320,
+          'range_pips': 55.0,
           'tactical_bias': 'BULLISH_REVERSAL_POST_SWEEP',
         },
         'GBP/USD': {
-          'current_price': 1.2940,
-          'asian_high': 1.2960,
-          'asian_low': 1.2915,
-          'range_pips': 45.0,
+          'current_price': 1.3270,
+          'asian_high': 1.3300,
+          'asian_low': 1.3240,
+          'range_pips': 60.0,
           'tactical_bias': 'BULLISH_EXPANSION',
         },
         'XAU/USD': {
-          'current_price': 2650.0,
-          'asian_high': 2658.5,
-          'asian_low': 2642.0,
-          'range_dollars': 16.5,
+          'current_price': 4185.0,
+          'asian_high': 4198.5,
+          'asian_low': 4172.0,
+          'range_dollars': 26.5,
           'tactical_bias': 'SNIPER_LONGS_DISCOUNT',
         },
       },
@@ -202,6 +202,8 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
   }
 
   SMCStructureData _buildFallbackSMC(String symbol) {
+    final isGold = symbol.toUpperCase().contains('XAU') || symbol.toUpperCase().contains('GOLD');
+    final isGbp = symbol.toUpperCase().contains('GBP');
     return SMCStructureData(
       symbol: symbol,
       timeframe: '15m',
@@ -214,16 +216,16 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           'symbol': symbol,
           'timeframe': '15m',
           'block_type': 'BULLISH',
-          'high': symbol == 'XAUUSD' ? 2648.5 : 1.0835,
-          'low': symbol == 'XAUUSD' ? 2645.0 : 1.0825,
+          'high': isGold ? 4175.5 : (isGbp ? 1.3245 : 1.1335),
+          'low': isGold ? 4171.0 : (isGbp ? 1.3235 : 1.1325),
           'is_mitigated': false,
         },
         {
           'symbol': symbol,
           'timeframe': '15m',
           'block_type': 'BEARISH',
-          'high': symbol == 'XAUUSD' ? 2662.0 : 1.0875,
-          'low': symbol == 'XAUUSD' ? 2659.0 : 1.0865,
+          'high': isGold ? 4198.0 : (isGbp ? 1.3315 : 1.1385),
+          'low': isGold ? 4195.0 : (isGbp ? 1.3300 : 1.1370),
           'is_mitigated': true,
         },
       ],
@@ -232,8 +234,8 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           'symbol': symbol,
           'timeframe': '15m',
           'gap_type': 'BULLISH',
-          'top': symbol == 'XAUUSD' ? 2653.0 : 1.0848,
-          'bottom': symbol == 'XAUUSD' ? 2650.0 : 1.0842,
+          'top': isGold ? 4182.0 : (isGbp ? 1.3265 : 1.1348),
+          'bottom': isGold ? 4178.0 : (isGbp ? 1.3255 : 1.1342),
           'is_mitigated': false,
         },
       ],

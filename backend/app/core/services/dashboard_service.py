@@ -190,11 +190,15 @@ class DashboardService:
         connected_provider = snapshots[0].metadata.providerName if snapshots else "TwelveData"
 
         try:
-            all_missions = mission_repository.get_all_missions()
-            total_missions = len(all_missions)
-            total_artifacts = mission_repository.count_artifacts() if hasattr(mission_repository, 'count_artifacts') else total_missions * 5
+            total_missions = mission_repository.count_missions() if hasattr(mission_repository, 'count_missions') else 0
+            recent_missions = mission_repository.get_recent_missions(limit=20)
+            if hasattr(mission_repository, 'count_artifacts'):
+                art_dict = mission_repository.count_artifacts()
+                total_artifacts = sum(art_dict.values()) if isinstance(art_dict, dict) else int(art_dict)
+            else:
+                total_artifacts = total_missions * 5
         except Exception:
-            all_missions = []
+            recent_missions = []
             total_missions = 0
             total_artifacts = 0
 
@@ -276,8 +280,8 @@ class DashboardService:
 
         # Extract real decision & execution readiness from latest mission artifacts
         latest_artifacts = {}
-        if all_missions:
-            latest_m = all_missions[-1]
+        if recent_missions:
+            latest_m = recent_missions[-1]
             latest_artifacts = mission_repository.get_mission_artifacts(latest_m.id)
 
         m_decisions = latest_artifacts.get("decisions", [])
@@ -338,8 +342,8 @@ class DashboardService:
 
         # Dynamic Confidence History across recent missions
         conf_history = []
-        recent_missions = all_missions[-5:] if len(all_missions) >= 5 else all_missions
-        for m in recent_missions:
+        hist_missions = recent_missions[-5:] if len(recent_missions) >= 5 else recent_missions
+        for m in hist_missions:
             arts = mission_repository.get_mission_artifacts(m.id)
             decs = arts.get("decisions", [])
             if decs:
@@ -426,12 +430,12 @@ class DashboardService:
         )
         
         # Compute real mission summary
-        successful_m = sum(1 for m in all_missions if getattr(m, "status", "").upper() == "SUCCESS" and "PARTIAL" not in getattr(m, "status", "").upper())
-        partial_m = sum(1 for m in all_missions if "PARTIAL" in getattr(m, "status", "").upper())
-        failed_m = sum(1 for m in all_missions if getattr(m, "status", "").upper() == "FAILED")
-        durations = [float(getattr(m, "durationMs", 0.0)) for m in all_missions if getattr(m, "durationMs", None)]
+        successful_m = sum(1 for m in recent_missions if getattr(m, "status", "").upper() == "SUCCESS" and "PARTIAL" not in getattr(m, "status", "").upper())
+        partial_m = sum(1 for m in recent_missions if "PARTIAL" in getattr(m, "status", "").upper())
+        failed_m = sum(1 for m in recent_missions if getattr(m, "status", "").upper() == "FAILED")
+        durations = [float(getattr(m, "durationMs", 0.0)) for m in recent_missions if getattr(m, "durationMs", None)]
         avg_dur = round(sum(durations) / len(durations), 1) if durations else 0.0
-        avg_health = 100.0 if not failed_m else round((successful_m / total_missions) * 100.0, 1) if total_missions else 100.0
+        avg_health = 100.0 if not failed_m else round((successful_m / max(len(recent_missions), 1)) * 100.0, 1)
 
         # Compute real analytics summary from trade journal
         from app.core.repository.trade_journal_repository import trade_journal_repository

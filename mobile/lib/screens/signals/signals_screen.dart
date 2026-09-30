@@ -175,8 +175,8 @@ class _SignalsScreenState extends State<SignalsScreen> {
             }
 
             final pinnedSignals = deduplicatedList.where((s) => _pinService.isPinned(s) || s.isPinned).toList();
-            final activeSignals = deduplicatedList.where((s) => s.status.toUpperCase() == 'ACTIVE').toList();
-            final watchlistSignals = deduplicatedList.where((s) => s.status.toUpperCase() == 'WAITING' || s.status.toUpperCase() == 'PENDING').toList();
+            final activeSignals = deduplicatedList.where((s) => s.status.toUpperCase() == 'ACTIVE' || s.status.toUpperCase() == 'OPEN').toList();
+            final watchlistSignals = deduplicatedList.where((s) => s.status.toUpperCase() == 'HOLD' || s.status.toUpperCase() == 'WAITING' || s.status.toUpperCase() == 'PENDING').toList();
             final resolvedSignals = deduplicatedList.where((s) => ['WON', 'WIN', 'LOST', 'LOSS', 'BREAKEVEN', 'BE', 'CLOSED', 'EXPIRED'].contains(s.status.toUpperCase())).toList();
 
             return RefreshIndicator(
