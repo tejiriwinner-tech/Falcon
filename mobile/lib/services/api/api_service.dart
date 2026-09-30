@@ -372,7 +372,11 @@ class ApiService {
 
 
   Future<DecisionArtifactListResponse> getDecisionArtifacts() async {
-    return _get<DecisionArtifactListResponse>('/decision-artifacts', DecisionArtifactListResponse.fromJson);
+    return _get<DecisionArtifactListResponse>(
+      '/decision-artifacts',
+      DecisionArtifactListResponse.fromJson,
+      timeoutSecondsOverride: 30,
+    );
   }
 
 
