@@ -201,15 +201,14 @@ class SignalService:
         # Step 2: Ingest candidate setups from recent missions
         missions = None
         try:
-            # Check get_all_missions first (honoring test mocks if present)
-            all_m = mission_repository.get_all_missions()
-            if all_m:
-                missions = all_m[-mission_limit:]
+            missions = mission_repository.get_recent_missions(limit=mission_limit)
         except Exception:
             pass
         if not missions:
             try:
-                missions = mission_repository.get_recent_missions(limit=mission_limit)
+                all_m = mission_repository.get_all_missions()
+                if all_m:
+                    missions = all_m[-mission_limit:]
             except Exception:
                 missions = []
 

@@ -32,17 +32,22 @@ def get_signal_candidates():
     global _cache_response, _cache_time
     now = datetime.now(timezone.utc)
 
-    # Fast path: check repository for recent stored mission candidates
+    # In-memory cache fast path
+    if _cache_response and _cache_time:
+        if (now - _cache_time).total_seconds() < CACHE_TTL_SECONDS:
+            return _cache_response
+
+    # Fast path: check repository for recent stored mission candidates (LIMIT 3)
     missions = None
     try:
-        all_m = mission_repository.get_all_missions()
-        if all_m:
-            missions = all_m[-5:]
+        missions = mission_repository.get_recent_missions(limit=3)
     except Exception:
         pass
     if not missions:
         try:
-            missions = mission_repository.get_recent_missions(limit=5)
+            all_m = mission_repository.get_all_missions()
+            if all_m:
+                missions = all_m[-3:]
         except Exception:
             missions = []
 
@@ -63,15 +68,13 @@ def get_signal_candidates():
                 candidates.extend(art.get("candidates", []))
 
     if candidates:
-        return SignalCandidateListResponse(
+        resp = SignalCandidateListResponse(
             candidates=candidates,
             lastUpdated=now,
         )
-
-    # In-memory cache fallback if repository has no stored missions
-    if _cache_response and _cache_time:
-        if (now - _cache_time).total_seconds() < CACHE_TTL_SECONDS:
-            return _cache_response
+        _cache_response = resp
+        _cache_time = now
+        return resp
 
     # Cold fallback: compute via engines
     try:

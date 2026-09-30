@@ -72,17 +72,22 @@ def get_decision_artifacts():
     global _cache_response, _cache_time
     now = datetime.now(timezone.utc)
 
-    # Fast path: check repository for recent stored mission decisions
+    # In-memory cache fast path (< 0.1ms)
+    if _cache_response and _cache_time:
+        if (now - _cache_time).total_seconds() < CACHE_TTL_SECONDS:
+            return _cache_response
+
+    # Fast path: check repository for recent stored mission decisions (LIMIT 3)
     missions = None
     try:
-        all_m = mission_repository.get_all_missions()
-        if all_m:
-            missions = all_m[-5:]
+        missions = mission_repository.get_recent_missions(limit=3)
     except Exception:
         pass
     if not missions:
         try:
-            missions = mission_repository.get_recent_missions(limit=5)
+            all_m = mission_repository.get_all_missions()
+            if all_m:
+                missions = all_m[-3:]
         except Exception:
             missions = []
 
@@ -104,16 +109,14 @@ def get_decision_artifacts():
 
     if decisions:
         summary = _build_summary(decisions)
-        return DecisionArtifactListResponse(
+        resp = DecisionArtifactListResponse(
             decisions=decisions,
             summary=summary,
             lastUpdated=now,
         )
-
-    # In-memory cache fallback if repository has no stored missions
-    if _cache_response and _cache_time:
-        if (now - _cache_time).total_seconds() < CACHE_TTL_SECONDS:
-            return _cache_response
+        _cache_response = resp
+        _cache_time = now
+        return resp
 
     # Cold fallback: compute via engines
     try:
