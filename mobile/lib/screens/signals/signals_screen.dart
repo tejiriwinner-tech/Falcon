@@ -323,7 +323,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
         ? 'Curated Live Setups ($activeCount Active)'
         : 'Curated Watchlist (0 Cleared)';
     final subtitleText = activeCount > 0
-        ? '$activeCount trade${activeCount != 1 ? 's' : ''} approved for execution • Max 3 top setups'
+        ? '$activeCount trade${activeCount != 1 ? 's' : ''} approved for execution • Real-time validation'
         : 'Capital Defense active • Setups awaiting entry trigger';
 
     return Padding(
