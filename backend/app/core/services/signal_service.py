@@ -297,12 +297,15 @@ class SignalService:
             curated_active: List[dict] = []
             curated_watchlist: List[dict] = []
             additional_resolved: List[SignalItem] = []
+            active_symbols: set = set()
+            watchlist_symbols: set = set()
 
             lot_size = ExecutionSettings().default_lot_size
 
             for item in candidate_pool:
                 cand = item["candidate"]
                 symbol = cand.symbol
+                norm_sym = symbol.replace("/", "").replace("-", "").upper()
                 direction_str = cand.direction.value if hasattr(cand.direction, "value") else str(cand.direction)
                 sig_key = canonical_signal_signature(
                     symbol,
@@ -315,6 +318,12 @@ class SignalService:
                     # Deduplication & Historical Memory: setup was already processed / triggered / completed
                     continue
                 seen_signatures.add(sig_key)
+
+                # Institutional Anti-Hedging & Unique Asset Resolve:
+                # If this asset already has an authoritative active or pending setup,
+                # skip weaker or conflicting setups so Falcon strictly focuses on 1 unique trade per symbol.
+                if norm_sym in active_symbols or norm_sym in watchlist_symbols:
+                    continue
 
                 # Fast in-memory quote lookup for display context (zero network blocking)
                 cur_px = None
@@ -374,6 +383,7 @@ class SignalService:
                         )
                     except Exception:
                         pass
+                    active_symbols.add(norm_sym)
                     curated_active.append(item)
                 else:
                     item["is_guardian_authorized"] = is_approved
@@ -385,6 +395,7 @@ class SignalService:
                         )
                     except Exception:
                         pass
+                    watchlist_symbols.add(norm_sym)
                     curated_watchlist.append(item)
 
             # Compute autonomous loss recovery metrics (in-memory, no DB)
