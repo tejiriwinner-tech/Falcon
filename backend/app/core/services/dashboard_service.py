@@ -249,10 +249,12 @@ class DashboardService:
         
         # Get real signals
         try:
-            signals_response = signal_service.get_signals()
+            signals_response = signal_service.build_signals()
             signals = signals_response.signals if hasattr(signals_response, 'signals') else []
             summary.totalSignals = len(signals)
-        except Exception:
+        except Exception as ex:
+            import logging
+            logging.getLogger("falcon.dashboard").warning(f"Error building signals for dashboard: {ex}")
             signals = []
         
         # Get real news

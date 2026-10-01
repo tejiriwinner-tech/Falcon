@@ -67,6 +67,10 @@ class SignalService:
             signal_signature_repository.get_resolved_signatures()
         )
 
+    def get_signals(self, mission_limit: int = 5, force_refresh: bool = False) -> SignalListResponse:
+        """Alias for build_signals to guarantee backward compatibility with callers."""
+        return self.build_signals(mission_limit=mission_limit, force_refresh=force_refresh)
+
     def build_signals(self, mission_limit: int = 5, force_refresh: bool = False) -> SignalListResponse:
         now = datetime.now(timezone.utc)
         if not force_refresh and self._cache_response and self._cache_time:

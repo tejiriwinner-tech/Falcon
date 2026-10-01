@@ -50,8 +50,10 @@ class SignalGenerationEngine:
         else:
             base_stop_dist = 0.0020
 
-        # Minimum distance safety bound
-        min_dist = 0.50 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.05 if "JPY" in raw_symbol else 0.0005)
+        # Minimum institutional distance safety bound:
+        # Forex: 15-20 pips minimum (0.0015 for standard majors, 0.20 for JPY)
+        # Gold: $5.00 minimum
+        min_dist = 5.00 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.20 if "JPY" in raw_symbol else 0.0015)
         if base_stop_dist < min_dist:
             base_stop_dist = min_dist
 
@@ -65,13 +67,21 @@ class SignalGenerationEngine:
             if "target_price" in pattern_details:
                 sniper_target = pattern_details["target_price"]
             elif sniper_stop is not None:
-                risk_d = abs(current_price - sniper_stop)
+                risk_d = max(abs(current_price - sniper_stop), min_dist)
                 sniper_target = current_price + (risk_d * rr) if direction == CandidateDirection.BUY else current_price - (risk_d * rr)
 
-        if sniper_stop is not None and sniper_target is not None:
+        if sniper_stop is not None:
+            # Guarantee stop loss respects institutional minimum distance safety
+            actual_risk = abs(current_price - sniper_stop)
+            if actual_risk < min_dist:
+                if direction == CandidateDirection.BUY:
+                    sniper_stop = current_price - min_dist
+                else:
+                    sniper_stop = current_price + min_dist
+                actual_risk = min_dist
+
             if adaptive_mult > 1.05:
-                raw_risk = abs(current_price - sniper_stop)
-                pad = raw_risk * (adaptive_mult - 1.0)
+                pad = actual_risk * (adaptive_mult - 1.0)
                 if direction == CandidateDirection.BUY:
                     stop_loss = round(sniper_stop - pad, dec_places)
                 else:
@@ -79,15 +89,19 @@ class SignalGenerationEngine:
             else:
                 stop_loss = round(sniper_stop, dec_places)
             
-            raw_reward = abs(sniper_target - current_price)
+            eff_rr = max(rr, 1.5)
+            eff_risk = abs(current_price - stop_loss)
+            target_dist = max(eff_risk * eff_rr, abs((sniper_target or current_price) - current_price))
             if recovery_mult > 1.0:
-                raw_reward = raw_reward * recovery_mult
+                target_dist = target_dist * recovery_mult
+
             if direction == CandidateDirection.BUY:
-                take_profit = round(current_price + raw_reward, dec_places)
+                take_profit = round(current_price + target_dist, dec_places)
             else:
-                take_profit = round(current_price - raw_reward, dec_places)
+                take_profit = round(current_price - target_dist, dec_places)
         else:
-            target_dist = base_stop_dist * rr * recovery_mult
+            eff_rr = max(rr, 1.5)
+            target_dist = base_stop_dist * eff_rr * recovery_mult
             if direction == CandidateDirection.BUY:
                 stop_loss = round(current_price - base_stop_dist, dec_places)
                 take_profit = round(current_price + target_dist, dec_places)

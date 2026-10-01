@@ -1036,18 +1036,23 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     if (signals == null) {
       return const PlaceholderCard(height: 140, isLoading: true);
     }
-    final activeSignals = signals.signals.where((s) => s.status == 'ACTIVE').toList();
-    if (activeSignals.isEmpty) {
+    final activeSignals = signals.signals.where((s) => s.status.toUpperCase() == 'ACTIVE').toList();
+    final watchlistSignals = signals.signals.where((s) => s.status.toUpperCase() == 'HOLD' || s.status.toUpperCase() == 'WAITING' || s.status.toUpperCase() == 'PENDING').toList();
+    
+    final signal = activeSignals.isNotEmpty 
+        ? activeSignals.first 
+        : (watchlistSignals.isNotEmpty ? watchlistSignals.first : (signals.signals.isNotEmpty ? signals.signals.first : null));
+
+    if (signal == null) {
       return const PlaceholderCard(
         height: 140,
         isLoading: false,
-        message: 'No active signals available',
+        message: 'No trade setups available',
         icon: Icons.signal_cellular_alt,
       );
     }
-    final signal = activeSignals.first;
-    final isBuy = signal.action == 'BUY';
-    // Continue rendering as before
+    final isBuy = signal.action.toUpperCase() == 'BUY';
+    final statusLabel = signal.status.toUpperCase() == 'ACTIVE' ? 'ACTIVE' : 'WATCHLIST';
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1073,13 +1078,33 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      signal.symbol,
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+                    Row(
+                      children: [
+                        Text(
+                          signal.symbol,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: (statusLabel == 'ACTIVE' ? AppColors.success : AppColors.warning).withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            statusLabel,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: statusLabel == 'ACTIVE' ? AppColors.success : AppColors.warning,
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                     Text(
                       '${signal.strategyName} • ${signal.timeframe}',
