@@ -394,6 +394,11 @@ class FmpProvider(BaseProvider):
         """Check if provider supports the given capability."""
         return capability in _CAPABILITIES
 
+    def supports_symbol(self, symbol: str) -> bool:
+        """Strict whitelist: FMP only supports GBPUSD (and alias GPBUSD)."""
+        canonical = symbol_mapper.normalize(symbol) or (symbol.upper() if symbol else "")
+        return canonical in ("GBPUSD", "GPBUSD")
+
     def get_statistics(self) -> ProviderStatistics:
         """Return comprehensive provider statistics."""
         total = self._request_count
@@ -498,6 +503,13 @@ class FmpProvider(BaseProvider):
         canonical = symbol_mapper.normalize(symbol)
         if canonical is None:
             canonical = symbol.upper()
+
+        # Hard guard: reject any symbol other than GBPUSD / GPBUSD with zero network request
+        if not self.supports_symbol(canonical):
+            logger.info(
+                f"[{self.PROVIDER_NAME}] Skipping {canonical}: FMP is strictly restricted to GBPUSD only."
+            )
+            return None
 
         now_ts = time.time()
         today_utc = datetime.now(timezone.utc).strftime("%Y-%m-%d")

@@ -40,14 +40,14 @@ logger = logging.getLogger(__name__)
 _SKIP_STATUSES = {ProviderStatus.RATE_LIMITED, ProviderStatus.OFFLINE}
 
 # Instrument-aware provider routing matrix (canonical -> ordered allowed providers)
-# GBPUSD / GPBUSD is prioritized with FMP (sub-second real-time quotes); other instruments use TwelveData first
+# GBPUSD / GPBUSD is prioritized with FMP (sub-second real-time quotes); ALL other instruments strictly exclude FMP
 _INSTRUMENT_PROVIDER_ROUTE: Dict[str, List[str]] = {
     "XAUUSD": ["twelve_data", "alpha_vantage", "mock_provider"],
     "GBPUSD": ["fmp", "twelve_data", "alpha_vantage", "mock_provider"],
     "GPBUSD": ["fmp", "twelve_data", "alpha_vantage", "mock_provider"],
-    "EURUSD": ["twelve_data", "fmp", "alpha_vantage", "mock_provider"],
+    "EURUSD": ["twelve_data", "alpha_vantage", "mock_provider"],
 }
-_DEFAULT_PROVIDER_ROUTE: List[str] = ["twelve_data", "fmp", "alpha_vantage", "mock_provider"]
+_DEFAULT_PROVIDER_ROUTE: List[str] = ["twelve_data", "alpha_vantage", "mock_provider"]
 
 _EVT_PROVIDER_SKIPPED_UNSUPPORTED = "ProviderSkippedUnsupported"
 
@@ -154,8 +154,14 @@ class ProviderManager:
         live_map = {p.provider_id: p for p in all_live}
         candidates = []
         for pid in allowed_route:
+            # Absolute guard: FMP must NEVER be invoked for any pair except GBPUSD / GPBUSD
+            if pid == "fmp" and canonical not in ("GBPUSD", "GPBUSD"):
+                continue
             if pid in live_map:
-                candidates.append(live_map[pid])
+                provider = live_map[pid]
+                if hasattr(provider, "supports_symbol") and not provider.supports_symbol(canonical):
+                    continue
+                candidates.append(provider)
         return candidates
 
     def _fetch_from_providers(self, canonical: str) -> Optional[MarketQuoteResponse]:
