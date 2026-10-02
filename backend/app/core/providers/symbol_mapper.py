@@ -22,6 +22,9 @@ _ALIAS_MAP: Dict[str, str] = {
     "gbpusd":   "GBPUSD",
     "gbp/usd":  "GBPUSD",
     "gbp_usd":  "GBPUSD",
+    "gpbusd":   "GBPUSD",
+    "gpb/usd":  "GBPUSD",
+    "gpb_usd":  "GBPUSD",
     "cable":    "GBPUSD",
 
     # USDJPY

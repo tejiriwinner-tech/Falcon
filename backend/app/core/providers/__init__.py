@@ -24,9 +24,10 @@ _alpha_vantage_provider = AlphaVantageProvider()
 _fmp_provider = FmpProvider()
 
 # ── Register providers in priority order ──────────────────────────────────────
-# FMP provides real-time quotes without 15-minute delays on Forex majors
-provider_registry.register(_fmp_provider, priority=1)
-provider_registry.register(_twelve_data_provider, priority=2)
+# Default global priority: TwelveData is Priority 1, FMP is Priority 2, Alpha Vantage is Priority 3.
+# (GBPUSD specifically routes via FMP Priority 1 in ProviderManager).
+provider_registry.register(_twelve_data_provider, priority=1)
+provider_registry.register(_fmp_provider, priority=2)
 provider_registry.register(_alpha_vantage_provider, priority=3)
 
 # The synthetic price provider is opt-in: with ENABLE_MOCK_PROVIDER unset the
