@@ -40,12 +40,13 @@ logger = logging.getLogger(__name__)
 _SKIP_STATUSES = {ProviderStatus.RATE_LIMITED, ProviderStatus.OFFLINE}
 
 # Instrument-aware provider routing matrix (canonical -> ordered allowed providers)
+# FMP provides sub-second real-time forex quotes, eliminating 15-minute delays from TwelveData free tier
 _INSTRUMENT_PROVIDER_ROUTE: Dict[str, List[str]] = {
     "XAUUSD": ["twelve_data", "alpha_vantage", "mock_provider"],
-    "GBPUSD": ["twelve_data", "fmp", "alpha_vantage", "mock_provider"],
-    "EURUSD": ["twelve_data", "fmp", "alpha_vantage", "mock_provider"],
+    "GBPUSD": ["fmp", "twelve_data", "alpha_vantage", "mock_provider"],
+    "EURUSD": ["fmp", "twelve_data", "alpha_vantage", "mock_provider"],
 }
-_DEFAULT_PROVIDER_ROUTE: List[str] = ["twelve_data", "fmp", "alpha_vantage", "mock_provider"]
+_DEFAULT_PROVIDER_ROUTE: List[str] = ["fmp", "twelve_data", "alpha_vantage", "mock_provider"]
 
 _EVT_PROVIDER_SKIPPED_UNSUPPORTED = "ProviderSkippedUnsupported"
 

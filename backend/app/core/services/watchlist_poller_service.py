@@ -14,11 +14,16 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from app.core.config import settings
+from app.core.providers import provider_manager
 from app.core.repository.signal_signature_repository import signal_signature_repository
+from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.core.services.session_budget_manager import session_budget_manager
 from app.core.services.signal_service import signal_service
+from app.core.services.signal_outcome_resolver import signal_outcome_resolver
+from app.schemas.trade_journal import TradeJournalUpdate
 
 logger = logging.getLogger("falcon.watchlist_poller")
+
 
 
 class WatchlistPollerService:
@@ -134,6 +139,98 @@ class WatchlistPollerService:
         except Exception as ex:
             self._stats["errors"] += 1
             logger.warning(f"Watchlist poller execution error: {ex}")
+
+        # Step 2: Monitor and auto-resolve OPEN trades in Trade Journal against live market
+        try:
+            open_trades = [
+                t for t in (trade_journal_repository.list_trades() or [])
+                if (t.status or "").upper() in ("OPEN", "FILLED") and t.closeDate is None and t.entryPrice > 0
+            ]
+            for trade in open_trades:
+                raw_sym = trade.symbol.replace("/", "").upper()
+                quote_resp = provider_manager.get_market_quote(raw_sym)
+                if not quote_resp or not quote_resp.quote or not quote_resp.quote.lastPrice:
+                    continue
+                cur_px = quote_resp.quote.lastPrice
+                direction = (trade.direction or "").upper()
+                sl = trade.stopLoss
+                tp = trade.takeProfit
+
+                hit_sl = False
+                hit_tp = False
+
+                if direction == "BUY":
+                    if cur_px <= sl:
+                        hit_sl = True
+                    elif cur_px >= tp:
+                        hit_tp = True
+                else:  # SELL
+                    if cur_px >= sl:
+                        hit_sl = True
+                    elif cur_px <= tp:
+                        hit_tp = True
+
+                if hit_sl:
+                    loss_pts = -round(abs(trade.entryPrice - sl), 4)
+                    trade_update = TradeJournalUpdate(
+                        status="CLOSED",
+                        result="LOST",
+                        exitPrice=sl,
+                        closeDate=now,
+                        profitLoss=loss_pts,
+                        realizedRMultiple=-1.0,
+                        reasonForExit="Stop Loss Hit",
+                    )
+                    updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
+                    try:
+                        signal_outcome_resolver._conduct_post_mortem_learning(
+                            trade=updated_trade or trade,
+                            market_context={
+                                "exit_reason": "Stop Loss Hit",
+                                "market_price": cur_px,
+                                "invalidation_boundary": sl,
+                            }
+                        )
+                    except Exception as ex:
+                        logger.warning(f"Error in post-mortem learning for trade #{trade.id}: {ex}")
+                    logger.info(
+                        f"🛑 STOP LOSS HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (SL: {sl:.4f}). "
+                        f"Trade closed as LOST and post-mortem recorded in journal."
+                    )
+                    result["new_expirations"] += 1
+
+                elif hit_tp:
+                    win_pts = round(abs(tp - trade.entryPrice), 4)
+                    rr_val = trade.riskReward or 2.0
+                    trade_update = TradeJournalUpdate(
+                        status="CLOSED",
+                        result="WON",
+                        exitPrice=tp,
+                        closeDate=now,
+                        profitLoss=win_pts,
+                        realizedRMultiple=rr_val,
+                        reasonForExit="Take Profit Target Hit Cleanly",
+                    )
+                    updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
+                    try:
+                        signal_outcome_resolver._conduct_post_mortem_learning(
+                            trade=updated_trade or trade,
+                            market_context={
+                                "exit_reason": "Take Profit Hit",
+                                "market_price": cur_px,
+                                "target": tp,
+                            }
+                        )
+                    except Exception as ex:
+                        logger.warning(f"Error in win learning for trade #{trade.id}: {ex}")
+                    logger.info(
+                        f"🏆 TAKE PROFIT HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (TP: {tp:.4f}). "
+                        f"Trade closed as WON in journal."
+                    )
+                    result["new_triggers"] += 1
+
+        except Exception as ex:
+            logger.warning(f"Error monitoring open trades in watchlist poller: {ex}")
 
         return result
 

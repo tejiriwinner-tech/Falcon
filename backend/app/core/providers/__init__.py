@@ -24,9 +24,10 @@ _alpha_vantage_provider = AlphaVantageProvider()
 _fmp_provider = FmpProvider()
 
 # ── Register providers in priority order ──────────────────────────────────────
-provider_registry.register(_twelve_data_provider, priority=1)
-provider_registry.register(_alpha_vantage_provider, priority=2)
-provider_registry.register(_fmp_provider, priority=3)
+# FMP provides real-time quotes without 15-minute delays on Forex majors
+provider_registry.register(_fmp_provider, priority=1)
+provider_registry.register(_twelve_data_provider, priority=2)
+provider_registry.register(_alpha_vantage_provider, priority=3)
 
 # The synthetic price provider is opt-in: with ENABLE_MOCK_PROVIDER unset the
 # pipeline reports missing data instead of serving fabricated quotes.

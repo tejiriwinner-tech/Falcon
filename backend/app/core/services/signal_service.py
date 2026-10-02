@@ -19,6 +19,8 @@ from app.schemas.decision_artifact import DecisionArtifact, DecisionStatus
 from app.schemas.execution_order import ExecutionSettings
 from app.schemas.signal_candidate import SignalCandidate, CandidateStatus, CandidateDirection
 from app.schemas.signal import SignalItem, SignalListResponse
+from app.schemas.trade_journal import TradeJournalCreate
+
 
 
 def canonical_signal_signature(
@@ -329,15 +331,27 @@ class SignalService:
                 if norm_sym in active_symbols or norm_sym in watchlist_symbols:
                     continue
 
-                # Fast in-memory quote lookup for display context (zero network blocking)
+                # Real-Time Live Market Quote Evaluation (Layer 2: Strict Freshness <= 60s)
                 cur_px = None
+                quote_age_s = 999.0
                 try:
                     raw_sym = symbol.replace("/", "").upper()
                     pm = getattr(providers, "provider_manager", None)
                     if pm is not None and hasattr(pm, "_cache"):
-                        cached_entry = pm._cache.get(raw_sym, allow_stale=True)
-                        if cached_entry and hasattr(cached_entry, "data") and getattr(cached_entry.data, "lastPrice", None):
-                            cur_px = cached_entry.data.lastPrice
+                        # Disallow stale cache lookups for entry gate
+                        cached_entry = pm._cache.get(raw_sym, allow_stale=False)
+                        if cached_entry and hasattr(cached_entry, "data"):
+                            q_data = cached_entry.data
+                            if getattr(q_data, "lastPrice", None):
+                                cur_px = q_data.lastPrice
+                                quote_age_s = cached_entry.age_seconds
+
+                    # If cache missing or older than 60s, force real-time fetch (routes FMP first for Forex)
+                    if (cur_px is None or quote_age_s > 60.0) and pm is not None:
+                        resp = pm.get_market_quote(raw_sym)
+                        if resp and resp.quote and resp.quote.lastPrice:
+                            cur_px = resp.quote.lastPrice
+                            quote_age_s = getattr(resp.quote, "freshnessSeconds", 0.0) or 0.0
                 except Exception:
                     pass
 
@@ -363,18 +377,46 @@ class SignalService:
                     ))
                     continue
 
-                # Check if live market price has touched entry (ACTIVE gate)
-                # For BUY: price <= entry (or within 1 pip). For SELL: price >= entry (or within 1 pip).
+                # Layer 3: Strict Active Proximity Band & Missed-Candle Invalidation
+                # Proximity band: 1.0 to 1.5 pips (0.00015 for 4-digit Forex, 0.50 for Gold)
+                pip_tolerance = 0.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.00015
+                slip_invalidation = 1.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.00030  # 3 pips
                 entry_hit = False
-                if cur_px is not None and cur_px > 0:
-                    pip_tolerance = 0.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.0005
-                    if cand.direction.value.upper() == "BUY":
-                        entry_hit = cur_px <= cand.entryPrice + pip_tolerance
+                is_slipped_past = False
+
+                if cur_px is not None and cur_px > 0 and quote_age_s <= 60.0:
+                    dist_to_entry = abs(cur_px - cand.entryPrice)
+                    # A. Strict Active Touch Window: Price must currently test entry within 1.0 - 1.5 pips
+                    if dist_to_entry <= pip_tolerance:
+                        entry_hit = True
                     else:
-                        entry_hit = cur_px >= cand.entryPrice - pip_tolerance
+                        # B. Missed/Slipped Invalidation:
+                        # If price has already moved past entry towards Stop Loss by > 3 pips,
+                        # the pullback was missed in a past candle -> mark EXPIRED cleanly, never activate late.
+                        if cand.direction.value.upper() == "BUY":
+                            if cur_px < (cand.entryPrice - slip_invalidation):
+                                is_slipped_past = True
+                        else:
+                            if cur_px > (cand.entryPrice + slip_invalidation):
+                                is_slipped_past = True
+
+                if is_slipped_past:
+                    self._historical_triggered_signatures.add(sig_key)
+                    try:
+                        signal_signature_repository.record_signature(
+                            symbol, direction_str, cand.entryPrice, cand.stopLoss, cand.takeProfit, status="EXPIRED"
+                        )
+                    except Exception:
+                        pass
+                    additional_resolved.append(self._to_signal(
+                        cand, item["decision"], item["signal_id"], now,
+                        override_status="EXPIRED",
+                        current_market_px=cur_px,
+                    ))
+                    continue
 
                 # Lifecycle Routing:
-                # 1. Price touches entry & setup approved + ready -> ACTIVE (no artificial 3-slot cap)
+                # 1. Price actively touches entry & setup approved + ready -> ACTIVE
                 # 2. Price has not yet touched entry -> Watchlist in HOLD status
                 if entry_hit and is_approved and is_ready:
                     item["is_guardian_authorized"] = True
@@ -387,6 +429,41 @@ class SignalService:
                         )
                     except Exception:
                         pass
+
+                    # Step 5: Automatically create an OPEN trade record in Trade Journal for lifecycle tracking
+                    try:
+                        existing_trades = trade_journal_repository.list_trades() or []
+                        already_recorded = any(
+                            (t.signalId == item["signal_id"] or (t.symbol == symbol and (t.status or "").upper() in ("OPEN", "FILLED")))
+                            for t in existing_trades
+                        )
+                        if not already_recorded:
+                            trade_journal_repository.create_trade(
+                                TradeJournalCreate(
+                                    signalId=item["signal_id"],
+                                    strategyId=cand.strategyId or "falcon-opt",
+                                    symbol=symbol,
+                                    direction=direction_str.upper(),
+                                    entryPrice=cand.entryPrice,
+                                    stopLoss=cand.stopLoss,
+                                    takeProfit=cand.takeProfit,
+                                    timeframe=cand.timeframe or "M15",
+                                    marketSession="London" if "London" in (cand.strategyName or "") else "New York",
+                                    tradeDate=now,
+                                    status="OPEN",
+                                    result="PENDING",
+                                    profitLoss=0.0,
+                                    riskReward=cand.riskReward or 2.0,
+                                    confidence=int(cand.confidence or 80),
+                                    reasonForEntry=f"Falcon Live Entry Verified at {cur_px:.4f} (Touch within {pip_tolerance:.5f})",
+                                    notes=f"Auto-recorded active trade from signal {item['signal_id']}",
+                                    fillPrice=cur_px,
+                                    fillTime=now,
+                                )
+                            )
+                    except Exception as ex:
+                        logger.debug(f"Could not auto-record trade to journal: {ex}")
+
                     active_symbols.add(norm_sym)
                     curated_active.append(item)
                 else:

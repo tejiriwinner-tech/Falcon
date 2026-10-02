@@ -122,3 +122,13 @@ def delete_trade_journal_entry(trade_id: int):
     if not trade_journal_repository.delete_trade(trade_id):
         raise HTTPException(status_code=404, detail=f"Trade '{trade_id}' not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.delete("/trade-journal", status_code=200)
+def clear_all_trade_journal():
+    """Purge all trade journal records and reset signal signature deduplication memory."""
+    trade_journal_repository.clear()
+    from app.core.repository.signal_signature_repository import signal_signature_repository
+    signal_signature_repository.clear()
+    return {"status": "success", "message": "All trade journal and history records cleared successfully"}
+
