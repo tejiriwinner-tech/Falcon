@@ -45,8 +45,10 @@ class TradeJournalCreate(TradeJournalBase):
     """Payload for a new entry. ``id`` and timestamps are assigned by the server."""
 
 class TradeJournalUpdate(BaseModel):
-    """Partial update — typically used to close an open trade."""
+    """Partial update — typically used to close an open trade or adjust stop loss/take profit."""
     exitPrice: Optional[float] = None
+    stopLoss: Optional[float] = None
+    takeProfit: Optional[float] = None
     closeDate: Optional[datetime] = None
     status: Optional[str] = None
     result: Optional[str] = None

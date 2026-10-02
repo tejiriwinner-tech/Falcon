@@ -415,10 +415,53 @@ class SignalService:
                     ))
                     continue
 
+                # Capital Defense Shield Checks:
+                shield_reason = None
+
+                # 1. Economic Calendar News Blackout Check
+                try:
+                    from app.core.services.economic_calendar_service import economic_calendar_service
+                    is_blk, n_title, n_curr, n_delta, n_phase = economic_calendar_service.check_blackout_status(symbol)
+                    if is_blk:
+                        phase_str = f"in {n_delta}m" if n_phase == "UPCOMING" else f"{n_delta}m ago"
+                        shield_reason = f"NEWS BLACKOUT: {n_curr} High-Impact event '{n_title}' {phase_str}. Capital shield active."
+                except Exception as ex:
+                    logger.debug(f"News blackout shield check error: {ex}")
+
+                # 2. Spread-Spike Protection (Rollover & Illiquid Hours)
+                if not shield_reason:
+                    try:
+                        if quote_resp and quote_resp.quote and getattr(quote_resp.quote, "bidAsk", None):
+                            raw_spread = quote_resp.quote.bidAsk.spread
+                            is_gold = "XAU" in symbol or cand.entryPrice > 100
+                            spread_pips = (raw_spread / 0.10) if is_gold else (raw_spread / 0.00010)
+                            max_allowed_spread = 3.5 if is_gold else 2.0
+                            if spread_pips > max_allowed_spread:
+                                shield_reason = f"SPREAD SPIKE: Live spread {spread_pips:.1f} pips exceeds {max_allowed_spread:.1f} limit. Entry held."
+                    except Exception as ex:
+                        logger.debug(f"Spread spike shield check error: {ex}")
+
+                # 3. Multi-Timeframe (MTF) Institutional Confluence Filter
+                if not shield_reason:
+                    try:
+                        cand_reasons = getattr(cand, "reasons", [])
+                        for r in cand_reasons:
+                            t_desc = (getattr(r, "title", "") + " " + getattr(r, "description", "")).lower()
+                            if any(k in t_desc for k in ["counter-trend", "against 4h", "against 1h", "bearish 4h ob", "bullish 4h ob"]):
+                                if getattr(cand, "confidence", 80) < 85:
+                                    shield_reason = "MTF FILTER: Counter-trend setup against higher-timeframe order flow requires >= 85% conviction."
+                                    break
+                    except Exception as ex:
+                        logger.debug(f"MTF filter check error: {ex}")
+
+                # If shield intervened, suppress entry promotion and enforce WAITING status
+                if shield_reason:
+                    entry_hit = False
+
                 # Lifecycle Routing:
-                # 1. Price actively touches entry & setup approved + ready -> ACTIVE
-                # 2. Price has not yet touched entry -> Watchlist in HOLD status
-                if entry_hit and is_approved and is_ready:
+                # 1. Price actively touches entry & setup approved + ready & no capital shields -> ACTIVE
+                # 2. Otherwise -> Watchlist in HOLD / WAITING status
+                if entry_hit and is_approved and is_ready and not shield_reason:
                     item["is_guardian_authorized"] = True
                     item["lot_size"] = lot_size
                     item["current_market_px"] = cur_px
@@ -430,7 +473,8 @@ class SignalService:
                     except Exception:
                         pass
 
-                    # Step 5: Automatically create an OPEN trade record in Trade Journal for lifecycle tracking
+                    # Automatically create an OPEN trade record in Trade Journal for lifecycle tracking
+                    new_trade_record = None
                     try:
                         existing_trades = trade_journal_repository.list_trades() or []
                         already_recorded = any(
@@ -438,7 +482,7 @@ class SignalService:
                             for t in existing_trades
                         )
                         if not already_recorded:
-                            trade_journal_repository.create_trade(
+                            new_trade_record = trade_journal_repository.create_trade(
                                 TradeJournalCreate(
                                     signalId=item["signal_id"],
                                     strategyId=cand.strategyId or "falcon-opt",
@@ -461,14 +505,20 @@ class SignalService:
                                     fillTime=now,
                                 )
                             )
+                            # Dispatch real-time Telegram trade alert
+                            try:
+                                from app.services.alerts.telegram_alert_service import telegram_alert_service
+                                telegram_alert_service.dispatch_active_trade_alert(new_trade_record)
+                            except Exception as ex:
+                                logger.debug(f"Telegram active alert error: {ex}")
                     except Exception as ex:
                         logger.debug(f"Could not auto-record trade to journal: {ex}")
 
                     active_symbols.add(norm_sym)
                     curated_active.append(item)
                 else:
-                    item["is_guardian_authorized"] = is_approved
-                    item["guardian_reason"] = None
+                    item["is_guardian_authorized"] = is_approved and not shield_reason
+                    item["guardian_reason"] = shield_reason
                     item["current_market_px"] = cur_px
                     try:
                         signal_signature_repository.record_signature(

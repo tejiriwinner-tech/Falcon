@@ -119,6 +119,15 @@ class SignalOutcomeResolver:
         outcomes = sorted(self._resolved_cache.values(), key=lambda x: x.resolvedAt, reverse=True)
         return outcomes[:limit]
 
+    def _conduct_post_mortem_learning(
+        self,
+        trade: Union[TradeJournalItem, Dict[str, Any]],
+        market_context: Optional[Dict[str, Any]] = None,
+        session: Optional[object] = None,
+    ) -> PostMortemDiagnostic:
+        """Alias for resolve_trade_outcome to support background poller invocation."""
+        return self.resolve_trade_outcome(trade=trade, market_context=market_context, session=session)
+
     def resolve_trade_outcome(
         self,
         trade: Union[TradeJournalItem, Dict[str, Any]],

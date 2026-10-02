@@ -8,7 +8,7 @@ same history even when the provider is unreachable or the API key is absent.
 import threading
 import time
 from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import requests
 from sqlalchemy import select
@@ -291,5 +291,73 @@ class EconomicCalendarService:
             )
         return events
 
+    def check_blackout_status(
+        self,
+        symbol: str,
+        blackout_pre_minutes: int = 30,
+        blackout_post_minutes: int = 15,
+    ) -> tuple[bool, Optional[str], Optional[str], Optional[int], Optional[str]]:
+        """
+        Evaluates whether an instrument is currently inside a high-impact news blackout window.
+        Blackout is active:
+          - Up to `blackout_pre_minutes` (default 30m) BEFORE a High-Impact event.
+          - Up to `blackout_post_minutes` (default 15m) AFTER a High-Impact event.
+        
+        Returns:
+            (is_blackout, event_title, currency, delta_minutes, phase)
+            where phase is 'UPCOMING' or 'PASSED'
+        """
+        clean_sym = symbol.replace("/", "").replace("_", "").upper()
+        currencies: Set[str] = set()
+
+        currency_map = {
+            "EURUSD": {"EUR", "USD"},
+            "GBPUSD": {"GBP", "USD"},
+            "USDJPY": {"USD", "JPY"},
+            "XAUUSD": {"USD"},
+            "GOLD": {"USD"},
+            "US30": {"USD"},
+            "NAS100": {"USD"},
+            "SPX500": {"USD"},
+        }
+
+        if clean_sym in currency_map:
+            currencies = currency_map[clean_sym]
+        elif len(clean_sym) == 6:
+            currencies = {clean_sym[:3], clean_sym[3:]}
+        else:
+            currencies = {"USD"}
+
+        # Check events in a 3-hour window (-1h to +2h)
+        events = self.get_events(lookback_hours=1, lookahead_hours=2)
+        now = datetime.now(timezone.utc)
+
+        for event in events:
+            # Check high impact
+            if (event.impact or "").strip().upper() not in ("HIGH", "RED"):
+                continue
+
+            event_curr = (event.currency or "").strip().upper()
+            if event_curr not in currencies:
+                continue
+
+            event_time = event.eventTime
+            if event_time.tzinfo is None:
+                event_time = event_time.replace(tzinfo=timezone.utc)
+
+            # Case A: Event is in the future (within pre-news window)
+            if event_time >= now:
+                mins_until = int((event_time - now).total_seconds() // 60)
+                if 0 <= mins_until <= blackout_pre_minutes:
+                    return True, event.title, event_curr, mins_until, "UPCOMING"
+            # Case B: Event just passed (within post-news settlement window)
+            else:
+                mins_since = int((now - event_time).total_seconds() // 60)
+                if 0 <= mins_since <= blackout_post_minutes:
+                    return True, event.title, event_curr, mins_since, "PASSED"
+
+        return False, None, None, None, None
+
 
 economic_calendar_service = EconomicCalendarService()
+

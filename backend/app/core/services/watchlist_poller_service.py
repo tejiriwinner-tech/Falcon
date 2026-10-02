@@ -20,6 +20,7 @@ from app.core.repository.trade_journal_repository import trade_journal_repositor
 from app.core.services.session_budget_manager import session_budget_manager
 from app.core.services.signal_service import signal_service
 from app.core.services.signal_outcome_resolver import signal_outcome_resolver
+from app.services.alerts.telegram_alert_service import telegram_alert_service
 from app.schemas.trade_journal import TradeJournalUpdate
 
 logger = logging.getLogger("falcon.watchlist_poller")
@@ -156,6 +157,48 @@ class WatchlistPollerService:
                 sl = trade.stopLoss
                 tp = trade.takeProfit
 
+                is_gold = "XAU" in raw_sym or "GOLD" in raw_sym or trade.entryPrice > 100
+                spread_buffer = 0.10 if is_gold else 0.00010  # 1 pip spread buffer
+
+                risk_dist = abs(trade.entryPrice - sl)
+                tp1_dist = 1.5 * risk_dist
+                tp1_price = (trade.entryPrice + tp1_dist) if direction == "BUY" else (trade.entryPrice - tp1_dist)
+                be_price = (trade.entryPrice + spread_buffer) if direction == "BUY" else (trade.entryPrice - spread_buffer)
+
+                notes_str = trade.notes or ""
+                is_be_protected = "BE_PROTECTED" in notes_str
+
+                # Phase 1: Automated Move-to-Breakeven (BE) when Price reaches TP1 (+1.5R)
+                if not is_be_protected and risk_dist > 0:
+                    tp1_hit = False
+                    if direction == "BUY" and cur_px >= tp1_price:
+                        tp1_hit = True
+                    elif direction == "SELL" and cur_px <= tp1_price:
+                        tp1_hit = True
+
+                    if tp1_hit:
+                        new_sl = round(be_price, 2 if is_gold else 4)
+                        new_notes = f"{notes_str} [BE_PROTECTED: TP1 +1.5R reached at {cur_px:.4f}; SL moved to {new_sl:.4f}]".strip()
+                        trade_update = TradeJournalUpdate(
+                            stopLoss=new_sl,
+                            notes=new_notes,
+                        )
+                        updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
+                        logger.info(
+                            f"🛡️ TP1 HIT & SL MOVED TO BREAKEVEN for {trade.symbol} #{trade.id} at {cur_px:.4f}. "
+                            f"Stop loss adjusted to {new_sl:.4f} (BE + spread). 50% partial profit secured."
+                        )
+                        try:
+                            telegram_alert_service.dispatch_breakeven_alert(trade, new_sl, cur_px)
+                        except Exception as ex:
+                            logger.debug(f"Telegram BE alert dispatch error: {ex}")
+
+                        trade.stopLoss = new_sl
+                        trade.notes = new_notes
+                        sl = new_sl
+                        is_be_protected = True
+
+                # Phase 2: Boundary Hit Testing against current Stop Loss & Final Target
                 hit_sl = False
                 hit_tp = False
 
@@ -171,32 +214,84 @@ class WatchlistPollerService:
                         hit_tp = True
 
                 if hit_sl:
-                    loss_pts = -round(abs(trade.entryPrice - sl), 4)
-                    trade_update = TradeJournalUpdate(
-                        status="CLOSED",
-                        result="LOST",
-                        exitPrice=sl,
-                        closeDate=now,
-                        profitLoss=loss_pts,
-                        realizedRMultiple=-1.0,
-                        reasonForExit="Stop Loss Hit",
-                    )
-                    updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
-                    try:
-                        signal_outcome_resolver._conduct_post_mortem_learning(
-                            trade=updated_trade or trade,
-                            market_context={
-                                "exit_reason": "Stop Loss Hit",
-                                "market_price": cur_px,
-                                "invalidation_boundary": sl,
-                            }
+                    if is_be_protected:
+                        # Trade stopped out at Breakeven after reaching TP1 (+1.5R partials banked)
+                        be_pts = round(abs(trade.entryPrice - sl), 4)
+                        trade_update = TradeJournalUpdate(
+                            status="CLOSED",
+                            result="BREAKEVEN",
+                            exitPrice=sl,
+                            closeDate=now,
+                            profitLoss=be_pts,
+                            realizedRMultiple=0.75,
+                            reasonForExit="Break-Even Stop Hit (Capital Defended after TP1)",
+                            lessonLearned="Capital defended by automated BE trailing rule; full 1R loss averted after +1.5R target run.",
                         )
-                    except Exception as ex:
-                        logger.warning(f"Error in post-mortem learning for trade #{trade.id}: {ex}")
-                    logger.info(
-                        f"🛑 STOP LOSS HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (SL: {sl:.4f}). "
-                        f"Trade closed as LOST and post-mortem recorded in journal."
-                    )
+                        updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
+                        try:
+                            signal_outcome_resolver._conduct_post_mortem_learning(
+                                trade=updated_trade or trade,
+                                market_context={
+                                    "exit_reason": "Break-Even Hit",
+                                    "market_price": cur_px,
+                                    "invalidation_boundary": sl,
+                                }
+                            )
+                        except Exception as ex:
+                            logger.warning(f"Error in BE post-mortem learning for #{trade.id}: {ex}")
+                        try:
+                            telegram_alert_service.dispatch_trade_closed_alert(
+                                updated_trade or trade,
+                                exit_reason="Break-Even Stop Hit (Capital Defended after TP1 run)",
+                                result="BREAKEVEN",
+                                realized_r=0.75,
+                                lesson="Capital preserved by automated BE trailing rule; full 1R loss avoided.",
+                            )
+                        except Exception as ex:
+                            logger.debug(f"Telegram trade closed alert error: {ex}")
+                        logger.info(
+                            f"🛡️ BREAKEVEN HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (Exit: {sl:.4f}). "
+                            f"Trade closed as BREAKEVEN (+0.75R banked). Capital 100% defended."
+                        )
+                    else:
+                        # Full stop-loss hit before reaching TP1
+                        loss_pts = -round(abs(trade.entryPrice - sl), 4)
+                        trade_update = TradeJournalUpdate(
+                            status="CLOSED",
+                            result="LOST",
+                            exitPrice=sl,
+                            closeDate=now,
+                            profitLoss=loss_pts,
+                            realizedRMultiple=-1.0,
+                            reasonForExit="Stop Loss Hit",
+                            lessonLearned="Initial stop-loss invalidation boundary breached before reaching TP1.",
+                        )
+                        updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
+                        try:
+                            signal_outcome_resolver._conduct_post_mortem_learning(
+                                trade=updated_trade or trade,
+                                market_context={
+                                    "exit_reason": "Stop Loss Hit",
+                                    "market_price": cur_px,
+                                    "invalidation_boundary": sl,
+                                }
+                            )
+                        except Exception as ex:
+                            logger.warning(f"Error in post-mortem learning for trade #{trade.id}: {ex}")
+                        try:
+                            telegram_alert_service.dispatch_trade_closed_alert(
+                                updated_trade or trade,
+                                exit_reason="Stop Loss Hit",
+                                result="LOST",
+                                realized_r=-1.0,
+                                lesson=getattr(updated_trade, "lessonLearned", None) or "Structural invalidation boundary breached.",
+                            )
+                        except Exception as ex:
+                            logger.debug(f"Telegram trade closed alert error: {ex}")
+                        logger.info(
+                            f"🛑 STOP LOSS HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (SL: {sl:.4f}). "
+                            f"Trade closed as LOST and post-mortem recorded in journal."
+                        )
                     result["new_expirations"] += 1
 
                 elif hit_tp:
@@ -210,6 +305,7 @@ class WatchlistPollerService:
                         profitLoss=win_pts,
                         realizedRMultiple=rr_val,
                         reasonForExit="Take Profit Target Hit Cleanly",
+                        lessonLearned="Target liquidity reached cleanly. Strategy reinforced.",
                     )
                     updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
                     try:
@@ -223,6 +319,16 @@ class WatchlistPollerService:
                         )
                     except Exception as ex:
                         logger.warning(f"Error in win learning for trade #{trade.id}: {ex}")
+                    try:
+                        telegram_alert_service.dispatch_trade_closed_alert(
+                            updated_trade or trade,
+                            exit_reason="Take Profit Target Hit Cleanly",
+                            result="WON",
+                            realized_r=rr_val,
+                            lesson="Target liquidity reached cleanly.",
+                        )
+                    except Exception as ex:
+                        logger.debug(f"Telegram trade closed alert error: {ex}")
                     logger.info(
                         f"🏆 TAKE PROFIT HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (TP: {tp:.4f}). "
                         f"Trade closed as WON in journal."

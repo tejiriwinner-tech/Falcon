@@ -299,7 +299,109 @@ class TelegramAlertService:
         except Exception as e:
             logger.warning(f"Failed to dispatch Telegram raw message: {e}")
 
+    def dispatch_active_trade_alert(self, trade: Any) -> None:
+        """Dispatches an instant alert when a trade actively triggers and opens."""
+        sym = getattr(trade, 'symbol', 'UNKNOWN')
+        sym_emoji = self._get_symbol_emoji(sym)
+        direction = getattr(trade, 'direction', 'BUY').upper()
+        dir_badge = "🟢 <b>BUY ACTIVE</b>" if direction == "BUY" else "🔴 <b>SELL ACTIVE</b>"
+        entry = getattr(trade, 'entryPrice', 0.0)
+        sl = getattr(trade, 'stopLoss', 0.0)
+        tp = getattr(trade, 'takeProfit', 0.0)
+        risk = abs(entry - sl)
+        tp1 = entry + (1.5 * risk) if direction == "BUY" else entry - (1.5 * risk)
+
+        p_entry = self._format_price(entry, sym)
+        p_sl = self._format_price(sl, sym)
+        p_tp1 = self._format_price(tp1, sym)
+        p_tp2 = self._format_price(tp, sym)
+
+        msg = (
+            f"🦅 <b>FALCON TRADE TRIGGERED</b> 🚀\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{sym_emoji} <b>Instrument:</b> <code>{sym}</code> ({getattr(trade, 'timeframe', 'M15')})\n"
+            f"{dir_badge}\n"
+            f"🎯 <b>Strategy:</b> {getattr(trade, 'strategyId', 'Falcon Core')}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"💵 <b>Entry Fill:</b> <code>{p_entry}</code>\n"
+            f"🛑 <b>Stop Loss:</b> <code>{p_sl}</code>\n"
+            f"🎯 <b>TP1 (Close 50% → Move BE):</b> <code>{p_tp1}</code> (+1.5R)\n"
+            f"🎯 <b>TP2 (Runner Target):</b> <code>{p_tp2}</code>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"⚡ <i>Live entry verified against real-time liquidity!</i>"
+        )
+        self.dispatch_raw_message(msg)
+
+    def dispatch_breakeven_alert(self, trade: Any, be_price: float, trigger_price: float) -> None:
+        """Dispatches an alert when TP1 is hit and Stop Loss is moved to Breakeven."""
+        sym = getattr(trade, 'symbol', 'UNKNOWN')
+        sym_emoji = self._get_symbol_emoji(sym)
+        p_be = self._format_price(be_price, sym)
+        p_trig = self._format_price(trigger_price, sym)
+
+        msg = (
+            f"🛡️ <b>TP1 HIT — SL MOVED TO BREAKEVEN</b> 🛡️\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{sym_emoji} <b>Instrument:</b> <code>{sym}</code> (#{getattr(trade, 'id', '')})\n"
+            f"🎯 <b>TP1 Reached:</b> <code>{p_trig}</code> (+1.5R Excursion)\n"
+            f"💰 <b>Banked:</b> 50% Partial Profits Secured\n"
+            f"🔒 <b>New Stop Loss:</b> <code>{p_be}</code> (Entry + Spread)\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"✨ <b>STATUS: RISK-FREE TRADE</b>. Capital is 100% defended!"
+        )
+        self.dispatch_raw_message(msg)
+
+    def dispatch_trade_closed_alert(
+        self,
+        trade: Any,
+        exit_reason: str,
+        result: str,
+        realized_r: Optional[float],
+        lesson: Optional[str] = None,
+    ) -> None:
+        """Dispatches an alert when a trade closes (Won, Lost, or Breakeven)."""
+        sym = getattr(trade, 'symbol', 'UNKNOWN')
+        sym_emoji = self._get_symbol_emoji(sym)
+        res_upper = (result or "").upper()
+
+        if res_upper in ("WIN", "WON"):
+            res_badge = "🏆 <b>TRADE WON (FULL TARGET)</b>"
+        elif res_upper in ("BREAKEVEN", "BE"):
+            res_badge = "🛡️ <b>TRADE CLOSED AT BREAKEVEN</b>"
+        else:
+            res_badge = "🛑 <b>TRADE STOPPED OUT (LOST)</b>"
+
+        r_str = f"{realized_r:+.2f}R" if realized_r is not None else "N/A"
+        exit_p = getattr(trade, 'exitPrice', 0.0) or 0.0
+        p_exit = self._format_price(exit_p, sym) if exit_p else "N/A"
+        pnl = getattr(trade, 'profitLoss', 0.0)
+
+        lesson_block = f"\n🧠 <b>AI Forensic Lesson:</b> <i>{lesson}</i>\n" if lesson else ""
+
+        msg = (
+            f"{res_badge}\n"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"{sym_emoji} <b>Instrument:</b> <code>{sym}</code> (#{getattr(trade, 'id', '')})\n"
+            f"🚪 <b>Exit Price:</b> <code>{p_exit}</code>\n"
+            f"📊 <b>Realized Performance:</b> <b>{r_str}</b> ({pnl:+.1f} pts)\n"
+            f"📝 <b>Exit Reason:</b> {exit_reason}"
+            f"{lesson_block}"
+            f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🔄 <i>Recorded to Falcon Trade History & AI Regime Memory.</i>"
+        )
+        self.dispatch_raw_message(msg)
+
+    def _format_price(self, p: float, sym: str) -> str:
+        s = sym.upper()
+        if "XAU" in s or "GOLD" in s:
+            return f"{p:.2f}"
+        elif "JPY" in s:
+            return f"{p:.3f}"
+        else:
+            return f"{p:.5f}"
+
 
 telegram_alert_service = TelegramAlertService()
+
 
 
