@@ -424,3 +424,103 @@ class OandaProvider(BaseProvider):
             logger.warning("[OANDA] Failed fetching candles for %s: %s", symbol, exc)
 
         return None
+
+    # ──────────────────────────────────────────────────────────────────
+    # Broker-Native Execution API (Orders)
+    # ──────────────────────────────────────────────────────────────────
+
+    def create_order(
+        self,
+        symbol: str,
+        units: int,
+        order_type: str = "LIMIT",
+        price: Optional[float] = None,
+        stop_loss: Optional[float] = None,
+        take_profit: Optional[float] = None,
+        time_in_force: str = "GTC",
+        client_tag: Optional[str] = None,
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Dispatch a native pending or market order with attached SL/TP directly to OANDA.
+
+        Parameters:
+        - symbol: Canonical symbol (e.g., 'GBPUSD', 'XAUUSD')
+        - units: Positive for BUY (e.g. 10000 = 0.10 lot), negative for SELL (-10000)
+        - order_type: "LIMIT", "STOP", or "MARKET"
+        - price: Target entry price (required for LIMIT / STOP)
+        - stop_loss: Hard Stop Loss price attached on fill
+        - take_profit: Hard Take Profit price attached on fill
+        - time_in_force: "GTC" (Good 'Til Cancelled) or "GFD" (Good For Day)
+        - client_tag: Optional tracking tag (e.g., signal ID or Falcon order ID)
+        """
+        if not self.configured or self._cb_should_block():
+            return None
+
+        canonical = symbol_mapper.normalize(symbol) or symbol.upper()
+        ticker = symbol_mapper.to_provider_symbol(canonical, self.PROVIDER_ID)
+
+        url = f"{self._base_url}/v3/accounts/{self._account_id}/orders"
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        order_spec: Dict[str, Any] = {
+            "instrument": ticker,
+            "units": str(int(units)),
+            "timeInForce": time_in_force,
+        }
+
+        o_type = order_type.upper()
+        if o_type in ("LIMIT", "STOP"):
+            order_spec["type"] = o_type
+            if price is not None:
+                dec = 2 if ("XAU" in canonical or "JPY" in canonical) else 5
+                order_spec["price"] = f"{price:.{dec}f}"
+        else:
+            order_spec["type"] = "MARKET"
+            order_spec["timeInForce"] = "FOK"
+
+        if stop_loss is not None:
+            dec = 2 if ("XAU" in canonical or "JPY" in canonical) else 5
+            order_spec["stopLossOnFill"] = {
+                "price": f"{stop_loss:.{dec}f}",
+                "timeInForce": "GTC",
+            }
+
+        if take_profit is not None:
+            dec = 2 if ("XAU" in canonical or "JPY" in canonical) else 5
+            order_spec["takeProfitOnFill"] = {
+                "price": f"{take_profit:.{dec}f}",
+                "timeInForce": "GTC",
+            }
+
+        if client_tag:
+            order_spec["clientExtensions"] = {
+                "id": str(client_tag)[:128],
+                "tag": "falcon-v10",
+                "comment": "Falcon Automated SMC",
+            }
+
+        payload = {"order": order_spec}
+
+        try:
+            resp = requests.post(url, headers=headers, json=payload, timeout=REQUEST_TIMEOUT_SECONDS)
+            if resp.status_code in (200, 201):
+                self._cb_record_success()
+                data = resp.json()
+                logger.info(
+                    "[OANDA] Order dispatched successfully for %s: %s units @ %s (Type: %s)",
+                    canonical, units, price, o_type
+                )
+                return data
+            else:
+                logger.warning(
+                    "[OANDA] Order rejected (%s): %s",
+                    resp.status_code, resp.text
+                )
+                return None
+        except Exception as exc:
+            logger.error("[OANDA] Failed to dispatch order for %s: %s", canonical, exc)
+            self._cb_record_failure()
+            return None

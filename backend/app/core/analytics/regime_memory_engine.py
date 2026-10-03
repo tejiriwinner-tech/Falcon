@@ -181,6 +181,35 @@ class RegimeMemoryEngine:
             )
         ) or datetime.now(timezone.utc)
 
+        # ── Check for Breakeven / Capital Defense ─────────────────────────────
+        is_breakeven = (
+            raw_result in ("BREAKEVEN", "BE")
+            or "break-even" in reason_exit.lower()
+            or "breakeven" in reason_exit.lower()
+            or "capital defended" in str(_extract_val(trade_record, "lesson_learned", "lessonLearned", default="") or "").lower()
+        )
+        if is_breakeven:
+            return PostMortemDiagnostic(
+                trade_id=trade_id,
+                symbol=symbol,
+                strategy_id=strategy_id,
+                outcome="BREAKEVEN",
+                pnl=pnl_val,
+                root_cause=RootCauseType.NORMAL_STOP_OUT,
+                rationale=reason_exit or "Stop loss triggered at Break-Even after target run. Capital defended.",
+                lesson_learned=(
+                    f"Capital defended on {symbol} by automated Break-Even trailing rule. "
+                    f"Risk-free trade lifecycle completed; strategy '{strategy_id}' baseline parameters maintained."
+                ),
+                prescribed_adaptation={
+                    "action": "MAINTAIN_CURRENT_RISK",
+                    "reinforce_strategy": False,
+                    "recommended_weight": 1.0,
+                    "atr_stop_multiplier_delta": 0.0,
+                },
+                timestamp=close_dt,
+            )
+
         # ── Check for Win / Take Profit ──────────────────────────────────────
         is_win = (raw_result in ("WIN", "WON")) or (pnl_val > 0.0)
         if is_win:

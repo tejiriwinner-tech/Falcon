@@ -93,13 +93,42 @@ class OrderExecutionService:
         self._orders[order_id] = item
         logger.info(f"Order created and queued: {order_id} ({item.action.value} {item.lot_size} {item.symbol})")
 
-        # Phase 5F Safety Gate: Automatic broker execution is strictly prohibited.
-        # Falcon is a decision-support system: Falcon -> Signal -> USER -> MT5 -> Exness.
-        # Orders remain PENDING for manual user execution / bridge synchronization only.
-        logger.info(
-            f"Order {order_id} recorded for decision-support tracking. "
-            "Automated broker order placement is strictly disabled."
-        )
+        # Phase 5F Safety Gate: Automatic broker execution toggle
+        from app.core.config import settings
+        if getattr(settings, "OANDA_AUTO_EXECUTE", False):
+            try:
+                from app.core.providers import _oanda_provider
+                if _oanda_provider and _oanda_provider.configured:
+                    is_gold = "XAU" in item.symbol or "GOLD" in item.symbol
+                    mult = 100 if is_gold else 100000
+                    units_val = int(round(float(item.lot_size) * mult))
+                    if item.action == OrderAction.SELL:
+                        units_val = -units_val
+
+                    o_type = "LIMIT" if item.order_type.upper() in ("LIMIT", "PENDING") else "MARKET"
+                    oanda_resp = _oanda_provider.create_order(
+                        symbol=item.symbol,
+                        units=units_val,
+                        order_type=o_type,
+                        price=item.entry_price,
+                        stop_loss=item.stop_loss,
+                        take_profit=item.take_profit,
+                        client_tag=item.order_id,
+                    )
+                    if oanda_resp:
+                        tx = oanda_resp.get("orderCreateTransaction") or oanda_resp.get("orderFillTransaction") or {}
+                        tx_id = tx.get("id")
+                        if tx_id:
+                            item.ticket_number = int(tx_id)
+                            item.broker_name = "OANDA"
+                            logger.info(f"OANDA order placed natively: Ticket #{tx_id}")
+            except Exception as ex:
+                logger.warning(f"Error dispatching native OANDA order for {order_id}: {ex}")
+        else:
+            logger.info(
+                f"Order {order_id} recorded for decision-support tracking. "
+                "Automated broker order placement is strictly disabled."
+            )
 
 
         # Send Telegram notification about dispatched order

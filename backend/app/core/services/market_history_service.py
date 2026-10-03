@@ -23,12 +23,30 @@ from app.core.services.session_budget_manager import session_budget_manager
 
 TWELVE_DATA_PROVIDER = "TwelveData"
 ALPHA_VANTAGE_PROVIDER = "AlphaVantage"
+OANDA_PROVIDER = "OANDA"
+
+_OANDA_GRANULARITY = {
+    "1m": "M1",
+    "5m": "M5",
+    "15m": "M15",
+    "15min": "M15",
+    "30m": "M30",
+    "30min": "M30",
+    "1h": "H1",
+    "60min": "H1",
+    "2h": "H2",
+    "4h": "H4",
+    "1d": "D",
+    "1D": "D",
+}
 
 _ALPHA_INTERVAL = {"1h": "60min", "30min": "30min", "15min": "15min"}
 _ALPHA_FX_PAIRS = {
     "EURUSD": ("EUR", "USD"),
     "GBPUSD": ("GBP", "USD"),
     "USDJPY": ("USD", "JPY"),
+    "GBPJPY": ("GBP", "JPY"),
+    "AUDUSD": ("AUD", "USD"),
     "XAUUSD": ("XAU", "USD"),
 }
 
@@ -47,6 +65,25 @@ class PriceBar:
 
 
 def _parse_bar_time(raw: str) -> Optional[datetime]:
+    if not raw:
+        return None
+    try:
+        cleaned = raw.replace("Z", "+00:00")
+        if "." in cleaned:
+            base, frac_tz = cleaned.split(".", 1)
+            if "+" in frac_tz:
+                frac, tz = frac_tz.split("+", 1)
+                cleaned = f"{base}.{frac[:6]}+{tz}"
+            elif "-" in frac_tz:
+                frac, tz = frac_tz.split("-", 1)
+                cleaned = f"{base}.{frac[:6]}-{tz}"
+            else:
+                cleaned = f"{base}.{frac_tz[:6]}"
+        dt = datetime.fromisoformat(cleaned)
+        return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    except Exception:
+        pass
+
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
         try:
             return datetime.strptime(raw, fmt).replace(tzinfo=timezone.utc)
@@ -74,6 +111,43 @@ class MarketHistoryService:
     # ------------------------------------------------------------------
     # Providers
     # ------------------------------------------------------------------
+
+    def _fetch_oanda(self, symbol: str, timeframe: str, limit: int) -> List[PriceBar]:
+        if not settings.OANDA_API_KEY:
+            return []
+        try:
+            from app.core.providers import _oanda_provider
+            if not _oanda_provider.configured:
+                return []
+            granularity = _OANDA_GRANULARITY.get(timeframe.lower(), "H1")
+            candles = _oanda_provider.fetch_candles(symbol, granularity=granularity, count=limit)
+        except Exception as exc:
+            self.last_error = f"OANDA candles error: {exc}"
+            return []
+
+        if not candles:
+            return []
+
+        bars: List[PriceBar] = []
+        for c in candles:
+            bar_time = _parse_bar_time(str(c.get("time", "")))
+            close = _to_float(c.get("close"))
+            if bar_time is None or close is None:
+                continue
+            bars.append(
+                PriceBar(
+                    symbol=symbol,
+                    timeframe=timeframe,
+                    bar_time=bar_time,
+                    open=_to_float(c.get("open")) or close,
+                    high=_to_float(c.get("high")) or close,
+                    low=_to_float(c.get("low")) or close,
+                    close=close,
+                    volume=_to_float(c.get("volume")),
+                    provider=OANDA_PROVIDER,
+                )
+            )
+        return bars
 
     def _fetch_twelve_data(self, symbol: str, timeframe: str, limit: int) -> List[PriceBar]:
         if not settings.TWELVEDATA_API_KEY:
@@ -289,7 +363,9 @@ class MarketHistoryService:
             if not force and last is not None and time.monotonic() - last < settings.HISTORY_REFRESH_SECONDS:
                 return 0
             self._last_refresh[key] = time.monotonic()
-        bars = self._fetch_twelve_data(symbol, timeframe, limit)
+        bars = self._fetch_oanda(symbol, timeframe, limit)
+        if not bars:
+            bars = self._fetch_twelve_data(symbol, timeframe, limit)
         if not bars:
             bars = self._fetch_alpha_vantage(symbol, timeframe, limit)
         if bars:

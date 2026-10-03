@@ -396,33 +396,44 @@ class SignalOutcomeResolver:
 
             # Evaluate boundary hits
             if direction == "BUY":
-                # For a BUY position, if current price or bid is at/below SL -> LOSS
+                # For a BUY position, if current price or bid is at/below SL
                 if current_price <= stop_loss or (bid > 0 and bid <= stop_loss):
-                    result = "LOSS"
-                    exit_price = stop_loss
-                # If current price or bid is at/above TP -> WIN
+                    if "BE_PROTECTED" in (trade.notes or "") or stop_loss >= entry:
+                        result = "BREAKEVEN"
+                        exit_price = stop_loss
+                    else:
+                        result = "LOST"
+                        exit_price = stop_loss
+                # If current price or bid is at/above TP -> WON
                 elif current_price >= take_profit or (bid > 0 and bid >= take_profit):
-                    result = "WIN"
+                    result = "WON"
                     exit_price = take_profit
             elif direction == "SELL":
-                # For a SELL position, if current price or ask is at/above SL -> LOSS
+                # For a SELL position, if current price or ask is at/above SL
                 if current_price >= stop_loss or (ask > 0 and ask >= stop_loss):
-                    result = "LOSS"
-                    exit_price = stop_loss
-                # If current price or ask is at/below TP -> WIN
+                    if "BE_PROTECTED" in (trade.notes or "") or stop_loss <= entry:
+                        result = "BREAKEVEN"
+                        exit_price = stop_loss
+                    else:
+                        result = "LOST"
+                        exit_price = stop_loss
+                # If current price or ask is at/below TP -> WON
                 elif current_price <= take_profit or (ask > 0 and ask <= take_profit):
-                    result = "WIN"
+                    result = "WON"
                     exit_price = take_profit
 
             # Handle optional simulation trigger for testing
             if result is None and force_simulate:
                 sig_key = trade.signalId or trade.id
-                if sig_key % 2 == 0:
-                    result = "WIN"
+                if sig_key % 3 == 0:
+                    result = "WON"
                     exit_price = take_profit
-                else:
-                    result = "LOSS"
+                elif sig_key % 3 == 1:
+                    result = "LOST"
                     exit_price = stop_loss
+                else:
+                    result = "BREAKEVEN"
+                    exit_price = entry
 
             if result is None:
                 open_count += 1
@@ -464,10 +475,12 @@ class SignalOutcomeResolver:
                 price_delta = entry - exit_price
 
             pnl = round(price_delta * multiplier, 2)
-            if result == "LOSS" and pnl >= 0:
+            if result in ("LOSS", "LOST") and pnl >= 0:
                 pnl = -round(risk_dist * multiplier, 2)
-            elif result == "WIN" and pnl <= 0:
+            elif result in ("WIN", "WON") and pnl <= 0:
                 pnl = round(reward_dist * multiplier, 2)
+            elif result in ("BREAKEVEN", "BE"):
+                pnl = max(0.0, round(price_delta * multiplier, 2))
 
             # Phase 5A / Blocker 1: Authoritative Realized R Multiple Calculation
             realized_r = None
@@ -480,12 +493,20 @@ class SignalOutcomeResolver:
                 else:
                     monetary_pnl = round(price_delta * 1000.0, 2)
 
-                if result == "WIN":
+                if result in ("WIN", "WON"):
                     realized_r = round(float(monetary_pnl) / float(initial_risk), 2)
-                elif result == "LOSS":
+                elif result in ("LOSS", "LOST"):
                     realized_r = -round(abs(float(monetary_pnl)) / float(initial_risk), 2)
                 elif result in ("BREAKEVEN", "BE"):
-                    realized_r = 0.0
+                    realized_r = 0.75 if "BE_PROTECTED" in (trade.notes or "") else 0.0
+
+            if realized_r is None:
+                if result in ("WIN", "WON"):
+                    realized_r = risk_reward
+                elif result in ("LOSS", "LOST"):
+                    realized_r = -1.0
+                elif result in ("BREAKEVEN", "BE"):
+                    realized_r = 0.75 if "BE_PROTECTED" in (trade.notes or "") else 0.0
 
             # Phase 5C: Excursion peak / trough & R finalization on close
             from app.core.analytics.execution_quality_service import execution_quality_service
@@ -496,9 +517,9 @@ class SignalOutcomeResolver:
             )
 
             # Step 5: Closed-Loop Autonomous Forensic Diagnostics via Regime Memory Engine
-            if result == "LOSS":
+            if result in ("LOSS", "LOST"):
                 losses_count += 1
-            else:
+            elif result in ("WIN", "WON"):
                 wins_count += 1
 
             market_context = {

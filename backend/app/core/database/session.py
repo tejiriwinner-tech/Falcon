@@ -38,6 +38,7 @@ def get_engine() -> Engine:
             normalize_database_url(settings.DATABASE_URL),
             echo=settings.DB_ECHO,
             pool_pre_ping=True,
+            pool_recycle=1800,
             pool_size=settings.DB_POOL_SIZE,
             max_overflow=settings.DB_MAX_OVERFLOW,
             connect_args={"connect_timeout": settings.DB_CONNECT_TIMEOUT},

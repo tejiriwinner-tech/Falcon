@@ -52,6 +52,8 @@ class Settings:
         "OANDA_BASE_URL",
         "https://api-fxpractice.oanda.com" if os.getenv("OANDA_ENVIRONMENT", "practice").lower() == "practice" else "https://api-fxtrade.oanda.com"
     )
+    OANDA_AUTO_EXECUTE: bool = os.getenv("OANDA_AUTO_EXECUTE", "False").lower() == "true"
+    FALCON_24_5_TRADING: bool = os.getenv("FALCON_24_5_TRADING", "True").lower() == "true"
 
     # How far ahead the economic calendar is fetched, and how long it is cached
     CALENDAR_LOOKAHEAD_DAYS: int = int(os.getenv("CALENDAR_LOOKAHEAD_DAYS", "7"))
@@ -68,8 +70,8 @@ class Settings:
     # Database (Supabase Postgres). Empty value keeps in-memory storage.
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL") or None
     DB_ECHO: bool = os.getenv("DB_ECHO", "False").lower() == "true"
-    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "5"))
-    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "5"))
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "10"))
+    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "10"))
     DB_CONNECT_TIMEOUT: int = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
 
     # Account equity the trade journal analytics are measured against
@@ -88,8 +90,8 @@ class Settings:
     USE_PRICE_HISTORY_FOR_SIGNALS: bool = os.getenv("USE_PRICE_HISTORY_FOR_SIGNALS", "true").lower() == "true"
 
     # Market Data Scheduler Configuration
-    # Watchlist of symbols to ingest for price_history (Primary 3 Core Assets)
-    MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD")
+    # Watchlist of symbols to ingest for price_history (6 Core Institutional Assets)
+    MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD,GBPJPY,USDJPY,AUDUSD")
     
     # Interval between market data ingestion cycles (seconds) - 36 minutes (2160s) = ~5 calls/hour across 3 assets
     MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "2160"))

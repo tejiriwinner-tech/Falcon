@@ -96,7 +96,10 @@ _PROVIDER_SYMBOL_MAP: Dict[str, Dict[str, str]] = {
         "XAUUSD": "XAU/USD",
         "GBPUSD": "GBP/USD",
         "EURUSD": "EUR/USD",
+        "GBPJPY": "GBP/JPY",
         "USDJPY": "USD/JPY",
+        "AUDUSD": "AUD/USD",
+        "USDCAD": "USD/CAD",
         "NAS100": "NAS100",
         "US30": "DJI",
         "BTCUSD": "BTC/USD",
@@ -116,7 +119,10 @@ _PROVIDER_SYMBOL_MAP: Dict[str, Dict[str, str]] = {
         "XAUUSD": "XAU/USD",
         "GBPUSD": "GBP/USD",
         "EURUSD": "EUR/USD",
+        "GBPJPY": "GBP/JPY",
         "USDJPY": "USD/JPY",
+        "AUDUSD": "AUD/USD",
+        "USDCAD": "USD/CAD",
         "BTCUSD": "BTC/USD",
         "ETHUSD": "ETH/USD",
     },
@@ -124,7 +130,9 @@ _PROVIDER_SYMBOL_MAP: Dict[str, Dict[str, str]] = {
         "XAUUSD": "XAUUSD",
         "GBPUSD": "GBPUSD",
         "EURUSD": "EURUSD",
+        "GBPJPY": "GBPJPY",
         "USDJPY": "USDJPY",
+        "AUDUSD": "AUDUSD",
         "NAS100": "NAS100",
         "US30": "US30",
         "BTCUSD": "BTCUSD",
@@ -145,7 +153,9 @@ _PROVIDER_SYMBOL_MAP: Dict[str, Dict[str, str]] = {
     "fmp": {
         "GBPUSD": "GBPUSD",
         "EURUSD": "EURUSD",
+        "GBPJPY": "GBPJPY",
         "USDJPY": "USDJPY",
+        "AUDUSD": "AUDUSD",
     }
 }
 

@@ -64,14 +64,20 @@ class SessionBudgetManager:
             self._current_day_key = day_key
             self._daily_calls_count = 0
 
-    def can_consume_call(self, dt: Optional[datetime] = None) -> bool:
+    def can_consume_call(self, provider_id: str = "unknown", dt: Optional[datetime] = None) -> bool:
         """
         Check if an external API call is permitted under session and budget constraints.
         Returns False if in STANDBY or if the hourly (65) or daily (780) quota ceiling is reached.
+        If provider is OANDA, call limits are bypassed because OANDA enforces no request quotas.
         """
         now = dt or datetime.now(timezone.utc)
         if not self.is_active(now):
             return False
+
+        # OANDA has no request caps or rate limits
+        from app.core.config import settings
+        if provider_id.lower() == "oanda" or (provider_id == "unknown" and getattr(settings, "OANDA_API_KEY", None)):
+            return True
 
         with self._lock:
             self._sync_buckets(now)
@@ -91,6 +97,9 @@ class SessionBudgetManager:
 
     def record_call(self, provider_id: str = "unknown", dt: Optional[datetime] = None) -> None:
         """Record an outbound live API call towards the hourly and daily budget."""
+        if provider_id.lower() == "oanda":
+            # OANDA has zero quota counting; do not deplete TwelveData allowance
+            return
         now = dt or datetime.now(timezone.utc)
         with self._lock:
             self._sync_buckets(now)
@@ -121,21 +130,33 @@ class SessionBudgetManager:
         Evaluate whether Falcon is in ACTIVE or STANDBY mode.
 
         Rules:
-          Monday-Friday:
-            07:00-19:00 UTC -> ACTIVE
-            19:00-07:00 UTC -> STANDBY
-          Saturday-Sunday:
-            STANDBY (forex & metals markets closed / dead spreads)
+          When OANDA is configured or FALCON_24_5_TRADING is True:
+            Monday 00:00 UTC through Friday 22:00 UTC -> ACTIVE 24/5
+            Friday 22:00 UTC through Sunday 21:00 UTC -> STANDBY (markets closed)
+          Legacy Fallback (free TwelveData tier only):
+            Monday-Friday 07:00-19:00 UTC -> ACTIVE
+            Outside hours or weekends -> STANDBY
         """
         now = dt or datetime.now(timezone.utc)
         weekday = now.weekday()  # 0 = Monday, 4 = Friday, 5 = Saturday, 6 = Sunday
         hour = now.hour
 
-        # Weekends are strictly STANDBY
-        if weekday in (5, 6):
+        from app.core.config import settings
+        is_24_5 = getattr(settings, "FALCON_24_5_TRADING", False) or bool(getattr(settings, "OANDA_API_KEY", None))
+
+        # Weekend closure evaluation (Forex & Gold markets closed)
+        if weekday == 5:  # Saturday
+            return SessionState.STANDBY
+        if weekday == 6 and hour < 21:  # Sunday before 21:00 UTC market open
+            return SessionState.STANDBY
+        if weekday == 4 and hour >= 22:  # Friday after 22:00 UTC market close
             return SessionState.STANDBY
 
-        # Monday-Friday: check hour range [07:00, 19:00) UTC
+        if is_24_5:
+            # Active 24 hours Monday through Friday
+            return SessionState.ACTIVE
+
+        # Legacy behavior: check hour range [07:00, 19:00) UTC
         if self.start_hour_utc <= hour < self.end_hour_utc:
             return SessionState.ACTIVE
 
@@ -157,20 +178,22 @@ class SessionBudgetManager:
         is_active = (state == SessionState.ACTIVE)
         telemetry = self.get_budget_telemetry(now)
 
+        from app.core.config import settings
+        is_24_5 = getattr(settings, "FALCON_24_5_TRADING", False) or bool(getattr(settings, "OANDA_API_KEY", None))
+
         return {
             "state": state.value,
             "isActive": is_active,
             "mode": "ACTIVE_SCANNING" if is_active else "MARKET_DATA_STANDBY",
             "currentTimeUtc": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
             "currentLocalTime": f"{local_hour:02d}:{now.minute:02d} (UTC+1)",
-            "activeWindowLocal": "08:00 - 20:00 (8:00 AM - 8:00 PM)",
-            "activeWindowUtc": f"{self.start_hour_utc:02d}:00 - {self.end_hour_utc:02d}:00 UTC",
+            "activeWindowLocal": "24/5 Continuous" if is_24_5 else "08:00 - 20:00 (8:00 AM - 8:00 PM)",
+            "activeWindowUtc": "24/5 (Mon 00:00 - Fri 22:00 UTC)" if is_24_5 else f"{self.start_hour_utc:02d}:00 - {self.end_hour_utc:02d}:00 UTC",
             "budgetPacing": telemetry,
             "message": (
-                f"Active prime market session. Paced at max {self.max_hourly_calls} calls/hour "
-                f"({telemetry['hourlyCallsRemaining']} remaining this hour)."
+                ("Active 24/5 institutional market session powered by OANDA broker feed." if is_24_5 else f"Active prime market session. Paced at max {self.max_hourly_calls} calls/hour.")
                 if is_active else
-                "STANDBY mode. Zero external market-price provider calls permitted to preserve TwelveData free quota."
+                "STANDBY mode (weekend market close / dead spreads)."
             ),
         }
 
