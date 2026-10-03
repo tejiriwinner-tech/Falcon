@@ -39,17 +39,25 @@ class SessionBudgetManager:
         end_hour_utc: int = DEFAULT_END_HOUR_UTC,
         max_hourly_calls: int = DEFAULT_MAX_HOURLY_CALLS,
         max_daily_calls: int = DEFAULT_MAX_DAILY_CALLS,
+        enable_24_5: Optional[bool] = None,
     ):
         self.start_hour_utc = start_hour_utc
         self.end_hour_utc = end_hour_utc
         self.max_hourly_calls = max_hourly_calls
         self.max_daily_calls = max_daily_calls
+        self.enable_24_5 = enable_24_5
 
         self._lock = threading.Lock()
         self._current_hour_key: str = ""
         self._hourly_calls_count: int = 0
         self._current_day_key: str = ""
         self._daily_calls_count: int = 0
+
+    def _is_24_5(self) -> bool:
+        if self.enable_24_5 is not None:
+            return self.enable_24_5
+        from app.core.config import settings
+        return getattr(settings, "FALCON_24_5_TRADING", False)
 
     def _sync_buckets(self, now: datetime) -> None:
         """Reset hourly and daily counters when time bucket rolls over."""
@@ -141,8 +149,7 @@ class SessionBudgetManager:
         weekday = now.weekday()  # 0 = Monday, 4 = Friday, 5 = Saturday, 6 = Sunday
         hour = now.hour
 
-        from app.core.config import settings
-        is_24_5 = getattr(settings, "FALCON_24_5_TRADING", False) or bool(getattr(settings, "OANDA_API_KEY", None))
+        is_24_5 = self._is_24_5()
 
         # Weekend closure evaluation (Forex & Gold markets closed)
         if weekday == 5:  # Saturday
@@ -178,8 +185,7 @@ class SessionBudgetManager:
         is_active = (state == SessionState.ACTIVE)
         telemetry = self.get_budget_telemetry(now)
 
-        from app.core.config import settings
-        is_24_5 = getattr(settings, "FALCON_24_5_TRADING", False) or bool(getattr(settings, "OANDA_API_KEY", None))
+        is_24_5 = self._is_24_5()
 
         return {
             "state": state.value,
@@ -187,7 +193,7 @@ class SessionBudgetManager:
             "mode": "ACTIVE_SCANNING" if is_active else "MARKET_DATA_STANDBY",
             "currentTimeUtc": now.strftime("%Y-%m-%d %H:%M:%S UTC"),
             "currentLocalTime": f"{local_hour:02d}:{now.minute:02d} (UTC+1)",
-            "activeWindowLocal": "24/5 Continuous" if is_24_5 else "08:00 - 20:00 (8:00 AM - 8:00 PM)",
+            "activeWindowLocal": "24/5 Continuous (08:00 - 20:00 Core)" if is_24_5 else "08:00 - 20:00 (8:00 AM - 8:00 PM)",
             "activeWindowUtc": "24/5 (Mon 00:00 - Fri 22:00 UTC)" if is_24_5 else f"{self.start_hour_utc:02d}:00 - {self.end_hour_utc:02d}:00 UTC",
             "budgetPacing": telemetry,
             "message": (

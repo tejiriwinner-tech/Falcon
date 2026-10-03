@@ -5,7 +5,7 @@ Manages order queue, MT5 bridge synchronization, trade journaling, and execution
 import logging
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 import uuid
 
 from app.core.repository.trade_journal_repository import trade_journal_repository
@@ -31,6 +31,7 @@ class OrderExecutionService:
     def __init__(self):
         self._orders: Dict[str, ExecutionOrderItem] = {}
         self.settings = ExecutionSettings()
+        self._execution_metrics: List[Dict[str, Any]] = []
 
     def create_order(self, order_in: ExecutionOrderCreate) -> ExecutionOrderItem:
         """Create and queue a new execution order."""
@@ -178,7 +179,19 @@ class OrderExecutionService:
         order.broker_name = confirm_in.broker_name
         order.executed_at = now
 
-        logger.info(f"Order {order_id} executed by MT5. Ticket #{confirm_in.ticket_number} @ {confirm_in.fill_price}")
+        # Record Latency and Slippage Metrics
+        latency_ms = (now - order.created_at).total_seconds() * 1000.0
+        slippage = confirm_in.slippage_pips or 0.0
+        self._execution_metrics.append({
+            "order_id": order_id,
+            "symbol": order.symbol,
+            "latency_ms": round(latency_ms, 2),
+            "slippage_pips": round(slippage, 2),
+            "executed_at": now.isoformat(),
+            "broker_name": confirm_in.broker_name or "MT5/OANDA",
+        })
+
+        logger.info(f"Order {order_id} executed. Latency: {latency_ms:.1f}ms, Slippage: {slippage:.1f} pips")
 
         # Update existing reservation or record into Falcon Trade Journal
         try:
@@ -291,6 +304,30 @@ class OrderExecutionService:
         telegram_alert_service.dispatch_raw_message(msg)
 
         return order
+
+    def get_execution_latency_metrics(self) -> Dict[str, Any]:
+        """Aggregate execution latency and slippage analytics."""
+        if not self._execution_metrics:
+            return {
+                "total_orders": 0,
+                "avg_latency_ms": 0.0,
+                "max_latency_ms": 0.0,
+                "avg_slippage_pips": 0.0,
+                "broker_status": "EXCELLENT",
+                "recent_metrics": [],
+            }
+        latencies = [m["latency_ms"] for m in self._execution_metrics]
+        slippages = [m["slippage_pips"] for m in self._execution_metrics]
+        avg_lat = sum(latencies) / len(latencies)
+        avg_slip = sum(slippages) / len(slippages)
+        return {
+            "total_orders": len(self._execution_metrics),
+            "avg_latency_ms": round(avg_lat, 2),
+            "max_latency_ms": round(max(latencies), 2),
+            "avg_slippage_pips": round(avg_slip, 2),
+            "broker_status": "EXCELLENT" if avg_lat < 250 else "NORMAL" if avg_lat < 1000 else "DEGRADED",
+            "recent_metrics": self._execution_metrics[-10:],
+        }
 
 
 order_execution_service = OrderExecutionService()

@@ -524,3 +524,96 @@ class OandaProvider(BaseProvider):
             logger.error("[OANDA] Failed to dispatch order for %s: %s", canonical, exc)
             self._cb_record_failure()
             return None
+
+    def get_account_summary(self) -> Optional[Dict[str, Any]]:
+        """Query OANDA account summary (NAV, balance, margin, currency)."""
+        if not self.configured or not self._cb_allow_request():
+            return None
+
+        url = f"{self._base_url}/v3/accounts/{self._account_id}/summary"
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+
+        try:
+            resp = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
+            if resp.status_code == 200:
+                self._cb_record_success()
+                data = resp.json().get("account", {})
+                return {
+                    "nav": float(data.get("NAV", data.get("balance", 0.0))),
+                    "balance": float(data.get("balance", 0.0)),
+                    "unrealized_pl": float(data.get("unrealizedPL", 0.0)),
+                    "margin_used": float(data.get("marginUsed", 0.0)),
+                    "margin_available": float(data.get("marginAvailable", 0.0)),
+                    "currency": data.get("currency", "USD"),
+                    "open_trade_count": int(data.get("openTradeCount", 0)),
+                    "pending_order_count": int(data.get("pendingOrderCount", 0)),
+                }
+            else:
+                logger.warning("[OANDA] get_account_summary failed (%s): %s", resp.status_code, resp.text)
+                return None
+        except Exception as exc:
+            logger.error("[OANDA] get_account_summary exception: %s", exc)
+            self._cb_record_failure()
+            return None
+
+    def get_open_trades(self) -> Optional[List[Dict[str, Any]]]:
+        """Fetch all currently open trades from OANDA."""
+        if not self.configured or not self._cb_allow_request():
+            return None
+
+        url = f"{self._base_url}/v3/accounts/{self._account_id}/openTrades"
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+
+        try:
+            resp = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
+            if resp.status_code == 200:
+                self._cb_record_success()
+                return resp.json().get("trades", [])
+            else:
+                logger.warning("[OANDA] get_open_trades failed (%s): %s", resp.status_code, resp.text)
+                return None
+        except Exception as exc:
+            logger.error("[OANDA] get_open_trades exception: %s", exc)
+            self._cb_record_failure()
+            return None
+
+    def get_pending_orders(self) -> Optional[List[Dict[str, Any]]]:
+        """Fetch all currently pending orders from OANDA."""
+        if not self.configured or not self._cb_allow_request():
+            return None
+
+        url = f"{self._base_url}/v3/accounts/{self._account_id}/pendingOrders"
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+
+        try:
+            resp = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
+            if resp.status_code == 200:
+                self._cb_record_success()
+                return resp.json().get("orders", [])
+            else:
+                logger.warning("[OANDA] get_pending_orders failed (%s): %s", resp.status_code, resp.text)
+                return None
+        except Exception as exc:
+            logger.error("[OANDA] get_pending_orders exception: %s", exc)
+            self._cb_record_failure()
+            return None
+
+    def get_trade_details(self, trade_id: str) -> Optional[Dict[str, Any]]:
+        """Fetch details of a specific trade (open or closed) from OANDA."""
+        if not self.configured or not self._cb_allow_request():
+            return None
+
+        url = f"{self._base_url}/v3/accounts/{self._account_id}/trades/{trade_id}"
+        headers = {"Authorization": f"Bearer {self._api_key}"}
+
+        try:
+            resp = requests.get(url, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
+            if resp.status_code == 200:
+                self._cb_record_success()
+                return resp.json().get("trade", {})
+            else:
+                return None
+        except Exception as exc:
+            logger.error("[OANDA] get_trade_details exception for %s: %s", trade_id, exc)
+            self._cb_record_failure()
+            return None

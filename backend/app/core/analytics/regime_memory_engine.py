@@ -111,6 +111,7 @@ class RegimeMemoryEngine:
             cls._instance = super(RegimeMemoryEngine, cls).__new__(cls)
             cls._instance._diagnostics_ledger = []
             cls._instance._strategy_health_cache = {}
+            cls._instance._paper_incubation_ledger = {}
         return cls._instance
 
     def __init__(self) -> None:
@@ -597,15 +598,33 @@ class RegimeMemoryEngine:
         else:
             profit_factor = 1.0 if total > 0 else 0.0
 
+        # Check for Paper Incubation Auto-Recovery
+        if not hasattr(self, "_paper_incubation_ledger") or self._paper_incubation_ledger is None:
+            self._paper_incubation_ledger = {}
+        paper_history = self._paper_incubation_ledger.get(strategy_id.lower(), [])
+        recent_paper = paper_history[-10:] if paper_history else []
+        paper_wins = sum(1 for pt in recent_paper if pt.get("result") in ("WIN", "WON") or pt.get("profit_loss", 0) > 0)
+        paper_total = len(recent_paper)
+        paper_win_rate = (paper_wins / paper_total) if paper_total > 0 else 0.0
+
         # Classification Logic
-        # Condition A: Quarantine to Paper
+        # Condition A: Quarantine to Paper (with Auto-Recovery check)
         if (total >= 3 and win_rate < 0.35) or consecutive_losses >= 3:
-            status = StrategyHealthStatus.QUARANTINED_PAPER
-            weight = 0.0
-            rationale = (
-                f"Quarantined to paper evaluation mode: win rate {win_rate*100:.1f}% (<35%) "
-                f"or consecutive losses {consecutive_losses} (>=3). Live risk paused."
-            )
+            if paper_total >= 5 and paper_win_rate >= 0.50:
+                status = StrategyHealthStatus.HEALTHY
+                weight = 1.0
+                rationale = (
+                    f"Auto-recovered from paper incubation: achieved {paper_win_rate*100:.1f}% win rate "
+                    f"across {paper_total} paper trades (>=50%). Restored to active 1.0x allocation."
+                )
+            else:
+                status = StrategyHealthStatus.QUARANTINED_PAPER
+                weight = 0.0
+                rationale = (
+                    f"Quarantined to paper evaluation mode: win rate {win_rate*100:.1f}% (<35%) "
+                    f"or consecutive losses {consecutive_losses} (>=3). Live risk paused. "
+                    f"Probationary paper incubation active."
+                )
         # Condition B: Boosted Allocation
         elif win_rate >= 0.60 and profit_factor >= 1.8:
             status = StrategyHealthStatus.BOOSTED
@@ -644,6 +663,25 @@ class RegimeMemoryEngine:
         )
         self._strategy_health_cache[strategy_id] = score
         return score
+
+    def record_paper_incubation_trade(
+        self, strategy_id: str, result: str, profit_loss: float = 0.0
+    ) -> None:
+        """Record synthetic paper execution to facilitate auto-recovery from quarantine."""
+        key = strategy_id.lower()
+        if not hasattr(self, "_paper_incubation_ledger") or self._paper_incubation_ledger is None:
+            self._paper_incubation_ledger = {}
+        self._paper_incubation_ledger.setdefault(key, []).append({
+            "result": result.upper(),
+            "profit_loss": profit_loss,
+            "recorded_at": datetime.now(timezone.utc),
+        })
+        logger.info(
+            "[Incubation] Recorded paper trade for strategy %s: result=%s, pnl=%.2f",
+            strategy_id, result, profit_loss
+        )
+        # Invalidate cached health score so next evaluation picks up recovery
+        self._strategy_health_cache.pop(strategy_id, None)
 
     # ─────────────────────────────────────────────────────────────────────────
     # 3. Memory Ledger & Aggregation

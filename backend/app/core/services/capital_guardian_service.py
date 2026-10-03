@@ -551,6 +551,59 @@ class CapitalGuardianService:
         except Exception as ex:
             logger.warning(f"Error checking streak loss ceiling in Capital Guardian: {ex}")
 
+        # Invariant 6C: Currency Cluster Correlation & Portfolio Exposure Gate
+        # Caps simultaneous directional exposure on correlated currency clusters when enabled
+        cluster_gate_enabled = getattr(settings, "ENABLE_CURRENCY_CLUSTER_GATE", False)
+        cluster_limit = getattr(settings, "MAX_CURRENCY_CLUSTER_EXPOSURE", 2)
+        if cluster_gate_enabled:
+            try:
+                prop_sym = proposal.symbol.replace("/", "").replace("_", "").upper()
+                prop_dir = dir_clean
+                prop_currencies = []
+                if "XAU" in prop_sym:
+                    prop_currencies.append(("GOLD", prop_dir))
+                    prop_currencies.append(("USD", "SELL" if prop_dir == "BUY" else "BUY"))
+                elif len(prop_sym) == 6:
+                    base, quote = prop_sym[:3], prop_sym[3:]
+                    prop_currencies.append((base, prop_dir))
+                    prop_currencies.append((quote, "SELL" if prop_dir == "BUY" else "BUY"))
+
+                for curr, direction in prop_currencies:
+                    matching_cluster_trades = 0
+                    for lt in live_trades:
+                        lt_sym = getattr(lt, "symbol", "").replace("/", "").replace("_", "").upper()
+                        lt_dir = getattr(lt, "direction", "").upper()
+                        if not lt_sym or not lt_dir:
+                            continue
+                        if "XAU" in lt_sym and curr == "USD":
+                            lt_usd_dir = "SELL" if lt_dir == "BUY" else "BUY"
+                            if lt_usd_dir == direction:
+                                matching_cluster_trades += 1
+                        elif len(lt_sym) == 6:
+                            lt_base, lt_quote = lt_sym[:3], lt_sym[3:]
+                            if lt_base == curr and lt_dir == direction:
+                                matching_cluster_trades += 1
+                            elif lt_quote == curr and ("SELL" if lt_dir == "BUY" else "BUY") == direction:
+                                matching_cluster_trades += 1
+
+                    if matching_cluster_trades >= cluster_limit:
+                        return CapitalGuardianDecision(
+                            allowed=False,
+                            reason=f"Currency cluster limit exceeded: Already {matching_cluster_trades} active trades with {direction} exposure to {curr}. Max allowed is {cluster_limit}.",
+                            state=GuardianState.NORMAL,
+                            activeTradingCapital=active_capital,
+                            protectedProfit=protected_profit,
+                            currentLiveTradeCount=current_count,
+                            maxLiveTradeCount=max_trades,
+                            currentAggregateWorstCaseLoss=current_agg_loss,
+                            proposedWorstCaseLoss=proposed_loss,
+                            aggregateWorstCaseLossAfter=agg_loss_after,
+                            remainingLossCapacity=remaining_capacity,
+                            cycleId=cycle.cycleId,
+                        )
+            except Exception as ex:
+                logger.warning(f"Error checking currency cluster exposure in Capital Guardian: {ex}")
+
         # Step 7: Authorization Granted
         new_remaining = active_capital - agg_loss_after
         return CapitalGuardianDecision(

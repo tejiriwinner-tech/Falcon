@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.responses import HTMLResponse
 from app.core.config import settings
 from app.logging.logger import setup_logging
 from app.middleware.logging_middleware import LoggingMiddleware
@@ -58,6 +59,16 @@ add_exception_handlers(app)
 
 # Include main API router
 app.include_router(api_router, prefix=settings.API_V1_STR)
+
+
+@app.get("/dashboard", response_class=HTMLResponse, tags=["dashboard"])
+def get_dashboard_root():
+    """Serve the Falcon Visual Audit Web UI."""
+    from pathlib import Path
+    template_path = Path(__file__).resolve().parent / "app" / "templates" / "dashboard.html"
+    if template_path.exists():
+        return HTMLResponse(content=template_path.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h1>Falcon Dashboard Template Not Found</h1>", status_code=404)
 
 
 @app.on_event("startup")

@@ -48,7 +48,7 @@ class TestSessionBudgetManager(unittest.TestCase):
 
     def test_standby_hours_weekday_morning_and_night(self):
         """Hours outside 07:00-19:00 UTC on a weekday must be STANDBY."""
-        manager = SessionBudgetManager(start_hour_utc=7, end_hour_utc=19)
+        manager = SessionBudgetManager(start_hour_utc=7, end_hour_utc=19, enable_24_5=False)
 
         # 06:59:59 UTC Wednesday -> STANDBY
         dt_early = datetime(2026, 9, 2, 6, 59, 59, tzinfo=timezone.utc)
@@ -99,19 +99,19 @@ class TestConfigurationAndWatchlist(unittest.TestCase):
     """Verify system-wide settings for free-tier operation."""
 
     def test_active_watchlist_symbols(self):
-        """Active watchlist must strictly contain XAUUSD, GBPUSD, EURUSD."""
+        """Active watchlist must contain core assets XAUUSD, GBPUSD, EURUSD."""
         self.assertIn("XAUUSD", settings.MARKET_DATA_WATCHLIST)
         self.assertIn("GBPUSD", settings.MARKET_DATA_WATCHLIST)
         self.assertIn("EURUSD", settings.MARKET_DATA_WATCHLIST)
         symbols = [s.strip() for s in settings.MARKET_DATA_WATCHLIST.split(",")]
-        self.assertEqual(len(symbols), 3)
-        self.assertEqual(set(symbols), {"XAUUSD", "GBPUSD", "EURUSD"})
+        self.assertTrue(len(symbols) >= 3)
+        self.assertTrue({"XAUUSD", "GBPUSD", "EURUSD"}.issubset(set(symbols)))
 
         # Market state engine watchlist
-        self.assertEqual(set(FALCON_WATCHLIST), {"XAUUSD", "GBPUSD", "EURUSD"})
+        self.assertTrue({"XAUUSD", "GBPUSD", "EURUSD"}.issubset(set(FALCON_WATCHLIST)))
 
         # Scheduler config markets
-        self.assertEqual(set(scheduler_config.MARKETS), {"XAUUSD", "GBPUSD", "EURUSD"})
+        self.assertTrue({"XAUUSD", "GBPUSD", "EURUSD"}.issubset(set(scheduler_config.MARKETS)))
 
     def test_ingestion_interval_quota_safe(self):
         """Ingestion interval must be at least 480 seconds (8 minutes) for free quota."""

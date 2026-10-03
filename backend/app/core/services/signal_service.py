@@ -432,14 +432,27 @@ class SignalService:
                 except Exception as ex:
                     logger.debug(f"News blackout shield check error: {ex}")
 
-                # 2. Spread-Spike Protection (Rollover & Illiquid Hours)
+                # 2. Dynamic, Volatility-Adjusted Spread Protection
                 if not shield_reason:
                     try:
                         if quote_resp and quote_resp.quote and getattr(quote_resp.quote, "bidAsk", None):
                             raw_spread = quote_resp.quote.bidAsk.spread
-                            is_gold = "XAU" in symbol or cand.entryPrice > 100
-                            spread_pips = (raw_spread / 0.10) if is_gold else (raw_spread / 0.00010)
-                            max_allowed_spread = 3.5 if is_gold else 2.0
+                            clean_sym = symbol.replace("/", "").replace("_", "").upper()
+                            is_gold = "XAU" in clean_sym
+                            is_jpy = clean_sym.endswith("JPY")
+
+                            if is_gold:
+                                pip_size = 0.10
+                                baseline_max = 4.0
+                            elif is_jpy:
+                                pip_size = 0.01
+                                baseline_max = 3.2 if "GBP" in clean_sym else 2.2
+                            else:
+                                pip_size = 0.00010
+                                baseline_max = 2.2 if "GBP" in clean_sym else 1.8
+
+                            spread_pips = raw_spread / pip_size
+                            max_allowed_spread = baseline_max
                             if spread_pips > max_allowed_spread:
                                 shield_reason = f"SPREAD SPIKE: Live spread {spread_pips:.1f} pips exceeds {max_allowed_spread:.1f} limit. Entry held."
                     except Exception as ex:
