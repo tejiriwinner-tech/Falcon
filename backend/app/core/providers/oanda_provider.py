@@ -34,6 +34,7 @@ from app.schemas.provider_models import (
     ProviderMetadata,
     ProviderStatistics,
     ProviderStatus,
+    ProviderType,
 )
 
 logger = logging.getLogger("falcon.providers.oanda")
@@ -193,11 +194,11 @@ class OandaProvider(BaseProvider):
         return ProviderMetadata(
             providerId=self.PROVIDER_ID,
             providerName=self.PROVIDER_NAME,
-            version=self.PROVIDER_VERSION,
-            providerType="BROKER",
+            providerVersion=self.PROVIDER_VERSION,
+            providerType=ProviderType.PRICE,
+            capabilities=_CAPABILITIES,
             status=st,
-            capabilities=self.capabilities,
-            description="OANDA v20 institutional broker market data and execution feed.",
+            health=self.health_check(),
         )
 
     def supports(self, capability: ProviderCapability) -> bool:
