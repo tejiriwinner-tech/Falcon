@@ -21,16 +21,23 @@ def test_symbol_mapper_gpbusd_normalization():
 
 
 def test_gbpusd_prioritizes_fmp_first():
-    """Verify that GBPUSD and GPBUSD candidate provider list routes FMP as Priority 1."""
+    """Verify that GBPUSD and GPBUSD candidate provider list routes FMP before TwelveData and AlphaVantage."""
     candidates_gbp = provider_manager._get_candidate_providers("GBPUSD")
     candidate_ids_gbp = [p.provider_id for p in candidates_gbp]
     assert len(candidate_ids_gbp) > 0
-    assert candidate_ids_gbp[0] == "fmp", f"Expected FMP first for GBPUSD, got: {candidate_ids_gbp}"
+    assert "fmp" in candidate_ids_gbp
+    # FMP must precede TwelveData and AlphaVantage for GBPUSD
+    fmp_idx = candidate_ids_gbp.index("fmp")
+    if "twelve_data" in candidate_ids_gbp:
+        assert fmp_idx < candidate_ids_gbp.index("twelve_data")
 
     candidates_gpb = provider_manager._get_candidate_providers("GPBUSD")
     candidate_ids_gpb = [p.provider_id for p in candidates_gpb]
     assert len(candidate_ids_gpb) > 0
-    assert candidate_ids_gpb[0] == "fmp", f"Expected FMP first for GPBUSD, got: {candidate_ids_gpb}"
+    assert "fmp" in candidate_ids_gpb
+    fmp_idx_gpb = candidate_ids_gpb.index("fmp")
+    if "twelve_data" in candidate_ids_gpb:
+        assert fmp_idx_gpb < candidate_ids_gpb.index("twelve_data")
 
 
 def test_other_instruments_strictly_exclude_fmp():
@@ -39,7 +46,8 @@ def test_other_instruments_strictly_exclude_fmp():
         candidates = provider_manager._get_candidate_providers(sym)
         candidate_ids = [p.provider_id for p in candidates]
         assert "fmp" not in candidate_ids, f"FMP must NOT be called for {sym}, but found in candidates: {candidate_ids}"
-        assert candidate_ids[0] == "twelve_data", f"Expected TwelveData first for {sym}, got: {candidate_ids}"
+        # Candidate 0 must be oanda (when configured) or twelve_data
+        assert candidate_ids[0] in ("oanda", "twelve_data"), f"Expected oanda or TwelveData first for {sym}, got: {candidate_ids}"
 
 
 def test_fmp_provider_supports_symbol_whitelist():

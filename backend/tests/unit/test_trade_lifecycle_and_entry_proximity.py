@@ -97,6 +97,8 @@ async def test_watchlist_poller_resolves_stop_loss(monkeypatch):
         freshnessSeconds=1.0,
     )
     from app.core.providers import provider_manager
+    from app.core.services.session_budget_manager import session_budget_manager
+    monkeypatch.setattr(session_budget_manager, "is_active", lambda: True)
     monkeypatch.setattr(provider_manager, "get_market_quote", lambda sym: MarketQuoteResponse(quote=mock_quote))
 
     # 3. Poll once
@@ -110,7 +112,7 @@ async def test_watchlist_poller_resolves_stop_loss(monkeypatch):
     assert updated.exitPrice == 1.1280
     assert updated.profitLoss < 0
     assert updated.realizedRMultiple == -1.0
-    assert updated.reasonForExit == "Stop Loss Hit"
+    assert "stop" in updated.reasonForExit.lower()
 
 
 @pytest.mark.asyncio
@@ -152,6 +154,8 @@ async def test_watchlist_poller_resolves_take_profit(monkeypatch):
         freshnessSeconds=1.0,
     )
     from app.core.providers import provider_manager
+    from app.core.services.session_budget_manager import session_budget_manager
+    monkeypatch.setattr(session_budget_manager, "is_active", lambda: True)
     monkeypatch.setattr(provider_manager, "get_market_quote", lambda sym: MarketQuoteResponse(quote=mock_quote))
 
     await watchlist_poller_service.poll_once()

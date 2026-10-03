@@ -15,20 +15,30 @@ from app.core.providers.provider_manager import ProviderManager
 from app.core.providers.twelve_data_provider import TwelveDataProvider
 from app.core.providers.fmp_provider import FmpProvider
 from app.core.providers.alpha_vantage_provider import AlphaVantageProvider
+from app.core.providers.oanda_provider import OandaProvider
 from app.core.providers.mock_price_provider import FalconMockPriceProvider
 from app.core.providers.provider_analytics import provider_analytics
 
 # ── Instantiate providers ──────────────────────────────────────────────────────
+_oanda_provider = OandaProvider()
 _twelve_data_provider = TwelveDataProvider()
 _alpha_vantage_provider = AlphaVantageProvider()
 _fmp_provider = FmpProvider()
 
 # ── Register providers in priority order ──────────────────────────────────────
-# Default global priority: TwelveData is Priority 1, FMP is Priority 2, Alpha Vantage is Priority 3.
-# (GBPUSD specifically routes via FMP Priority 1 in ProviderManager).
-provider_registry.register(_twelve_data_provider, priority=1)
-provider_registry.register(_fmp_provider, priority=2)
-provider_registry.register(_alpha_vantage_provider, priority=3)
+# When OANDA is configured, it is Priority 1 broker provider for all Forex and Gold.
+# TwelveData, FMP, and Alpha Vantage serve as fallbacks and historical data sources.
+if _oanda_provider.configured:
+    provider_registry.register(_oanda_provider, priority=1)
+    provider_registry.register(_twelve_data_provider, priority=2)
+    provider_registry.register(_fmp_provider, priority=3)
+    provider_registry.register(_alpha_vantage_provider, priority=4)
+else:
+    provider_registry.register(_twelve_data_provider, priority=1)
+    provider_registry.register(_fmp_provider, priority=2)
+    provider_registry.register(_alpha_vantage_provider, priority=3)
+    provider_registry.register(_oanda_provider, priority=4)
+
 
 # The synthetic price provider is opt-in: with ENABLE_MOCK_PROVIDER unset the
 # pipeline reports missing data instead of serving fabricated quotes.

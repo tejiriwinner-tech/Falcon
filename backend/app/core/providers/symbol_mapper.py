@@ -32,11 +32,43 @@ _ALIAS_MAP: Dict[str, str] = {
     "usd/jpy":  "USDJPY",
     "usd_jpy":  "USDJPY",
 
+    # GBPJPY
+    "gbpjpy":   "GBPJPY",
+    "gbp/jpy":  "GBPJPY",
+    "gbp_jpy":  "GBPJPY",
+    "guppy":    "GBPJPY",
+
+    # AUDUSD
+    "audusd":   "AUDUSD",
+    "aud/usd":  "AUDUSD",
+    "aud_usd":  "AUDUSD",
+
+    # USDCAD
+    "usdcad":   "USDCAD",
+    "usd/cad":  "USDCAD",
+    "usd_cad":  "USDCAD",
+
+    # NZDUSD
+    "nzdusd":   "NZDUSD",
+    "nzd/usd":  "NZDUSD",
+    "nzd_usd":  "NZDUSD",
+
+    # EURJPY
+    "eurjpy":   "EURJPY",
+    "eur/jpy":  "EURJPY",
+    "eur_jpy":  "EURJPY",
+
+    # EURGBP
+    "eurgbp":   "EURGBP",
+    "eur/gbp":  "EURGBP",
+    "eur_gbp":  "EURGBP",
+
     # Dow Jones
     "us30":     "US30",
     "dow":      "US30",
     "dji":      "US30",
     "djia":     "US30",
+
 
     # Nasdaq
     "nas100":   "NAS100",
@@ -97,6 +129,23 @@ _PROVIDER_SYMBOL_MAP: Dict[str, Dict[str, str]] = {
         "US30": "US30",
         "BTCUSD": "BTCUSD",
         "ETHUSD": "ETHUSD",
+    },
+    "oanda": {
+        "XAUUSD": "XAU_USD",
+        "GBPUSD": "GBP_USD",
+        "EURUSD": "EUR_USD",
+        "GBPJPY": "GBP_JPY",
+        "USDJPY": "USD_JPY",
+        "AUDUSD": "AUD_USD",
+        "USDCAD": "USD_CAD",
+        "NZDUSD": "NZD_USD",
+        "EURJPY": "EUR_JPY",
+        "EURGBP": "EUR_GBP",
+    },
+    "fmp": {
+        "GBPUSD": "GBPUSD",
+        "EURUSD": "EURUSD",
+        "USDJPY": "USDJPY",
     }
 }
 

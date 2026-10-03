@@ -334,6 +334,7 @@ class SignalService:
                 # Real-Time Live Market Quote Evaluation (Layer 2: Strict Freshness <= 60s)
                 cur_px = None
                 quote_age_s = 999.0
+                quote_resp = None
                 try:
                     raw_sym = symbol.replace("/", "").upper()
                     pm = getattr(providers, "provider_manager", None)
@@ -345,6 +346,8 @@ class SignalService:
                             if getattr(q_data, "lastPrice", None):
                                 cur_px = q_data.lastPrice
                                 quote_age_s = cached_entry.age_seconds
+                            if isinstance(q_data, MarketQuote):
+                                quote_resp = MarketQuoteResponse(quote=q_data)
 
                     # If cache missing or older than 60s, force real-time fetch (routes FMP first for Forex)
                     if (cur_px is None or quote_age_s > 60.0) and pm is not None:
@@ -352,6 +355,7 @@ class SignalService:
                         if resp and resp.quote and resp.quote.lastPrice:
                             cur_px = resp.quote.lastPrice
                             quote_age_s = getattr(resp.quote, "freshnessSeconds", 0.0) or 0.0
+                            quote_resp = resp
                 except Exception:
                     pass
 

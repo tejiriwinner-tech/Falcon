@@ -44,6 +44,15 @@ class Settings:
     ALPHA_BASE_URL: str = os.getenv("ALPHA_BASE_URL", "https://www.alphavantage.co/query")
     ALPHA_VANTAGE_API_KEY: Optional[str] = os.getenv("ALPHA_VANTAGE_API_KEY")
 
+    # OANDA v20 Configuration (Priority 1 Live Broker Feed)
+    OANDA_API_KEY: Optional[str] = os.getenv("OANDA_API_KEY")
+    OANDA_ACCOUNT_ID: Optional[str] = os.getenv("OANDA_ACCOUNT_ID")
+    OANDA_ENVIRONMENT: str = os.getenv("OANDA_ENVIRONMENT", "practice").lower()
+    OANDA_BASE_URL: str = os.getenv(
+        "OANDA_BASE_URL",
+        "https://api-fxpractice.oanda.com" if os.getenv("OANDA_ENVIRONMENT", "practice").lower() == "practice" else "https://api-fxtrade.oanda.com"
+    )
+
     # How far ahead the economic calendar is fetched, and how long it is cached
     CALENDAR_LOOKAHEAD_DAYS: int = int(os.getenv("CALENDAR_LOOKAHEAD_DAYS", "7"))
     CALENDAR_CACHE_SECONDS: int = int(os.getenv("CALENDAR_CACHE_SECONDS", "900"))

@@ -40,14 +40,17 @@ logger = logging.getLogger(__name__)
 _SKIP_STATUSES = {ProviderStatus.RATE_LIMITED, ProviderStatus.OFFLINE}
 
 # Instrument-aware provider routing matrix (canonical -> ordered allowed providers)
-# GBPUSD / GPBUSD is prioritized with FMP (sub-second real-time quotes); ALL other instruments strictly exclude FMP
+# OANDA is Priority 1 for all Forex pairs and Gold (zero delay, broker ticks);
+# GBPUSD / GPBUSD falls back to FMP; ALL other instruments strictly exclude FMP
 _INSTRUMENT_PROVIDER_ROUTE: Dict[str, List[str]] = {
-    "XAUUSD": ["twelve_data", "alpha_vantage", "mock_provider"],
-    "GBPUSD": ["fmp", "twelve_data", "alpha_vantage", "mock_provider"],
-    "GPBUSD": ["fmp", "twelve_data", "alpha_vantage", "mock_provider"],
-    "EURUSD": ["twelve_data", "alpha_vantage", "mock_provider"],
+    "XAUUSD": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
+    "GBPUSD": ["oanda", "fmp", "twelve_data", "alpha_vantage", "mock_provider"],
+    "GPBUSD": ["oanda", "fmp", "twelve_data", "alpha_vantage", "mock_provider"],
+    "EURUSD": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
+    "GBPJPY": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
+    "USDJPY": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
 }
-_DEFAULT_PROVIDER_ROUTE: List[str] = ["twelve_data", "alpha_vantage", "mock_provider"]
+_DEFAULT_PROVIDER_ROUTE: List[str] = ["oanda", "twelve_data", "alpha_vantage", "mock_provider"]
 
 _EVT_PROVIDER_SKIPPED_UNSUPPORTED = "ProviderSkippedUnsupported"
 
@@ -131,6 +134,74 @@ class ProviderManager:
             with self._lock:
                 self._pending_requests.pop(canonical, None)
 
+    def get_batch_quotes(self, raw_symbols: List[str]) -> Dict[str, MarketQuoteResponse]:
+        """Fetch quotes for multiple symbols with batch acceleration when supported by primary provider."""
+        results: Dict[str, MarketQuoteResponse] = {}
+        missing_canonical: List[str] = []
+
+        # 1. Check cache first
+        for sym in raw_symbols:
+            canonical = self._mapper.normalize(sym)
+            if not canonical:
+                continue
+            cached_entry = self._cache.get(canonical, allow_stale=False)
+            if cached_entry and isinstance(cached_entry.data, MarketQuote):
+                results[canonical] = MarketQuoteResponse(quote=cached_entry.data)
+            else:
+                missing_canonical.append(canonical)
+
+        if not missing_canonical:
+            return results
+
+        # 2. Try OANDA batch if available and configured
+        oanda = self._registry.get("oanda")
+        if oanda and getattr(oanda, "configured", False) and hasattr(oanda, "fetch_batch"):
+            try:
+                batch_data = oanda.fetch_batch(missing_canonical)
+                for c_sym, raw_data in batch_data.items():
+                    freshness = self._compute_quote_age_seconds(raw_data.get("timestamp"))
+                    quote = MarketQuote(
+                        symbol=c_sym,
+                        bidAsk=BidAsk(
+                            bid=raw_data["bid"],
+                            ask=raw_data["ask"],
+                            spread=raw_data["spread"],
+                        ),
+                        lastPrice=raw_data.get("lastPrice", raw_data.get("mid", 0.0)),
+                        change=raw_data.get("change", 0.0),
+                        changePercent=raw_data.get("changePercent", 0.0),
+                        timestamp=(
+                            datetime.fromisoformat(raw_data["timestamp"])
+                            if isinstance(raw_data["timestamp"], str)
+                            else raw_data["timestamp"]
+                        ),
+                        providerId=oanda.provider_id,
+                        providerName=oanda.provider_name,
+                        quoteStatus=QuoteStatus.LIVE,
+                        marketStatus=MarketStatus.OPEN,
+                        freshnessSeconds=freshness,
+                    )
+                    self._cache.set(
+                        symbol=c_sym,
+                        data=quote,
+                        provider_id=oanda.provider_id,
+                        provider_name=oanda.provider_name,
+                        ttl=compute_adaptive_ttl("ONLINE", 100.0),
+                    )
+                    results[c_sym] = MarketQuoteResponse(quote=quote)
+            except Exception as ex:
+                logger.warning("Error during OANDA batch quote fetch: %s", ex)
+
+        # 3. For any remaining symbols, fall back to get_market_quote individually
+        for sym in raw_symbols:
+            canonical = self._mapper.normalize(sym)
+            if canonical and canonical not in results:
+                q_resp = self.get_market_quote(canonical)
+                if q_resp:
+                    results[canonical] = q_resp
+
+        return results
+
     # ──────────────────────────────────────────────────────────────────
     # Internal fetch with state-aware skip + adaptive TTL
     # ──────────────────────────────────────────────────────────────────
@@ -159,6 +230,9 @@ class ProviderManager:
                 continue
             if pid in live_map:
                 provider = live_map[pid]
+                # Graceful failover: if provider requires credentials and is unconfigured, skip immediately
+                if hasattr(provider, "configured") and not provider.configured:
+                    continue
                 if hasattr(provider, "supports_symbol") and not provider.supports_symbol(canonical):
                     continue
                 candidates.append(provider)
