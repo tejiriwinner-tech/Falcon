@@ -72,9 +72,9 @@ class Settings:
     # Database (Supabase Postgres). Empty value keeps in-memory storage.
     DATABASE_URL: Optional[str] = os.getenv("DATABASE_URL") or None
     DB_ECHO: bool = os.getenv("DB_ECHO", "False").lower() == "true"
-    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "10"))
-    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "10"))
-    DB_CONNECT_TIMEOUT: int = int(os.getenv("DB_CONNECT_TIMEOUT", "10"))
+    DB_POOL_SIZE: int = int(os.getenv("DB_POOL_SIZE", "3"))
+    DB_MAX_OVERFLOW: int = int(os.getenv("DB_MAX_OVERFLOW", "2"))
+    DB_CONNECT_TIMEOUT: int = int(os.getenv("DB_CONNECT_TIMEOUT", "5"))
 
     # Account equity the trade journal analytics are measured against
     STARTING_EQUITY: float = float(os.getenv("STARTING_EQUITY", "10000"))

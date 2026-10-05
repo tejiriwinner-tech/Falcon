@@ -204,6 +204,11 @@ class DashboardService:
             total_missions = 0
             total_artifacts = 0
 
+        try:
+            total_strategies = len(self.strategy_engine.get_strategies())
+        except Exception:
+            total_strategies = 4
+
         # Build summary with real data
         summary = DashboardSummary(
             providerStatus="ONLINE" if online_count > 0 else "OFFLINE",
@@ -212,7 +217,7 @@ class DashboardService:
             activeProviders=online_count,
             connectedProvider=connected_provider,
             watchedSymbols=watchlist_symbols,
-            totalStrategies=len(self.strategy_engine.get_strategies()),
+            totalStrategies=total_strategies,
             totalSignals=0,  # Will be updated from real signals
             totalMissions=total_missions,
             totalArchivedArtifacts=total_artifacts,
@@ -335,13 +340,20 @@ class DashboardService:
 
         # Dynamic Confidence History across recent missions
         conf_history = []
-        hist_missions = recent_missions[-5:] if len(recent_missions) >= 5 else recent_missions
-        for m in hist_missions:
-            arts = mission_repository.get_mission_artifacts(m.id)
-            decs = arts.get("decisions", [])
-            if decs:
-                top_d = max(decs, key=lambda d: float(getattr(d, "decisionConfidence", 0.0)))
-                conf_history.append(int(round(float(getattr(top_d, "decisionConfidence", 80.0)))))
+        try:
+            hist_missions = recent_missions[-5:] if len(recent_missions) >= 5 else recent_missions
+            for m in hist_missions:
+                try:
+                    arts = mission_repository.get_mission_artifacts(m.id)
+                    decs = arts.get("decisions", [])
+                    if decs:
+                        top_d = max(decs, key=lambda d: float(getattr(d, "decisionConfidence", 0.0)))
+                        conf_history.append(int(round(float(getattr(top_d, "decisionConfidence", 80.0)))))
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
         if not conf_history:
             conf_history = [dyn_conf]
 
@@ -432,12 +444,18 @@ class DashboardService:
 
         # Compute real analytics summary from trade journal
         from app.core.repository.trade_journal_repository import trade_journal_repository
-        trades = trade_journal_repository.list_trades()
-        closed_trades = [t for t in trades if getattr(t, "status", "").upper() == "CLOSED"]
-        win_trades = [t for t in closed_trades if (getattr(t, "profitLoss", 0) or 0) > 0]
-        win_rate = round((len(win_trades) / len(closed_trades)) * 100.0, 1) if closed_trades else 0.0
-        net_profit = round(sum(getattr(t, "profitLoss", 0.0) or 0.0 for t in closed_trades), 2)
-        trading_score = min(100, int(win_rate * 0.8 + 20)) if closed_trades else 0
+        try:
+            trades = trade_journal_repository.list_trades()
+            closed_trades = [t for t in trades if getattr(t, "status", "").upper() == "CLOSED"]
+            win_trades = [t for t in closed_trades if (getattr(t, "profitLoss", 0) or 0) > 0]
+            win_rate = round((len(win_trades) / len(closed_trades)) * 100.0, 1) if closed_trades else 0.0
+            net_profit = round(sum(getattr(t, "profitLoss", 0.0) or 0.0 for t in closed_trades), 2)
+            trading_score = min(100, int(win_rate * 0.8 + 20)) if closed_trades else 0
+        except Exception:
+            trades = []
+            win_rate = 0.0
+            net_profit = 0.0
+            trading_score = 0
 
         # Compute real provider health detail
         provider_health: List[ProviderHealthDetail] = []

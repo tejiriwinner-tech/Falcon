@@ -17,15 +17,16 @@ DATABASE_URL = os.getenv(
 # Create engine with connection pooling for PostgreSQL
 if "postgresql" in DATABASE_URL or "supabase" in DATABASE_URL:
     # PostgreSQL/Supabase connection pool configuration
-    # Use settings for configurable pool sizes
+    # Keep pool minimal (2-3 connections) so Fly.io multi-worker machines do not exhaust Supabase pooler
     engine = create_engine(
         DATABASE_URL,
-        pool_size=settings.DB_POOL_SIZE,  # Maximum number of connections to keep in pool
-        max_overflow=settings.DB_MAX_OVERFLOW,  # Maximum number of connections beyond pool_size
-        pool_pre_ping=True,  # Test connections before using
-        pool_recycle=3600,  # Recycle connections after 1 hour
-        pool_timeout=settings.DB_CONNECT_TIMEOUT,  # Connection timeout
-        echo=settings.DB_ECHO  # Enable query logging in development
+        pool_size=settings.DB_POOL_SIZE,
+        max_overflow=settings.DB_MAX_OVERFLOW,
+        pool_pre_ping=True,
+        pool_recycle=600,
+        pool_timeout=settings.DB_CONNECT_TIMEOUT,
+        connect_args={"connect_timeout": settings.DB_CONNECT_TIMEOUT},
+        echo=settings.DB_ECHO
     )
 else:
     # SQLite configuration with optimizations

@@ -120,14 +120,35 @@ def last_used_by_strategy() -> Dict[str, Optional[str]]:
         return dict(_last_used_cache)
 
     last_used: Dict[str, Optional[str]] = {}
-    missions = mission_repository.get_all_missions()
-    # Check the most recent 15 missions in reverse to find the latest usage instantly
-    recent_missions = list(reversed(missions[-15:] if len(missions) > 15 else missions))
-    for mission in recent_missions:
-        artifacts = mission_repository.get_mission_artifacts(mission.id)
-        for candidate in artifacts.get("candidates", []):
-            if candidate.strategyId not in last_used:
-                last_used[candidate.strategyId] = candidate.generatedAt
+    try:
+        missions = mission_repository.get_all_missions()
+        recent_missions = list(reversed(missions[-15:] if len(missions) > 15 else missions))
+        recent_ids = [m.id for m in recent_missions]
+        
+        # Use bulk lookup if available on storage
+        bulk_artifacts = {}
+        if hasattr(mission_repository._storage, "get_all_artifacts_bulk"):
+            try:
+                bulk_artifacts = mission_repository._storage.get_all_artifacts_bulk(recent_ids)
+            except Exception:
+                bulk_artifacts = {}
+
+        for mission in recent_missions:
+            if mission.id in bulk_artifacts:
+                cands = bulk_artifacts[mission.id].get("candidates", []) or bulk_artifacts[mission.id].get("CANDIDATE", [])
+            else:
+                try:
+                    artifacts = mission_repository.get_mission_artifacts(mission.id)
+                    cands = artifacts.get("candidates", [])
+                except Exception:
+                    cands = []
+
+            for candidate in cands:
+                s_id = getattr(candidate, "strategyId", None)
+                if s_id and s_id not in last_used:
+                    last_used[s_id] = getattr(candidate, "generatedAt", None)
+    except Exception:
+        pass
 
     _last_used_cache = last_used
     _last_used_at = now

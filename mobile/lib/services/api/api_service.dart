@@ -521,7 +521,11 @@ class ApiService {
 
 
   Future<DashboardResponse> getDashboard() async {
-    return _get<DashboardResponse>('/dashboard', DashboardResponse.fromJson);
+    return _get<DashboardResponse>(
+      '/dashboard',
+      DashboardResponse.fromJson,
+      timeoutSecondsOverride: 30,
+    );
   }
 
 

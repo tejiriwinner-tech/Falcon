@@ -139,6 +139,10 @@ class OandaProvider(BaseProvider):
                     self._is_trial_request = True
             return self._cb_state
 
+    def _cb_allow_request(self) -> bool:
+        """Returns True if the circuit breaker allows an outgoing request."""
+        return not self._cb_should_block()
+
     def _cb_should_block(self) -> bool:
         with self._cb_lock:
             if self._cb_state == _CB_CLOSED:
