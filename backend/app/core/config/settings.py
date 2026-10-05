@@ -95,8 +95,8 @@ class Settings:
     # Watchlist of symbols to ingest for price_history (6 Core Institutional Assets)
     MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD,GBPJPY,USDJPY,AUDUSD")
     
-    # Interval between market data ingestion cycles (seconds) - 15 seconds for continuous real-time OANDA feed
-    MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "15"))
+    # Interval between market data ingestion cycles (seconds) - 900s (15 min) for higher-timeframe bar backfilling
+    MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "900"))
     
     # Initial delay before first ingestion cycle (seconds)
     INITIAL_BACKFILL_DELAY_SECONDS: int = int(os.getenv("INITIAL_BACKFILL_DELAY_SECONDS", "30"))

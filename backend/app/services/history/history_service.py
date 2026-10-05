@@ -153,6 +153,15 @@ class HistoryService:
         self._cache[cache_key] = (candles, datetime.now(timezone.utc))
         
         return candles
+
+    def get_candles(
+        self,
+        symbol: str,
+        timeframe: Timeframe,
+        limit: int = 100
+    ) -> List[MarketCandle]:
+        """Alias for get_latest_candles."""
+        return self.get_latest_candles(symbol, timeframe, limit)
     
     def get_historical_candles(
         self,
