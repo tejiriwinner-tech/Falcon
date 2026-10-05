@@ -256,7 +256,7 @@ class CapitalGuardianService:
             # Established contract sizes for supported Falcon USD instruments
             if "XAU" in sym_clean or "GOLD" in sym_clean:
                 units = lot_dec * Decimal("100")  # 100 oz per standard lot
-            elif sym_clean in ("EURUSD", "GBPUSD"):
+            elif sym_clean in ("EURUSD", "GBPUSD", "AUDUSD"):
                 units = lot_dec * Decimal("100000")  # 100,000 units per standard lot
             else:
                 raise ValueError(

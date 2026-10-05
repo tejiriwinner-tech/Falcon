@@ -210,9 +210,9 @@ class DatabaseMissionStorage:
     def get_all_missions(self) -> List[MissionReport]:
         with get_session() as session:
             records = session.scalars(
-                select(MissionRecord).order_by(MissionRecord.stored_at)
+                select(MissionRecord).order_by(MissionRecord.stored_at.desc()).limit(50)
             ).all()
-            return [MissionReport.model_validate(record.payload) for record in records]
+            return [MissionReport.model_validate(record.payload) for record in reversed(records)]
 
     def get_recent_missions(self, limit: int = 20) -> List[MissionReport]:
         with get_session() as session:
@@ -258,12 +258,18 @@ class DatabaseMissionStorage:
                         pass
         return result
 
-    def get_all_artifacts_bulk(self, mission_ids: Optional[List[str]] = None) -> Dict[str, Dict[str, List[BaseModel]]]:
+    def get_all_artifacts_bulk(
+        self,
+        mission_ids: Optional[List[str]] = None,
+        artifact_types: Optional[List[str]] = None,
+    ) -> Dict[str, Dict[str, List[BaseModel]]]:
         results: Dict[str, Dict[str, List[BaseModel]]] = {}
         with get_session() as session:
             stmt = select(MissionArtifactRecord).order_by(MissionArtifactRecord.mission_id, MissionArtifactRecord.position)
             if mission_ids:
                 stmt = stmt.where(MissionArtifactRecord.mission_id.in_(mission_ids))
+            if artifact_types:
+                stmt = stmt.where(MissionArtifactRecord.artifact_type.in_(artifact_types))
             records = session.scalars(stmt).all()
             for record in records:
                 mid = record.mission_id

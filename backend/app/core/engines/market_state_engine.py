@@ -36,8 +36,8 @@ _FRESH_MAX_SECONDS: float = 300.0          # 0–5 min (current candle window is
 _STALE_MAX_SECONDS: float = 900.0          # 5–15 min (prior candle window is STALE)
 # Beyond 15 min → EXPIRED
 
-# ── Watchlist (Focused 3 Primary Core Assets) ─────────────────────────────────
-FALCON_WATCHLIST: List[str] = ["XAUUSD", "GBPUSD", "EURUSD"]
+# ── Watchlist (6 Core Institutional Assets) ───────────────────────────────────
+FALCON_WATCHLIST: List[str] = ["XAUUSD", "GBPUSD", "EURUSD", "GBPJPY", "USDJPY", "AUDUSD"]
 
 # ── Trend classification thresholds ──────────────────────────────────────────
 # Phase 4.3: simple deterministic classification from changePercent.
@@ -258,10 +258,11 @@ class MarketStateEngine:
         primary_freshness: float = 0.0
         freshness_values: List[float] = []
 
-        # ── Fetch all symbols via ProviderManager ─────────────────────────────
+        # ── Fetch all symbols via ProviderManager (batch-optimized) ───────────
+        batch_res = provider_manager.get_batch_quotes(symbols)
         for sym in symbols:
-            quote_resp = provider_manager.get_market_quote(sym)
-            if quote_resp is None:
+            quote_resp = batch_res.get(sym)
+            if quote_resp is None or getattr(quote_resp, "quote", None) is None:
                 continue  # provider unavailable — exclude, do not fabricate
             q = quote_resp.quote
 

@@ -473,7 +473,9 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
                     DropdownMenuItem(value: 'XAUUSD', child: Text('XAU')),
                     DropdownMenuItem(value: 'EURUSD', child: Text('EUR')),
                     DropdownMenuItem(value: 'GBPUSD', child: Text('GBP')),
-                    DropdownMenuItem(value: 'USDJPY', child: Text('JPY')),
+                    DropdownMenuItem(value: 'GBPJPY', child: Text('GJ')),
+                    DropdownMenuItem(value: 'USDJPY', child: Text('UJ')),
+                    DropdownMenuItem(value: 'AUDUSD', child: Text('AUD')),
                   ],
                   onChanged: (val) {
                     if (val != null) setState(() => _selectedSymbol = val);
@@ -748,6 +750,9 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
                   items: const [
                     DropdownMenuItem(value: 'EURUSD', child: Text('EUR/USD')),
                     DropdownMenuItem(value: 'GBPUSD', child: Text('GBP/USD')),
+                    DropdownMenuItem(value: 'GBPJPY', child: Text('GBP/JPY')),
+                    DropdownMenuItem(value: 'USDJPY', child: Text('USD/JPY')),
+                    DropdownMenuItem(value: 'AUDUSD', child: Text('AUD/USD')),
                     DropdownMenuItem(value: 'XAUUSD', child: Text('Gold (XAU)')),
                   ],
                   onChanged: (val) {

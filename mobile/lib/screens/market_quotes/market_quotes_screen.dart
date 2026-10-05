@@ -43,7 +43,7 @@ class _MarketQuotesScreenState extends State<MarketQuotesScreen> {
   void _fetchData() {
     setState(() {
       _watchlistFuture = _apiService.getWatchlist(
-        symbols: ['XAUUSD', 'GBPUSD', 'EURUSD', 'USDJPY', 'NAS100', 'US30'],
+        symbols: ['XAUUSD', 'GBPUSD', 'EURUSD', 'GBPJPY', 'USDJPY', 'AUDUSD', 'NAS100', 'US30'],
       );
       _providersFuture = _apiService.getProviders();
       _lastRefresh = DateTime.now();

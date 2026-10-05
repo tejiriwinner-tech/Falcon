@@ -31,7 +31,7 @@ class _IntelligenceScreenState extends State<IntelligenceScreen> {
   String? _errorMessage;
   final ApiService _apiService = ApiService();
 
-  final List<String> _symbols = ['XAUUSD', 'GBPUSD', 'EURUSD', 'USDJPY'];
+  final List<String> _symbols = ['XAUUSD', 'GBPUSD', 'EURUSD', 'GBPJPY', 'USDJPY', 'AUDUSD'];
   final List<String> _timeframes = ['M5', 'M15', 'M30', 'H1', 'H4', 'D1'];
 
   @override

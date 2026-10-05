@@ -129,7 +129,7 @@ class ExecutionQualityService:
         # Established contract sizes for supported Falcon USD instruments
         if "XAU" in sym_clean or "GOLD" in sym_clean:
             units = Decimal("1.0")  # 100 oz/lot * 0.01 lot = 1 oz
-        elif sym_clean in ("EURUSD", "GBPUSD"):
+        elif sym_clean in ("EURUSD", "GBPUSD", "AUDUSD"):
             units = Decimal("1000.0")  # 100,000 units/lot * 0.01 lot = 1,000 units
         else:
             return None, None

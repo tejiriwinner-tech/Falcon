@@ -128,6 +128,8 @@ class SignalSignatureRepository:
     def __init__(self) -> None:
         self._in_memory = InMemorySignalSignatureStorage()
         self._tables_initialized = False
+        self._cached_resolved: Optional[Set[Tuple[str, str, float, float, float]]] = None
+        self._cached_resolved_at: float = 0.0
 
     def _ensure_schema(self) -> None:
         if not self._tables_initialized and database_enabled():
@@ -152,41 +154,49 @@ class SignalSignatureRepository:
         status: str = "ACTIVE",
     ) -> str:
         sig_key = format_signature_key(symbol, direction, entry_price, stop_loss, take_profit)
+        existing = self._in_memory.get_signature(sig_key)
+        if existing and (existing.get("status") or "").upper() == status.upper():
+            return sig_key
+
         self._in_memory.record_signature(
             sig_key, symbol, direction, entry_price, stop_loss, take_profit, status
         )
+        self._cached_resolved = None
 
         if database_enabled():
-            self._ensure_schema()
-            try:
-                session = get_session()
+            def _async_persist():
                 try:
-                    now = datetime.now(timezone.utc)
-                    record = session.get(SignalSignatureRecord, sig_key)
-                    if record is None:
-                        record = SignalSignatureRecord(
-                            signature=sig_key,
-                            symbol=symbol.replace("/", "").upper(),
-                            direction=direction.upper(),
-                            entry_price=round(float(entry_price), 4),
-                            stop_loss=round(float(stop_loss), 4),
-                            take_profit=round(float(take_profit), 4),
-                            status=status.upper(),
-                            created_at=now,
-                            updated_at=now,
-                        )
-                        session.add(record)
-                    else:
-                        record.status = status.upper()
-                        record.updated_at = now
-                    session.commit()
+                    self._ensure_schema()
+                    session = get_session()
+                    try:
+                        now = datetime.now(timezone.utc)
+                        record = session.get(SignalSignatureRecord, sig_key)
+                        if record is None:
+                            record = SignalSignatureRecord(
+                                signature=sig_key,
+                                symbol=symbol.replace("/", "").upper(),
+                                direction=direction.upper(),
+                                entry_price=round(float(entry_price), 4),
+                                stop_loss=round(float(stop_loss), 4),
+                                take_profit=round(float(take_profit), 4),
+                                status=status.upper(),
+                                created_at=now,
+                                updated_at=now,
+                            )
+                            session.add(record)
+                        else:
+                            record.status = status.upper()
+                            record.updated_at = now
+                        session.commit()
+                    except Exception as ex:
+                        session.rollback()
+                        logger.warning(f"Error persisting signal signature to DB: {ex}")
+                    finally:
+                        session.close()
                 except Exception as ex:
-                    session.rollback()
-                    logger.warning(f"Error persisting signal signature to DB: {ex}")
-                finally:
-                    session.close()
-            except Exception as ex:
-                logger.warning(f"Database session error for signal signature: {ex}")
+                    logger.warning(f"Database session error for signal signature: {ex}")
+
+            threading.Thread(target=_async_persist, daemon=True).start()
 
         return sig_key
 
@@ -252,6 +262,11 @@ class SignalSignatureRepository:
         return tuples
 
     def get_resolved_signatures(self) -> Set[Tuple[str, str, float, float, float]]:
+        import time as _t
+        now_mono = _t.monotonic()
+        if self._cached_resolved is not None and (now_mono - self._cached_resolved_at) < 30.0:
+            return set(self._cached_resolved)
+
         resolved_keys = set(self._in_memory.get_resolved_signatures())
         if database_enabled():
             self._ensure_schema()
@@ -274,6 +289,8 @@ class SignalSignatureRepository:
             parsed = parse_signature_key(k)
             if parsed:
                 tuples.add(parsed)
+        self._cached_resolved = set(tuples)
+        self._cached_resolved_at = _t.monotonic()
         return tuples
 
     def update_status(

@@ -418,12 +418,33 @@ class TradeJournalRepository:
             else InMemoryTradeJournalStorage()
         )
 
+    def __init__(self) -> None:
+        self._cached_trades: Optional[List[TradeJournalItem]] = None
+        self._cached_trades_at: float = 0.0
+        self._cache_lock = threading.Lock()
+
+    def _invalidate_cache(self) -> None:
+        with self._cache_lock:
+            self._cached_trades = None
+            self._cached_trades_at = 0.0
+
     @property
     def persistent(self) -> bool:
         return isinstance(self._storage, DatabaseTradeJournalStorage)
 
     def list_trades(self, session: Optional[object] = None) -> List[TradeJournalItem]:
-        return self._storage.list_trades(session=session)
+        import time as _t
+        now_m = _t.monotonic()
+        if session is None:
+            with self._cache_lock:
+                if self._cached_trades is not None and (now_m - self._cached_trades_at) < 15.0:
+                    return [copy.deepcopy(t) for t in self._cached_trades]
+        trades = self._storage.list_trades(session=session)
+        if session is None:
+            with self._cache_lock:
+                self._cached_trades = trades
+                self._cached_trades_at = _t.monotonic()
+        return trades
 
     def list_closed_trades_as_of(
         self,
@@ -439,28 +460,35 @@ class TradeJournalRepository:
         return self._storage.get_trade(trade_id, session=session)
 
     def create_trade(self, payload: TradeJournalCreate, session: Optional[object] = None) -> TradeJournalItem:
+        self._invalidate_cache()
         return self._storage.create_trade(payload, session=session)
 
     def update_trade(
         self, trade_id: int, payload: TradeJournalUpdate, session: Optional[object] = None
     ) -> Optional[TradeJournalItem]:
+        self._invalidate_cache()
         return self._storage.update_trade(trade_id, payload, session=session)
 
     def delete_trade(self, trade_id: int, session: Optional[object] = None) -> bool:
+        self._invalidate_cache()
         return self._storage.delete_trade(trade_id, session=session)
 
     def purge_invalid_trades(self) -> int:
+        self._invalidate_cache()
         return self._storage.purge_invalid_trades()
 
     def cleanup_stale_open_trades(self, max_age_hours: int = 6) -> int:
+        self._invalidate_cache()
         return self._storage.cleanup_stale_open_trades(max_age_hours)
 
     def clear_history(self) -> int:
         """Delete finished trades (WIN/LOSS/BREAKEVEN/EXPIRED...), keep active ones."""
+        self._invalidate_cache()
         return self._storage.clear_history()
 
     def clear(self) -> None:
         """Clear all stored entries (for testing purposes only)."""
+        self._invalidate_cache()
         self._storage.clear()
 
 

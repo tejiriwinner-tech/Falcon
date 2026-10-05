@@ -316,6 +316,52 @@ def _populate_registry() -> CanonicalInstrumentRegistry:
             lastUpdatedAt=datetime.now(timezone.utc),
         ),
         
+        # GBPJPY - British Pound / Japanese Yen
+        InstrumentMetadata(
+            canonicalSymbol="GBPJPY",
+            instrumentType=InstrumentType.FOREX,
+            assetClass=AssetClass.CURRENCIES,
+            exchange=Exchange.FOREX_OTC,
+            currency="JPY",
+            pipSize=0.01,
+            precision=3,
+            displayName="GBP/JPY",
+            description="British pound / Japanese yen currency pair",
+            providerMappings={
+                "twelve_data": "GBP/JPY",
+                "alpaca": "GBP/JPY",
+                "alpha_vantage": "GBP/JPY",
+                "mock_price": "GBPJPY",
+                "oanda": "GBP_JPY",
+            },
+            expectedInstrumentTypes=[InstrumentType.FOREX],
+            addedAt=datetime.now(timezone.utc),
+            lastUpdatedAt=datetime.now(timezone.utc),
+        ),
+
+        # AUDUSD - Australian Dollar / US Dollar
+        InstrumentMetadata(
+            canonicalSymbol="AUDUSD",
+            instrumentType=InstrumentType.FOREX,
+            assetClass=AssetClass.CURRENCIES,
+            exchange=Exchange.FOREX_OTC,
+            currency="USD",
+            pipSize=0.0001,
+            precision=4,
+            displayName="AUD/USD",
+            description="Australian dollar / US dollar currency pair",
+            providerMappings={
+                "twelve_data": "AUD/USD",
+                "alpaca": "AUD/USD",
+                "alpha_vantage": "AUD/USD",
+                "mock_price": "AUDUSD",
+                "oanda": "AUD_USD",
+            },
+            expectedInstrumentTypes=[InstrumentType.FOREX],
+            addedAt=datetime.now(timezone.utc),
+            lastUpdatedAt=datetime.now(timezone.utc),
+        ),
+
         # NAS100 - NASDAQ-100 Index
         InstrumentMetadata(
             canonicalSymbol="NAS100",

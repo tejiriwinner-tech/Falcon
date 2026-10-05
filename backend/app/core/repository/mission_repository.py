@@ -160,17 +160,21 @@ class MissionRepository:
             "decisions": self._storage.get_artifacts(mission_id, DECISION),
         }
 
-    def get_all_mission_artifacts_bulk(self, mission_ids: Optional[List[str]] = None) -> Dict[str, Dict[str, Any]]:
+    def get_all_mission_artifacts_bulk(
+        self,
+        mission_ids: Optional[List[str]] = None,
+        artifact_types: Optional[List[str]] = None,
+    ) -> Dict[str, Dict[str, Any]]:
         """Returns structured artifacts for multiple missions in a single bulk query."""
         import time as _t
         now = _t.monotonic()
-        if self._cached_bulk_artifacts is not None and (now - self._cached_bulk_at) < 60.0:
+        if artifact_types is None and self._cached_bulk_artifacts is not None and (now - self._cached_bulk_at) < 60.0:
             if mission_ids is None:
                 return dict(self._cached_bulk_artifacts)
             if all(mid in self._cached_bulk_artifacts for mid in mission_ids):
                 return {mid: self._cached_bulk_artifacts[mid] for mid in mission_ids}
         if hasattr(self._storage, "get_all_artifacts_bulk"):
-            bulk = self._storage.get_all_artifacts_bulk(mission_ids)
+            bulk = self._storage.get_all_artifacts_bulk(mission_ids, artifact_types=artifact_types)
             result = {}
             for mid, grouped in bulk.items():
                 market_states = grouped.get(MARKET_STATE, [])
@@ -183,7 +187,7 @@ class MissionRepository:
                     "executionReadiness": grouped.get(EXECUTION_READINESS, []),
                     "decisions": grouped.get(DECISION, []),
                 }
-            if mission_ids is None:
+            if mission_ids is None and artifact_types is None:
                 self._cached_bulk_artifacts = result
                 self._cached_bulk_at = now
             return result

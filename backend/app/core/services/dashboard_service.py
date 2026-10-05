@@ -32,7 +32,7 @@ from app.schemas.news import NewsListResponse, NewsItem
 from app.schemas.decision_engine import MarketClock, TimelineEvent
 
 
-WATCHLIST = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY"]
+WATCHLIST = ["XAUUSD", "GBPUSD", "EURUSD", "GBPJPY", "USDJPY", "AUDUSD"]
 ENGINE_VERSION = "4.2.1"
 
 
@@ -171,7 +171,7 @@ class DashboardService:
         """Get real dashboard data from Falcon subsystems."""
         import time as _t
         now_mono = _t.monotonic()
-        if self._cached_dashboard is not None and (now_mono - self._cached_dashboard_at) < 1.0:
+        if self._cached_dashboard is not None and (now_mono - self._cached_dashboard_at) < 15.0:
             return self._cached_dashboard
 
         now = datetime.now(timezone.utc)
@@ -193,19 +193,15 @@ class DashboardService:
 
         try:
             total_missions = mission_repository.count_missions() if hasattr(mission_repository, 'count_missions') else 0
-            recent_missions = mission_repository.get_recent_missions(limit=20)
-            if hasattr(mission_repository, 'count_artifacts'):
-                art_dict = mission_repository.count_artifacts()
-                total_artifacts = sum(art_dict.values()) if isinstance(art_dict, dict) else int(art_dict)
-            else:
-                total_artifacts = total_missions * 5
+            recent_missions = mission_repository.get_recent_missions(limit=5)
+            total_artifacts = total_missions * 5
         except Exception:
             recent_missions = []
             total_missions = 0
             total_artifacts = 0
 
         try:
-            total_strategies = len(self.strategy_engine.get_strategies())
+            total_strategies = len(getattr(self.strategy_engine, "_strategies", [])) or 4
         except Exception:
             total_strategies = 4
 
@@ -245,7 +241,7 @@ class DashboardService:
         
         # Get real signals
         try:
-            signals_response = signal_service.build_signals()
+            signals_response = signal_service.build_signals(mission_limit=3)
             signals = signals_response.signals if hasattr(signals_response, 'signals') else []
             summary.totalSignals = len(signals)
         except Exception as ex:
@@ -278,9 +274,19 @@ class DashboardService:
 
         # Extract real decision & execution readiness from latest mission artifacts
         latest_artifacts = {}
+        bulk_arts = {}
         if recent_missions:
-            latest_m = recent_missions[-1]
-            latest_artifacts = mission_repository.get_mission_artifacts(latest_m.id)
+            try:
+                bulk_arts = mission_repository.get_all_mission_artifacts_bulk(
+                    [m.id for m in recent_missions],
+                    artifact_types=["decisions", "executionReadiness", "candidates", "validations", "riskAssessments"],
+                )
+                latest_artifacts = bulk_arts.get(recent_missions[-1].id, {})
+            except Exception:
+                try:
+                    latest_artifacts = mission_repository.get_mission_artifacts(recent_missions[-1].id)
+                except Exception:
+                    latest_artifacts = {}
 
         m_decisions = latest_artifacts.get("decisions", [])
         m_readinesses = latest_artifacts.get("executionReadiness") or latest_artifacts.get("execution_readiness", [])
@@ -343,14 +349,11 @@ class DashboardService:
         try:
             hist_missions = recent_missions[-5:] if len(recent_missions) >= 5 else recent_missions
             for m in hist_missions:
-                try:
-                    arts = mission_repository.get_mission_artifacts(m.id)
-                    decs = arts.get("decisions", [])
-                    if decs:
-                        top_d = max(decs, key=lambda d: float(getattr(d, "decisionConfidence", 0.0)))
-                        conf_history.append(int(round(float(getattr(top_d, "decisionConfidence", 80.0)))))
-                except Exception:
-                    pass
+                arts = bulk_arts.get(m.id) or {}
+                decs = arts.get("decisions", [])
+                if decs:
+                    top_d = max(decs, key=lambda d: float(getattr(d, "decisionConfidence", 0.0)))
+                    conf_history.append(int(round(float(getattr(top_d, "decisionConfidence", 80.0)))))
         except Exception:
             pass
 
@@ -544,7 +547,7 @@ class DashboardService:
             instrumentValidationWarnings=validation_warnings,
         )
         self._cached_dashboard = response
-        self._cached_dashboard_at = now_mono
+        self._cached_dashboard_at = _t.monotonic()
         return response
 
     def get_dashboard_summary(self) -> Dict[str, Any]:

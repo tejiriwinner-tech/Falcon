@@ -8,13 +8,15 @@ from app.schemas.market import MarketItem, MarketListResponse
 
 router = APIRouter()
 
-DEFAULT_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "NAS100", "US30"]
+DEFAULT_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "GBPJPY", "USDJPY", "AUDUSD", "NAS100", "US30"]
 
 _DISPLAY_NAMES = {
     "XAUUSD": "Gold",
     "GBPUSD": "British Pound",
     "EURUSD": "Euro",
+    "GBPJPY": "GBP / JPY",
     "USDJPY": "Japanese Yen",
+    "AUDUSD": "Australian Dollar",
     "NAS100": "Nasdaq 100",
     "US30": "Dow Jones 30",
     "BTCUSD": "Bitcoin",

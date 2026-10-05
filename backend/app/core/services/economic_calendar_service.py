@@ -117,6 +117,8 @@ class EconomicCalendarService:
         self._lock = threading.Lock()
         self._memory: Dict[tuple, _StoredEvent] = {}
         self._last_fetch_monotonic: Optional[float] = None
+        self._cached_events: Optional[List[EconomicEvent]] = None
+        self._cached_events_at: float = 0.0
         self.last_error: Optional[str] = None
 
     # ------------------------------------------------------------------
@@ -135,7 +137,7 @@ class EconomicCalendarService:
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
                 "Accept": "application/json, text/plain, */*",
             }
-            resp = requests.get(ff_url, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
+            resp = requests.get(ff_url, headers=headers, timeout=(1.5, 2.5))
             if resp.status_code == 200:
                 payload = resp.json()
                 if isinstance(payload, list) and len(payload) > 0:
@@ -158,7 +160,7 @@ class EconomicCalendarService:
                 response = requests.get(
                     endpoint,
                     params=params,
-                    timeout=REQUEST_TIMEOUT_SECONDS,
+                    timeout=(1.5, 2.5),
                 )
                 response.raise_for_status()
                 payload = response.json()
@@ -264,32 +266,45 @@ class EconomicCalendarService:
                 self._last_fetch_monotonic = time.monotonic()
 
     def get_events(self, lookback_hours: int = 0, lookahead_hours: int = 168) -> List[EconomicEvent]:
-        """Returns stored events as pipeline artifacts, refreshing when stale."""
-        self.refresh()
+        """Returns stored events as pipeline artifacts, refreshing in the background when stale."""
+        now_mono = time.monotonic()
         now = datetime.now(timezone.utc)
-        stored = self._load(
-            now - timedelta(hours=lookback_hours), now + timedelta(hours=lookahead_hours)
-        )
-        events: List[EconomicEvent] = []
-        for record in stored:
-            event_time = record.event_time
-            if event_time.tzinfo is None:
-                event_time = event_time.replace(tzinfo=timezone.utc)
-            countdown = int((event_time - now).total_seconds() // 60)
-            events.append(
-                EconomicEvent(
-                    title=record.title,
-                    currency=record.currency,
-                    impact=record.impact,
-                    eventTime=event_time,
-                    countdownMinutes=countdown,
-                    forecast=record.forecast or "",
-                    previous=record.previous or "",
-                    actual=record.actual,
-                    provider=PROVIDER_NAME,
-                )
+        if self._cached_events is None or (now_mono - self._cached_events_at) >= 300.0:
+            # Refresh asynchronously in background so HTTP requests never stall on network feeds
+            import threading
+            threading.Thread(target=self.refresh, daemon=True).start()
+
+            stored = self._load(
+                now - timedelta(hours=48), now + timedelta(hours=168)
             )
-        return events
+            events: List[EconomicEvent] = []
+            for record in stored:
+                event_time = record.event_time
+                if event_time.tzinfo is None:
+                    event_time = event_time.replace(tzinfo=timezone.utc)
+                countdown = int((event_time - now).total_seconds() // 60)
+                events.append(
+                    EconomicEvent(
+                        title=record.title,
+                        currency=record.currency,
+                        impact=record.impact,
+                        eventTime=event_time,
+                        countdownMinutes=countdown,
+                        forecast=record.forecast or "",
+                        previous=record.previous or "",
+                        actual=record.actual,
+                        provider=PROVIDER_NAME,
+                    )
+                )
+            self._cached_events = events
+            self._cached_events_at = time.monotonic()
+
+        start_t = now - timedelta(hours=lookback_hours)
+        end_t = now + timedelta(hours=lookahead_hours)
+        return [
+            e for e in self._cached_events
+            if start_t <= e.eventTime <= end_t
+        ]
 
     def check_blackout_status(
         self,
@@ -313,7 +328,9 @@ class EconomicCalendarService:
         currency_map = {
             "EURUSD": {"EUR", "USD"},
             "GBPUSD": {"GBP", "USD"},
+            "GBPJPY": {"GBP", "JPY"},
             "USDJPY": {"USD", "JPY"},
+            "AUDUSD": {"AUD", "USD"},
             "XAUUSD": {"USD"},
             "GOLD": {"USD"},
             "US30": {"USD"},

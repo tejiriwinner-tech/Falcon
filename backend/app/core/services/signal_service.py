@@ -125,9 +125,13 @@ class SignalService:
                     raw_ot_sym = ot.symbol.replace("/", "").upper()
                     pm = getattr(providers, "provider_manager", None)
                     if pm is not None:
-                        q_resp = pm.get_market_quote(raw_ot_sym)
-                        if q_resp and q_resp.quote and q_resp.quote.lastPrice:
-                            cur_live_px = q_resp.quote.lastPrice
+                        cached_e = pm._cache.get(raw_ot_sym, allow_stale=True) if hasattr(pm, "_cache") else None
+                        if cached_e and getattr(cached_e.data, "lastPrice", None):
+                            cur_live_px = cached_e.data.lastPrice
+                        else:
+                            q_resp = pm.get_market_quote(raw_ot_sym)
+                            if q_resp and q_resp.quote and q_resp.quote.lastPrice:
+                                cur_live_px = q_resp.quote.lastPrice
                 except Exception:
                     pass
 
@@ -248,15 +252,14 @@ class SignalService:
         # Step 2: Ingest candidate setups from recent missions
         missions = None
         try:
-            # Check get_all_missions first (honoring test mocks if present)
-            all_m = mission_repository.get_all_missions()
-            if all_m:
-                missions = all_m[-mission_limit:]
+            missions = mission_repository.get_recent_missions(limit=mission_limit)
         except Exception:
-            pass
+            missions = None
         if not missions:
             try:
-                missions = mission_repository.get_recent_missions(limit=mission_limit)
+                all_m = mission_repository.get_all_missions()
+                if all_m:
+                    missions = all_m[-mission_limit:]
             except Exception:
                 missions = []
 
@@ -265,7 +268,10 @@ class SignalService:
             bulk_artifacts = {}
             if hasattr(mission_repository, "get_all_mission_artifacts_bulk"):
                 try:
-                    bulk_artifacts = mission_repository.get_all_mission_artifacts_bulk(mission_ids) or {}
+                    bulk_artifacts = mission_repository.get_all_mission_artifacts_bulk(
+                        mission_ids,
+                        artifact_types=["candidates", "decisions"],
+                    ) or {}
                 except Exception:
                     bulk_artifacts = {}
 
@@ -321,6 +327,13 @@ class SignalService:
             watchlist_symbols: set = set()
 
             lot_size = ExecutionSettings().default_lot_size
+            pm = getattr(providers, "provider_manager", None)
+            if pm is not None and hasattr(pm, "get_batch_quotes") and candidate_pool:
+                try:
+                    unique_syms = list({item["candidate"].symbol.replace("/", "").upper() for item in candidate_pool})
+                    pm.get_batch_quotes(unique_syms)
+                except Exception:
+                    pass
 
             for item in candidate_pool:
                 cand = item["candidate"]
@@ -351,10 +364,8 @@ class SignalService:
                 quote_resp = None
                 try:
                     raw_sym = symbol.replace("/", "").upper()
-                    pm = getattr(providers, "provider_manager", None)
                     if pm is not None and hasattr(pm, "_cache"):
-                        # Disallow stale cache lookups for entry gate
-                        cached_entry = pm._cache.get(raw_sym, allow_stale=False)
+                        cached_entry = pm._cache.get(raw_sym, allow_stale=True)
                         if cached_entry and hasattr(cached_entry, "data"):
                             q_data = cached_entry.data
                             if getattr(q_data, "lastPrice", None):
@@ -363,7 +374,7 @@ class SignalService:
                             if isinstance(q_data, MarketQuote):
                                 quote_resp = MarketQuoteResponse(quote=q_data)
 
-                    # If cache missing or older than 60s, force real-time fetch (routes FMP first for Forex)
+                    # If cache missing or older than 60s, fetch real-time quote
                     if (cur_px is None or quote_age_s > 60.0) and pm is not None:
                         resp = pm.get_market_quote(raw_sym)
                         if resp and resp.quote and resp.quote.lastPrice:

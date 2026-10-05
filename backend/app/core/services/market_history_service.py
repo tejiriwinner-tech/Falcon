@@ -106,6 +106,7 @@ class MarketHistoryService:
         self._lock = threading.Lock()
         self._memory: Dict[Tuple[str, str, datetime], PriceBar] = {}
         self._last_refresh: Dict[Tuple[str, str], float] = {}
+        self._bars_cache: Dict[Tuple[str, str, int], Tuple[float, List[PriceBar]]] = {}
         self.last_error: Optional[str] = None
 
     # ------------------------------------------------------------------
@@ -299,11 +300,20 @@ class MarketHistoryService:
         )
         with get_session() as session, session.begin():
             session.execute(statement)
+        with self._lock:
+            self._bars_cache.clear()
         return len(rows)
 
     def get_bars(self, symbol: str, timeframe: Optional[str] = None, limit: int = 200) -> List[PriceBar]:
         """Returns stored bars oldest-first."""
         timeframe = timeframe or settings.HISTORY_TIMEFRAME
+        cache_key = (symbol, timeframe, limit)
+        now_mono = time.monotonic()
+        with self._lock:
+            cached = self._bars_cache.get(cache_key)
+            if cached and (now_mono - cached[0]) < 30.0:
+                return list(cached[1])
+
         if not database_enabled():
             with self._lock:
                 bars = [
@@ -311,7 +321,11 @@ class MarketHistoryService:
                     for (sym, tf, _), bar in self._memory.items()
                     if sym == symbol and tf == timeframe
                 ]
-            return sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
+            result = sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
+            with self._lock:
+                self._bars_cache[cache_key] = (now_mono, result)
+            return result
+
         with get_session() as session:
             records = session.scalars(
                 select(PriceBarRecord)
@@ -320,7 +334,7 @@ class MarketHistoryService:
                 .order_by(PriceBarRecord.bar_time.desc())
                 .limit(limit)
             ).all()
-        return [
+        result = [
             PriceBar(
                 symbol=record.symbol,
                 timeframe=record.timeframe,
@@ -334,6 +348,9 @@ class MarketHistoryService:
             )
             for record in reversed(records)
         ]
+        with self._lock:
+            self._bars_cache[cache_key] = (now_mono, result)
+        return result
 
     # ------------------------------------------------------------------
     # Public API

@@ -49,6 +49,7 @@ _INSTRUMENT_PROVIDER_ROUTE: Dict[str, List[str]] = {
     "EURUSD": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
     "GBPJPY": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
     "USDJPY": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
+    "AUDUSD": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
 }
 _DEFAULT_PROVIDER_ROUTE: List[str] = ["oanda", "twelve_data", "alpha_vantage", "mock_provider"]
 
