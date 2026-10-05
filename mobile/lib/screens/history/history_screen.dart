@@ -27,9 +27,70 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   void _fetchHistory() {
+    ApiService.invalidateTradeJournalCache();
     setState(() {
       _journalFuture = _apiService.getTradeJournal();
     });
+  }
+
+  bool _isActive(TradeJournalItem trade) {
+    const active = {'OPEN', 'PENDING', 'FILLED', 'ACTIVE'};
+    return active.contains(trade.status.toUpperCase());
+  }
+
+  Future<void> _confirmClearHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Clear trade history?'),
+        content: const Text(
+          'All finished trades (WIN, LOSS, BREAKEVEN, EXPIRED) will be permanently '
+          'deleted. Active trades are kept and will appear here again once they '
+          'resolve.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            child: const Text('Clear'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final deleted = await _apiService.clearTradeHistory();
+      messenger.showSnackBar(
+        SnackBar(content: Text('Cleared $deleted finished trade(s).')),
+      );
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not clear history: $e')),
+      );
+    }
+    if (mounted) _fetchHistory();
+  }
+
+  Future<bool> _deleteTrade(TradeJournalItem trade) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      await _apiService.deleteTradeJournal(trade.id);
+      messenger.showSnackBar(
+        SnackBar(content: Text('Deleted ${trade.symbol} trade.')),
+      );
+      return true;
+    } catch (e) {
+      messenger.showSnackBar(
+        SnackBar(content: Text('Could not delete trade: $e')),
+      );
+      return false;
+    }
   }
 
   @override
@@ -38,6 +99,11 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: const Text('Trade History'),
         actions: [
+          IconButton(
+            onPressed: _confirmClearHistory,
+            icon: const Icon(Icons.delete_sweep_outlined),
+            tooltip: 'Clear history',
+          ),
           IconButton(
             onPressed: _fetchHistory,
             icon: const Icon(Icons.refresh),
@@ -99,7 +165,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ...filtered.map(
                     (trade) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildTradeCard(trade),
+                      child: _isActive(trade)
+                          ? _buildTradeCard(trade)
+                          : Dismissible(
+                              key: ValueKey('trade-${trade.id}'),
+                              direction: DismissDirection.endToStart,
+                              confirmDismiss: (_) => _deleteTrade(trade),
+                              onDismissed: (_) => _fetchHistory(),
+                              background: Container(
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 20),
+                                decoration: BoxDecoration(
+                                  color: AppColors.error.withValues(alpha: 0.85),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(Icons.delete_outline, color: Colors.white),
+                              ),
+                              child: _buildTradeCard(trade),
+                            ),
                     ),
                   ),
                 const SizedBox(height: 24),

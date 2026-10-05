@@ -117,6 +117,27 @@ def update_trade_journal_entry(trade_id: int, update: TradeJournalUpdate):
     return trade
 
 
+@router.delete("/trade-journal/history", status_code=200)
+def clear_trade_history():
+    """Delete finished trades (WIN / LOSS / BREAKEVEN / EXPIRED ...).
+
+    Active trades (OPEN / PENDING / FILLED) are kept so they still resolve and
+    re-appear in history when they hit TP, SL or breakeven.
+    """
+    deleted = trade_journal_repository.clear_history()
+    try:
+        from app.core.services.signal_outcome_resolver import signal_outcome_resolver
+        with signal_outcome_resolver._lock:
+            signal_outcome_resolver._resolved_cache.clear()
+    except Exception:
+        pass
+    return {
+        "status": "success",
+        "deleted": deleted,
+        "message": f"Cleared {deleted} finished trade(s). Active trades were kept.",
+    }
+
+
 @router.delete("/trade-journal/{trade_id}", status_code=204)
 def delete_trade_journal_entry(trade_id: int):
     if not trade_journal_repository.delete_trade(trade_id):

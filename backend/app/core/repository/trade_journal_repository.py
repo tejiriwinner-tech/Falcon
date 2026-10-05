@@ -9,7 +9,7 @@ import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Union
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.database.models import TradeJournalRecord
 from app.core.database.session import database_enabled, get_session
@@ -22,6 +22,9 @@ from app.schemas.trade_journal import (
     TradeJournalItem,
     TradeJournalUpdate,
 )
+
+# Trades in these states are still live and must survive a history clear.
+ACTIVE_TRADE_STATUSES = ("OPEN", "PENDING", "FILLED", "ACTIVE")
 
 _COLUMNS: Dict[str, str] = {
     "signalId": "signal_id",
@@ -171,6 +174,17 @@ class InMemoryTradeJournalStorage:
     def delete_trade(self, trade_id: int, session: Optional[object] = None) -> bool:
         with self._lock:
             return self._trades.pop(trade_id, None) is not None
+
+    def clear_history(self) -> int:
+        """Delete finished trades only; active (OPEN/PENDING/FILLED) trades are kept."""
+        with self._lock:
+            to_del = [
+                tid for tid, t in self._trades.items()
+                if (t.status or "").upper() not in ACTIVE_TRADE_STATUSES
+            ]
+            for tid in to_del:
+                del self._trades[tid]
+            return len(to_del)
 
     def purge_invalid_trades(self) -> int:
         with self._lock:
@@ -340,6 +354,17 @@ class DatabaseTradeJournalStorage:
             session.commit()
             return True
 
+    def clear_history(self) -> int:
+        """Delete finished trades only; active (OPEN/PENDING/FILLED) trades are kept."""
+        with get_session() as session:
+            count = (
+                session.query(TradeJournalRecord)
+                .filter(func.upper(TradeJournalRecord.status).notin_(ACTIVE_TRADE_STATUSES))
+                .delete(synchronize_session=False)
+            )
+            session.commit()
+            return count
+
     def purge_invalid_trades(self) -> int:
         with get_session() as session:
             count = session.query(TradeJournalRecord).filter(
@@ -429,6 +454,10 @@ class TradeJournalRepository:
 
     def cleanup_stale_open_trades(self, max_age_hours: int = 6) -> int:
         return self._storage.cleanup_stale_open_trades(max_age_hours)
+
+    def clear_history(self) -> int:
+        """Delete finished trades (WIN/LOSS/BREAKEVEN/EXPIRED...), keep active ones."""
+        return self._storage.clear_history()
 
     def clear(self) -> None:
         """Clear all stored entries (for testing purposes only)."""

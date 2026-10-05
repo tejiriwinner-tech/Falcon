@@ -34,7 +34,7 @@ decision_engine = DecisionEngine()
 
 _cache_response: Optional[DecisionArtifactListResponse] = None
 _cache_time: Optional[datetime] = None
-CACHE_TTL_SECONDS: float = 30.0
+CACHE_TTL_SECONDS: float = 60.0
 
 
 def _build_summary(decisions: List[DecisionArtifact]) -> DecisionSummary:

@@ -325,6 +325,44 @@ class ApiService {
     );
   }
 
+  Future<http.Response> _delete(String endpoint) async {
+    final url = '$baseUrl$endpoint';
+    print("Calling: DELETE $url");
+    try {
+      return await http
+          .delete(Uri.parse(url))
+          .timeout(const Duration(seconds: timeoutSeconds));
+    } on http.ClientException {
+      throw Exception('Network connection failed. Please check your connection to the server.');
+    } on TimeoutException {
+      throw Exception('Request timed out after $timeoutSeconds seconds. Server is unreachable.');
+    }
+  }
+
+  /// Deletes all finished trades (WIN / LOSS / BREAKEVEN / EXPIRED).
+  /// Active trades are kept on the server. Returns the number deleted.
+  Future<int> clearTradeHistory() async {
+    final response = await _delete('/trade-journal/history');
+    if (response.statusCode != 200) {
+      throw Exception('Server error: ${response.statusCode} - ${response.reasonPhrase}');
+    }
+    _cache.remove('/trade-journal');
+    final data = jsonDecode(response.body) as Map<String, dynamic>;
+    return (data['deleted'] as num?)?.toInt() ?? 0;
+  }
+
+  /// Deletes a single journal entry by id.
+  Future<void> deleteTradeJournal(int tradeId) async {
+    final response = await _delete('/trade-journal/$tradeId');
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw Exception('Server error: ${response.statusCode} - ${response.reasonPhrase}');
+    }
+    _cache.remove('/trade-journal');
+  }
+
+  /// Forces the next getTradeJournal() call to hit the server.
+  static void invalidateTradeJournalCache() => _cache.remove('/trade-journal');
+
 
   Future<TradeIntelligenceResponse> getTradeIntelligence() async {
     return _get<TradeIntelligenceResponse>('/trade-intelligence', TradeIntelligenceResponse.fromJson);

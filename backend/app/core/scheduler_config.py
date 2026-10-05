@@ -11,8 +11,8 @@ from typing import List
 class SchedulerConfig:
     """Configuration for the background signal scheduler."""
     
-    # Scan Configuration (15-second real-time scan cycle)
-    SCAN_INTERVAL_SECONDS: int = int(os.getenv("FALCON_SCAN_INTERVAL", "15"))
+    # Scan Configuration (30-second scan cycle; scan work runs in a worker thread)
+    SCAN_INTERVAL_SECONDS: int = int(os.getenv("FALCON_SCAN_INTERVAL", "30"))
     
     # Signal Limits
     MAX_SIGNALS_PER_SYMBOL: int = int(os.getenv("FALCON_MAX_SIGNALS_PER_SYMBOL", "3"))

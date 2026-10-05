@@ -5,6 +5,7 @@ Runs the complete Falcon pipeline for each configured market and timeframe.
 Generates signals, evaluates them through all engines, and saves approved signals.
 """
 import asyncio
+import threading
 import time
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -47,11 +48,26 @@ class MarketScheduler:
         
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
-        self._scan_lock = asyncio.Lock()  # Prevent overlapping scans
-    
+        # threading.Lock (not asyncio.Lock): the scan body runs in a worker thread
+        self._scan_lock = threading.Lock()  # Prevent overlapping scans
+
+    @staticmethod
+    def _skipped_result() -> dict:
+        return {
+            "signals_generated": 0,
+            "signals_approved": 0,
+            "signals_rejected": 0,
+            "duplicates_prevented": 0,
+            "errors": ["Scan skipped: previous scan still in progress"],
+        }
+
     async def scan_cycle(self, db: Session) -> dict:
         """
         Run a complete scan cycle for all configured markets and timeframes.
+
+        The heavy work (synchronous SQLAlchemy/Supabase queries and indicator
+        computation) is offloaded to a worker thread so the asyncio event loop
+        keeps serving HTTP requests while a scan is in progress.
         
         Args:
             db: Database session
@@ -62,16 +78,21 @@ class MarketScheduler:
         # Check if a scan is already in progress
         if self._scan_lock.locked():
             logger.warning("Scan cycle skipped: previous scan still in progress")
-            return {
-                "signals_generated": 0,
-                "signals_approved": 0,
-                "signals_rejected": 0,
-                "duplicates_prevented": 0,
-                "errors": ["Scan skipped: previous scan still in progress"],
-            }
-        
-        # Acquire lock to prevent overlapping scans
-        async with self._scan_lock:
+            return self._skipped_result()
+        return await asyncio.to_thread(self._scan_cycle_sync, db)
+
+    def _scan_cycle_sync(self, db: Session) -> dict:
+        """Synchronous scan cycle body. Must be run off the event loop."""
+        if not self._scan_lock.acquire(blocking=False):
+            logger.warning("Scan cycle skipped: previous scan still in progress")
+            return self._skipped_result()
+        try:
+            return self._scan_cycle_locked(db)
+        finally:
+            self._scan_lock.release()
+
+    def _scan_cycle_locked(self, db: Session) -> dict:
+        if True:  # preserves original block indentation
             scan_start_ms = self.statistics.record_scan_start()
             results = {
                 "signals_generated": 0,
@@ -137,7 +158,7 @@ class MarketScheduler:
 
                     for timeframe in scheduler_config.TIMEFRAMES:
                         try:
-                            signal_result = await self._scan_market_timeframe(
+                            signal_result = self._scan_market_timeframe(
                                 symbol, timeframe, db, existing_signals, live_price=symbol_live_price
                             )
                             
@@ -166,7 +187,7 @@ class MarketScheduler:
             
             return results
     
-    async def _scan_market_timeframe(
+    def _scan_market_timeframe(
         self,
         symbol: str,
         timeframe: str,
