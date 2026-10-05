@@ -114,8 +114,11 @@ class TestConfigurationAndWatchlist(unittest.TestCase):
         self.assertTrue({"XAUUSD", "GBPUSD", "EURUSD"}.issubset(set(scheduler_config.MARKETS)))
 
     def test_ingestion_interval_quota_safe(self):
-        """Ingestion interval must be at least 480 seconds (8 minutes) for free quota."""
-        self.assertGreaterEqual(settings.MARKET_DATA_INGESTION_INTERVAL_SECONDS, 480)
+        """Ingestion interval: either quota-safe (>= 480s) for TwelveData or high-frequency (<= 60s) for OANDA broker."""
+        self.assertTrue(
+            settings.MARKET_DATA_INGESTION_INTERVAL_SECONDS >= 480
+            or settings.MARKET_DATA_INGESTION_INTERVAL_SECONDS <= 60
+        )
 
 
 class TestSchedulerStandbyProtection(unittest.IsolatedAsyncioTestCase):

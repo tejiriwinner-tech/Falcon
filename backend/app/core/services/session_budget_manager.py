@@ -57,7 +57,7 @@ class SessionBudgetManager:
         if self.enable_24_5 is not None:
             return self.enable_24_5
         from app.core.config import settings
-        return getattr(settings, "FALCON_24_5_TRADING", False)
+        return getattr(settings, "FALCON_24_5_TRADING", False) or bool(getattr(settings, "OANDA_API_KEY", None))
 
     def _sync_buckets(self, now: datetime) -> None:
         """Reset hourly and daily counters when time bucket rolls over."""

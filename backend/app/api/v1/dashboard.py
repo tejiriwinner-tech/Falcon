@@ -15,6 +15,12 @@ def get_dashboard():
     return dashboard_service.get_dashboard()
 
 
+@router.get("/summary")
+def get_dashboard_summary():
+    """Return real-time telemetry summary (<50ms data freshness)."""
+    return dashboard_service.get_dashboard_summary()
+
+
 @router.get("/ui", response_class=HTMLResponse)
 def get_dashboard_ui():
     """Return the visual audit dashboard web UI."""

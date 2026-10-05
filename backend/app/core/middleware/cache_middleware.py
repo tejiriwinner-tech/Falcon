@@ -5,14 +5,16 @@ from datetime import datetime, timedelta
 class CacheMiddleware(BaseHTTPMiddleware):
     """Middleware to add caching headers to API responses."""
     
-    # Cache durations for different endpoint types (in seconds)
     CACHE_DURATIONS = {
         '/health': 0,  # Never cache health checks
         '/signals': 30,  # 30 seconds for signals
         '/intelligence': 60,  # 1 minute for intelligence
-        '/market': 15,  # 15 seconds for market data
+        '/market': 0,  # Never cache real-time market data
         '/news': 300,  # 5 minutes for news
-        '/dashboard': 60,  # 1 minute for dashboard
+        '/dashboard': 0,  # Never cache dashboard; stream live updates
+        '/market-quotes': 0,  # Never cache live quotes
+        '/execution-readiness': 0,  # Real-time pre-flight readiness
+        '/runtime': 0,  # Real-time telemetry
     }
     
     async def dispatch(self, request: Request, call_next):

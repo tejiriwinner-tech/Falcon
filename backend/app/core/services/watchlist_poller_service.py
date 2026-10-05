@@ -7,6 +7,7 @@ Monitors pending Watchlist setups (HOLD status) in real time:
 - Keeps PostgreSQL/Supabase and memory synchronized even when no frontend client is active.
 """
 
+import os
 import asyncio
 import logging
 import time
@@ -32,8 +33,8 @@ class WatchlistPollerService:
     Background price poller and state synchronizer for Falcon Watchlist.
     """
 
-    def __init__(self, poll_interval_seconds: int = 30) -> None:
-        self.poll_interval_seconds = poll_interval_seconds
+    def __init__(self, poll_interval_seconds: int = 10) -> None:
+        self.poll_interval_seconds = int(os.getenv("WATCHLIST_POLL_INTERVAL_SECONDS", str(poll_interval_seconds)))
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
         self._last_poll_time: Optional[datetime] = None

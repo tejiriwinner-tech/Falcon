@@ -96,9 +96,42 @@ class ProviderManager:
             self._failed_requests += 1
             return None
 
-        # ── Single-Flight + Cache ──────────────────────────────────────
+        # ── 1. In-Memory Sub-Second Streaming Fast-Path ────────────────
+        try:
+            from app.core.providers.oanda_streaming_service import oanda_streaming_service
+            tick = oanda_streaming_service.get_latest_tick(canonical)
+            if tick is not None:
+                now = datetime.now(timezone.utc)
+                age = (now - tick["timestamp"]).total_seconds()
+                if age < 60.0:  # Fresh tick from persistent broker stream
+                    quote = MarketQuote(
+                        symbol=canonical,
+                        bidAsk=BidAsk(
+                            bid=tick["bid"],
+                            ask=tick["ask"],
+                            spread=tick["spread"],
+                        ),
+                        lastPrice=tick.get("last", tick["bid"]),
+                        change=0.0,
+                        changePercent=0.0,
+                        timestamp=tick["timestamp"],
+                        providerId="oanda",
+                        providerName="OANDA Stream",
+                        quoteStatus=QuoteStatus.LIVE,
+                        marketStatus=MarketStatus.OPEN,
+                        freshnessSeconds=round(age, 4),
+                    )
+                    self._successful_requests += 1
+                    elapsed_ms = (time.time() - t_start) * 1000
+                    self._warm_request_count += 1
+                    self._warm_total_ms += elapsed_ms
+                    return MarketQuoteResponse(quote=quote)
+        except Exception as ex:
+            logger.debug("[ProviderManager] Streaming tick check error: %s", ex)
+
+        # ── 2. Single-Flight + Fresh Cache ──────────────────────────────
         with self._lock:
-            cached_entry = self._cache.get(canonical, allow_stale=True)
+            cached_entry = self._cache.get(canonical, allow_stale=False)
             if cached_entry is not None:
                 quote = cached_entry.data
                 if isinstance(quote, MarketQuote):
@@ -122,6 +155,14 @@ class ProviderManager:
 
         try:
             result = self._fetch_from_providers(canonical)
+            if result is None:
+                # Emergency fallback to stale cache if network/provider failed
+                stale_entry = self._cache.get(canonical, allow_stale=True)
+                if stale_entry and isinstance(stale_entry.data, MarketQuote):
+                    stale_quote = stale_entry.data
+                    stale_quote.freshnessSeconds = stale_entry.age_seconds
+                    result = MarketQuoteResponse(quote=stale_quote)
+
             future.set_result(result)
             elapsed_ms = (time.time() - t_start) * 1000
             self._cold_request_count += 1
@@ -139,10 +180,43 @@ class ProviderManager:
         results: Dict[str, MarketQuoteResponse] = {}
         missing_canonical: List[str] = []
 
-        # 1. Check cache first
+        # 1. Check in-memory streaming ticks first
+        try:
+            from app.core.providers.oanda_streaming_service import oanda_streaming_service
+            for sym in raw_symbols:
+                canonical = self._mapper.normalize(sym)
+                if not canonical:
+                    continue
+                tick = oanda_streaming_service.get_latest_tick(canonical)
+                if tick is not None:
+                    now = datetime.now(timezone.utc)
+                    age = (now - tick["timestamp"]).total_seconds()
+                    if age < 60.0:
+                        quote = MarketQuote(
+                            symbol=canonical,
+                            bidAsk=BidAsk(
+                                bid=tick["bid"],
+                                ask=tick["ask"],
+                                spread=tick["spread"],
+                            ),
+                            lastPrice=tick.get("last", tick["bid"]),
+                            change=0.0,
+                            changePercent=0.0,
+                            timestamp=tick["timestamp"],
+                            providerId="oanda",
+                            providerName="OANDA Stream",
+                            quoteStatus=QuoteStatus.LIVE,
+                            marketStatus=MarketStatus.OPEN,
+                            freshnessSeconds=round(age, 4),
+                        )
+                        results[canonical] = MarketQuoteResponse(quote=quote)
+        except Exception:
+            pass
+
+        # 2. Check fresh cache
         for sym in raw_symbols:
             canonical = self._mapper.normalize(sym)
-            if not canonical:
+            if not canonical or canonical in results:
                 continue
             cached_entry = self._cache.get(canonical, allow_stale=False)
             if cached_entry and isinstance(cached_entry.data, MarketQuote):

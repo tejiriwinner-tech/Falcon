@@ -171,10 +171,12 @@ class DashboardService:
         """Get real dashboard data from Falcon subsystems."""
         import time as _t
         now_mono = _t.monotonic()
-        if self._cached_dashboard is not None and (now_mono - self._cached_dashboard_at) < 60.0:
+        if self._cached_dashboard is not None and (now_mono - self._cached_dashboard_at) < 1.0:
             return self._cached_dashboard
 
         now = datetime.now(timezone.utc)
+        from app.core.config import settings
+        watchlist_symbols = [s.strip().upper() for s in settings.MARKET_DATA_WATCHLIST.split(",") if s.strip()] or WATCHLIST
         
         # Get live provider status & snapshots
         snapshots = provider_registry.get_all_snapshots()
@@ -209,7 +211,7 @@ class DashboardService:
             repositoryHealth=100.0 if mission_repository.persistent else 50.0,
             activeProviders=online_count,
             connectedProvider=connected_provider,
-            watchedSymbols=WATCHLIST,
+            watchedSymbols=watchlist_symbols,
             totalStrategies=len(self.strategy_engine.get_strategies()),
             totalSignals=0,  # Will be updated from real signals
             totalMissions=total_missions,
@@ -219,24 +221,13 @@ class DashboardService:
             engineVersion=ENGINE_VERSION
         )
         
-        # Get real market quotes concurrently
+        # Get real market quotes via provider_manager (streaming ticks + OANDA batched)
         market_quotes: List[MarketQuote] = []
-        from concurrent.futures import ThreadPoolExecutor, as_completed
-        def _fetch_quote(sym):
-            try:
-                resp = provider_manager.get_market_quote(sym)
-                if resp and hasattr(resp, 'quote'):
-                    return resp.quote
-            except Exception:
-                pass
-            return None
-
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            future_to_sym = {executor.submit(_fetch_quote, sym): sym for sym in WATCHLIST}
-            for fut in as_completed(future_to_sym):
-                q = fut.result()
-                if q:
-                    market_quotes.append(q)
+        batch_res = provider_manager.get_batch_quotes(watchlist_symbols)
+        for sym in watchlist_symbols:
+            q_resp = batch_res.get(sym)
+            if q_resp and getattr(q_resp, "quote", None):
+                market_quotes.append(q_resp.quote)
         
         system_health = self.health_engine.get_health()
         health_response = HealthResponse(
@@ -537,6 +528,51 @@ class DashboardService:
         self._cached_dashboard = response
         self._cached_dashboard_at = now_mono
         return response
+
+    def get_dashboard_summary(self) -> Dict[str, Any]:
+        """Telemetry summary providing sub-second latency quote checks and account state."""
+        from app.core.repository.trade_journal_repository import trade_journal_repository
+        from app.core.config import settings
+
+        symbols = [s.strip().upper() for s in settings.MARKET_DATA_WATCHLIST.split(",") if s.strip()] or WATCHLIST
+        quotes = provider_manager.get_batch_quotes(symbols)
+
+        trades = trade_journal_repository.list_trades() if hasattr(trade_journal_repository, "list_trades") else []
+        active_trades = [t for t in trades if getattr(t, "status", "").upper() in ("OPEN", "ACTIVE", "PENDING")]
+        account_summary = None
+        oanda_p = provider_registry.get("oanda")
+        if oanda_p and hasattr(oanda_p, "get_account_summary"):
+            try:
+                account_summary = oanda_p.get_account_summary()
+            except Exception:
+                pass
+
+        now = datetime.now(timezone.utc)
+        quotes_summary = {}
+        for sym, q_resp in quotes.items():
+            if q_resp and getattr(q_resp, "quote", None):
+                q = q_resp.quote
+                quotes_summary[sym] = {
+                    "bid": q.bidAsk.bid,
+                    "ask": q.bidAsk.ask,
+                    "mid": q.lastPrice,
+                    "spread": q.bidAsk.spread,
+                    "freshnessSeconds": q.freshnessSeconds,
+                    "provider": q.providerName,
+                    "timestamp": q.timestamp.isoformat() if hasattr(q.timestamp, "isoformat") else str(q.timestamp),
+                }
+
+        return {
+            "timestamp": now.isoformat(),
+            "status": "ONLINE",
+            "watchlist": symbols,
+            "quotes": quotes_summary,
+            "activeTradesCount": len(active_trades),
+            "nav": account_summary.get("NAV") if account_summary else float(settings.STARTING_EQUITY),
+            "currency": account_summary.get("currency") if account_summary else "USD",
+            "executionMode": settings.EXECUTION_MODE,
+            "session": session_budget_manager.get_session_state(now).value,
+        }
 
 
 dashboard_service = DashboardService()

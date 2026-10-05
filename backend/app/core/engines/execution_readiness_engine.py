@@ -82,7 +82,7 @@ class ExecutionReadinessEngine:
             if "london" in session_lower or "new york" in session_lower or "ny" in session_lower:
                 s_score = 15
                 s_desc = f"Active session '{session}' matches optimal trading sessions."
-            elif "asian" in session_lower or "asia" in session_lower or "tokyo" in session_lower:
+            elif "asian" in session_lower or "asia" in session_lower or "tokyo" in session_lower or "sydney" in session_lower:
                 s_score = 10
                 s_desc = f"Active session '{session}' has reduced liquidity."
                 reasons.append(ReadinessReason(
@@ -114,13 +114,24 @@ class ExecutionReadinessEngine:
             
             # Asset-aware institutional spread thresholds
             if "XAU" in sym or "GOLD" in sym:
-                ideal_spread, acceptable_spread, max_spread = 2.5, 4.0, 4.5
+                ideal_spread, acceptable_spread, max_spread = 2.5, 4.0, 5.0
+            elif "GBPJPY" in sym:
+                ideal_spread, acceptable_spread, max_spread = 2.0, 3.2, 4.0
             elif "GBP" in sym:
-                ideal_spread, acceptable_spread, max_spread = 1.5, 2.5, 3.0
+                ideal_spread, acceptable_spread, max_spread = 1.5, 2.5, 3.2
             elif "JPY" in sym:
-                ideal_spread, acceptable_spread, max_spread = 1.5, 2.2, 3.0
+                ideal_spread, acceptable_spread, max_spread = 1.2, 2.2, 3.0
+            elif "AUD" in sym or "CAD" in sym:
+                ideal_spread, acceptable_spread, max_spread = 1.2, 2.2, 3.0
             else:  # EURUSD and standard majors
                 ideal_spread, acceptable_spread, max_spread = 1.0, 1.8, 2.5
+
+            # Dynamic Volatility (ATR) spread scaling if ATR is present
+            atr_val = getattr(candidate.marketSnapshot, "atr", None)
+            if atr_val and isinstance(atr_val, (int, float)) and atr_val > 0:
+                pip_mult = 100.0 if "JPY" in sym else 10000.0
+                atr_pips = atr_val * pip_mult if atr_val < 10.0 else atr_val
+                max_spread = max(max_spread, round(atr_pips * 0.25, 2))
 
             if spread <= ideal_spread:
                 sp_score = 15

@@ -11,8 +11,8 @@ from typing import List
 class SchedulerConfig:
     """Configuration for the background signal scheduler."""
     
-    # Scan Configuration (3-minute interval = 20 scan cycles/hour)
-    SCAN_INTERVAL_SECONDS: int = int(os.getenv("FALCON_SCAN_INTERVAL", "180"))
+    # Scan Configuration (15-second real-time scan cycle)
+    SCAN_INTERVAL_SECONDS: int = int(os.getenv("FALCON_SCAN_INTERVAL", "15"))
     
     # Signal Limits
     MAX_SIGNALS_PER_SYMBOL: int = int(os.getenv("FALCON_MAX_SIGNALS_PER_SYMBOL", "3"))
@@ -27,8 +27,8 @@ class SchedulerConfig:
     DUPLICATE_ENTRY_TOLERANCE_PIPS: float = float(os.getenv("FALCON_DUPLICATE_ENTRY_TOLERANCE", "5.0"))
     DUPLICATE_TIME_WINDOW_MINUTES: int = int(os.getenv("FALCON_DUPLICATE_TIME_WINDOW", "30"))
     
-    # Markets to Monitor (Focused 3 Primary Core Assets)
-    MARKETS: List[str] = os.getenv("FALCON_MARKETS", "XAUUSD,GBPUSD,EURUSD").split(",")
+    # Markets to Monitor (6 Core Institutional Assets)
+    MARKETS: List[str] = os.getenv("FALCON_MARKETS", "XAUUSD,GBPUSD,EURUSD,GBPJPY,USDJPY,AUDUSD").split(",")
     
     # Timeframes to Monitor
     TIMEFRAMES: List[str] = os.getenv("FALCON_TIMEFRAMES", "H4,H1,M15,M5").split(",")

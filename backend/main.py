@@ -105,6 +105,16 @@ async def startup_event():
     except Exception as e:
         logging.getLogger(__name__).warning("Watchlist price poller start error: %s", e)
 
+    # Start OANDA Live Pricing Stream & Local Candle Aggregator
+    try:
+        from app.core.services.oanda_streaming_service import oanda_streaming_service
+        from app.core.services.local_candle_aggregator import local_candle_aggregator
+        oanda_streaming_service.register_tick_listener(local_candle_aggregator.on_tick)
+        oanda_streaming_service.start()
+        logging.getLogger(__name__).info("OANDA Live Pricing Stream worker launched")
+    except Exception as e:
+        logging.getLogger(__name__).warning("OANDA Live Pricing Stream startup error: %s", e)
+
     # Warm Falcon AI Co-Pilot & scheduled briefings cache
     try:
         briefing_service.warm_cache()
@@ -116,6 +126,11 @@ async def startup_event():
 @app.on_event("shutdown")
 async def shutdown_event():
     """Stop all background schedulers, pollers, and managers on shutdown."""
+    try:
+        from app.core.services.oanda_streaming_service import oanda_streaming_service
+        oanda_streaming_service.stop()
+    except Exception:
+        pass
     try:
         await watchlist_poller_service.stop()
     except Exception:

@@ -670,5 +670,33 @@ class TestDashboardInstrumentContextIntegration(unittest.TestCase):
         self.assertEqual(contexts[2].pipSize, 0.01)
 
 
+class TestDashboardTelemetrySummaryAndCache(unittest.TestCase):
+    """Verify sub-second telemetry summary and cache-busting middleware."""
+
+    def test_dashboard_summary_returns_telemetry_fields(self):
+        from app.core.services.dashboard_service import dashboard_service
+        summary = dashboard_service.get_dashboard_summary()
+        self.assertIn("timestamp", summary)
+        self.assertIn("status", summary)
+        self.assertIn("watchlist", summary)
+        self.assertIn("quotes", summary)
+        self.assertIn("activeTradesCount", summary)
+        self.assertIn("nav", summary)
+        self.assertIn("currency", summary)
+        self.assertIn("executionMode", summary)
+        self.assertIn("session", summary)
+        self.assertEqual(summary["status"], "ONLINE")
+
+    def test_cache_middleware_zero_duration_endpoints(self):
+        from app.core.middleware.cache_middleware import CacheMiddleware
+        middleware = CacheMiddleware(app=None)
+        # Verify real-time endpoints have 0 cache duration
+        self.assertEqual(middleware._get_cache_duration("/dashboard"), 0)
+        self.assertEqual(middleware._get_cache_duration("/api/v1/dashboard"), 0)
+        self.assertEqual(middleware._get_cache_duration("/api/v1/dashboard/summary"), 0)
+        self.assertEqual(middleware._get_cache_duration("/market-quotes"), 0)
+        self.assertEqual(middleware._get_cache_duration("/execution-readiness"), 0)
+
+
 if __name__ == "__main__":
     unittest.main()
