@@ -103,10 +103,11 @@ class MarketDataScheduler:
                 # Use existing MarketHistoryService which handles provider routing
                 # Twelve Data → Alpha Vantage fallback (XAUUSD)
                 # Twelve Data → FMP → Alpha Vantage (GBPUSD, EURUSD, etc.)
-                bars_stored = market_history_service.refresh_symbol(
+                bars_stored = await asyncio.to_thread(
+                    market_history_service.refresh_symbol,
                     symbol=symbol,
                     timeframe=self._timeframe,
-                    force=True  # Force refresh to get latest data
+                    force=True
                 )
                 
                 cycle_result["symbols_processed"] += 1

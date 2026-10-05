@@ -107,7 +107,7 @@ async def startup_event():
 
     # Start OANDA Live Pricing Stream & Local Candle Aggregator
     try:
-        from app.core.services.oanda_streaming_service import oanda_streaming_service
+        from app.core.providers.oanda_streaming_service import oanda_streaming_service
         from app.core.services.local_candle_aggregator import local_candle_aggregator
         oanda_streaming_service.register_tick_listener(local_candle_aggregator.on_tick)
         oanda_streaming_service.start()
@@ -127,7 +127,7 @@ async def startup_event():
 async def shutdown_event():
     """Stop all background schedulers, pollers, and managers on shutdown."""
     try:
-        from app.core.services.oanda_streaming_service import oanda_streaming_service
+        from app.core.providers.oanda_streaming_service import oanda_streaming_service
         oanda_streaming_service.stop()
     except Exception:
         pass
