@@ -21,6 +21,7 @@ from app.core.repository.trade_journal_repository import trade_journal_repositor
 from app.core.services.session_budget_manager import session_budget_manager
 from app.core.services.signal_service import signal_service
 from app.core.services.signal_outcome_resolver import signal_outcome_resolver
+from app.core.services.broker_reconciliation_service import broker_reconciliation_service
 from app.services.alerts.telegram_alert_service import telegram_alert_service
 from app.schemas.trade_journal import TradeJournalUpdate
 
@@ -146,7 +147,15 @@ class WatchlistPollerService:
             self._stats["errors"] += 1
             logger.warning(f"Watchlist poller execution error: {ex}")
 
-        # Step 2: Monitor and auto-resolve OPEN trades in Trade Journal against live market
+        # Step 2: Broker Reconciliation Pass (OANDA open trades / external closes / SL sync)
+        try:
+            recon_res = broker_reconciliation_service.reconcile_state()
+            if recon_res.get("closed_synced", 0) > 0 or recon_res.get("modified_synced", 0) > 0:
+                logger.info(f"Broker reconciliation synchronized: {recon_res}")
+        except Exception as ex:
+            logger.debug(f"Broker reconciliation pass error: {ex}")
+
+        # Step 3: Monitor and auto-resolve OPEN trades in Trade Journal against live market
         try:
             open_trades = [
                 t for t in (trade_journal_repository.list_trades() or [])

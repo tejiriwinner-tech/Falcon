@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/signal.dart';
+import '../../models/trade_journal.dart';
+import '../../services/api/api_service.dart';
 import '../../services/signals/signal_pin_service.dart';
 
 class SignalCard extends StatefulWidget {
@@ -21,13 +23,15 @@ class SignalCard extends StatefulWidget {
 
 class _SignalCardState extends State<SignalCard> {
   final SignalPinService _pinService = SignalPinService();
+  bool _isPromotingToLive = false;
+  bool _isLocallyLive = false;
 
   bool get _isWon => widget.signal.status.toUpperCase() == 'WON' || widget.signal.status.toUpperCase() == 'WIN';
   bool get _isLost => widget.signal.status.toUpperCase() == 'LOST' || widget.signal.status.toUpperCase() == 'LOSS';
   bool get _isBreakeven => widget.signal.status.toUpperCase() == 'BREAKEVEN' || widget.signal.status.toUpperCase() == 'BE';
-  bool get _isExpired => widget.signal.status.toUpperCase() == 'EXPIRED' || widget.signal.status.toUpperCase() == 'INVALIDATED';
-  bool get _isHold => widget.signal.status.toUpperCase() == 'HOLD' || widget.signal.status.toUpperCase() == 'WAITING' || widget.signal.status.toUpperCase() == 'PENDING';
-  bool get _isActive => widget.signal.status.toUpperCase() == 'ACTIVE' || widget.signal.status.toUpperCase() == 'OPEN' || widget.signal.status.toUpperCase() == 'FILLED';
+  bool get _isExpired => !_isLocallyLive && (widget.signal.status.toUpperCase() == 'EXPIRED' || widget.signal.status.toUpperCase() == 'INVALIDATED');
+  bool get _isHold => !_isLocallyLive && (widget.signal.status.toUpperCase() == 'HOLD' || widget.signal.status.toUpperCase() == 'WAITING' || widget.signal.status.toUpperCase() == 'PENDING');
+  bool get _isActive => _isLocallyLive || widget.signal.status.toUpperCase() == 'ACTIVE' || widget.signal.status.toUpperCase() == 'OPEN' || widget.signal.status.toUpperCase() == 'FILLED';
   bool get _isBuy => widget.signal.action == 'BUY';
 
   String get _directionBadgeText {
@@ -35,7 +39,7 @@ class _SignalCardState extends State<SignalCard> {
     if (_isLost) return '🛑 STOPPED OUT (LOST)';
     if (_isBreakeven) return '🛡️ BREAKEVEN (\$0.00)';
     if (_isExpired) return '⏳ EXPIRED (UNTRIGGERED)';
-    if (_isActive) return _isBuy ? '🟢 ACTIVE (BUY)' : '🔴 ACTIVE (SELL)';
+    if (_isActive) return _isBuy ? '🟢 RUNNING (LIVE BUY)' : '🔴 RUNNING (LIVE SELL)';
     return _isBuy ? '⏳ HOLD (BUY)' : '⏳ HOLD (SELL)';
   }
 
@@ -474,114 +478,145 @@ class _SignalCardState extends State<SignalCard> {
             else if (_isActive)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Row(
+                child: Column(
                   children: [
-                    // Copy SL Number only
-                    Expanded(
-                      flex: 4,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => _copyNumberOnly(_formatPriceNumber(widget.signal.stopLoss), 'Stop Loss'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.error.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.error.withValues(alpha: 0.45)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.copy_rounded, size: 13, color: AppColors.error),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  'SL: ${_formatPriceNumber(widget.signal.stopLoss)}',
-                                  style: const TextStyle(
-                                    color: AppColors.error,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                    if (_isLocallyLive)
+                      Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: AppColors.success.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: AppColors.success.withValues(alpha: 0.4)),
+                        ),
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.bolt_rounded, size: 14, color: AppColors.success),
+                            SizedBox(width: 6),
+                            Text(
+                              '⚡ RUNNING LIVE ON BROKER — EXPIRATION DISABLED',
+                              style: TextStyle(
+                                color: AppColors.success,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.6,
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Copy TP Number only
-                    Expanded(
-                      flex: 4,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => _copyNumberOnly(_formatPriceNumber(widget.signal.takeProfit), 'Take Profit'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.12),
+                    Row(
+                      children: [
+                        // Copy SL Number only
+                        Expanded(
+                          flex: 4,
+                          child: InkWell(
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.success.withValues(alpha: 0.45)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.copy_rounded, size: 13, color: AppColors.success),
-                              const SizedBox(width: 5),
-                              Flexible(
-                                child: Text(
-                                  'TP: ${_formatPriceNumber(widget.signal.takeProfit)}',
-                                  style: const TextStyle(
-                                    color: AppColors.success,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                            onTap: () => _copyNumberOnly(_formatPriceNumber(widget.signal.stopLoss), 'Stop Loss'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.error.withValues(alpha: 0.45)),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.copy_rounded, size: 13, color: AppColors.error),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      'SL: ${_formatPriceNumber(widget.signal.stopLoss)}',
+                                      style: const TextStyle(
+                                        color: AppColors.error,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    // Copy Entry Number only
-                    Expanded(
-                      flex: 3,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(8),
-                        onTap: () => _copyNumberOnly(_formatPriceNumber(widget.signal.entry), 'Entry'),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.12),
+                        const SizedBox(width: 8),
+                        // Copy TP Number only
+                        Expanded(
+                          flex: 4,
+                          child: InkWell(
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(Icons.copy_rounded, size: 12, color: AppColors.primary),
-                              const SizedBox(width: 4),
-                              Flexible(
-                                child: const Text(
-                                  'ENTRY',
-                                  style: TextStyle(
-                                    color: AppColors.primary,
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 0.5,
-                                  ),
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                            onTap: () => _copyNumberOnly(_formatPriceNumber(widget.signal.takeProfit), 'Take Profit'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.success.withValues(alpha: 0.45)),
                               ),
-                            ],
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.copy_rounded, size: 13, color: AppColors.success),
+                                  const SizedBox(width: 5),
+                                  Flexible(
+                                    child: Text(
+                                      'TP: ${_formatPriceNumber(widget.signal.takeProfit)}',
+                                      style: const TextStyle(
+                                        color: AppColors.success,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        // Copy Entry Number only
+                        Expanded(
+                          flex: 3,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () => _copyNumberOnly(_formatPriceNumber(widget.signal.entry), 'Entry'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(color: AppColors.primary.withValues(alpha: 0.4)),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  const Icon(Icons.copy_rounded, size: 12, color: AppColors.primary),
+                                  const SizedBox(width: 4),
+                                  Flexible(
+                                    child: const Text(
+                                      'ENTRY',
+                                      style: TextStyle(
+                                        color: AppColors.primary,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        letterSpacing: 0.5,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -589,29 +624,73 @@ class _SignalCardState extends State<SignalCard> {
             else if (_isHold)
               Padding(
                 padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: AppColors.warning.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.hourglass_top_rounded, size: 14, color: AppColors.warning),
-                      const SizedBox(width: 8),
-                      Text(
-                        '⏳ STATUS: HOLD (AWAITING ENTRY AT ${_formatPriceNumber(widget.signal.entry)})',
-                        style: const TextStyle(
-                          color: AppColors.warning,
-                          fontSize: 11,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.8,
+                child: Column(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.35)),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(Icons.hourglass_top_rounded, size: 14, color: AppColors.warning),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '⏳ STATUS: HOLD (AWAITING ENTRY AT ${_formatPriceNumber(widget.signal.entry)})',
+                              style: const TextStyle(
+                                color: AppColors.warning,
+                                fontSize: 11,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.6,
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Action button: I Placed This (Track Live)
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: _isPromotingToLive ? null : _handlePromoteToLive,
+                        icon: _isPromotingToLive
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Icon(Icons.bolt_rounded, size: 16),
+                        label: Text(
+                          _isPromotingToLive
+                              ? 'PROMOTING TO LIVE POSITION...'
+                              : '⚡ I PLACED THIS (TRACK LIVE)',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.6,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.success,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          elevation: 0,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
 
@@ -725,6 +804,80 @@ class _SignalCardState extends State<SignalCard> {
         ),
       ),
     );
+  }
+
+  Future<void> _handlePromoteToLive() async {
+    setState(() {
+      _isPromotingToLive = true;
+    });
+
+    try {
+      final apiService = ApiService();
+      final draft = TradeJournalDraft(
+        strategyId: widget.signal.strategyId.isNotEmpty ? widget.signal.strategyId : 'falcon-sniper',
+        symbol: widget.signal.symbol,
+        direction: widget.signal.action,
+        entryPrice: widget.signal.entry,
+        stopLoss: widget.signal.stopLoss,
+        takeProfit: widget.signal.takeProfit,
+        timeframe: widget.signal.timeframe,
+        marketSession: 'LIVE',
+        tradeDate: DateTime.now().toUtc(),
+        riskReward: widget.signal.riskReward ?? 2.0,
+        confidence: widget.signal.confidence,
+        reasonForEntry: 'Manual Execution via Mobile (⚡ I Placed This)',
+        notes: 'Tracked Live [Falcon Mobile Execution: ${widget.signal.symbol} ${widget.signal.action}]',
+      );
+
+      await apiService.createTradeJournal(draft);
+
+      // Also pin the signal locally for prominent tracking
+      if (!_pinService.isPinned(widget.signal)) {
+        await _pinService.togglePin(widget.signal);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _isPromotingToLive = false;
+        _isLocallyLive = true;
+      });
+
+      widget.onPinChanged?.call();
+
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '⚡ ${widget.signal.symbol} is now RUNNING LIVE! Expiration disabled; tracking to TP/SL.',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                ),
+              ),
+            ],
+          ),
+          backgroundColor: AppColors.surface,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _isPromotingToLive = false;
+      });
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to record live trade: $e'),
+          backgroundColor: AppColors.error,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    }
   }
 
   Future<void> _handleTogglePin(bool currentlyPinned) async {

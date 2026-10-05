@@ -118,6 +118,20 @@ class SignalService:
                 dec = 2 if "XAU" in ot.symbol or ot.entryPrice > 100 else 4
                 risk_d = abs(ot.entryPrice - ot.stopLoss)
                 be_trig = ot.entryPrice + risk_d if ot.direction.upper() == "BUY" else ot.entryPrice - risk_d
+
+                # Fetch real-time market quote to reflect live floating metrics
+                cur_live_px = None
+                try:
+                    raw_ot_sym = ot.symbol.replace("/", "").upper()
+                    pm = getattr(providers, "provider_manager", None)
+                    if pm is not None:
+                        q_resp = pm.get_market_quote(raw_ot_sym)
+                        if q_resp and q_resp.quote and q_resp.quote.lastPrice:
+                            cur_live_px = q_resp.quote.lastPrice
+                except Exception:
+                    pass
+
+                live_px_str = f" | Current Market: {cur_live_px:.4f}" if cur_live_px else ""
                 active_signal = SignalItem(
                     id=ot.signalId or ot.id,
                     symbol=ot.symbol,
@@ -128,17 +142,17 @@ class SignalService:
                     confidence=ot.confidence or 85,
                     timeframe=ot.timeframe or "M15",
                     status="ACTIVE",
-                    analysis=f"🎯 ACTIVE (IN POSITION) [{ot.notes or 'Falcon Trade'}]: Live market in position from entry {ot.entryPrice:.4f}. Holding until Take Profit ({ot.takeProfit:.4f}) or Stop Loss ({ot.stopLoss:.4f}).",
+                    analysis=f"🎯 RUNNING (LIVE) [{ot.notes or 'Falcon Trade'}]: Live position active from entry {ot.entryPrice:.4f}{live_px_str}. Holding until Take Profit ({ot.takeProfit:.4f}) or Stop Loss ({ot.stopLoss:.4f}). Expiration disabled.",
                     timestamp=ot.tradeDate,
                     strategyId=ot.strategyId or "falcon-opt",
                     strategyName=ot.notes or "Falcon Strategy",
                     strategyVersion="4.2",
                     dataAgeSeconds=0,
                     triggerCondition=f"Enter {ot.direction.upper()} at {ot.entryPrice:.4f}",
-                    validUntil=ot.tradeDate + timedelta(hours=8),
+                    validUntil=ot.tradeDate + timedelta(hours=48),
                     setupPattern=ot.notes or "Sniper Setup",
                     riskReward=ot.riskReward,
-                    isPinned=False,
+                    isPinned=True,
                     breakevenTrigger=round(be_trig, dec),
                     breakevenPrice=round(ot.entryPrice, dec),
                     isBreakeven=False,
@@ -303,7 +317,7 @@ class SignalService:
             curated_active: List[dict] = []
             curated_watchlist: List[dict] = []
             additional_resolved: List[SignalItem] = []
-            active_symbols: set = set()
+            active_symbols: set = {ot.symbol.replace("/", "").replace("-", "").upper() for ot in open_trades}
             watchlist_symbols: set = set()
 
             lot_size = ExecutionSettings().default_lot_size
