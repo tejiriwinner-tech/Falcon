@@ -33,7 +33,7 @@ class WatchlistPollerService:
     Background price poller and state synchronizer for Falcon Watchlist.
     """
 
-    def __init__(self, poll_interval_seconds: int = 10) -> None:
+    def __init__(self, poll_interval_seconds: int = 15) -> None:
         self.poll_interval_seconds = int(os.getenv("WATCHLIST_POLL_INTERVAL_SECONDS", str(poll_interval_seconds)))
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
@@ -93,8 +93,12 @@ class WatchlistPollerService:
     async def poll_once(self) -> dict:
         """
         Executes a single check across all active and pending watchlist setups.
-        Auto-transitions HOLD -> ACTIVE upon entry hit or -> EXPIRED upon 1-hour timeout.
+        Offloads synchronous database and calculation work to a worker thread
+        so the asyncio event loop remains non-blocking for HTTP requests.
         """
+        return await asyncio.to_thread(self._poll_once_sync)
+
+    def _poll_once_sync(self) -> dict:
         now = datetime.now(timezone.utc)
         self._stats["cycles"] += 1
         self._last_poll_time = now

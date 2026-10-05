@@ -136,7 +136,12 @@ def get_decision_artifacts():
         )
     except Exception as exc:
         logger.warning(f"Error computing decision artifacts: {exc}")
+        if _cache_response is not None:
+            return _cache_response
         decisions = []
+
+    if not decisions and _cache_response is not None:
+        return _cache_response
 
     summary = _build_summary(decisions)
     response = DecisionArtifactListResponse(

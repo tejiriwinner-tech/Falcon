@@ -18,12 +18,12 @@ primary_region = "lhr"
   processes = ["app"]
 
   [[http_service.checks]]
-    grace_period = "90s"
-    interval = "15s"
+    grace_period = "120s"
+    interval = "20s"
     method = "GET"
     path = "/api/v1/health"
     protocol = "http"
-    timeout = "10s"
+    timeout = "15s"
 
 [[vm]]
   cpu_kind = "shared"
