@@ -174,7 +174,21 @@ class MissionRepository:
             if all(mid in self._cached_bulk_artifacts for mid in mission_ids):
                 return {mid: self._cached_bulk_artifacts[mid] for mid in mission_ids}
         if hasattr(self._storage, "get_all_artifacts_bulk"):
-            bulk = self._storage.get_all_artifacts_bulk(mission_ids, artifact_types=artifact_types)
+            # Map any camelCase names to uppercase database artifact_type constants
+            storage_types = None
+            if artifact_types is not None:
+                type_map = {
+                    "decisions": DECISION,
+                    "candidates": CANDIDATE,
+                    "validations": VALIDATION,
+                    "riskassessments": RISK_ASSESSMENT,
+                    "executionreadiness": EXECUTION_READINESS,
+                    "marketstate": MARKET_STATE,
+                }
+                storage_types = [
+                    type_map.get(t.lower(), t.upper()) for t in artifact_types
+                ]
+            bulk = self._storage.get_all_artifacts_bulk(mission_ids, artifact_types=storage_types)
             result = {}
             for mid, grouped in bulk.items():
                 market_states = grouped.get(MARKET_STATE, [])
