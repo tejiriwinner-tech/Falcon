@@ -622,7 +622,7 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
           children: [
             // Header
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
               child: Row(
                 children: [
                   const Icon(Icons.stars_rounded, size: 16, color: AppColors.primary),
@@ -635,18 +635,27 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${d.strategyName} (v${d.strategyVersion})',
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontSize: 11,
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      '${d.strategyName} (v${d.strategyVersion})',
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
                     ),
                   ),
-                  const Spacer(),
-                  _buildBadge(d.recommendation.name, recColor),
-                  const SizedBox(width: 4),
-                  _buildBadge(d.status.name, statusColor),
+                  const SizedBox(width: 8),
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _buildBadge(d.recommendation.name, recColor),
+                      const SizedBox(width: 4),
+                      _buildBadge(d.status.name, statusColor),
+                    ],
+                  ),
                 ],
               ),
             ),

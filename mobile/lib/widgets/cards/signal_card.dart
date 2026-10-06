@@ -655,6 +655,51 @@ class _SignalCardState extends State<SignalCard> {
                       ),
                     ),
                     const SizedBox(height: 8),
+                    // Action button: View Live Chart before hitting entry
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        onPressed: () {
+                          final overlay = TradeCorridorOverlay(
+                            entry: widget.signal.entry,
+                            stopLoss: widget.signal.stopLoss,
+                            takeProfit: widget.signal.takeProfit,
+                            isBuy: _isBuy,
+                            status: widget.signal.status,
+                            isBreakeven: widget.signal.isBreakeven,
+                            breakevenPrice: widget.signal.breakevenPrice,
+                            entryTime: widget.signal.timestamp,
+                          );
+
+                          context.push(
+                            '/chart?symbol=${widget.signal.symbol}&timeframe=${widget.signal.timeframe}',
+                            extra: {
+                              'tradeOverlay': overlay,
+                              'strategyName': widget.signal.strategyName,
+                              'conviction': widget.signal.confidence,
+                            },
+                          );
+                        },
+                        icon: const Icon(Icons.candlestick_chart_rounded, size: 16, color: AppColors.primary),
+                        label: const Text(
+                          '📊 VIEW LIVE CHART (BEFORE ENTRY)',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.6,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(color: AppColors.primary.withValues(alpha: 0.5), width: 1.2),
+                          padding: const EdgeInsets.symmetric(vertical: 9, horizontal: 12),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
                     // Action button: I Placed This (Track Live)
                     SizedBox(
                       width: double.infinity,
