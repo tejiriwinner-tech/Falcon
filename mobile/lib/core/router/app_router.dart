@@ -28,6 +28,8 @@ import '../../screens/providers/providers_screen.dart';
 import '../../screens/market_quotes/market_quotes_screen.dart';
 import '../../screens/runtime/runtime_screen.dart';
 import '../../screens/copilot/copilot_screen.dart';
+import '../../screens/chart/trading_chart_screen.dart';
+import '../../models/candle_data.dart';
 import '../constants/app_colors.dart';
 
 final GlobalKey<NavigatorState> _rootNavigatorKey = GlobalKey<NavigatorState>();
@@ -145,6 +147,34 @@ class AppRouter {
           GoRoute(
             path: '/runtime',
             builder: (context, state) => const RuntimeScreen(),
+          ),
+          GoRoute(
+            path: '/chart',
+            builder: (context, state) {
+              final symbol = state.uri.queryParameters['symbol'] ?? 'EURUSD';
+              final timeframe = state.uri.queryParameters['timeframe'] ?? '15m';
+              final extra = state.extra as Map<String, dynamic>?;
+
+              TradeCorridorOverlay? overlay;
+              String? strategyName;
+              int? convictionScore;
+
+              if (extra != null) {
+                if (extra.containsKey('tradeOverlay')) {
+                  overlay = extra['tradeOverlay'] as TradeCorridorOverlay?;
+                }
+                strategyName = extra['strategyName'] as String?;
+                convictionScore = extra['conviction'] as int?;
+              }
+
+              return TradingChartScreen(
+                symbol: symbol,
+                initialTimeframe: timeframe,
+                tradeOverlay: overlay,
+                strategyName: strategyName,
+                convictionScore: convictionScore,
+              );
+            },
           ),
           GoRoute(
             path: '/copilot',

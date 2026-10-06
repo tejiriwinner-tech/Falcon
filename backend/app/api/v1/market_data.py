@@ -64,6 +64,16 @@ def get_history(
     limit: int = Query(200, ge=1, le=1000),
 ):
     """Returns stored bars for a symbol; empty when nothing has been backfilled."""
+    norm_tf = (timeframe or "1h").lower()
+    alias_map = {
+        "m5": "5m",
+        "m15": "15m",
+        "m30": "30m",
+        "h1": "1h",
+        "h4": "4h",
+        "d1": "1d",
+    }
+    effective_tf = alias_map.get(norm_tf, norm_tf)
     return [
         PriceBarResponse(
             symbol=bar.symbol,
@@ -76,7 +86,7 @@ def get_history(
             volume=bar.volume,
             provider=bar.provider,
         )
-        for bar in market_history_service.get_bars(symbol, timeframe, limit)
+        for bar in market_history_service.get_bars(symbol, effective_tf, limit)
     ]
 
 

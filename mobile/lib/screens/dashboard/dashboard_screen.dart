@@ -902,42 +902,54 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     final spreadStr = 'Spread: ${quote.bidAsk.spread.toStringAsFixed(1)}p';
     final freshnessLabel = 'Fresh ${quote.freshnessSeconds.toInt()}s';
 
-    return AppCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(quote.symbol, style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: badgeColor.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(color: badgeColor.withValues(alpha: 0.4), width: 0.8),
+    return InkWell(
+      borderRadius: BorderRadius.circular(12),
+      onTap: () {
+        context.push('/chart?symbol=${quote.symbol}&timeframe=15m');
+      },
+      child: AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(quote.symbol, style: const TextStyle(color: AppColors.textSecondary, fontWeight: FontWeight.w600, fontSize: 13)),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.show_chart_rounded, size: 14, color: AppColors.primary),
+                  ],
                 ),
-                child: Text(
-                  isFresh ? 'LIVE' : 'STALE',
-                  style: TextStyle(color: badgeColor, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: badgeColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: badgeColor.withValues(alpha: 0.4), width: 0.8),
+                  ),
+                  child: Text(
+                    isFresh ? 'LIVE' : 'STALE',
+                    style: TextStyle(color: badgeColor, fontSize: 9, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(midStr, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
-          const SizedBox(height: 4),
-          Text(spreadStr, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-          const SizedBox(height: 6),
-          Row(
-            children: [
-              const Icon(Icons.cloud_queue_rounded, size: 10, color: AppColors.textSecondary),
-              const SizedBox(width: 4),
-              Expanded(child: Text(providerShort, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10), overflow: TextOverflow.ellipsis)),
-              Text(freshnessLabel, style: TextStyle(color: isFresh ? AppColors.success : AppColors.warning, fontSize: 10, fontWeight: FontWeight.w500)),
-            ],
-          ),
-        ],
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(midStr, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+            const SizedBox(height: 4),
+            Text(spreadStr, style: const TextStyle(color: AppColors.textSecondary, fontSize: 11)),
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                const Icon(Icons.cloud_queue_rounded, size: 10, color: AppColors.textSecondary),
+                const SizedBox(width: 4),
+                Expanded(child: Text(providerShort, style: const TextStyle(color: AppColors.textSecondary, fontSize: 10), overflow: TextOverflow.ellipsis)),
+                Text(freshnessLabel, style: TextStyle(color: isFresh ? AppColors.success : AppColors.warning, fontSize: 10, fontWeight: FontWeight.w500)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

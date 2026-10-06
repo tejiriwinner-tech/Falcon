@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/signal.dart';
 import '../../models/trade_journal.dart';
+import '../../models/candle_data.dart';
 import '../../services/api/api_service.dart';
 import '../../services/signals/signal_pin_service.dart';
 
@@ -746,6 +747,55 @@ class _SignalCardState extends State<SignalCard> {
                     style: const TextStyle(
                       color: AppColors.textTertiary,
                       fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // View Live Chart Button & Strategy tag
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 2, 16, 10),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        final overlay = TradeCorridorOverlay(
+                          entry: widget.signal.entry,
+                          stopLoss: widget.signal.stopLoss,
+                          takeProfit: widget.signal.takeProfit,
+                          isBuy: _isBuy,
+                          status: widget.signal.status,
+                          isBreakeven: widget.signal.isBreakeven,
+                          breakevenPrice: widget.signal.breakevenPrice,
+                          entryTime: widget.signal.timestamp,
+                        );
+
+                        context.push(
+                          '/chart?symbol=${widget.signal.symbol}&timeframe=${widget.signal.timeframe}',
+                          extra: {
+                            'tradeOverlay': overlay,
+                            'strategyName': widget.signal.strategyName,
+                            'conviction': widget.signal.confidence,
+                          },
+                        );
+                      },
+                      icon: const Icon(Icons.candlestick_chart_rounded, size: 16, color: AppColors.primary),
+                      label: const Text(
+                        '📊 VIEW LIVE CHART',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: AppColors.primary.withValues(alpha: 0.45)),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                      ),
                     ),
                   ),
                 ],

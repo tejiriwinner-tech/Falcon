@@ -348,6 +348,41 @@ class MarketHistoryService:
             )
             for record in reversed(records)
         ]
+        if not result or len(result) < min(limit, 20):
+            # On-demand backfill so clients (charting, SMC) always receive full candle series
+            self.refresh_symbol(symbol, timeframe, force=True, bypass_budget=True)
+            if not database_enabled():
+                with self._lock:
+                    bars = [
+                        bar
+                        for (sym, tf, _), bar in self._memory.items()
+                        if sym == symbol and tf == timeframe
+                    ]
+                result = sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
+            else:
+                with get_session() as session:
+                    records = session.scalars(
+                        select(PriceBarRecord)
+                        .where(PriceBarRecord.symbol == symbol)
+                        .where(PriceBarRecord.timeframe == timeframe)
+                        .order_by(PriceBarRecord.bar_time.desc())
+                        .limit(limit)
+                    ).all()
+                result = [
+                    PriceBar(
+                        symbol=record.symbol,
+                        timeframe=record.timeframe,
+                        bar_time=record.bar_time,
+                        open=record.open,
+                        high=record.high,
+                        low=record.low,
+                        close=record.close,
+                        volume=record.volume,
+                        provider=record.provider,
+                    )
+                    for record in reversed(records)
+                ]
+
         with self._lock:
             self._bars_cache[cache_key] = (now_mono, result)
         return result

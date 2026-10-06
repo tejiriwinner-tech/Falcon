@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
 import '../../models/strategy_model.dart';
 import '../../models/trade_journal.dart';
+import '../../models/candle_data.dart';
 import '../../services/api/api_service.dart';
 import '../../widgets/cards/app_card.dart';
 import '../../widgets/chips/status_chip.dart';
@@ -246,18 +248,53 @@ class _JournalScreenState extends State<JournalScreen> {
                 type: StatusChipType.journalStatus,
               ),
             ],
-          ),
-          if (trade.status.toUpperCase() != 'CLOSED') ...[
-            const SizedBox(height: 8),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton.icon(
-                onPressed: () => _closeTrade(trade),
-                icon: const Icon(Icons.flag_outlined, size: 18),
-                label: const Text('Close trade'),
+          const SizedBox(height: 10),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              OutlinedButton.icon(
+                onPressed: () {
+                  final isBuy = trade.direction.toUpperCase() == 'BUY';
+                  final overlay = TradeCorridorOverlay(
+                    entry: trade.entryPrice,
+                    stopLoss: trade.stopLoss,
+                    takeProfit: trade.takeProfit,
+                    isBuy: isBuy,
+                    status: trade.status,
+                    isBreakeven: trade.status.toUpperCase() == 'BREAKEVEN',
+                    breakevenPrice: trade.status.toUpperCase() == 'BREAKEVEN' ? trade.entryPrice : null,
+                    entryTime: trade.tradeDate,
+                  );
+
+                  context.push(
+                    '/chart?symbol=${trade.symbol}&timeframe=${trade.timeframe}',
+                    extra: {
+                      'tradeOverlay': overlay,
+                      'strategyName': trade.strategyId,
+                      'conviction': trade.confidence,
+                    },
+                  );
+                },
+                icon: const Icon(Icons.candlestick_chart_rounded, size: 15, color: AppColors.primary),
+                label: const Text('Chart View', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.4)),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  minimumSize: const Size(0, 32),
+                ),
               ),
-            ),
-          ],
+              if (trade.status.toUpperCase() != 'CLOSED')
+                TextButton.icon(
+                  onPressed: () => _closeTrade(trade),
+                  icon: const Icon(Icons.flag_outlined, size: 16),
+                  label: const Text('Close trade', style: TextStyle(fontSize: 12)),
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    minimumSize: const Size(0, 32),
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );

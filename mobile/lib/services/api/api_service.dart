@@ -31,6 +31,7 @@ import '../../models/market_quote.dart';
 import '../../models/dashboard.dart';
 import '../../models/intelligence.dart';
 import '../../models/copilot_models.dart';
+import '../../models/candle_data.dart';
 import '../cache/cache_service.dart';
 
 
@@ -694,6 +695,33 @@ class ApiService {
       throw Exception('Request timed out after $briefingTimeoutSeconds seconds.');
     } catch (e) {
       throw Exception('Telegram dispatch failed: $e');
+    }
+  }
+
+  /// GET /market-data/history/{symbol} — Fetch historical OHLCV candlestick bars.
+  Future<List<CandleData>> getCandles({
+    required String symbol,
+    String timeframe = '15m',
+    int limit = 120,
+  }) async {
+    final url = '$baseUrl/market-data/history/$symbol?timeframe=$timeframe&limit=$limit';
+    print('Calling: $url');
+    try {
+      final response = await http
+          .get(Uri.parse(url))
+          .timeout(const Duration(seconds: timeoutSeconds));
+
+      if (response.statusCode == 200) {
+        final List<dynamic> list = jsonDecode(response.body) as List<dynamic>;
+        return list
+            .map((item) => CandleData.fromJson(item as Map<String, dynamic>))
+            .toList();
+      }
+      throw Exception('Candles fetch error: ${response.statusCode}');
+    } on TimeoutException {
+      throw Exception('Candles request timed out after $timeoutSeconds seconds.');
+    } catch (e) {
+      throw Exception('Failed to load candles for $symbol: $e');
     }
   }
 
