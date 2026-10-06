@@ -11,7 +11,7 @@ Two interchangeable backends are provided:
 
 import copy
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Sequence, Type, TypeVar
 
 from pydantic import BaseModel
@@ -144,6 +144,18 @@ class InMemoryMissionStorage:
             return 0
         all_ids = list(self._missions.keys())
         to_delete = all_ids[:-keep_latest]
+        for mid in to_delete:
+            self._missions.pop(mid, None)
+            self._artifacts.pop(mid, None)
+        return len(to_delete)
+
+    def prune_older_than(self, days: int = 14) -> int:
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=days)
+        to_delete = [
+            mid for mid, m in self._missions.items()
+            if m.timestamp < cutoff
+        ]
         for mid in to_delete:
             self._missions.pop(mid, None)
             self._artifacts.pop(mid, None)
@@ -334,6 +346,29 @@ class DatabaseMissionStorage:
             result = session.execute(
                 delete(MissionRecord)
                 .where(~MissionRecord.id.in_(keep_ids))
+            )
+            return result.rowcount or 0
+
+    def prune_older_than(self, days: int = 14) -> int:
+        now = datetime.now(timezone.utc)
+        cutoff = now - timedelta(days=days)
+        with get_session() as session, session.begin():
+            # Find missions older than cutoff date
+            old_mission_ids = list(session.scalars(
+                select(MissionRecord.id)
+                .where(MissionRecord.stored_at < cutoff)
+            ).all())
+            if not old_mission_ids:
+                return 0
+            # Delete artifacts associated with old missions
+            session.execute(
+                delete(MissionArtifactRecord)
+                .where(MissionArtifactRecord.mission_id.in_(old_mission_ids))
+            )
+            # Delete old mission records
+            result = session.execute(
+                delete(MissionRecord)
+                .where(MissionRecord.id.in_(old_mission_ids))
             )
             return result.rowcount or 0
 

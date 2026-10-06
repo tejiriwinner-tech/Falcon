@@ -115,6 +115,15 @@ class LearningSchedulerService:
         except Exception as e:
             logger.warning(f"[Stage 4] Strategy optimizer failed: {e}")
 
+        # Stage 5: Autonomous Database & Memory Maintenance (Daily / Every 96 cycles)
+        if self._total_cycles % 96 == 0 or self._total_cycles == 1:
+            try:
+                pruned_count = await asyncio.to_thread(mission_repository.prune_older_than, 14)
+                if pruned_count > 0:
+                    logger.info(f"[Maintenance] Auto-pruned {pruned_count} historical missions and artifacts older than 14 days.")
+            except Exception as e:
+                logger.debug(f"[Maintenance] Historical mission pruning error: {e}")
+
         logger.info(f"--- Learning Cycle #{self._total_cycles} finished ---")
         import gc
         gc.collect()

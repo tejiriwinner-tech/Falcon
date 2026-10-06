@@ -83,6 +83,28 @@ class BrokerReconciliationService:
                     pass
 
             if not broker_ticket:
+                # Fuzzy Reconciliation: Match unticketed active trade by Symbol + Direction + Price proximity
+                t_sym = trade.symbol.replace("/", "_").upper()
+                t_dir = (trade.direction or "").upper()
+                for b_id, b_trade in broker_trade_map.items():
+                    b_inst = b_trade.get("instrument", "").replace("/", "_").upper()
+                    b_units = float(b_trade.get("currentUnits", 0.0) or b_trade.get("initialUnits", 0.0))
+                    b_dir = "BUY" if b_units > 0 else "SELL"
+                    if b_inst == t_sym and b_dir == t_dir:
+                        b_price = float(b_trade.get("price", 0.0))
+                        pip_tol = 0.50 if ("XAU" in t_sym or trade.entryPrice > 100) else 0.0010
+                        if abs(b_price - float(trade.entryPrice)) <= pip_tol:
+                            broker_ticket = b_id
+                            # Bind the matched broker ticket into journal record notes
+                            new_notes = f"{notes} ticket:{b_id}".strip()
+                            self._journal.update_trade(trade.id, TradeJournalUpdate(notes=new_notes))
+                            logger.info(
+                                "[Reconciliation] Successfully linked broker ticket #%s to journal trade #%s (%s %s)",
+                                b_id, trade.id, trade.symbol, trade.direction
+                            )
+                            break
+
+            if not broker_ticket:
                 continue
 
             # Check if trade is still open on OANDA

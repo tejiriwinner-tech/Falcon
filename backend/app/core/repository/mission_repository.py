@@ -210,6 +210,14 @@ class MissionRepository:
             lastMissionAt=self.last_mission_at,
         )
 
+    def prune_missions(self, keep_latest: int = 20) -> int:
+        """Prunes historical missions down to the specified latest count."""
+        return self._storage.prune_missions(keep_latest=keep_latest)
+
+    def prune_older_than(self, days: int = 14) -> int:
+        """Prunes historical missions and associated artifacts older than specified days."""
+        return self._storage.prune_older_than(days=days)
+
     def clear_repository(self) -> None:
         """Clear all stored data (for testing purposes only)."""
         self._storage.clear()
