@@ -200,6 +200,44 @@ class SignalSignatureRepository:
 
         return sig_key
 
+    def get_status(
+        self,
+        symbol: str,
+        direction: str,
+        entry_price: float,
+        stop_loss: float,
+        take_profit: float,
+    ) -> Optional[str]:
+        sig_key = format_signature_key(symbol, direction, entry_price, stop_loss, take_profit)
+        sig = self._in_memory.get_signature(sig_key)
+        if sig and sig.get("status"):
+            return (sig.get("status") or "").upper()
+
+        if database_enabled():
+            self._ensure_schema()
+            try:
+                session = get_session()
+                try:
+                    record = session.get(SignalSignatureRecord, sig_key)
+                    if record is not None and record.status:
+                        return record.status.upper()
+                finally:
+                    session.close()
+            except Exception as ex:
+                logger.debug(f"Error checking signature status in DB: {ex}")
+        return None
+
+    def is_active(
+        self,
+        symbol: str,
+        direction: str,
+        entry_price: float,
+        stop_loss: float,
+        take_profit: float,
+    ) -> bool:
+        status = self.get_status(symbol, direction, entry_price, stop_loss, take_profit)
+        return status == "ACTIVE"
+
     def has_signature(
         self,
         symbol: str,
@@ -208,32 +246,7 @@ class SignalSignatureRepository:
         stop_loss: float,
         take_profit: float,
     ) -> bool:
-        sig_key = format_signature_key(symbol, direction, entry_price, stop_loss, take_profit)
-        if self._in_memory.has_signature(sig_key):
-            return True
-
-        if database_enabled():
-            self._ensure_schema()
-            try:
-                session = get_session()
-                try:
-                    record = session.get(SignalSignatureRecord, sig_key)
-                    if record is not None:
-                        self._in_memory.record_signature(
-                            record.signature,
-                            record.symbol,
-                            record.direction,
-                            record.entry_price,
-                            record.stop_loss,
-                            record.take_profit,
-                            record.status,
-                        )
-                        return True
-                finally:
-                    session.close()
-            except Exception as ex:
-                logger.debug(f"Error checking signature in DB: {ex}")
-        return False
+        return self.get_status(symbol, direction, entry_price, stop_loss, take_profit) is not None
 
     def get_all_signatures(self) -> Set[str]:
         signatures = set(self._in_memory.get_all_signatures())

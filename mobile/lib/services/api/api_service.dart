@@ -704,7 +704,8 @@ class ApiService {
     String timeframe = '15m',
     int limit = 120,
   }) async {
-    final url = '$baseUrl/market-data/history/$symbol?timeframe=$timeframe&limit=$limit';
+    final cleanSymbol = symbol.replaceAll('/', '').replaceAll('_', '').replaceAll('-', '').trim().toUpperCase();
+    final url = '$baseUrl/market-data/history/$cleanSymbol?timeframe=$timeframe&limit=$limit';
     print('Calling: $url');
     try {
       final response = await http
@@ -730,8 +731,9 @@ class ApiService {
     String symbol = 'EURUSD',
     String timeframe = '15m',
   }) async {
+    final cleanSymbol = symbol.replaceAll('/', '').replaceAll('_', '').replaceAll('-', '').trim().toUpperCase();
     return _get<SMCStructureData>(
-      '/smc/structure?symbol=$symbol&timeframe=$timeframe',
+      '/smc/structure?symbol=$cleanSymbol&timeframe=$timeframe',
       SMCStructureData.fromJson,
       timeoutSecondsOverride: briefingTimeoutSeconds,
     );
@@ -744,7 +746,8 @@ class ApiService {
     String? session,
     double? spreadPips,
   }) async {
-    var url = '$baseUrl/smc/conviction?symbol=$symbol&direction=$direction';
+    final cleanSymbol = symbol.replaceAll('/', '').replaceAll('_', '').replaceAll('-', '').trim().toUpperCase();
+    var url = '$baseUrl/smc/conviction?symbol=$cleanSymbol&direction=$direction';
     if (session != null) url += '&session=$session';
     if (spreadPips != null) url += '&spread_pips=$spreadPips';
     print('Calling: $url');

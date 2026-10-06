@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:falcon/models/chart_models.dart';
 import 'package:falcon/models/copilot_models.dart';
 import 'package:falcon/screens/copilot/copilot_screen.dart';
 

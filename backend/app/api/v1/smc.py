@@ -17,6 +17,7 @@ from fastapi import APIRouter, Query
 
 from app.core.engines.candlestick_pattern_engine import CandleBar
 from app.core.engines.smc_structure_engine import smc_structure_engine
+from app.core.providers.symbol_mapper import symbol_mapper
 from app.core.services.market_history_service import market_history_service
 from app.schemas.smc_structure import (
     CompositeConvictionScore,
@@ -40,8 +41,9 @@ def get_smc_structure(
     Returns detected Order Blocks, Fair Value Gaps, and Session Levels for the instrument.
     Purely read-only query (R4) with sub-50ms caching and benchmark fallback.
     """
+    canonical_symbol = symbol_mapper.normalize(symbol) or symbol.replace("/", "").replace("_", "").replace("-", "").strip().upper()
     now = datetime.now(timezone.utc)
-    cache_key = f"{symbol.upper()}_{timeframe.lower()}"
+    cache_key = f"{canonical_symbol}_{timeframe.lower()}"
 
     if cache_key in _smc_structure_cache:
         cached_resp, cache_time = _smc_structure_cache[cache_key]
@@ -50,7 +52,7 @@ def get_smc_structure(
 
     try:
         try:
-            bars = market_history_service.get_bars(symbol=symbol, timeframe=timeframe, limit=limit)
+            bars = market_history_service.get_bars(symbol=canonical_symbol, timeframe=timeframe, limit=limit)
         except Exception:
             bars = []
 
@@ -119,8 +121,9 @@ def get_smc_sweeps(
     Returns session liquidity sweeps (manipulation wicks that sweep session extremes and reverse).
     Purely read-only query (R4).
     """
+    canonical_symbol = symbol_mapper.normalize(symbol) or symbol.replace("/", "").replace("_", "").replace("-", "").strip().upper()
     try:
-        bars = market_history_service.get_bars(symbol=symbol, timeframe=timeframe, limit=limit)
+        bars = market_history_service.get_bars(symbol=canonical_symbol, timeframe=timeframe, limit=limit)
     except Exception:
         bars = []
     session_levels = smc_structure_engine.compute_session_levels(bars) if bars else None
@@ -138,7 +141,7 @@ def get_smc_sweeps(
 
     sweeps = (
         smc_structure_engine.detect_session_liquidity_sweeps(
-            candles=candles, session_levels=session_levels, symbol=symbol
+            candles=candles, session_levels=session_levels, symbol=canonical_symbol
         )
         if session_levels and session_levels.high > 0.0
         else []
@@ -148,7 +151,7 @@ def get_smc_sweeps(
     low_sweeps = sum(1 for s in sweeps if s.is_low_sweep)
 
     return SMCSweepsResponse(
-        symbol=symbol,
+        symbol=canonical_symbol,
         session_levels=session_levels,
         sweeps=sweeps,
         total_sweeps=len(sweeps),
@@ -173,6 +176,7 @@ def get_composite_conviction(
     macro news blackout, DXY inverse correlation, and live spreads.
     Purely read-only query (R4).
     """
+    canonical_symbol = symbol_mapper.normalize(symbol) or symbol.replace("/", "").replace("_", "").replace("-", "").strip().upper()
     if not session:
         utc_hour = datetime.now(timezone.utc).hour
         if 0 <= utc_hour < 7:
@@ -185,7 +189,7 @@ def get_composite_conviction(
             session = "OFF_HOURS"
 
     try:
-        bars = market_history_service.get_bars(symbol=symbol, timeframe=timeframe, limit=100)
+        bars = market_history_service.get_bars(symbol=canonical_symbol, timeframe=timeframe, limit=100)
     except Exception:
         bars = []
     candles = [
@@ -199,11 +203,11 @@ def get_composite_conviction(
         for b in bars
     ]
 
-    obs = smc_structure_engine.detect_order_blocks(candles, symbol=symbol, timeframe=timeframe) if candles else []
-    fvgs = smc_structure_engine.detect_fair_value_gaps(candles, symbol=symbol, timeframe=timeframe) if candles else []
+    obs = smc_structure_engine.detect_order_blocks(candles, symbol=canonical_symbol, timeframe=timeframe) if candles else []
+    fvgs = smc_structure_engine.detect_fair_value_gaps(candles, symbol=canonical_symbol, timeframe=timeframe) if candles else []
     sess_levels = smc_structure_engine.compute_session_levels(bars) if bars else None
     sweeps = (
-        smc_structure_engine.detect_session_liquidity_sweeps(candles, sess_levels, symbol=symbol)
+        smc_structure_engine.detect_session_liquidity_sweeps(candles, sess_levels, symbol=canonical_symbol)
         if sess_levels and sess_levels.high > 0.0
         else []
     )
@@ -218,7 +222,7 @@ def get_composite_conviction(
         dxy_trend=dxy_trend,
         macro_news_impact=macro_news_impact,
         minutes_to_news=minutes_to_news,
-        symbol=symbol,
+        symbol=canonical_symbol,
     )
 
     return conviction

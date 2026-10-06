@@ -306,6 +306,8 @@ class MarketHistoryService:
 
     def get_bars(self, symbol: str, timeframe: Optional[str] = None, limit: int = 200) -> List[PriceBar]:
         """Returns stored bars oldest-first."""
+        canonical_symbol = symbol_mapper.normalize(symbol) or symbol.replace("/", "").replace("_", "").replace("-", "").strip().upper()
+        symbol = canonical_symbol
         timeframe = timeframe or settings.HISTORY_TIMEFRAME
         cache_key = (symbol, timeframe, limit)
         now_mono = time.monotonic()
@@ -403,6 +405,8 @@ class MarketHistoryService:
         Refreshes are throttled per symbol so a busy pipeline cannot exhaust the
         provider quota.
         """
+        canonical_symbol = symbol_mapper.normalize(symbol) or symbol.replace("/", "").replace("_", "").replace("-", "").strip().upper()
+        symbol = canonical_symbol
         # Session budget gate: in STANDBY mode or if hourly quota reached, skip outbound provider calls unless explicitly bypassed
         if not bypass_budget and not session_budget_manager.can_consume_call():
             return 0

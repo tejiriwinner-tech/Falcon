@@ -384,13 +384,32 @@ class SignalService:
                 except Exception:
                     pass
 
-                # 1-hour expiration rule: watchlist signal without entry hit for >= 1h -> EXPIRED
+                # Proximity band: 1.0 to 1.5 pips (0.00015 for 4-digit Forex, 0.50 for Gold)
+                pip_tolerance = 0.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.00015
+                slip_invalidation = 1.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.00030  # 3 pips
+
+                # Check if this setup is ALREADY recorded as ACTIVE in repository or open trades
+                is_already_active = signal_signature_repository.is_active(
+                    symbol, direction_str, cand.entryPrice, cand.stopLoss, cand.takeProfit
+                )
+                if not is_already_active:
+                    for ot in open_trades:
+                        ot_sym = ot.symbol.replace("/", "").replace("-", "").upper()
+                        if (
+                            ot_sym == norm_sym
+                            and ot.direction.upper() == direction_str.upper()
+                            and abs(ot.entryPrice - cand.entryPrice) <= pip_tolerance
+                        ):
+                            is_already_active = True
+                            break
+
+                # 1-hour expiration rule: applies ONLY to pending watchlist setups (never to active running positions)
                 age_seconds = (now - cand.generatedAt).total_seconds()
                 is_1h_elapsed = age_seconds >= 3600
                 is_approved = item["is_approved"]
                 is_ready = getattr(cand, "readinessScore", 0) >= 80
 
-                if is_1h_elapsed:
+                if not is_already_active and is_1h_elapsed:
                     # Expired: on watchlist >= 1hr without touching entry -> RESOLVED/EXPIRED
                     self._historical_triggered_signatures.add(sig_key)
                     try:
@@ -407,10 +426,7 @@ class SignalService:
                     continue
 
                 # Layer 3: Strict Active Proximity Band & Missed-Candle Invalidation
-                # Proximity band: 1.0 to 1.5 pips (0.00015 for 4-digit Forex, 0.50 for Gold)
-                pip_tolerance = 0.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.00015
-                slip_invalidation = 1.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.00030  # 3 pips
-                entry_hit = False
+                entry_hit = is_already_active
                 is_slipped_past = False
 
                 if cur_px is not None and cur_px > 0 and quote_age_s <= 60.0:
@@ -418,10 +434,8 @@ class SignalService:
                     # A. Strict Active Touch Window: Price must currently test entry within 1.0 - 1.5 pips
                     if dist_to_entry <= pip_tolerance:
                         entry_hit = True
-                    else:
-                        # B. Missed/Slipped Invalidation:
-                        # If price has already moved past entry towards Stop Loss by > 3 pips,
-                        # the pullback was missed in a past candle -> mark EXPIRED cleanly, never activate late.
+                    elif not is_already_active:
+                        # B. Missed/Slipped Invalidation (applies ONLY if trade hasn't activated yet):
                         if cand.direction.value.upper() == "BUY":
                             if cur_px < (cand.entryPrice - slip_invalidation):
                                 is_slipped_past = True
@@ -444,66 +458,103 @@ class SignalService:
                     ))
                     continue
 
-                # Capital Defense Shield Checks:
+                # If position is already active, monitor live SL / TP boundary hit:
+                if is_already_active and cur_px is not None and cur_px > 0:
+                    hit_tp = False
+                    hit_sl = False
+                    if cand.direction.value.upper() == "BUY":
+                        if cur_px >= cand.takeProfit:
+                            hit_tp = True
+                        elif cur_px <= cand.stopLoss:
+                            hit_sl = True
+                    else:
+                        if cur_px <= cand.takeProfit:
+                            hit_tp = True
+                        elif cur_px >= cand.stopLoss:
+                            hit_sl = True
+
+                    if hit_tp or hit_sl:
+                        outcome = "WON" if hit_tp else "LOST"
+                        if hit_sl:
+                            risk_d = abs(cand.entryPrice - cand.stopLoss)
+                            be_trig = cand.entryPrice + risk_d if cand.direction.value.upper() == "BUY" else cand.entryPrice - risk_d
+                            if (cand.direction.value.upper() == "BUY" and cur_px >= be_trig) or (cand.direction.value.upper() == "SELL" and cur_px <= be_trig):
+                                outcome = "BREAKEVEN"
+
+                        self._historical_triggered_signatures.add(sig_key)
+                        try:
+                            signal_signature_repository.record_signature(
+                                symbol, direction_str, cand.entryPrice, cand.stopLoss, cand.takeProfit, status=outcome
+                            )
+                        except Exception:
+                            pass
+                        additional_resolved.append(self._to_signal(
+                            cand, item["decision"], item["signal_id"], now,
+                            override_status=outcome,
+                            current_market_px=cur_px,
+                        ))
+                        continue
+
+                # Capital Defense Shield Checks (apply only to pending setups):
                 shield_reason = None
-
-                # 1. Economic Calendar News Blackout Check
-                try:
-                    from app.core.services.economic_calendar_service import economic_calendar_service
-                    is_blk, n_title, n_curr, n_delta, n_phase = economic_calendar_service.check_blackout_status(symbol)
-                    if is_blk:
-                        phase_str = f"in {n_delta}m" if n_phase == "UPCOMING" else f"{n_delta}m ago"
-                        shield_reason = f"NEWS BLACKOUT: {n_curr} High-Impact event '{n_title}' {phase_str}. Capital shield active."
-                except Exception as ex:
-                    logger.debug(f"News blackout shield check error: {ex}")
-
-                # 2. Dynamic, Volatility-Adjusted Spread Protection
-                if not shield_reason:
+                if not is_already_active:
+                    # 1. Economic Calendar News Blackout Check
                     try:
-                        if quote_resp and quote_resp.quote and getattr(quote_resp.quote, "bidAsk", None):
-                            raw_spread = quote_resp.quote.bidAsk.spread
-                            clean_sym = symbol.replace("/", "").replace("_", "").upper()
-                            is_gold = "XAU" in clean_sym
-                            is_jpy = clean_sym.endswith("JPY")
-
-                            if is_gold:
-                                pip_size = 0.10
-                                baseline_max = 4.0
-                            elif is_jpy:
-                                pip_size = 0.01
-                                baseline_max = 3.2 if "GBP" in clean_sym else 2.2
-                            else:
-                                pip_size = 0.00010
-                                baseline_max = 2.2 if "GBP" in clean_sym else 1.8
-
-                            spread_pips = raw_spread / pip_size
-                            max_allowed_spread = baseline_max
-                            if spread_pips > max_allowed_spread:
-                                shield_reason = f"SPREAD SPIKE: Live spread {spread_pips:.1f} pips exceeds {max_allowed_spread:.1f} limit. Entry held."
+                        from app.core.services.economic_calendar_service import economic_calendar_service
+                        is_blk, n_title, n_curr, n_delta, n_phase = economic_calendar_service.check_blackout_status(symbol)
+                        if is_blk:
+                            phase_str = f"in {n_delta}m" if n_phase == "UPCOMING" else f"{n_delta}m ago"
+                            shield_reason = f"NEWS BLACKOUT: {n_curr} High-Impact event '{n_title}' {phase_str}. Capital shield active."
                     except Exception as ex:
-                        logger.debug(f"Spread spike shield check error: {ex}")
+                        logger.debug(f"News blackout shield check error: {ex}")
 
-                # 3. Multi-Timeframe (MTF) Institutional Confluence Filter
-                if not shield_reason:
-                    try:
-                        cand_reasons = getattr(cand, "reasons", [])
-                        for r in cand_reasons:
-                            t_desc = (getattr(r, "title", "") + " " + getattr(r, "description", "")).lower()
-                            if any(k in t_desc for k in ["counter-trend", "against 4h", "against 1h", "bearish 4h ob", "bullish 4h ob"]):
-                                if getattr(cand, "confidence", 80) < 85:
-                                    shield_reason = "MTF FILTER: Counter-trend setup against higher-timeframe order flow requires >= 85% conviction."
-                                    break
-                    except Exception as ex:
-                        logger.debug(f"MTF filter check error: {ex}")
+                    # 2. Dynamic, Volatility-Adjusted Spread Protection
+                    if not shield_reason:
+                        try:
+                            if quote_resp and quote_resp.quote and getattr(quote_resp.quote, "bidAsk", None):
+                                raw_spread = quote_resp.quote.bidAsk.spread
+                                clean_sym = symbol.replace("/", "").replace("_", "").upper()
+                                is_gold = "XAU" in clean_sym
+                                is_jpy = clean_sym.endswith("JPY")
 
-                # If shield intervened, suppress entry promotion and enforce WAITING status
-                if shield_reason:
+                                if is_gold:
+                                    pip_size = 0.10
+                                    baseline_max = 4.0
+                                elif is_jpy:
+                                    pip_size = 0.01
+                                    baseline_max = 3.2 if "GBP" in clean_sym else 2.2
+                                else:
+                                    pip_size = 0.00010
+                                    baseline_max = 2.2 if "GBP" in clean_sym else 1.8
+
+                                spread_pips = raw_spread / pip_size
+                                max_allowed_spread = baseline_max
+                                if spread_pips > max_allowed_spread:
+                                    shield_reason = f"SPREAD SPIKE: Live spread {spread_pips:.1f} pips exceeds {max_allowed_spread:.1f} limit. Entry held."
+                        except Exception as ex:
+                            logger.debug(f"Spread spike shield check error: {ex}")
+
+                    # 3. Multi-Timeframe (MTF) Institutional Confluence Filter
+                    if not shield_reason:
+                        try:
+                            cand_reasons = getattr(cand, "reasons", [])
+                            for r in cand_reasons:
+                                t_desc = (getattr(r, "title", "") + " " + getattr(r, "description", "")).lower()
+                                if any(k in t_desc for k in ["counter-trend", "against 4h", "against 1h", "bearish 4h ob", "bullish 4h ob"]):
+                                    if getattr(cand, "confidence", 80) < 85:
+                                        shield_reason = "MTF FILTER: Counter-trend setup against higher-timeframe order flow requires >= 85% conviction."
+                                        break
+                        except Exception as ex:
+                            logger.debug(f"MTF filter check error: {ex}")
+
+                # If shield intervened on a pending setup, suppress entry promotion
+                if shield_reason and not is_already_active:
                     entry_hit = False
 
                 # Lifecycle Routing:
-                # 1. Price actively touches entry & setup approved + ready & no capital shields -> ACTIVE
+                # 1. Price actively touches entry (or was previously activated) & setup approved + ready & no shields -> ACTIVE
                 # 2. Otherwise -> Watchlist in HOLD / WAITING status
-                if entry_hit and is_approved and is_ready and not shield_reason:
+                if is_already_active or (entry_hit and is_approved and is_ready and not shield_reason):
                     item["is_guardian_authorized"] = True
                     item["lot_size"] = lot_size
                     item["current_market_px"] = cur_px
@@ -520,7 +571,15 @@ class SignalService:
                     try:
                         existing_trades = trade_journal_repository.list_trades() or []
                         already_recorded = any(
-                            (t.signalId == item["signal_id"] or (t.symbol == symbol and (t.status or "").upper() in ("OPEN", "FILLED")))
+                            (
+                                t.signalId == item["signal_id"]
+                                or (
+                                    t.symbol.replace("/", "").replace("-", "").upper() == norm_sym
+                                    and t.direction.upper() == direction_str.upper()
+                                    and abs(t.entryPrice - cand.entryPrice) <= pip_tolerance
+                                    and (t.status or "").upper() in ("OPEN", "FILLED")
+                                )
+                            )
                             for t in existing_trades
                         )
                         if not already_recorded:

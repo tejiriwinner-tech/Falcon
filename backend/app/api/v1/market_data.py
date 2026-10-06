@@ -57,13 +57,17 @@ def refresh_market_data(
     )
 
 
-@router.get("/history/{symbol}", response_model=List[PriceBarResponse])
+from app.core.providers.symbol_mapper import symbol_mapper
+
+
+@router.get("/history/{symbol:path}", response_model=List[PriceBarResponse])
 def get_history(
     symbol: str,
     timeframe: Optional[str] = Query(default=None),
     limit: int = Query(200, ge=1, le=1000),
 ):
     """Returns stored bars for a symbol; empty when nothing has been backfilled."""
+    canonical_symbol = symbol_mapper.normalize(symbol) or symbol.replace("/", "").replace("_", "").replace("-", "").strip().upper()
     norm_tf = (timeframe or "1h").lower()
     alias_map = {
         "m5": "5m",
@@ -86,7 +90,7 @@ def get_history(
             volume=bar.volume,
             provider=bar.provider,
         )
-        for bar in market_history_service.get_bars(symbol, effective_tf, limit)
+        for bar in market_history_service.get_bars(canonical_symbol, effective_tf, limit)
     ]
 
 
