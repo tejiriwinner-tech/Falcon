@@ -205,6 +205,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
   SMCStructureData _buildFallbackSMC(String symbol) {
     final isGold = symbol.toUpperCase().contains('XAU') || symbol.toUpperCase().contains('GOLD');
     final isGbp = symbol.toUpperCase().contains('GBP');
+    final now = DateTime.now();
     return SMCStructureData(
       symbol: symbol,
       timeframe: '15m',
@@ -219,7 +220,10 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           blockType: 'BULLISH',
           high: isGold ? 4175.5 : (isGbp ? 1.3245 : 1.1335),
           low: isGold ? 4171.0 : (isGbp ? 1.3235 : 1.1325),
+          openPrice: isGold ? 4171.0 : (isGbp ? 1.3235 : 1.1325),
+          closePrice: isGold ? 4175.5 : (isGbp ? 1.3245 : 1.1335),
           isMitigated: false,
+          formedAt: now,
         ),
         OrderBlockOverlay(
           symbol: symbol,
@@ -227,7 +231,10 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           blockType: 'BEARISH',
           high: isGold ? 4198.0 : (isGbp ? 1.3315 : 1.1385),
           low: isGold ? 4195.0 : (isGbp ? 1.3300 : 1.1370),
+          openPrice: isGold ? 4198.0 : (isGbp ? 1.3315 : 1.1385),
+          closePrice: isGold ? 4195.0 : (isGbp ? 1.3300 : 1.1370),
           isMitigated: true,
+          formedAt: now,
         ),
       ],
       fairValueGaps: [
@@ -237,7 +244,9 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           gapType: 'BULLISH',
           top: isGold ? 4182.0 : (isGbp ? 1.3265 : 1.1348),
           bottom: isGold ? 4178.0 : (isGbp ? 1.3255 : 1.1342),
+          sizePips: 4.0,
           isMitigated: false,
+          formedAt: now,
         ),
       ],
     );
