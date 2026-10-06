@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 class CopilotQueryResponse {
   final String query;
   final String intent;
@@ -89,40 +87,5 @@ class IntelligenceBriefing {
       'formatted_text': formattedText,
       'generated_at': generatedAt,
     };
-  }
-}
-
-class SMCStructureData {
-  final String symbol;
-  final String timeframe;
-  final int totalOrderBlocks;
-  final int totalFairValueGaps;
-  final int unmitigatedOrderBlocks;
-  final int unmitigatedFairValueGaps;
-  final List<dynamic> orderBlocks;
-  final List<dynamic> fairValueGaps;
-
-  SMCStructureData({
-    required this.symbol,
-    required this.timeframe,
-    required this.totalOrderBlocks,
-    required this.totalFairValueGaps,
-    required this.unmitigatedOrderBlocks,
-    required this.unmitigatedFairValueGaps,
-    required this.orderBlocks,
-    required this.fairValueGaps,
-  });
-
-  factory SMCStructureData.fromJson(Map<String, dynamic> json) {
-    return SMCStructureData(
-      symbol: json['symbol'] ?? 'EURUSD',
-      timeframe: json['timeframe'] ?? '15m',
-      totalOrderBlocks: json['total_order_blocks'] ?? 0,
-      totalFairValueGaps: json['total_fair_value_gaps'] ?? 0,
-      unmitigatedOrderBlocks: json['unmitigated_order_blocks'] ?? 0,
-      unmitigatedFairValueGaps: json['unmitigated_fair_value_gaps'] ?? 0,
-      orderBlocks: json['order_blocks'] as List<dynamic>? ?? [],
-      fairValueGaps: json['fair_value_gaps'] as List<dynamic>? ?? [],
-    );
   }
 }

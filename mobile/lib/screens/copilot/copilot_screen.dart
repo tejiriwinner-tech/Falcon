@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../services/api/api_service.dart';
 import '../../models/copilot_models.dart';
+import '../../models/candle_data.dart';
 import '../../widgets/cards/app_card.dart';
 import '../../core/constants/app_colors.dart';
 
@@ -212,32 +213,32 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
       unmitigatedOrderBlocks: 1,
       unmitigatedFairValueGaps: 1,
       orderBlocks: [
-        {
-          'symbol': symbol,
-          'timeframe': '15m',
-          'block_type': 'BULLISH',
-          'high': isGold ? 4175.5 : (isGbp ? 1.3245 : 1.1335),
-          'low': isGold ? 4171.0 : (isGbp ? 1.3235 : 1.1325),
-          'is_mitigated': false,
-        },
-        {
-          'symbol': symbol,
-          'timeframe': '15m',
-          'block_type': 'BEARISH',
-          'high': isGold ? 4198.0 : (isGbp ? 1.3315 : 1.1385),
-          'low': isGold ? 4195.0 : (isGbp ? 1.3300 : 1.1370),
-          'is_mitigated': true,
-        },
+        OrderBlockOverlay(
+          symbol: symbol,
+          timeframe: '15m',
+          blockType: 'BULLISH',
+          high: isGold ? 4175.5 : (isGbp ? 1.3245 : 1.1335),
+          low: isGold ? 4171.0 : (isGbp ? 1.3235 : 1.1325),
+          isMitigated: false,
+        ),
+        OrderBlockOverlay(
+          symbol: symbol,
+          timeframe: '15m',
+          blockType: 'BEARISH',
+          high: isGold ? 4198.0 : (isGbp ? 1.3315 : 1.1385),
+          low: isGold ? 4195.0 : (isGbp ? 1.3300 : 1.1370),
+          isMitigated: true,
+        ),
       ],
       fairValueGaps: [
-        {
-          'symbol': symbol,
-          'timeframe': '15m',
-          'gap_type': 'BULLISH',
-          'top': isGold ? 4182.0 : (isGbp ? 1.3265 : 1.1348),
-          'bottom': isGold ? 4178.0 : (isGbp ? 1.3255 : 1.1342),
-          'is_mitigated': false,
-        },
+        FvgOverlay(
+          symbol: symbol,
+          timeframe: '15m',
+          gapType: 'BULLISH',
+          top: isGold ? 4182.0 : (isGbp ? 1.3265 : 1.1348),
+          bottom: isGold ? 4178.0 : (isGbp ? 1.3255 : 1.1342),
+          isMitigated: false,
+        ),
       ],
     );
   }

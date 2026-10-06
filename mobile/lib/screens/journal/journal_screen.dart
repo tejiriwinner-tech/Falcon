@@ -248,6 +248,7 @@ class _JournalScreenState extends State<JournalScreen> {
                 type: StatusChipType.journalStatus,
               ),
             ],
+          ),
           const SizedBox(height: 10),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,

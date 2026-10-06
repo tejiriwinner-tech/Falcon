@@ -97,10 +97,6 @@ class FalconCandlestickPainter extends CustomPainter {
       return chartHeight - ((price - minPrice) / priceRange) * chartHeight;
     }
 
-    double yToPrice(double y) {
-      return minPrice + (1.0 - (y / chartHeight)) * priceRange;
-    }
-
     // 3. Draw Grid Lines
     _drawGrid(canvas, chartWidth, chartHeight, minPrice, maxPrice, priceToY);
 
