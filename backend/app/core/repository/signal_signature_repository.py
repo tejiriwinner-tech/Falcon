@@ -76,6 +76,12 @@ class InMemorySignalSignatureStorage:
         now = datetime.now(timezone.utc)
         with self._lock:
             existing = self._signatures.get(signature)
+            if existing:
+                ex_st = (existing.get("status") or "").upper()
+                if ex_st == "ACTIVE" and status.upper() == "HOLD":
+                    return
+                if ex_st in {"WON", "LOST", "BREAKEVEN", "EXPIRED"} and status.upper() in {"HOLD", "ACTIVE"}:
+                    return
             created_at = existing["created_at"] if existing else now
             self._signatures[signature] = {
                 "signature": signature,
@@ -155,8 +161,15 @@ class SignalSignatureRepository:
     ) -> str:
         sig_key = format_signature_key(symbol, direction, entry_price, stop_loss, take_profit)
         existing = self._in_memory.get_signature(sig_key)
-        if existing and (existing.get("status") or "").upper() == status.upper():
-            return sig_key
+        # Never allow a HOLD status to downgrade or overwrite an already ACTIVE or terminal signal
+        if existing:
+            existing_status = (existing.get("status") or "").upper()
+            if existing_status == "ACTIVE" and status.upper() == "HOLD":
+                return sig_key
+            if existing_status in {"WON", "LOST", "BREAKEVEN", "EXPIRED"} and status.upper() in {"HOLD", "ACTIVE"}:
+                return sig_key
+            if existing_status == status.upper():
+                return sig_key
 
         self._in_memory.record_signature(
             sig_key, symbol, direction, entry_price, stop_loss, take_profit, status
@@ -164,7 +177,7 @@ class SignalSignatureRepository:
         self._cached_resolved = None
 
         if database_enabled():
-            def _async_persist():
+            def _persist(sync: bool = False):
                 try:
                     self._ensure_schema()
                     session = get_session()
@@ -185,6 +198,12 @@ class SignalSignatureRepository:
                             )
                             session.add(record)
                         else:
+                            # Protect DB row from downgrade too
+                            cur_db_st = (record.status or "").upper()
+                            if cur_db_st == "ACTIVE" and status.upper() == "HOLD":
+                                return
+                            if cur_db_st in {"WON", "LOST", "BREAKEVEN", "EXPIRED"} and status.upper() in {"HOLD", "ACTIVE"}:
+                                return
                             record.status = status.upper()
                             record.updated_at = now
                         session.commit()
@@ -196,7 +215,10 @@ class SignalSignatureRepository:
                 except Exception as ex:
                     logger.warning(f"Database session error for signal signature: {ex}")
 
-            threading.Thread(target=_async_persist, daemon=True).start()
+            if status.upper() in {"ACTIVE", "WON", "LOST", "BREAKEVEN", "EXPIRED"}:
+                _persist(sync=True)
+            else:
+                threading.Thread(target=_persist, daemon=True).start()
 
         return sig_key
 
