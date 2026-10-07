@@ -393,15 +393,20 @@ class SignalService:
                     symbol, direction_str, cand.entryPrice, cand.stopLoss, cand.takeProfit
                 )
                 if not is_already_active:
-                    for ot in open_trades:
-                        ot_sym = ot.symbol.replace("/", "").replace("-", "").upper()
-                        if (
-                            ot_sym == norm_sym
-                            and ot.direction.upper() == direction_str.upper()
-                            and abs(ot.entryPrice - cand.entryPrice) <= pip_tolerance
-                        ):
-                            is_already_active = True
-                            break
+                    if signal_signature_repository.is_active(symbol, direction_str, cand.entryPrice, cand.stopLoss, cand.takeProfit):
+                        is_already_active = True
+                        self._historical_triggered_signatures.add(sig_key)
+                    else:
+                        for ot in open_trades:
+                            ot_sym = ot.symbol.replace("/", "").replace("-", "").upper()
+                            if (
+                                ot_sym == norm_sym
+                                and ot.direction.upper() == direction_str.upper()
+                                and abs(ot.entryPrice - cand.entryPrice) <= pip_tolerance
+                            ):
+                                is_already_active = True
+                                self._historical_triggered_signatures.add(sig_key)
+                                break
 
                 # 1-hour expiration rule: applies ONLY to pending watchlist setups (never to active running positions)
                 age_seconds = (now - cand.generatedAt).total_seconds()
@@ -488,6 +493,82 @@ class SignalService:
                             )
                         except Exception:
                             pass
+
+                        # Resolve & close the corresponding trade in Trade Journal
+                        try:
+                            exit_px = cand.takeProfit if hit_tp else cand.stopLoss
+                            actual_exit = cur_px if cur_px is not None and cur_px > 0 else exit_px
+                            risk_dist = abs(cand.entryPrice - cand.stopLoss)
+                            pnl_dist = (actual_exit - cand.entryPrice) if direction_str.upper() == "BUY" else (cand.entryPrice - actual_exit)
+                            pnl_amount = round(pnl_dist * 100000, 2)
+                            r_multiple = round(pnl_dist / risk_dist, 2) if risk_dist > 0 else (1.5 if outcome == "WON" else -1.0)
+                            if outcome == "BREAKEVEN":
+                                pnl_amount = 0.0
+                                r_multiple = 0.0
+
+                            matching_trade = None
+                            for ot in open_trades:
+                                ot_sym = ot.symbol.replace("/", "").replace("-", "").upper()
+                                if ot.signalId == item["signal_id"] or (
+                                    ot_sym == norm_sym
+                                    and ot.direction.upper() == direction_str.upper()
+                                    and abs(ot.entryPrice - cand.entryPrice) <= pip_tolerance
+                                ):
+                                    matching_trade = ot
+                                    break
+
+                            exit_label = "Target (TP)" if hit_tp else ("Breakeven" if outcome == "BREAKEVEN" else "Stop Loss (SL)")
+                            exit_reason_str = f"Signal hit {exit_label} at {actual_exit:.4f}"
+                            lesson_str = "Predefined target achieved; institutional take profit executed." if hit_tp else (
+                                "Capital preserved at breakeven stop." if outcome == "BREAKEVEN" else "Risk contained by stop loss invalidation boundary."
+                            )
+
+                            if matching_trade:
+                                trade_journal_repository.update_trade(
+                                    matching_trade.id,
+                                    TradeJournalUpdate(
+                                        status="CLOSED",
+                                        result=outcome,
+                                        exitPrice=actual_exit,
+                                        closeDate=now,
+                                        profitLoss=pnl_amount,
+                                        realizedRMultiple=r_multiple,
+                                        reasonForExit=exit_reason_str,
+                                        lessonLearned=lesson_str,
+                                    ),
+                                )
+                            else:
+                                trade_journal_repository.create_trade(
+                                    TradeJournalCreate(
+                                        signalId=item["signal_id"],
+                                        strategyId=cand.strategyId or "falcon-opt",
+                                        symbol=symbol,
+                                        direction=direction_str.upper(),
+                                        entryPrice=cand.entryPrice,
+                                        stopLoss=cand.stopLoss,
+                                        takeProfit=cand.takeProfit,
+                                        timeframe=cand.timeframe or "M15",
+                                        marketSession="London" if "London" in (cand.strategyName or "") else "New York",
+                                        tradeDate=cand.generatedAt or now,
+                                        closeDate=now,
+                                        status="CLOSED",
+                                        result=outcome,
+                                        exitPrice=actual_exit,
+                                        profitLoss=pnl_amount,
+                                        riskReward=cand.riskReward or 2.0,
+                                        realizedRMultiple=r_multiple,
+                                        confidence=int(cand.confidence or 80),
+                                        reasonForEntry=f"Falcon Live Setup {direction_str.upper()}",
+                                        reasonForExit=exit_reason_str,
+                                        lessonLearned=lesson_str,
+                                        notes=f"Auto-resolved {outcome} from active signal {item['signal_id']}",
+                                        fillPrice=cand.entryPrice,
+                                        fillTime=cand.generatedAt or now,
+                                    )
+                                )
+                        except Exception as ex:
+                            logger.debug(f"Could not record closed trade to trade journal: {ex}")
+
                         additional_resolved.append(self._to_signal(
                             cand, item["decision"], item["signal_id"], now,
                             override_status=outcome,

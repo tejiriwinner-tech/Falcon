@@ -623,38 +623,40 @@ class _DecisionArtifactsScreenState extends State<DecisionArtifactsScreen> {
             // Header
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Icon(Icons.stars_rounded, size: 16, color: AppColors.primary),
-                  const SizedBox(width: 6),
-                  Text(
-                    d.id,
-                    style: const TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 13,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '${d.strategyName} (v${d.strategyVersion})',
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 11,
-                      ),
-                      overflow: TextOverflow.ellipsis,
-                      maxLines: 1,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
                   Row(
-                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      _buildBadge(d.recommendation.name, recColor),
-                      const SizedBox(width: 4),
-                      _buildBadge(d.status.name, statusColor),
+                      const Icon(Icons.stars_rounded, size: 16, color: AppColors.primary),
+                      const SizedBox(width: 6),
+                      Text(
+                        d.id,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      Wrap(
+                        spacing: 4,
+                        children: [
+                          _buildBadge(d.recommendation.name, recColor),
+                          _buildBadge(d.status.name, statusColor),
+                        ],
+                      ),
                     ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${d.strategyName} (v${d.strategyVersion})',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
                   ),
                 ],
               ),

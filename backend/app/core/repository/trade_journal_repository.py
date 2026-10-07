@@ -5,11 +5,14 @@ configured, process-local memory otherwise.
 """
 
 import copy
+import logging
 import threading
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Union
 
 from sqlalchemy import func, select
+
+logger = logging.getLogger("falcon.trade_journal_repository")
 
 from app.core.database.models import TradeJournalRecord
 from app.core.database.session import database_enabled, get_session
@@ -219,28 +222,43 @@ class InMemoryTradeJournalStorage:
 
 
 class DatabaseTradeJournalStorage:
-    """Postgres-backed storage."""
+    """Postgres-backed storage with automatic in-memory fallback for high availability."""
+
+    def __init__(self) -> None:
+        self._fallback_memory = InMemoryTradeJournalStorage()
 
     def clear(self) -> None:
-        with get_session() as session:
-            session.query(TradeJournalRecord).delete()
-            session.commit()
+        try:
+            with get_session() as session:
+                session.query(TradeJournalRecord).delete()
+                session.commit()
+        except Exception as ex:
+            logger.warning(f"Database clear failed: {ex}")
+        self._fallback_memory.clear()
 
     def list_trades(self, session: Optional[object] = None) -> List[TradeJournalItem]:
-        if session is not None:
-            records = session.scalars(
-                select(TradeJournalRecord).order_by(
-                    TradeJournalRecord.trade_date.desc(), TradeJournalRecord.id.desc()
-                )
-            ).all()
-            return [_to_item(record) for record in records]
-        with get_session() as session:
-            records = session.scalars(
-                select(TradeJournalRecord).order_by(
-                    TradeJournalRecord.trade_date.desc(), TradeJournalRecord.id.desc()
-                )
-            ).all()
-            return [_to_item(record) for record in records]
+        try:
+            if session is not None:
+                records = session.scalars(
+                    select(TradeJournalRecord).order_by(
+                        TradeJournalRecord.trade_date.desc(), TradeJournalRecord.id.desc()
+                    )
+                ).all()
+                db_trades = [_to_item(record) for record in records]
+            else:
+                with get_session() as session_ctx:
+                    records = session_ctx.scalars(
+                        select(TradeJournalRecord).order_by(
+                            TradeJournalRecord.trade_date.desc(), TradeJournalRecord.id.desc()
+                        )
+                    ).all()
+                    db_trades = [_to_item(record) for record in records]
+            if db_trades:
+                return db_trades
+            return self._fallback_memory.list_trades()
+        except Exception as ex:
+            logger.warning(f"Database list_trades failed, falling back to memory: {ex}")
+            return self._fallback_memory.list_trades()
 
     def list_closed_trades_as_of(
         self,
@@ -248,122 +266,151 @@ class DatabaseTradeJournalStorage:
         as_of: Optional[datetime] = None,
         session: Optional[object] = None,
     ) -> List[TradeJournalItem]:
-        as_of_utc = (
-            as_of.astimezone(timezone.utc)
-            if (as_of and as_of.tzinfo)
-            else (as_of.replace(tzinfo=timezone.utc) if as_of else None)
-        )
-        query = select(TradeJournalRecord).filter(
-            TradeJournalRecord.status.in_(["CLOSED", "closed"]),
-            TradeJournalRecord.close_date.isnot(None),
-        )
-        if strategy_id is not None:
-            query = query.filter(TradeJournalRecord.strategy_id == strategy_id)
-        if as_of_utc is not None:
-            query = query.filter(TradeJournalRecord.close_date <= as_of_utc)
+        try:
+            as_of_utc = (
+                as_of.astimezone(timezone.utc)
+                if (as_of and as_of.tzinfo)
+                else (as_of.replace(tzinfo=timezone.utc) if as_of else None)
+            )
+            query = select(TradeJournalRecord).filter(
+                TradeJournalRecord.status.in_(["CLOSED", "closed"]),
+                TradeJournalRecord.close_date.isnot(None),
+            )
+            if strategy_id is not None:
+                query = query.filter(TradeJournalRecord.strategy_id == strategy_id)
+            if as_of_utc is not None:
+                query = query.filter(TradeJournalRecord.close_date <= as_of_utc)
 
-        query = query.order_by(
-            TradeJournalRecord.trade_date.desc(), TradeJournalRecord.id.desc()
-        )
+            query = query.order_by(
+                TradeJournalRecord.trade_date.desc(), TradeJournalRecord.id.desc()
+            )
 
-        if session is not None:
-            records = session.scalars(query).all()
-            return [_to_item(record) for record in records]
-        with get_session() as session:
-            records = session.scalars(query).all()
-            return [_to_item(record) for record in records]
+            if session is not None:
+                records = session.scalars(query).all()
+                return [_to_item(record) for record in records]
+            with get_session() as session_ctx:
+                records = session_ctx.scalars(query).all()
+                return [_to_item(record) for record in records]
+        except Exception as ex:
+            logger.warning(f"Database list_closed_trades_as_of failed, falling back to memory: {ex}")
+            return self._fallback_memory.list_closed_trades_as_of(strategy_id, as_of)
 
     def get_trade(self, trade_id: int, session: Optional[object] = None) -> Optional[TradeJournalItem]:
-        if session is not None:
-            record = session.get(TradeJournalRecord, trade_id)
-            return _to_item(record) if record else None
-        with get_session() as session:
-            record = session.get(TradeJournalRecord, trade_id)
-            return _to_item(record) if record else None
+        try:
+            if session is not None:
+                record = session.get(TradeJournalRecord, trade_id)
+                if record:
+                    return _to_item(record)
+            else:
+                with get_session() as session_ctx:
+                    record = session_ctx.get(TradeJournalRecord, trade_id)
+                    if record:
+                        return _to_item(record)
+        except Exception as ex:
+            logger.warning(f"Database get_trade failed: {ex}")
+        return self._fallback_memory.get_trade(trade_id)
 
     def create_trade(self, payload: TradeJournalCreate, session: Optional[object] = None) -> TradeJournalItem:
+        mem_item = self._fallback_memory.create_trade(payload)
         now = datetime.now(timezone.utc)
         values = {
             column: getattr(payload, field) for field, column in _COLUMNS.items()
         }
         if payload.executionMode:
             values["notes"] = inject_mode_token(values.get("notes"), payload.executionMode)
-        if session is not None:
-            record = TradeJournalRecord(created_at=now, updated_at=now, **values)
-            session.add(record)
-            session.flush()
-            session.refresh(record)
-            return _to_item(record)
-        with get_session() as session:
-            record = TradeJournalRecord(created_at=now, updated_at=now, **values)
-            session.add(record)
-            session.commit()
-            session.refresh(record)
-            return _to_item(record)
+        try:
+            if session is not None:
+                record = TradeJournalRecord(created_at=now, updated_at=now, **values)
+                session.add(record)
+                session.flush()
+                session.refresh(record)
+                return _to_item(record)
+            with get_session() as session_ctx:
+                record = TradeJournalRecord(created_at=now, updated_at=now, **values)
+                session_ctx.add(record)
+                session_ctx.commit()
+                session_ctx.refresh(record)
+                return _to_item(record)
+        except Exception as ex:
+            logger.warning(f"Database create_trade failed, falling back to in-memory: {ex}")
+            return mem_item
 
     def update_trade(
         self, trade_id: int, payload: TradeJournalUpdate, session: Optional[object] = None
     ) -> Optional[TradeJournalItem]:
-        if session is not None:
-            record = session.get(TradeJournalRecord, trade_id)
-            if record is None:
-                return None
-            dump = payload.model_dump(exclude_unset=True)
-            mode_val = dump.pop("executionMode", None)
-            if mode_val is not None:
-                current_notes = dump.get("notes", getattr(record, "notes", None))
-                dump["notes"] = inject_mode_token(current_notes, mode_val)
-            for field, value in dump.items():
-                if field in _COLUMNS:
-                    setattr(record, _COLUMNS[field], value)
-            record.updated_at = datetime.now(timezone.utc)
-            session.flush()
-            session.refresh(record)
-            return _to_item(record)
-        with get_session() as session:
-            record = session.get(TradeJournalRecord, trade_id)
-            if record is None:
-                return None
-            dump = payload.model_dump(exclude_unset=True)
-            mode_val = dump.pop("executionMode", None)
-            if mode_val is not None:
-                current_notes = dump.get("notes", getattr(record, "notes", None))
-                dump["notes"] = inject_mode_token(current_notes, mode_val)
-            for field, value in dump.items():
-                if field in _COLUMNS:
-                    setattr(record, _COLUMNS[field], value)
-            record.updated_at = datetime.now(timezone.utc)
-            session.commit()
-            session.refresh(record)
-            return _to_item(record)
-
+        self._fallback_memory.update_trade(trade_id, payload)
+        try:
+            if session is not None:
+                record = session.get(TradeJournalRecord, trade_id)
+                if record is not None:
+                    dump = payload.model_dump(exclude_unset=True)
+                    mode_val = dump.pop("executionMode", None)
+                    if mode_val is not None:
+                        current_notes = dump.get("notes", getattr(record, "notes", None))
+                        dump["notes"] = inject_mode_token(current_notes, mode_val)
+                    for field, value in dump.items():
+                        if field in _COLUMNS:
+                            setattr(record, _COLUMNS[field], value)
+                    record.updated_at = datetime.now(timezone.utc)
+                    session.flush()
+                    session.refresh(record)
+                    return _to_item(record)
+            else:
+                with get_session() as session_ctx:
+                    record = session_ctx.get(TradeJournalRecord, trade_id)
+                    if record is not None:
+                        dump = payload.model_dump(exclude_unset=True)
+                        mode_val = dump.pop("executionMode", None)
+                        if mode_val is not None:
+                            current_notes = dump.get("notes", getattr(record, "notes", None))
+                            dump["notes"] = inject_mode_token(current_notes, mode_val)
+                        for field, value in dump.items():
+                            if field in _COLUMNS:
+                                setattr(record, _COLUMNS[field], value)
+                        record.updated_at = datetime.now(timezone.utc)
+                        session_ctx.commit()
+                        session_ctx.refresh(record)
+                        return _to_item(record)
+        except Exception as ex:
+            logger.warning(f"Database update_trade failed, returning in-memory updated trade: {ex}")
+        return self._fallback_memory.get_trade(trade_id)
 
     def delete_trade(self, trade_id: int, session: Optional[object] = None) -> bool:
-        if session is not None:
-            record = session.get(TradeJournalRecord, trade_id)
-            if record is None:
-                return False
-            session.delete(record)
-            session.flush()
-            return True
-        with get_session() as session:
-            record = session.get(TradeJournalRecord, trade_id)
-            if record is None:
-                return False
-            session.delete(record)
-            session.commit()
+        self._fallback_memory.delete_trade(trade_id)
+        try:
+            if session is not None:
+                record = session.get(TradeJournalRecord, trade_id)
+                if record is None:
+                    return False
+                session.delete(record)
+                session.flush()
+                return True
+            with get_session() as session_ctx:
+                record = session_ctx.get(TradeJournalRecord, trade_id)
+                if record is None:
+                    return False
+                session_ctx.delete(record)
+                session_ctx.commit()
+                return True
+        except Exception as ex:
+            logger.warning(f"Database delete_trade failed: {ex}")
             return True
 
     def clear_history(self) -> int:
         """Delete finished trades only; active (OPEN/PENDING/FILLED) trades are kept."""
-        with get_session() as session:
-            count = (
-                session.query(TradeJournalRecord)
-                .filter(func.upper(TradeJournalRecord.status).notin_(ACTIVE_TRADE_STATUSES))
-                .delete(synchronize_session=False)
-            )
-            session.commit()
-            return count
+        mem_count = self._fallback_memory.clear_history()
+        try:
+            with get_session() as session:
+                count = (
+                    session.query(TradeJournalRecord)
+                    .filter(func.upper(TradeJournalRecord.status).notin_(ACTIVE_TRADE_STATUSES))
+                    .delete(synchronize_session=False)
+                )
+                session.commit()
+                return count
+        except Exception as ex:
+            logger.warning(f"Database clear_history failed: {ex}")
+            return mem_count
 
     def purge_invalid_trades(self) -> int:
         with get_session() as session:

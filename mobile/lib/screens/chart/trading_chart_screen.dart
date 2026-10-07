@@ -67,7 +67,7 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
       final smcFuture = _apiService.getSMCStructure(
         symbol: widget.symbol,
         timeframe: _activeTimeframe,
-      );
+      ).catchError((_) => SMCStructureData.empty(widget.symbol, _activeTimeframe));
 
       final results = await Future.wait([candlesFuture, smcFuture]);
 

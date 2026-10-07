@@ -150,6 +150,17 @@ class SMCStructureData {
     required this.unmitigatedFairValueGaps,
   });
 
+  factory SMCStructureData.empty([String symbol = '', String timeframe = '']) => SMCStructureData(
+    symbol: symbol,
+    timeframe: timeframe,
+    orderBlocks: const [],
+    fairValueGaps: const [],
+    totalOrderBlocks: 0,
+    totalFairValueGaps: 0,
+    unmitigatedOrderBlocks: 0,
+    unmitigatedFairValueGaps: 0,
+  );
+
   factory SMCStructureData.fromJson(Map<String, dynamic> json) {
     final rawObs = json['order_blocks'] as List<dynamic>? ?? [];
     final rawFvgs = json['fair_value_gaps'] as List<dynamic>? ?? [];

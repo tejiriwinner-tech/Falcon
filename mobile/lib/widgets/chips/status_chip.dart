@@ -71,16 +71,22 @@ class StatusChip extends StatelessWidget {
       // journalResult
       switch (status.toUpperCase()) {
         case 'WIN':
+        case 'WON':
           color = AppColors.success;
+          displayText = 'WON';
           break;
         case 'LOSS':
+        case 'LOST':
           color = AppColors.error;
+          displayText = 'LOST';
           break;
         case 'BREAKEVEN':
           color = AppColors.warning;
+          displayText = 'BREAKEVEN';
           break;
         case 'OPEN':
-          color = AppColors.textSecondary;
+          color = AppColors.info;
+          displayText = 'OPEN';
           break;
         default:
           color = AppColors.textSecondary;

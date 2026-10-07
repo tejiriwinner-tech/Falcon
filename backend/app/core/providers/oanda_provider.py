@@ -412,8 +412,6 @@ class OandaProvider(BaseProvider):
                 raw_candles = payload.get("candles", [])
                 candles: List[Dict[str, Any]] = []
                 for c in raw_candles:
-                    if not c.get("complete", True):
-                        continue
                     mid = c.get("mid", {})
                     candles.append({
                         "time": c.get("time"),

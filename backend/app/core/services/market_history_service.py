@@ -304,6 +304,36 @@ class MarketHistoryService:
             self._bars_cache.clear()
         return len(rows)
 
+    @staticmethod
+    def _is_candle_stale(latest_time: Optional[datetime], timeframe: str) -> bool:
+        if not latest_time:
+            return True
+        now = datetime.now(timezone.utc)
+        if latest_time.tzinfo is None:
+            latest_time = latest_time.replace(tzinfo=timezone.utc)
+        age = (now - latest_time).total_seconds()
+
+        # Don't mark as stale on forex weekend closure (Friday 22:00 UTC to Sunday 21:00 UTC)
+        weekday = now.weekday()
+        if (weekday == 5) or (weekday == 4 and now.hour >= 22) or (weekday == 6 and now.hour < 21):
+            return False
+
+        tf_thresholds = {
+            "1m": 120,      # 2m
+            "5m": 360,      # 6m
+            "15m": 1200,    # 20m
+            "15min": 1200,
+            "30m": 2400,    # 40m
+            "30min": 2400,
+            "1h": 4500,     # 75m
+            "60min": 4500,
+            "2h": 9000,
+            "4h": 18000,    # 5h
+            "1d": 90000,    # 25h
+        }
+        threshold = tf_thresholds.get(timeframe.lower(), 600)
+        return age > threshold
+
     def get_bars(self, symbol: str, timeframe: Optional[str] = None, limit: int = 200) -> List[PriceBar]:
         """Returns stored bars oldest-first."""
         canonical_symbol = symbol_mapper.normalize(symbol) or symbol.replace("/", "").replace("_", "").replace("-", "").strip().upper()
@@ -313,8 +343,10 @@ class MarketHistoryService:
         now_mono = time.monotonic()
         with self._lock:
             cached = self._bars_cache.get(cache_key)
-            if cached and (now_mono - cached[0]) < 30.0:
-                return list(cached[1])
+            if cached and (now_mono - cached[0]) < 10.0:
+                cached_bars = cached[1]
+                if cached_bars and not self._is_candle_stale(cached_bars[-1].bar_time, timeframe):
+                    return list(cached_bars)
 
         if not database_enabled():
             with self._lock:
@@ -324,6 +356,16 @@ class MarketHistoryService:
                     if sym == symbol and tf == timeframe
                 ]
             result = sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
+            is_stale = not result or self._is_candle_stale(result[-1].bar_time, timeframe)
+            if not result or len(result) < min(limit, 20) or is_stale:
+                self.refresh_symbol(symbol, timeframe, force=True, bypass_budget=True)
+                with self._lock:
+                    bars = [
+                        bar
+                        for (sym, tf, _), bar in self._memory.items()
+                        if sym == symbol and tf == timeframe
+                    ]
+                result = sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
             with self._lock:
                 self._bars_cache[cache_key] = (now_mono, result)
             return result
@@ -350,8 +392,9 @@ class MarketHistoryService:
             )
             for record in reversed(records)
         ]
-        if not result or len(result) < min(limit, 20):
-            # On-demand backfill so clients (charting, SMC) always receive full candle series
+        is_stale = not result or self._is_candle_stale(result[-1].bar_time, timeframe)
+        if not result or len(result) < min(limit, 20) or is_stale:
+            # On-demand backfill/refresh so clients (charting, SMC) always receive full, live candle series
             self.refresh_symbol(symbol, timeframe, force=True, bypass_budget=True)
             if not database_enabled():
                 with self._lock:

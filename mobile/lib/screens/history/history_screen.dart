@@ -128,17 +128,28 @@ class _HistoryScreenState extends State<HistoryScreen> {
           final closed = trades
               .where((trade) => trade.status.toUpperCase() == 'CLOSED')
               .toList();
-          final won =
-              closed.where((trade) => trade.result.toUpperCase() == 'WIN').length;
-          final lost =
-              closed.where((trade) => trade.result.toUpperCase() == 'LOSS').length;
+          final won = closed.where((trade) {
+            final res = trade.result.toUpperCase();
+            return res == 'WIN' || res == 'WON';
+          }).length;
+          final lost = closed.where((trade) {
+            final res = trade.result.toUpperCase();
+            return res == 'LOSS' || res == 'LOST';
+          }).length;
           final winRate = closed.isEmpty ? 0.0 : won / closed.length;
 
           final filtered = _filterResult == null
               ? trades
-              : trades
-                  .where((trade) => trade.result.toUpperCase() == _filterResult)
-                  .toList();
+              : trades.where((trade) {
+                  final res = trade.result.toUpperCase();
+                  final stat = trade.status.toUpperCase();
+                  if (_filterResult == 'WIN') return res == 'WIN' || res == 'WON';
+                  if (_filterResult == 'LOSS') return res == 'LOSS' || res == 'LOST';
+                  if (_filterResult == 'OPEN') {
+                    return stat == 'OPEN' || stat == 'PENDING' || stat == 'FILLED' || stat == 'ACTIVE';
+                  }
+                  return res == _filterResult;
+                }).toList();
 
           return RefreshIndicator(
             onRefresh: () async => _fetchHistory(),
@@ -308,51 +319,40 @@ class _HistoryScreenState extends State<HistoryScreen> {
           ],
           if (trade.reasonForExit != null && trade.reasonForExit!.isNotEmpty) ...[
             const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: (trade.result.toUpperCase() == 'LOSS'
-                        ? AppColors.error
-                        : AppColors.success)
-                    .withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: (trade.result.toUpperCase() == 'LOSS'
-                          ? AppColors.error
-                          : AppColors.success)
-                      .withValues(alpha: 0.2),
-                ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(
-                        trade.result.toUpperCase() == 'LOSS'
-                            ? Icons.biotech_outlined
-                            : Icons.check_circle_outline,
-                        size: 14,
-                        color: trade.result.toUpperCase() == 'LOSS'
-                            ? AppColors.error
-                            : AppColors.success,
-                      ),
-                      const SizedBox(width: 6),
-                      Text(
-                        trade.result.toUpperCase() == 'LOSS'
-                            ? 'POST-MORTEM DIAGNOSTIC'
-                            : 'OUTCOME RESOLUTION',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
-                          color: trade.result.toUpperCase() == 'LOSS'
-                              ? AppColors.error
-                              : AppColors.success,
-                        ),
-                      ),
-                    ],
+            () {
+              final isLoss = trade.result.toUpperCase() == 'LOSS' || trade.result.toUpperCase() == 'LOST';
+              final badgeColor = isLoss ? AppColors.error : AppColors.success;
+              return Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: badgeColor.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: badgeColor.withValues(alpha: 0.2),
                   ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          isLoss ? Icons.biotech_outlined : Icons.check_circle_outline,
+                          size: 14,
+                          color: badgeColor,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          isLoss ? 'POST-MORTEM DIAGNOSTIC' : 'OUTCOME RESOLUTION',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                            color: badgeColor,
+                          ),
+                        ),
+                      ],
+                    ),
                   const SizedBox(height: 4),
                   Text(
                     trade.reasonForExit!,
@@ -371,8 +371,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ],
                 ],
               ),
-            ),
-          ],
+            );
+          }(),
+        ],
         ],
       ),
     );

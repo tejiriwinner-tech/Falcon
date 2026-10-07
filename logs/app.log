@@ -601,3 +601,967 @@
 2026-09-30 12:01:24,446 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/briefings/dispatch-telegram
 2026-09-30 12:01:24,448 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/briefings/dispatch-telegram - Status: 200 - Time: 0.0020s
 2026-09-30 12:01:24,451 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/briefings/dispatch-telegram?briefing_type=london-open "HTTP/1.1 200 OK"
+2026-10-03 10:49:50,479 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:49:50,581 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 10:49:51,329 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api-fxpractice.oanda.com:443
+2026-10-03 10:49:56,314 - urllib3.connectionpool - DEBUG - https://api-fxpractice.oanda.com:443 "GET /v3/accounts/101-004-40615696-001/pricing?instruments=EUR_USD HTTP/1.1" 200 None
+2026-10-03 10:50:14,449 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:50:14,450 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 10:50:31,047 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:50:32,331 - falcon.watchlist_poller - DEBUG - Session budget standby: skipping watchlist poller price check.
+2026-10-03 10:50:35,694 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:50:37,074 - falcon.watchlist_poller - DEBUG - Session budget standby: skipping watchlist poller price check.
+2026-10-03 10:50:39,133 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:50:39,133 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:50:39,133 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:50:39,133 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:50:39,134 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:51:45,824 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:51:45,826 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 10:51:52,705 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:51:52,706 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 10:53:30,923 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:53:30,924 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 10:53:37,553 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:53:37,554 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 10:53:53,682 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:54:10,602 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): nfs.faireconomy.media:443
+2026-10-03 10:54:12,162 - urllib3.connectionpool - DEBUG - https://nfs.faireconomy.media:443 "GET /ff_calendar_thisweek.json HTTP/1.1" 200 None
+2026-10-03 10:54:13,964 - falcon.signal_service - DEBUG - Spread spike shield check error: name 'quote_resp' is not defined
+2026-10-03 10:54:18,886 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 1 ACTIVE, 1 HOLD, 4 EXPIRED
+2026-10-03 10:54:32,144 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:54:45,915 - falcon.signal_service - DEBUG - Spread spike shield check error: name 'quote_resp' is not defined
+2026-10-03 10:54:47,569 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 1 ACTIVE, 1 HOLD, 0 EXPIRED
+2026-10-03 10:55:01,215 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:55:01,216 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:55:01,216 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:55:01,216 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:55:01,216 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:57:19,146 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:57:19,147 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 10:57:25,601 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:57:25,602 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 10:57:41,514 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:57:56,305 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): nfs.faireconomy.media:443
+2026-10-03 10:57:57,449 - urllib3.connectionpool - DEBUG - https://nfs.faireconomy.media:443 "GET /ff_calendar_thisweek.json HTTP/1.1" 200 None
+2026-10-03 10:58:04,010 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 1 ACTIVE, 1 HOLD, 4 EXPIRED
+2026-10-03 10:58:17,203 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 10:58:29,682 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 1 ACTIVE, 1 HOLD, 0 EXPIRED
+2026-10-03 10:58:42,417 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:58:42,417 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:58:42,418 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:58:42,418 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 10:58:42,419 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:56:40,079 - falcon.providers.oanda - INFO - [OANDA] Order dispatched successfully for GBPUSD: 10000 units @ 1.3217 (Type: LIMIT)
+2026-10-03 11:56:43,227 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 11:56:43,342 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 11:56:53,822 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 11:56:53,823 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 11:56:59,242 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:56:59,242 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:56:59,243 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:56:59,243 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:56:59,243 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:59:35,136 - falcon.providers.oanda - INFO - [OANDA] Order dispatched successfully for GBPUSD: 10000 units @ 1.3217 (Type: LIMIT)
+2026-10-03 11:59:39,584 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 11:59:39,586 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 11:59:46,599 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 11:59:46,600 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 11:59:52,489 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:59:52,489 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:59:52,489 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:59:52,490 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 11:59:52,490 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:01:57,238 - falcon.providers.oanda - INFO - [OANDA] Order dispatched successfully for GBPUSD: 10000 units @ 1.3217 (Type: LIMIT)
+2026-10-03 12:01:57,917 - falcon.execution.service - INFO - Order created and queued: ord-aba9b6fe (BUY 0.05 GBPJPY)
+2026-10-03 12:01:57,918 - falcon.execution.service - INFO - OANDA order placed natively: Ticket #99123
+2026-10-03 12:02:00,191 - falcon.signal_outcome_resolver - DEBUG - Acquired pg_advisory_xact_lock(8882026) for resolver
+2026-10-03 12:02:02,049 - falcon.signal_outcome_resolver - INFO - Legacy record #2634 classified as UNKNOWN. Preserving without mutation.
+2026-10-03 12:02:05,805 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 12:02:05,806 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 12:02:12,300 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 12:02:12,301 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 12:02:18,047 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:02:18,047 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:02:18,048 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:02:18,048 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:02:18,048 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:03:16,553 - falcon.providers.oanda - INFO - [OANDA] Order dispatched successfully for GBPUSD: 10000 units @ 1.3217 (Type: LIMIT)
+2026-10-03 12:03:17,292 - falcon.execution.service - INFO - Order created and queued: ord-fd516f7b (BUY 0.05 GBPJPY)
+2026-10-03 12:03:17,292 - falcon.execution.service - INFO - OANDA order placed natively: Ticket #99123
+2026-10-03 12:03:19,399 - falcon.signal_outcome_resolver - DEBUG - Acquired pg_advisory_xact_lock(8882026) for resolver
+2026-10-03 12:03:25,546 - falcon.signal_outcome_resolver - INFO - Resolved open trade #2637 (Signal #7701 USDJPY BUY) -> BREAKEVEN (+100.00)
+2026-10-03 12:03:28,662 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 12:03:28,663 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 12:03:35,038 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 12:03:35,039 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 12:03:40,887 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:03:40,888 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:03:40,888 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:03:40,889 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 12:03:40,889 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 13:12:15,325 - falcon.broker_reconciliation - INFO - [Reconciliation] Trade #1 (ticket 12345, GBPUSD) is no longer open on OANDA. Reconciling close.
+2026-10-03 13:12:15,958 - falcon.broker_reconciliation - DEBUG - Reconciliation post-mortem learning error: SignalOutcomeResolver._conduct_post_mortem_learning() got an unexpected keyword argument 'exit_reason'
+2026-10-03 13:12:15,962 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 13:12:15,962 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 13:12:15,962 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 13:12:15,962 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 13:12:15,963 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 13:12:17,977 - falcon.signal_authorization_service - DEBUG - Acquired pg_advisory_xact_lock(8882026)
+2026-10-03 13:12:20,857 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2640 for signal #None (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $10.00/$250.00
+2026-10-03 13:12:21,067 - falcon.execution.service - INFO - Order created and queued: ord-9ff1d498 (BUY 0.02 EURUSD)
+2026-10-03 13:12:21,068 - falcon.execution.service - INFO - Order ord-9ff1d498 recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-10-03 13:12:21,068 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 13:13:28,847 - falcon.signal_authorization_service - DEBUG - Acquired pg_advisory_xact_lock(8882026)
+2026-10-03 13:13:29,936 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2641 for signal #None (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $20.00/$250.00
+2026-10-03 13:13:30,088 - falcon.execution.service - INFO - Order created and queued: ord-5792b618 (BUY 0.02 EURUSD)
+2026-10-03 13:13:30,089 - falcon.execution.service - INFO - Order ord-5792b618 recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-10-03 13:13:30,089 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 13:13:32,824 - httpcore.connection - DEBUG - connect_tcp.started host='api.telegram.org' port=443 local_address=None timeout=15.0 socket_options=None
+2026-10-03 13:13:39,283 - httpcore.connection - DEBUG - connect_tcp.complete return_value=<httpcore._backends.anyio.AnyIOStream object at 0x0000014640416120>
+2026-10-03 13:13:39,283 - httpcore.connection - DEBUG - start_tls.started ssl_context=<ssl.SSLContext object at 0x000001464032CCD0> server_hostname='api.telegram.org' timeout=15.0
+2026-10-03 14:15:56,423 - falcon.broker_reconciliation - INFO - [Reconciliation] Trade #1 (ticket 12345, GBPUSD) is no longer open on OANDA. Reconciling close.
+2026-10-03 14:15:56,424 - falcon.broker_reconciliation - DEBUG - Reconciliation post-mortem learning error: SignalOutcomeResolver._conduct_post_mortem_learning() got an unexpected keyword argument 'exit_reason'
+2026-10-03 14:15:56,427 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:15:56,427 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:15:56,428 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:15:56,428 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:15:56,428 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:15:56,693 - falcon.execution.service - INFO - Order created and queued: ord-c915aa60 (BUY 0.02 EURUSD)
+2026-10-03 14:15:56,693 - falcon.execution.service - INFO - Order ord-c915aa60 recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-10-03 14:15:56,694 - falcon.execution.service - INFO - Order ord-c915aa60 executed. Latency: 1.7ms, Slippage: 0.3 pips
+2026-10-03 14:15:59,524 - falcon.execution.service - INFO - Updated reservation #2641 to OPEN for order ord-c915aa60
+2026-10-03 14:17:01,563 - falcon.broker_reconciliation - INFO - [Reconciliation] Trade #1 (ticket 12345, GBPUSD) is no longer open on OANDA. Reconciling close.
+2026-10-03 14:17:01,564 - falcon.broker_reconciliation - DEBUG - Reconciliation post-mortem learning error: SignalOutcomeResolver._conduct_post_mortem_learning() got an unexpected keyword argument 'exit_reason'
+2026-10-03 14:17:01,569 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:17:01,570 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:17:01,570 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:17:01,570 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:17:01,570 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:17:01,810 - falcon.execution.service - INFO - Order created and queued: ord-4341b907 (BUY 0.02 EURUSD)
+2026-10-03 14:17:01,810 - falcon.execution.service - INFO - Order ord-4341b907 recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-10-03 14:17:01,811 - falcon.execution.service - INFO - Order ord-4341b907 executed. Latency: 1.3ms, Slippage: 0.3 pips
+2026-10-03 14:17:04,022 - falcon.execution.service - INFO - Updated reservation #2640 to OPEN for order ord-4341b907
+2026-10-03 14:18:06,074 - alembic.runtime.plugins - INFO - setup plugin alembic.autogenerate.schemas
+2026-10-03 14:18:06,075 - alembic.runtime.plugins - INFO - setup plugin alembic.autogenerate.tables
+2026-10-03 14:18:06,075 - alembic.runtime.plugins - INFO - setup plugin alembic.autogenerate.types
+2026-10-03 14:18:06,075 - alembic.runtime.plugins - INFO - setup plugin alembic.autogenerate.constraints
+2026-10-03 14:18:06,075 - alembic.runtime.plugins - INFO - setup plugin alembic.autogenerate.defaults
+2026-10-03 14:18:06,075 - alembic.runtime.plugins - INFO - setup plugin alembic.autogenerate.comments
+2026-10-03 14:18:15,021 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: False, Health: CRITICAL", "timestamp": "2026-10-03T13:18:15.021519+00:00"}
+2026-10-03 14:18:15,025 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.025027+00:00"}
+2026-10-03 14:18:15,028 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: WARNING", "timestamp": "2026-10-03T13:18:15.028222+00:00"}
+2026-10-03 14:18:15,031 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: CRITICAL", "timestamp": "2026-10-03T13:18:15.031327+00:00"}
+2026-10-03 14:18:15,038 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.038307+00:00"}
+2026-10-03 14:18:15,042 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.042816+00:00"}
+2026-10-03 14:18:15,045 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.045816+00:00"}
+2026-10-03 14:18:15,049 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.049009+00:00"}
+2026-10-03 14:18:15,051 - app.core.providers.alpaca_provider - WARNING - [Alpaca] Missing quote data in response: {'quotes': {'NDX': {'bp': 15234.56, 'ap': 15235.78, 't': '2022-08-17T10:07:40.286587431Z'}}}
+2026-10-03 14:18:15,052 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.052234+00:00"}
+2026-10-03 14:18:15,088 - app.core.providers.alpaca_provider - WARNING - [Alpaca] Missing quote data in response: {'quotes': {'DJI': {'bp': 34567.89, 'ap': 34568.9, 't': '2022-08-17T10:07:40.286587431Z'}}}
+2026-10-03 14:18:15,089 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.089030+00:00"}
+2026-10-03 14:18:15,114 - app.core.providers.alpaca_provider - WARNING - [Alpaca] Missing bid/ask in rate data: {'ap': 2346.89, 'mp': 2346.28, 't': '2022-04-20T18:23:00Z'}
+2026-10-03 14:18:15,114 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.114787+00:00"}
+2026-10-03 14:18:15,118 - app.core.providers.alpaca_provider - WARNING - [Alpaca] Missing bid/ask in rate data: {'bp': 2345.67, 'mp': 2346.28, 't': '2022-04-20T18:23:00Z'}
+2026-10-03 14:18:15,118 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.118846+00:00"}
+2026-10-03 14:18:15,122 - app.core.providers.alpaca_provider - WARNING - [Alpaca] Missing rate data in response: {'error': 'Invalid request'}
+2026-10-03 14:18:15,123 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.123188+00:00"}
+2026-10-03 14:18:15,126 - app.core.providers.alpaca_provider - ERROR - [Alpaca] JSON parsing error: Invalid JSON
+2026-10-03 14:18:15,127 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.127191+00:00"}
+2026-10-03 14:18:15,130 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.130860+00:00"}
+2026-10-03 14:18:15,181 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.181475+00:00"}
+2026-10-03 14:18:15,185 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.185366+00:00"}
+2026-10-03 14:18:15,189 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.189583+00:00"}
+2026-10-03 14:18:15,193 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Request error: Connection failed
+2026-10-03 14:18:15,193 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.193834+00:00"}
+2026-10-03 14:18:15,197 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Request error: Connection failed
+2026-10-03 14:18:15,197 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.197752+00:00"}
+2026-10-03 14:18:15,202 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.201989+00:00"}
+2026-10-03 14:18:15,206 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.206496+00:00"}
+2026-10-03 14:18:15,206 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.206871+00:00"}
+2026-10-03 14:18:15,207 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.207164+00:00"}
+2026-10-03 14:18:15,207 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Circuit opened after 3 consecutive failures (HTTP 429 rate limit). Cooldown: 60s", "timestamp": "2026-10-03T13:18:15.207738+00:00"}
+2026-10-03 14:18:15,214 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,214 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.214447+00:00"}
+2026-10-03 14:18:15,214 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,214 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.214783+00:00"}
+2026-10-03 14:18:15,214 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,215 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.215089+00:00"}
+2026-10-03 14:18:15,215 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Circuit opened after 3 consecutive failures (other). Cooldown: 60s", "timestamp": "2026-10-03T13:18:15.215221+00:00"}
+2026-10-03 14:18:15,218 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,218 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.218598+00:00"}
+2026-10-03 14:18:15,218 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,218 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.218954+00:00"}
+2026-10-03 14:18:15,219 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,219 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.219241+00:00"}
+2026-10-03 14:18:15,219 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Circuit opened after 3 consecutive failures (other). Cooldown: 60s", "timestamp": "2026-10-03T13:18:15.219368+00:00"}
+2026-10-03 14:18:15,222 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerHalfOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Cooldown elapsed \u2014 allowing trial request", "timestamp": "2026-10-03T13:18:15.222449+00:00"}
+2026-10-03 14:18:15,229 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223618976'> error: <MagicMock name='get().text.__getitem__()' id='2426223616288'>
+2026-10-03 14:18:15,230 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.230316+00:00"}
+2026-10-03 14:18:15,230 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223618976'> error: <MagicMock name='get().text.__getitem__()' id='2426223616288'>
+2026-10-03 14:18:15,231 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.231067+00:00"}
+2026-10-03 14:18:15,231 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223618976'> error: <MagicMock name='get().text.__getitem__()' id='2426223616288'>
+2026-10-03 14:18:15,231 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.231753+00:00"}
+2026-10-03 14:18:15,232 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Circuit opened after 3 consecutive failures (other). Cooldown: 60s", "timestamp": "2026-10-03T13:18:15.231968+00:00"}
+2026-10-03 14:18:15,232 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerHalfOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Cooldown elapsed \u2014 allowing trial request", "timestamp": "2026-10-03T13:18:15.232334+00:00"}
+2026-10-03 14:18:15,232 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: CRITICAL", "timestamp": "2026-10-03T13:18:15.232655+00:00"}
+2026-10-03 14:18:15,232 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerClosed", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Trial request succeeded \u2014 circuit reset", "timestamp": "2026-10-03T13:18:15.232883+00:00"}
+2026-10-03 14:18:15,239 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223611248'> error: <MagicMock name='get().text.__getitem__()' id='2426223608896'>
+2026-10-03 14:18:15,239 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.239417+00:00"}
+2026-10-03 14:18:15,239 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223611248'> error: <MagicMock name='get().text.__getitem__()' id='2426223608896'>
+2026-10-03 14:18:15,240 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.240147+00:00"}
+2026-10-03 14:18:15,240 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223611248'> error: <MagicMock name='get().text.__getitem__()' id='2426223608896'>
+2026-10-03 14:18:15,240 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.240814+00:00"}
+2026-10-03 14:18:15,241 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Circuit opened after 3 consecutive failures (other). Cooldown: 60s", "timestamp": "2026-10-03T13:18:15.241038+00:00"}
+2026-10-03 14:18:15,241 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerHalfOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Cooldown elapsed \u2014 allowing trial request", "timestamp": "2026-10-03T13:18:15.241281+00:00"}
+2026-10-03 14:18:15,241 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,241 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: CRITICAL", "timestamp": "2026-10-03T13:18:15.241872+00:00"}
+2026-10-03 14:18:15,242 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerReopened", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Trial request failed \u2014 circuit reopened (upstream failure). Cooldown: 60s", "timestamp": "2026-10-03T13:18:15.242112+00:00"}
+2026-10-03 14:18:15,251 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,252 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,252 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,257 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,257 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.257341+00:00"}
+2026-10-03 14:18:15,257 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,257 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.257677+00:00"}
+2026-10-03 14:18:15,257 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,258 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.257989+00:00"}
+2026-10-03 14:18:15,258 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Circuit opened after 3 consecutive failures (other). Cooldown: 60s", "timestamp": "2026-10-03T13:18:15.258118+00:00"}
+2026-10-03 14:18:15,263 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223609568'> error: <MagicMock name='get().text.__getitem__()' id='2426223611584'>
+2026-10-03 14:18:15,263 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.263698+00:00"}
+2026-10-03 14:18:15,264 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223609568'> error: <MagicMock name='get().text.__getitem__()' id='2426223611584'>
+2026-10-03 14:18:15,264 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.264171+00:00"}
+2026-10-03 14:18:15,264 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223609568'> error: <MagicMock name='get().text.__getitem__()' id='2426223611584'>
+2026-10-03 14:18:15,264 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.264569+00:00"}
+2026-10-03 14:18:15,264 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Circuit opened after 3 consecutive failures (other). Cooldown: 60s", "timestamp": "2026-10-03T13:18:15.264707+00:00"}
+2026-10-03 14:18:15,270 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223952288'> error: <MagicMock name='get().text.__getitem__()' id='2426223620656'>
+2026-10-03 14:18:15,271 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.271375+00:00"}
+2026-10-03 14:18:15,271 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223952288'> error: <MagicMock name='get().text.__getitem__()' id='2426223620656'>
+2026-10-03 14:18:15,271 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.271967+00:00"}
+2026-10-03 14:18:15,272 - app.core.providers.alpaca_provider - ERROR - [Alpaca] HTTP <MagicMock name='get().status_code' id='2426223952288'> error: <MagicMock name='get().text.__getitem__()' id='2426223620656'>
+2026-10-03 14:18:15,272 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.272393+00:00"}
+2026-10-03 14:18:15,272 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Circuit opened after 3 consecutive failures (other). Cooldown: 60s", "timestamp": "2026-10-03T13:18:15.272527+00:00"}
+2026-10-03 14:18:15,273 - app.core.providers.alpaca_provider - ERROR - [Alpaca] Unexpected error: 'Mock' object is not subscriptable
+2026-10-03 14:18:15,275 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.275507+00:00"}
+2026-10-03 14:18:15,278 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.278832+00:00"}
+2026-10-03 14:18:15,282 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: False, Health: CRITICAL", "timestamp": "2026-10-03T13:18:15.282131+00:00"}
+2026-10-03 14:18:15,282 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.282588+00:00"}
+2026-10-03 14:18:15,285 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.285661+00:00"}
+2026-10-03 14:18:15,289 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.289599+00:00"}
+2026-10-03 14:18:15,293 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.293111+00:00"}
+2026-10-03 14:18:15,296 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.296285+00:00"}
+2026-10-03 14:18:15,301 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.301801+00:00"}
+2026-10-03 14:18:15,306 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.306347+00:00"}
+2026-10-03 14:18:15,309 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.309892+00:00"}
+2026-10-03 14:18:15,315 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.314924+00:00"}
+2026-10-03 14:18:15,394 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.393990+00:00"}
+2026-10-03 14:18:15,409 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.409033+00:00"}
+2026-10-03 14:18:15,413 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.413888+00:00"}
+2026-10-03 14:18:15,418 - app.core.providers.alpaca_provider - WARNING - [Alpaca] Missing quote data in response: {'quotes': {'NDX': {'bp': 15234.56, 'ap': 15235.78, 't': '2022-08-17T10:07:40.286587431Z'}}}
+2026-10-03 14:18:15,418 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.418477+00:00"}
+2026-10-03 14:18:15,422 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.422625+00:00"}
+2026-10-03 14:18:15,426 - app.core.providers.alpaca_provider - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "alpaca", "providerName": "Alpaca", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:15.426317+00:00"}
+2026-10-03 14:18:17,494 - falcon.broker_reconciliation - INFO - [Reconciliation] Trade #1 (ticket 12345, GBPUSD) is no longer open on OANDA. Reconciling close.
+2026-10-03 14:18:17,494 - falcon.broker_reconciliation - DEBUG - Reconciliation post-mortem learning error: SignalOutcomeResolver._conduct_post_mortem_learning() got an unexpected keyword argument 'exit_reason'
+2026-10-03 14:18:17,497 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:18:17,498 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:18:17,498 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:18:17,498 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:18:17,498 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:18:19,547 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:18:19,548 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 14:18:26,622 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:18:26,623 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 0 ACTIVE, 0 HOLD, 0 EXPIRED
+2026-10-03 14:18:35,058 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,058 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,063 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,064 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,067 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,067 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,072 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,072 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,075 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,076 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,079 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,079 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,082 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,083 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,087 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,088 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,093 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,094 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,100 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,103 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,109 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,110 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,115 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,115 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,122 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,123 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,128 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,129 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,134 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,135 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,142 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,142 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,146 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,147 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,150 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,150 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,155 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,155 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,168 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,169 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,174 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,175 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,179 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,180 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,184 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,185 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,190 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-001 mission=mission-001
+2026-10-03 14:18:35,191 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-001 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,193 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,194 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,197 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,197 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,200 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,201 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,204 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,205 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,208 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,208 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,212 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,212 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,215 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,215 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,220 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,221 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,223 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,223 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,225 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,225 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,227 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,227 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,229 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,229 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,231 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,232 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,234 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-000 mission=mission-000
+2026-10-03 14:18:35,234 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-000 direction=WAIT trend=Neutral session=Unknown spread=0.0000
+2026-10-03 14:18:35,241 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-002 mission=mission-002
+2026-10-03 14:18:35,241 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-002 direction=SELL trend=Bearish session=New York spread=0.6000
+2026-10-03 14:18:35,245 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-002 mission=mission-002
+2026-10-03 14:18:35,246 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-002 direction=SELL trend=Bearish session=New York spread=0.6000
+2026-10-03 14:18:35,250 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-002 mission=mission-002
+2026-10-03 14:18:35,251 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-002 direction=SELL trend=Bearish session=New York spread=0.6000
+2026-10-03 14:18:35,256 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-002 mission=mission-002
+2026-10-03 14:18:35,257 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-002 direction=SELL trend=Bearish session=New York spread=0.6000
+2026-10-03 14:18:35,260 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-002 mission=mission-002
+2026-10-03 14:18:35,260 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-002 direction=SELL trend=Bearish session=New York spread=0.6000
+2026-10-03 14:18:35,265 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-002 mission=mission-002
+2026-10-03 14:18:35,265 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-002 direction=SELL trend=Bearish session=New York spread=0.6000
+2026-10-03 14:18:35,270 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-002 mission=mission-002
+2026-10-03 14:18:35,271 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-002 direction=SELL trend=Bearish session=New York spread=0.6000
+2026-10-03 14:18:35,275 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-003 mission=mission-003
+2026-10-03 14:18:35,275 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-003 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,278 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-003 mission=mission-003
+2026-10-03 14:18:35,279 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-003 direction=BUY trend=Bullish session=London spread=0.3500
+2026-10-03 14:18:35,282 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-x mission=m-x
+2026-10-03 14:18:35,283 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-x direction=BUY trend=Bullish session=London spread=0.4200
+2026-10-03 14:18:35,283 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-x mission=m-x
+2026-10-03 14:18:35,283 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-x direction=BUY trend=Bullish session=London spread=0.4200
+2026-10-03 14:18:35,289 - app.core.engines.decision.context_builder - DEBUG - Building DecisionContext for candidate=cand-004 mission=mission-004
+2026-10-03 14:18:35,289 - app.core.engines.decision.context_builder - DEBUG - DecisionContext built: candidate=cand-004 direction=WAIT trend=Bearish session=Asian spread=0.8000
+2026-10-03 14:18:35,692 - app.core.engines.decision.decision_generator - WARNING - Evaluator BadEval failed: Simulated crash
+2026-10-03 14:18:35,871 - app.core.engines.decision.decision_generator - WARNING - Evaluator BadEval failed: Simulated crash
+2026-10-03 14:18:36,834 - app.repositories.decision_repository - INFO - Decision persisted: a130b5c2-acab-440b-bf9f-2436c20c0a93 | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,225 - app.repositories.decision_repository - INFO - Decision persisted: 9df8e9fd-d1f1-4721-bc79-9e59be7cfe2c | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,244 - app.repositories.decision_repository - INFO - Decision persisted: 70ea46fa-63b9-40ff-9cd0-380be0b64cf9 | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,264 - app.repositories.decision_repository - INFO - Decision persisted: 8ba416dc-fde5-409e-8174-4608e3fae6f6 | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,266 - app.repositories.decision_repository - INFO - Decision persisted: 177ef132-f934-408a-b940-a1e79bb3a0b0 | Mission: mission-001 | Instrument: GBPUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,279 - app.repositories.decision_repository - INFO - Decision persisted: 9f78e9fc-d913-4b6a-8649-8984879392f2 | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,305 - app.repositories.decision_repository - INFO - Decision persisted: 9b831210-6a5c-40f6-acdb-c98470fe72da | Mission: mission-0 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,307 - app.repositories.decision_repository - INFO - Decision persisted: 10b9f9e0-1f4d-40dc-9650-60553cfce552 | Mission: mission-1 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,309 - app.repositories.decision_repository - INFO - Decision persisted: 8d5b2cf8-72ac-4250-9008-5c6231dd5417 | Mission: mission-2 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,311 - app.repositories.decision_repository - INFO - Decision persisted: a0063e13-ec00-4663-b462-fefbbad1d203 | Mission: mission-3 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,313 - app.repositories.decision_repository - INFO - Decision persisted: 2d3b975e-ddc5-4149-879e-c99bdcb453db | Mission: mission-4 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,330 - app.repositories.decision_repository - INFO - Decision persisted: b89bff20-d514-4e43-93c1-d712a98f786c | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,347 - app.repositories.decision_repository - INFO - Decision persisted: 80ab47d2-a2a1-4f8d-9d6d-20c391718dfc | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,349 - app.repositories.decision_repository - INFO - Decision persisted: 4e5fd2ed-e5f6-4a1d-b346-93f4b0c5dce4 | Mission: mission-002 | Instrument: GBPUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,364 - app.repositories.decision_repository - INFO - Decision persisted: f690bb98-0211-4090-8eeb-db145a371fd1 | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,381 - app.repositories.decision_repository - INFO - Decision persisted: a2c480a9-e47b-4669-ab56-42d2566bebec | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,470 - app.repositories.decision_repository - INFO - Decision persisted: 4c7e1164-0b27-45c8-8450-e70cd64d1ec7 | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,496 - app.repositories.decision_repository - INFO - Decision persisted: ad5e108d-fdc3-49d8-a518-8883e8e3a141 | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,518 - app.repositories.decision_repository - INFO - Decision persisted: b1b12247-f0d6-4b28-8491-640af1347daf | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,521 - app.repositories.decision_repository - INFO - Updated metadata for decision b1b12247-f0d6-4b28-8491-640af1347daf
+2026-10-03 14:18:37,533 - app.repositories.decision_repository - WARNING - Decision non-existent-id not found for metadata update
+2026-10-03 14:18:37,547 - app.repositories.decision_repository - INFO - Decision persisted: 8679cced-0855-46fe-821e-98a7747bf9c4 | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,548 - app.repositories.decision_repository - INFO - Deleted 0 old decisions older than 2026-10-03 12:18:37.547547+00:00
+2026-10-03 14:18:37,549 - app.repositories.decision_repository - INFO - Deleted 1 old decisions older than 2026-10-03 14:18:37.548644+00:00
+2026-10-03 14:18:37,563 - app.repositories.decision_repository - INFO - Decision persisted: cb8bd143-ac77-486a-87fd-67d45e500b18 | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,588 - app.repositories.decision_repository - INFO - Decision persisted: 1a9bfd10-9f81-47a3-b0ae-404b2c675fcb | Mission: mission-001 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,635 - app.repositories.decision_repository - INFO - Decision persisted: 5fca334a-fd4e-4e45-b312-a4733dbe54b3 | Mission: mission-0 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,637 - app.repositories.decision_repository - INFO - Decision persisted: 4ed8046d-47a3-4cdd-93f0-3c018eb02689 | Mission: mission-1 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,638 - app.repositories.decision_repository - INFO - Decision persisted: 4acb93e3-e701-40a5-a195-67671b36b0f1 | Mission: mission-2 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,640 - app.repositories.decision_repository - INFO - Decision persisted: c03c1df3-a29e-4f26-8ac6-9d4f6626f70c | Mission: mission-3 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,641 - app.repositories.decision_repository - INFO - Decision persisted: d4d47874-a16d-43a2-91a8-73cbbc204624 | Mission: mission-4 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,642 - app.repositories.decision_repository - INFO - Decision persisted: 71aa1a7f-20b1-4cfd-9df5-3c4d727a2f98 | Mission: mission-5 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,644 - app.repositories.decision_repository - INFO - Decision persisted: 8c6e14be-ec86-49d2-96a2-83254d3683c9 | Mission: mission-6 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,645 - app.repositories.decision_repository - INFO - Decision persisted: b370a7dd-c50b-4745-bdb6-a066af875efc | Mission: mission-7 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,646 - app.repositories.decision_repository - INFO - Decision persisted: b0eb8c47-0a9c-47bf-984e-c948a3a5abf1 | Mission: mission-8 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:37,649 - app.repositories.decision_repository - INFO - Decision persisted: d916bea3-017d-4944-bc9f-9d0c068d8ccd | Mission: mission-9 | Instrument: XAUUSD | Decision: BUY | Confidence: 78.5
+2026-10-03 14:18:40,170 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Connected (api_key configured)
+2026-10-03 14:18:40,174 - falcon.providers.fmp - WARNING - [Financial Modeling Prep] API key not configured. Set FMP_API_KEY environment variable.
+2026-10-03 14:18:40,180 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:40.180357+00:00"}
+2026-10-03 14:18:40,184 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: False, Health: CRITICAL", "timestamp": "2026-10-03T13:18:40.184016+00:00"}
+2026-10-03 14:18:40,188 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: CRITICAL", "timestamp": "2026-10-03T13:18:40.188066+00:00"}
+2026-10-03 14:18:40,191 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: WARNING", "timestamp": "2026-10-03T13:18:40.191268+00:00"}
+2026-10-03 14:18:40,197 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Circuit opened after 3 consecutive failures (other). Cooldown: 60s", "timestamp": "2026-10-03T13:18:40.197285+00:00"}
+2026-10-03 14:18:40,204 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "CircuitBreakerHalfOpen", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Cooldown elapsed \u2014 allowing trial request", "timestamp": "2026-10-03T13:18:40.203981+00:00"}
+2026-10-03 14:18:40,206 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "CircuitBreakerClosed", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Trial request succeeded \u2014 circuit reset", "timestamp": "2026-10-03T13:18:40.206872+00:00"}
+2026-10-03 14:18:40,211 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,354 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,377 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,382 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,424 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,428 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,428 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,429 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,452 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,459 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,464 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,470 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,473 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:40,477 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:40.477384+00:00"}
+2026-10-03 14:18:40,521 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "CircuitBreakerOpen", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Circuit opened after 3 consecutive failures (HTTP 429 rate limit). Cooldown: 60s", "timestamp": "2026-10-03T13:18:40.521020+00:00"}
+2026-10-03 14:18:40,523 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:40.523306+00:00"}
+2026-10-03 14:18:40,523 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:40.523726+00:00"}
+2026-10-03 14:18:40,526 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:40.526075+00:00"}
+2026-10-03 14:18:40,534 - falcon.providers.fmp - WARNING - [Financial Modeling Prep] API key not configured. Set FMP_API_KEY environment variable.
+2026-10-03 14:18:40,540 - falcon.providers.fmp - WARNING - [Financial Modeling Prep] API key not configured. Set FMP_API_KEY environment variable.
+2026-10-03 14:18:51,885 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Connected (api_key configured)
+2026-10-03 14:18:51,886 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:18:51.886646+00:00"}
+2026-10-03 14:18:51,893 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Connected (api_key configured)
+2026-10-03 14:18:51,932 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:51,933 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:51,933 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:51,934 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:18:51,934 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:19:07,965 - falcon.providers.oanda - INFO - [OANDA] Order dispatched successfully for GBPUSD: 10000 units @ 1.3217 (Type: LIMIT)
+2026-10-03 14:19:08,632 - falcon.execution.service - INFO - Order created and queued: ord-34fa01b7 (BUY 0.05 GBPJPY)
+2026-10-03 14:19:08,633 - falcon.execution.service - INFO - OANDA order placed natively: Ticket #99123
+2026-10-03 14:19:08,660 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:08.660823+00:00"}
+2026-10-03 14:19:08,663 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:08.663258+00:00"}
+2026-10-03 14:19:08,666 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:08.666236+00:00"}
+2026-10-03 14:19:08,668 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:08.668530+00:00"}
+2026-10-03 14:19:08,671 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:08.671928+00:00"}
+2026-10-03 14:19:08,672 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:08.672558+00:00"}
+2026-10-03 14:19:08,673 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:08.673218+00:00"}
+2026-10-03 14:19:08,878 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "EURUSD", "timestamp": "2026-10-03T13:19:08.878459+00:00"}
+2026-10-03 14:19:08,882 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "EURUSD", "timestamp": "2026-10-03T13:19:08.882039+00:00"}
+2026-10-03 14:19:08,904 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "EURUSD", "timestamp": "2026-10-03T13:19:08.904665+00:00"}
+2026-10-03 14:19:08,927 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "EURUSD", "timestamp": "2026-10-03T13:19:08.927160+00:00"}
+2026-10-03 14:19:08,930 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "EURUSD", "timestamp": "2026-10-03T13:19:08.930858+00:00"}
+2026-10-03 14:19:08,978 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "EURUSD", "timestamp": "2026-10-03T13:19:08.978681+00:00"}
+2026-10-03 14:19:09,011 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:09.011402+00:00"}
+2026-10-03 14:19:09,017 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:09.017012+00:00"}
+2026-10-03 14:19:09,019 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:19:09.019964+00:00"}
+2026-10-03 14:19:09,431 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:09,433 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:19:10,050 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.6167s
+2026-10-03 14:19:10,053 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,250 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,253 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:19:10,258 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0052s
+2026-10-03 14:19:10,260 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,273 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,275 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:19:10,279 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0038s
+2026-10-03 14:19:10,281 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,286 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,288 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:19:10,290 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:19:10.290782+00:00"}
+2026-10-03 14:19:10,291 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0027s
+2026-10-03 14:19:10,293 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,298 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,302 - httpx - INFO - HTTP Request: OPTIONS http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,307 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,308 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:19:10,312 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0035s
+2026-10-03 14:19:10,314 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,318 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,321 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:19:10,325 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0041s
+2026-10-03 14:19:10,327 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,328 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,330 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:19:10,334 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0040s
+2026-10-03 14:19:10,337 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,351 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,354 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:19:10,355 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:19:10.355455+00:00"}
+2026-10-03 14:19:10,356 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0017s
+2026-10-03 14:19:10,358 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,359 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,360 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:19:10,361 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:19:10.361473+00:00"}
+2026-10-03 14:19:10,361 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0011s
+2026-10-03 14:19:10,363 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,364 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,366 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:19:10,367 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:19:10.367153+00:00"}
+2026-10-03 14:19:10,367 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0011s
+2026-10-03 14:19:10,370 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,374 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,376 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:19:10,377 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:19:10.377753+00:00"}
+2026-10-03 14:19:10,378 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0020s
+2026-10-03 14:19:10,380 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,392 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,394 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:19:10,395 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:19:10.395907+00:00"}
+2026-10-03 14:19:10,396 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0019s
+2026-10-03 14:19:10,398 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,577 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,580 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:19:10,580 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:19:10.580800+00:00"}
+2026-10-03 14:19:10,581 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0012s
+2026-10-03 14:19:10,583 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,587 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:10,589 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:19:10,592 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0033s
+2026-10-03 14:19:10,594 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:19:10,697 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:11,006 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:19:11,008 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:11,013 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:19:11,026 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:19:11,029 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:11,153 - app.core.services.market_data_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market data ingestion to conserve free API quota.
+2026-10-03 14:19:11,154 - asyncio - WARNING - Executing <Task finished name='Task-65' coro=<TestSchedulerStandbyProtection.test_market_data_scheduler_skips_in_standby() done, defined at C:\Users\ACER\Documents\SCHOOLWORKS\Falcon\backend\tests\unit\test_session_budget_manager.py:124> result=None created at C:\Python313\Lib\asyncio\runners.py:100> took 0.118 seconds
+2026-10-03 14:19:11,169 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:19:11,172 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:11,180 - app.services.scheduler.market_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market scanning to preserve free API quota.
+2026-10-03 14:19:11,193 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:19:11,196 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:11,217 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:19:12,394 - falcon.execution.service - INFO - Order created and queued: ord-b3713313 (BUY 0.02 EURUSD)
+2026-10-03 14:19:12,394 - falcon.execution.service - INFO - Order ord-b3713313 recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-10-03 14:19:12,395 - falcon.execution.service - INFO - Order ord-b3713313 executed. Latency: 0.7ms, Slippage: 0.3 pips
+2026-10-03 14:19:24,625 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:19:57,411 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): nfs.faireconomy.media:443
+2026-10-03 14:20:03,765 - urllib3.connectionpool - DEBUG - https://nfs.faireconomy.media:443 "GET /ff_calendar_thisweek.json HTTP/1.1" 200 None
+2026-10-03 14:20:07,262 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 1 ACTIVE, 1 HOLD, 4 EXPIRED
+2026-10-03 14:20:20,037 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:20:33,807 - falcon.watchlist_poller - DEBUG - Watchlist poller cycle completed: 1 ACTIVE, 1 HOLD, 0 EXPIRED
+2026-10-03 14:20:49,500 - falcon.signal_outcome_resolver - DEBUG - Acquired pg_advisory_xact_lock(8882026) for resolver
+2026-10-03 14:20:56,885 - falcon.signal_outcome_resolver - INFO - Resolved open trade #2648 (Signal #7701 USDJPY BUY) -> BREAKEVEN (+100.00)
+2026-10-03 14:20:58,155 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:20:58,159 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour
+2026-10-03 14:21:04,512 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour - Status: 200 - Time: 6.3532s
+2026-10-03 14:21:04,515 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour "HTTP/1.1 200 OK"
+2026-10-03 14:21:04,526 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:21:04,530 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour
+2026-10-03 14:21:05,535 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour - Status: 200 - Time: 1.0049s
+2026-10-03 14:21:05,537 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour?instrument=XAUUSD "HTTP/1.1 200 OK"
+2026-10-03 14:21:05,544 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:21:05,546 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour
+2026-10-03 14:21:09,416 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour - Status: 200 - Time: 3.8697s
+2026-10-03 14:21:09,419 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour?timeframe=M15 "HTTP/1.1 200 OK"
+2026-10-03 14:21:09,424 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:21:09,427 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour
+2026-10-03 14:21:14,863 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour - Status: 200 - Time: 5.4364s
+2026-10-03 14:21:14,865 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour?pattern=HAMMER "HTTP/1.1 200 OK"
+2026-10-03 14:21:14,869 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:21:14,872 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour
+2026-10-03 14:21:20,370 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour - Status: 200 - Time: 5.4975s
+2026-10-03 14:21:20,374 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour?wick_type=LOWER_PRICE_REJECTION "HTTP/1.1 200 OK"
+2026-10-03 14:21:20,382 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:21:20,385 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour
+2026-10-03 14:21:25,519 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour - Status: 200 - Time: 5.1337s
+2026-10-03 14:21:25,522 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour?regime=TRENDING "HTTP/1.1 200 OK"
+2026-10-03 14:21:25,528 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:21:25,531 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour
+2026-10-03 14:21:29,514 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour - Status: 200 - Time: 3.9829s
+2026-10-03 14:21:29,516 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour?limit=5 "HTTP/1.1 200 OK"
+2026-10-03 14:21:29,521 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:21:29,524 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour
+2026-10-03 14:21:34,486 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour - Status: 200 - Time: 4.9619s
+2026-10-03 14:21:34,491 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour?as_of=2026-09-22T08:00:00Z "HTTP/1.1 200 OK"
+2026-10-03 14:21:57,060 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "XAUUSD", "timestamp": "2026-10-03T13:21:57.060736+00:00"}
+2026-10-03 14:21:57,063 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api-fxpractice.oanda.com:443
+2026-10-03 14:22:00,000 - urllib3.connectionpool - DEBUG - https://api-fxpractice.oanda.com:443 "GET /v3/accounts/101-004-40615696-001/pricing?instruments=XAU_USD HTTP/1.1" 200 None
+2026-10-03 14:22:03,522 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api-fxpractice.oanda.com:443
+2026-10-03 14:22:04,774 - urllib3.connectionpool - DEBUG - https://api-fxpractice.oanda.com:443 "GET /v3/accounts/101-004-40615696-001/pricing?instruments=GBP_USD HTTP/1.1" 200 None
+2026-10-03 14:22:06,139 - app.core.providers.provider_manager - INFO - {"eventName": "ProviderSkippedUnsupported", "providerId": "fmp", "symbol": "EURUSD", "timestamp": "2026-10-03T13:22:06.138907+00:00"}
+2026-10-03 14:22:06,144 - urllib3.connectionpool - DEBUG - Starting new HTTPS connection (1): api-fxpractice.oanda.com:443
+2026-10-03 14:22:07,380 - urllib3.connectionpool - DEBUG - https://api-fxpractice.oanda.com:443 "GET /v3/accounts/101-004-40615696-001/pricing?instruments=EUR_USD HTTP/1.1" 200 None
+2026-10-03 14:22:31,048 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:22:31,050 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/query
+2026-10-03 14:22:53,879 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/query - Status: 200 - Time: 22.8286s
+2026-10-03 14:22:53,882 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/query "HTTP/1.1 200 OK"
+2026-10-03 14:22:53,887 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:22:53,889 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/query
+2026-10-03 14:22:56,822 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/query - Status: 200 - Time: 2.9326s
+2026-10-03 14:22:56,830 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/query "HTTP/1.1 200 OK"
+2026-10-03 14:22:56,841 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:22:56,847 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/london-open
+2026-10-03 14:22:56,853 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/london-open - Status: 200 - Time: 0.0062s
+2026-10-03 14:22:56,859 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/london-open "HTTP/1.1 200 OK"
+2026-10-03 14:22:56,871 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:22:56,877 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/daily-review
+2026-10-03 14:22:56,881 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/daily-review - Status: 200 - Time: 0.0044s
+2026-10-03 14:22:56,885 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/daily-review "HTTP/1.1 200 OK"
+2026-10-03 14:22:56,891 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:22:56,896 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/london-open
+2026-10-03 14:22:56,899 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/london-open - Status: 200 - Time: 0.0037s
+2026-10-03 14:22:56,903 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/london-open "HTTP/1.1 200 OK"
+2026-10-03 14:22:56,906 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:22:56,909 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/copilot/briefings/latest
+2026-10-03 14:22:56,913 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/copilot/briefings/latest - Status: 200 - Time: 0.0035s
+2026-10-03 14:22:56,916 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/copilot/briefings/latest "HTTP/1.1 200 OK"
+2026-10-03 14:22:56,924 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:22:56,928 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/copilot/briefings/dispatch-telegram
+2026-10-03 14:22:56,931 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/copilot/briefings/dispatch-telegram - Status: 200 - Time: 0.0031s
+2026-10-03 14:22:56,935 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/copilot/briefings/dispatch-telegram?briefing_type=london-open "HTTP/1.1 200 OK"
+2026-10-03 14:22:56,966 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:22:56,968 - app.middleware.logging_middleware - INFO - Incoming request: POST /api/v1/capital-cycles/set-capital
+2026-10-03 14:22:59,181 - app.middleware.logging_middleware - INFO - Completed response: POST /api/v1/capital-cycles/set-capital - Status: 200 - Time: 2.2125s
+2026-10-03 14:22:59,183 - httpx - INFO - HTTP Request: POST http://testserver/api/v1/capital-cycles/set-capital?amount=250.00 "HTTP/1.1 200 OK"
+2026-10-03 14:23:00,200 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:23:00,202 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/history
+2026-10-03 14:23:04,723 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/history - Status: 200 - Time: 4.5203s
+2026-10-03 14:23:04,729 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/history?limit=10 "HTTP/1.1 200 OK"
+2026-10-03 14:23:04,736 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:23:04,738 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/history/summary
+2026-10-03 14:23:09,050 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/history/summary - Status: 200 - Time: 4.3120s
+2026-10-03 14:23:09,052 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/history/summary "HTTP/1.1 200 OK"
+2026-10-03 14:23:09,056 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:23:09,060 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/history
+2026-10-03 14:23:09,703 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/history - Status: 200 - Time: 0.6437s
+2026-10-03 14:23:09,706 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/history?instrument=EURUSD&timeframe=M15&forward_window=10&behaviour=UPPER_PRICE_REJECTION "HTTP/1.1 200 OK"
+2026-10-03 14:23:09,713 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:23:09,717 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/history/summary
+2026-10-03 14:23:13,813 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/history/summary - Status: 200 - Time: 4.0961s
+2026-10-03 14:23:13,816 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/history/summary?pattern=HAMMER&regime=TRENDING "HTTP/1.1 200 OK"
+2026-10-03 14:23:13,849 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:23:13,851 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/history
+2026-10-03 14:23:19,235 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/history - Status: 200 - Time: 5.3837s
+2026-10-03 14:23:19,238 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/history?as_of=2026-01-01T00:00:00Z "HTTP/1.1 200 OK"
+2026-10-03 14:23:19,245 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:23:19,247 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/history/summary
+2026-10-03 14:23:20,041 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/history/summary - Status: 200 - Time: 0.7939s
+2026-10-03 14:23:20,044 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/history/summary?instrument=EURUSD "HTTP/1.1 200 OK"
+2026-10-03 14:23:20,046 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:23:20,047 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/history/summary
+2026-10-03 14:23:20,747 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/history/summary - Status: 200 - Time: 0.6996s
+2026-10-03 14:23:20,751 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/history/summary?instrument=EURUSD "HTTP/1.1 200 OK"
+2026-10-03 14:23:43,052 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:23:43,055 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/findings
+2026-10-03 14:24:37,024 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/findings - Status: 200 - Time: 53.9690s
+2026-10-03 14:24:37,026 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/findings?limit=10 "HTTP/1.1 200 OK"
+2026-10-03 14:24:37,034 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:24:37,036 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/stability
+2026-10-03 14:25:28,328 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/stability - Status: 200 - Time: 51.2919s
+2026-10-03 14:25:28,330 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/stability "HTTP/1.1 200 OK"
+2026-10-03 14:25:28,334 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:25:28,336 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/hypotheses
+2026-10-03 14:26:20,986 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/hypotheses - Status: 200 - Time: 52.6492s
+2026-10-03 14:26:20,989 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/hypotheses "HTTP/1.1 200 OK"
+2026-10-03 14:26:20,995 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:26:20,997 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/findings
+2026-10-03 14:26:35,596 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/findings - Status: 200 - Time: 14.5989s
+2026-10-03 14:26:35,598 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/findings?instrument=GBPUSD&timeframe=H1&forward_window=10 "HTTP/1.1 200 OK"
+2026-10-03 14:26:35,604 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:26:35,606 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/candlestick-behaviour/findings
+2026-10-03 14:26:42,278 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/candlestick-behaviour/findings - Status: 200 - Time: 6.6720s
+2026-10-03 14:26:42,280 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/candlestick-behaviour/findings?as_of=2026-01-01T00:00:00Z "HTTP/1.1 200 OK"
+2026-10-03 14:34:55,509 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:34:55,570 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:34:55,575 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:34:55,584 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:34:55,601 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:34:55,605 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:34:55,616 - app.core.services.market_data_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market data ingestion to conserve free API quota.
+2026-10-03 14:34:55,639 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:34:55,642 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:34:55,652 - app.services.scheduler.market_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market scanning to preserve free API quota.
+2026-10-03 14:34:55,665 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:34:55,670 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:34:55,694 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:35:40,727 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:40,732 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:35:40,973 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.2408s
+2026-10-03 14:35:40,976 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,605 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,607 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:35:41,613 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0062s
+2026-10-03 14:35:41,617 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,634 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,636 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:35:41,642 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0064s
+2026-10-03 14:35:41,645 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,654 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,658 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:35:41,661 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:35:41.661445+00:00"}
+2026-10-03 14:35:41,662 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0043s
+2026-10-03 14:35:41,665 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,669 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,673 - httpx - INFO - HTTP Request: OPTIONS http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,678 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,680 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:35:41,686 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0061s
+2026-10-03 14:35:41,689 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,696 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,698 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:35:41,704 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0060s
+2026-10-03 14:35:41,708 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,709 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,711 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:35:41,715 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0042s
+2026-10-03 14:35:41,935 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,952 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,960 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:35:41,962 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:35:41.962483+00:00"}
+2026-10-03 14:35:41,963 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0023s
+2026-10-03 14:35:41,965 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,967 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,969 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:35:41,969 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:35:41.969714+00:00"}
+2026-10-03 14:35:41,970 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0012s
+2026-10-03 14:35:41,972 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,974 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,976 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:35:41,976 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:35:41.976710+00:00"}
+2026-10-03 14:35:41,977 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0012s
+2026-10-03 14:35:41,979 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,982 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:41,984 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:35:41,986 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:35:41.986095+00:00"}
+2026-10-03 14:35:41,986 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0020s
+2026-10-03 14:35:41,989 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:35:41,999 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:42,001 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:35:42,002 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:35:42.002565+00:00"}
+2026-10-03 14:35:42,003 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0022s
+2026-10-03 14:35:42,006 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:35:42,071 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:42,074 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/health
+2026-10-03 14:35:42,075 - falcon.providers.fmp - INFO - [EVENT BUS] {"eventName": "ProviderHeartbeat", "providerId": "fmp", "providerName": "Financial Modeling Prep", "detail": "Alive: True, Health: HEALTHY", "timestamp": "2026-10-03T13:35:42.075450+00:00"}
+2026-10-03 14:35:42,076 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/health - Status: 200 - Time: 0.0020s
+2026-10-03 14:35:42,078 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/health "HTTP/1.1 200 OK"
+2026-10-03 14:35:42,084 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:35:42,086 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/runtime/instruments
+2026-10-03 14:35:42,093 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/runtime/instruments - Status: 200 - Time: 0.0068s
+2026-10-03 14:35:42,096 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/runtime/instruments "HTTP/1.1 200 OK"
+2026-10-03 14:40:16,795 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:40:16,826 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:40:16,831 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:40:16,836 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-03 14:40:16,852 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:40:16,856 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:40:16,864 - app.core.services.market_data_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market data ingestion to conserve free API quota.
+2026-10-03 14:40:16,881 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:40:16,884 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:40:16,897 - app.services.scheduler.market_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market scanning to preserve free API quota.
+2026-10-03 14:40:16,916 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:40:16,920 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-03 14:40:16,939 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-03 14:41:21,932 - falcon.broker_reconciliation - INFO - [Reconciliation] Trade #1 (ticket 12345, GBPUSD) is no longer open on OANDA. Reconciling close.
+2026-10-03 14:41:21,933 - falcon.broker_reconciliation - DEBUG - Reconciliation post-mortem learning error: SignalOutcomeResolver._conduct_post_mortem_learning() got an unexpected keyword argument 'exit_reason'
+2026-10-03 14:41:21,937 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:41:21,937 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:41:21,938 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:41:21,938 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:41:21,938 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:41:21,996 - falcon.execution.service - INFO - Order created and queued: ord-b3817f1d (BUY 0.02 EURUSD)
+2026-10-03 14:41:21,996 - falcon.execution.service - INFO - Order ord-b3817f1d recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-10-03 14:41:21,997 - falcon.execution.service - INFO - Order ord-b3817f1d executed. Latency: 1.1ms, Slippage: 0.3 pips
+2026-10-03 14:42:05,592 - falcon.broker_reconciliation - INFO - [Reconciliation] Trade #1 (ticket 12345, GBPUSD) is no longer open on OANDA. Reconciling close.
+2026-10-03 14:42:05,593 - falcon.broker_reconciliation - DEBUG - Reconciliation post-mortem learning error: SignalOutcomeResolver._conduct_post_mortem_learning() got an unexpected keyword argument 'exit_reason'
+2026-10-03 14:42:05,599 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:42:05,599 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:42:05,599 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:42:05,600 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:42:05,600 - falcon.regime_memory_engine - INFO - [Incubation] Recorded paper trade for strategy test_incubating_strat: result=WON, pnl=15.00
+2026-10-03 14:42:05,641 - falcon.execution.service - INFO - Order created and queued: ord-f42b82bf (BUY 0.02 EURUSD)
+2026-10-03 14:42:05,641 - falcon.execution.service - INFO - Order ord-f42b82bf recorded for decision-support tracking. Automated broker order placement is strictly disabled.
+2026-10-03 14:42:05,642 - falcon.execution.service - INFO - Order ord-f42b82bf executed. Latency: 1.0ms, Slippage: 0.3 pips
+2026-10-07 11:13:03,064 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #101 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:03,347 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #102 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $10.00/$20.00
+2026-10-07 11:13:03,351 - falcon.signal_outcome_resolver - INFO - Signal #102 reached entry price 1.1 -> Activated to OPEN/ACTIVE
+2026-10-07 11:13:04,628 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #103 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $10.00/$20.00
+2026-10-07 11:13:04,629 - falcon.signal_authorization_service - INFO - Signal #103 already has active reservation #1. Returning existing reservation.
+2026-10-07 11:13:04,635 - falcon.signal_outcome_resolver - INFO - Signal #104 reached entry price 1.1 -> Activated to OPEN/ACTIVE
+2026-10-07 11:13:04,676 - falcon.signal_outcome_resolver - INFO - Signal #105 reached entry price 1.1 -> Activated to OPEN/ACTIVE
+2026-10-07 11:13:04,705 - falcon.signal_outcome_resolver - INFO - Invalidated unexecuted PENDING reservation #1 (Signal #106)
+2026-10-07 11:13:04,731 - falcon.signal_outcome_resolver - INFO - Resolved open trade #1 (Signal #108 EURUSD BUY) -> WON (+100.00)
+2026-10-07 11:13:04,807 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:04,810 - falcon.signal_outcome_resolver - INFO - Signal #113 reached entry price 1.1 -> Activated to OPEN/ACTIVE
+2026-10-07 11:13:04,811 - falcon.signal_outcome_resolver - INFO - Signal #112 reached entry price 1.1 -> Activated to OPEN/ACTIVE
+2026-10-07 11:13:04,812 - falcon.signal_outcome_resolver - INFO - Signal #111 reached entry price 1.1 -> Activated to OPEN/ACTIVE
+2026-10-07 11:13:04,857 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:04,863 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #133 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $15.00/$20.00
+2026-10-07 11:13:04,872 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:04,918 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #4 for signal #165 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:05,077 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,078 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,161 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,162 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,164 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,172 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,173 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,175 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,176 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,177 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,310 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 4/3, Agg Loss: $16.00 + $0.00 vs $20.00)
+2026-10-07 11:13:05,319 - falcon.signal_outcome_resolver - INFO - Retired duplicate speculative record #4 (Signal #340306)
+2026-10-07 11:13:05,319 - falcon.signal_outcome_resolver - INFO - Retired duplicate speculative record #2 (Signal #340304)
+2026-10-07 11:13:05,320 - falcon.signal_outcome_resolver - INFO - Expired unexecuted watchlist signal #3 (Signal #340306) after 1h
+2026-10-07 11:13:05,321 - falcon.signal_outcome_resolver - INFO - Expired unexecuted watchlist signal #1 (Signal #340304) after 1h
+2026-10-07 11:13:05,325 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #5 for signal #340308 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:05,333 - falcon.signal_outcome_resolver - INFO - Legacy record #1 classified as UNKNOWN. Preserving without mutation.
+2026-10-07 11:13:05,358 - falcon.execution_mode_guard - WARNING - EXECUTION_MODE is LIVE but LIVE_EXECUTION_ACKNOWLEDGED is not True. Failing closed to PAPER.
+2026-10-07 11:13:05,359 - falcon.execution_mode_guard - WARNING - EXECUTION_MODE is LIVE but LIVE_EXECUTION_ACKNOWLEDGED is not True. Failing closed to PAPER.
+2026-10-07 11:13:05,447 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:05,626 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/execution/mode
+2026-10-07 11:13:06,088 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/execution/mode - Status: 200 - Time: 0.4621s
+2026-10-07 11:13:06,112 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/execution/mode "HTTP/1.1 200 OK"
+2026-10-07 11:13:06,117 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #2001 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,117 - falcon.signal_authorization_service - INFO - Signal #2001 already has active reservation #1. Returning existing reservation.
+2026-10-07 11:13:06,122 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #2002 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,123 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,123 - falcon.paper_trading_engine - WARNING - Simulate fill failed: Trade #1 is 'OPEN', expected PENDING.
+2026-10-07 11:13:06,128 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #2003 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,128 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,129 - falcon.paper_trading_engine - INFO - [PAPER_CLOSED] Trade #1 CLOSED -> WIN (PnL: +150.00, Realized R: 3.0) @ 1.11500. Reservation released. Real capital cycle untouched.
+2026-10-07 11:13:06,130 - falcon.paper_trading_engine - DEBUG - Trade #1 is in terminal state 'CLOSED'. Ignoring further observation.
+2026-10-07 11:13:06,135 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #2004 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,136 - falcon.paper_trading_engine - WARNING - Simulate fill failed: Trade #1 is 'EXPIRED', expected PENDING.
+2026-10-07 11:13:06,140 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #2005 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,142 - falcon.paper_trading_engine - WARNING - Simulate fill failed: Trade #1 is 'INVALIDATED', expected PENDING.
+2026-10-07 11:13:06,158 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #3000 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,160 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #3001 (EURUSD BUY). Mode: PAPER, Slots: 2/3, Loss After: $10.00/$20.00
+2026-10-07 11:13:06,162 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #3002 (EURUSD BUY). Mode: PAPER, Slots: 3/3, Loss After: $15.00/$20.00
+2026-10-07 11:13:06,163 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:06,164 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:06,166 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:06,167 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:06,168 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:06,176 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #3100 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $8.00/$20.00
+2026-10-07 11:13:06,177 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #3101 (EURUSD BUY). Mode: PAPER, Slots: 2/3, Loss After: $16.00/$20.00
+2026-10-07 11:13:06,179 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade causes aggregate worst-case loss ($24.00) to equal or exceed active trading capital ($20.00) (Live trades: 2/3, Agg Loss: $16.00 + $8.00 vs $20.00)
+2026-10-07 11:13:06,180 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade causes aggregate worst-case loss ($24.00) to equal or exceed active trading capital ($20.00) (Live trades: 2/3, Agg Loss: $16.00 + $8.00 vs $20.00)
+2026-10-07 11:13:06,185 - falcon.signal_authorization_service - DEBUG - Acquired pg_advisory_xact_lock(8882026)
+2026-10-07 11:13:06,191 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #3200 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,192 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #3201 (EURUSD BUY). Mode: PAPER, Slots: 2/3, Loss After: $10.00/$20.00
+2026-10-07 11:13:06,194 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #3202 (EURUSD BUY). Mode: PAPER, Slots: 3/3, Loss After: $15.00/$20.00
+2026-10-07 11:13:06,208 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,209 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #2 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,211 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #3 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,232 - falcon.signal_authorization_service - ERROR - Capital Guardian authorization failed closed: Simulated DB Disk Full
+2026-10-07 11:13:06,236 - falcon.signal_authorization_service - ERROR - Capital Guardian authorization failed closed: Unexpected calculation error
+2026-10-07 11:13:06,242 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #4003 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,243 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,247 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #4004 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,248 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,249 - falcon.paper_trading_engine - INFO - [PAPER_CLOSED] Trade #1 CLOSED -> WIN (PnL: +150.00, Realized R: 3.0) @ 1.11500. Reservation released. Real capital cycle untouched.
+2026-10-07 11:13:06,258 - falcon.signal_authorization_service - ERROR - Capital Guardian authorization failed closed: Transient network drop
+2026-10-07 11:13:06,260 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #4005 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,265 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #4006 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,266 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #4007 (EURUSD BUY). Mode: PAPER, Slots: 2/3, Loss After: $10.00/$20.00
+2026-10-07 11:13:06,267 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #2 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,271 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #5001 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,274 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #5002 (EURUSD BUY). Mode: LIVE, Slots: 2/3, Loss After: $10.00/$20.00
+2026-10-07 11:13:06,276 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #5003 (EURUSD BUY). Mode: LIVE, Slots: 3/3, Loss After: $15.00/$20.00
+2026-10-07 11:13:06,277 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:06,282 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade causes aggregate worst-case loss ($20.00) to equal or exceed active trading capital ($20.00) (Live trades: 1/3, Agg Loss: $15.00 + $5.00 vs $20.00)
+2026-10-07 11:13:06,287 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade causes aggregate worst-case loss ($20.01) to equal or exceed active trading capital ($20.00) (Live trades: 1/3, Agg Loss: $15.00 + $5.01 vs $20.00)
+2026-10-07 11:13:06,297 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #5030 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,298 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #2 for signal #5031 (EURUSD BUY). Mode: PAPER, Slots: 2/3, Loss After: $10.00/$20.00
+2026-10-07 11:13:06,300 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #3 for signal #5032 (EURUSD BUY). Mode: PAPER, Slots: 3/3, Loss After: $15.00/$20.00
+2026-10-07 11:13:06,301 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Maximum simultaneous capital-reserving trades (3) reached (Live trades: 3/3, Agg Loss: $15.00 + $0.00 vs $20.00)
+2026-10-07 11:13:06,303 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #4 for signal #5035 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,312 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade causes aggregate worst-case loss ($25.00) to equal or exceed active trading capital ($20.00) (Live trades: 0/3, Agg Loss: $0.00 + $25.00 vs $20.00)
+2026-10-07 11:13:06,317 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #6001 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,319 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,326 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #6002 (EURUSD SELL). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,328 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD SELL). Status -> OPEN.
+2026-10-07 11:13:06,333 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #6003 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,333 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,334 - falcon.paper_trading_engine - INFO - [PAPER_CLOSED] Trade #1 CLOSED -> LOSS (PnL: -50.00, Realized R: -1.0) @ 1.09500. Reservation released. Real capital cycle untouched.
+2026-10-07 11:13:06,334 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade worst-case loss ($5.00) plus accumulated streak loss ($50.00) equals $55.00, exceeding Falcon's strict maximum loss ceiling ($20.00) (Live trades: 0/3, Agg Loss: $0.00 + $5.00 vs $20.00)
+2026-10-07 11:13:06,608 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #6005 (EURUSD SELL). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,609 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD SELL). Status -> OPEN.
+2026-10-07 11:13:06,610 - falcon.paper_trading_engine - INFO - [PAPER_CLOSED] Trade #1 CLOSED -> LOSS (PnL: -50.00, Realized R: -1.0) @ 1.10500. Reservation released. Real capital cycle untouched.
+2026-10-07 11:13:06,611 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade worst-case loss ($5.00) plus accumulated streak loss ($50.00) equals $55.00, exceeding Falcon's strict maximum loss ceiling ($20.00) (Live trades: 0/3, Agg Loss: $0.00 + $5.00 vs $20.00)
+2026-10-07 11:13:06,668 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #6007 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,669 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,669 - falcon.paper_trading_engine - WARNING - Ambiguous simultaneous SL/TP breach for PAPER trade #1. Resolved fail-closed to LOSS at Stop Loss.
+2026-10-07 11:13:06,670 - falcon.paper_trading_engine - INFO - [PAPER_CLOSED] Trade #1 CLOSED -> LOSS (PnL: -50.00, Realized R: -1.0) @ 1.09500. Reservation released. Real capital cycle untouched.
+2026-10-07 11:13:06,675 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #6008 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,675 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:13:06,680 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #6009 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,681 - falcon.execution_mode_guard - WARNING - Ambiguous execution mode tokens detected in notes: ['LIVE', 'PAPER']. Failing closed to None.
+2026-10-07 11:13:06,682 - falcon.paper_trading_engine - WARNING - Simulate fill failed: Trade #1 is 'EXPIRED', expected PENDING.
+2026-10-07 11:13:06,688 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #6010 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,688 - falcon.execution_mode_guard - WARNING - Ambiguous execution mode tokens detected in notes: ['LIVE', 'PAPER']. Failing closed to None.
+2026-10-07 11:13:06,689 - falcon.paper_trading_engine - WARNING - Simulate fill failed: Trade #1 is 'INVALIDATED', expected PENDING.
+2026-10-07 11:13:06,693 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #7001 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,699 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #7002 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,704 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #7003 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,709 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #7004 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,715 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #7005 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:06,790 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:06,792 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/execution/mode
+2026-10-07 11:13:06,798 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/execution/mode - Status: 200 - Time: 0.0058s
+2026-10-07 11:13:06,801 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/execution/mode "HTTP/1.1 200 OK"
+2026-10-07 11:13:06,807 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:06,810 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/paper/trades
+2026-10-07 11:13:07,047 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/paper/trades - Status: 200 - Time: 0.2363s
+2026-10-07 11:13:07,049 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/paper/trades?limit=2 "HTTP/1.1 200 OK"
+2026-10-07 11:13:07,054 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:07,056 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/divergence
+2026-10-07 11:13:07,146 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/divergence - Status: 200 - Time: 0.0898s
+2026-10-07 11:13:07,148 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/divergence "HTTP/1.1 200 OK"
+2026-10-07 11:13:07,153 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:07,155 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/attribution
+2026-10-07 11:13:07,165 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/attribution - Status: 200 - Time: 0.0094s
+2026-10-07 11:13:07,167 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/attribution "HTTP/1.1 200 OK"
+2026-10-07 11:13:07,172 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:07,175 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/divergence
+2026-10-07 11:13:07,228 - app.core.exceptions - WARNING - Validation error on /api/v1/analytics/divergence: [{'type': 'datetime_from_date_parsing', 'loc': ('query', 'as_of'), 'msg': 'Input should be a valid datetime or date, invalid character in year', 'input': 'invalid-date-format', 'ctx': {'error': 'invalid character in year'}}]
+2026-10-07 11:13:07,228 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/divergence - Status: 422 - Time: 0.0535s
+2026-10-07 11:13:07,231 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/divergence?as_of=invalid-date-format "HTTP/1.1 422 Unprocessable Entity"
+2026-10-07 11:13:07,236 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:07,238 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/execution/mode
+2026-10-07 11:13:07,243 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/execution/mode - Status: 200 - Time: 0.0047s
+2026-10-07 11:13:07,246 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/execution/mode "HTTP/1.1 200 OK"
+2026-10-07 11:13:07,247 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:07,250 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/paper/trades
+2026-10-07 11:13:07,254 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/paper/trades - Status: 200 - Time: 0.0040s
+2026-10-07 11:13:07,256 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/paper/trades "HTTP/1.1 200 OK"
+2026-10-07 11:13:07,257 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:07,259 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/divergence
+2026-10-07 11:13:07,263 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/divergence - Status: 200 - Time: 0.0033s
+2026-10-07 11:13:07,265 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/divergence "HTTP/1.1 200 OK"
+2026-10-07 11:13:07,266 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:07,268 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/attribution
+2026-10-07 11:13:07,272 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/attribution - Status: 200 - Time: 0.0038s
+2026-10-07 11:13:07,275 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/attribution "HTTP/1.1 200 OK"
+2026-10-07 11:13:07,276 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:07,281 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/canonical
+2026-10-07 11:13:09,714 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/canonical - Status: 200 - Time: 2.4325s
+2026-10-07 11:13:09,716 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/canonical "HTTP/1.1 200 OK"
+2026-10-07 11:13:09,717 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-07 11:13:09,719 - app.middleware.logging_middleware - INFO - Incoming request: GET /api/v1/analytics/execution-quality
+2026-10-07 11:13:09,722 - app.middleware.logging_middleware - INFO - Completed response: GET /api/v1/analytics/execution-quality - Status: 200 - Time: 0.0027s
+2026-10-07 11:13:09,724 - httpx - INFO - HTTP Request: GET http://testserver/api/v1/analytics/execution-quality "HTTP/1.1 200 OK"
+2026-10-07 11:13:40,197 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #102 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:13:40,201 - falcon.signal_outcome_resolver - INFO - Signal #102 reached entry price 1.1 -> Activated to OPEN/ACTIVE
+2026-10-07 11:14:02,707 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #102 (EURUSD BUY). Mode: LIVE, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:14:02,711 - falcon.signal_outcome_resolver - INFO - Signal #102 reached entry price 1.1 -> Activated to OPEN/ACTIVE
+2026-10-07 11:18:43,356 - falcon.signal_authorization_service - INFO - [AUTHORIZED] Capital Guardian authorized and reserved trade #1 for signal #6003 (EURUSD BUY). Mode: PAPER, Slots: 1/3, Loss After: $5.00/$20.00
+2026-10-07 11:18:43,357 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
+2026-10-07 11:18:43,357 - falcon.paper_trading_engine - INFO - [PAPER_CLOSED] Trade #1 CLOSED -> LOSS (PnL: -50.00, Realized R: -1.0) @ 1.09500. Reservation released. Real capital cycle untouched.
+2026-10-07 11:18:43,358 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade worst-case loss ($5.00) plus accumulated streak loss ($50.00) equals $55.00, exceeding Falcon's strict maximum loss ceiling ($20.00) (Live trades: 0/3, Agg Loss: $0.00 + $5.00 vs $20.00)
