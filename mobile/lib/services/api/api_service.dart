@@ -617,7 +617,7 @@ class ApiService {
     }
   }
 
-  // ── Pillar 1 & 3 — Falcon AI Co-Pilot, Briefings & SMC Structure ───────
+  // ── Pillar 1 & 3 — Falcon AI Co-Pilot, Briefings & Session Breakouts ───────
 
   /// POST /copilot/query — Ask Falcon AI Co-Pilot a natural language question.
   Future<CopilotQueryResponse> queryCopilot(String query, {String? symbol}) async {
@@ -726,29 +726,27 @@ class ApiService {
     }
   }
 
-  /// GET /smc/structure — Fetch SMC institutional order blocks and fair value gaps.
-  Future<SMCStructureData> getSMCStructure({
+  /// GET /session-breakout/structure — Fetch Session Corridors, Volume Spikes, and Volatility Bands.
+  Future<SessionBreakoutStructureData> getSessionBreakoutStructure({
     String symbol = 'EURUSD',
     String timeframe = '15m',
   }) async {
     final cleanSymbol = symbol.replaceAll('/', '').replaceAll('_', '').replaceAll('-', '').trim().toUpperCase();
-    return _get<SMCStructureData>(
-      '/smc/structure?symbol=$cleanSymbol&timeframe=$timeframe',
-      SMCStructureData.fromJson,
+    return _get<SessionBreakoutStructureData>(
+      '/session-breakout/structure?symbol=$cleanSymbol&timeframe=$timeframe',
+      SessionBreakoutStructureData.fromJson,
       timeoutSecondsOverride: briefingTimeoutSeconds,
     );
   }
 
-  /// GET /smc/conviction — Calculate SMC composite conviction score (0-100%).
-  Future<Map<String, dynamic>> getSMCConviction({
+  /// GET /session-breakout/conviction — Calculate composite conviction score (0-100%).
+  Future<Map<String, dynamic>> getSessionConviction({
     String symbol = 'EURUSD',
     String direction = 'BUY',
-    String? session,
     double? spreadPips,
   }) async {
     final cleanSymbol = symbol.replaceAll('/', '').replaceAll('_', '').replaceAll('-', '').trim().toUpperCase();
-    var url = '$baseUrl/smc/conviction?symbol=$cleanSymbol&direction=$direction';
-    if (session != null) url += '&session=$session';
+    var url = '$baseUrl/session-breakout/conviction?symbol=$cleanSymbol&direction=$direction';
     if (spreadPips != null) url += '&spread_pips=$spreadPips';
     print('Calling: $url');
     try {
@@ -759,11 +757,11 @@ class ApiService {
       if (response.statusCode == 200) {
         return jsonDecode(response.body) as Map<String, dynamic>;
       }
-      throw Exception('SMC conviction error: ${response.statusCode}');
+      throw Exception('Session conviction error: ${response.statusCode}');
     } on TimeoutException {
       throw Exception('Request timed out after $briefingTimeoutSeconds seconds.');
     } catch (e) {
-      throw Exception('SMC conviction fetch failed: $e');
+      throw Exception('Session conviction fetch failed: $e');
     }
   }
 

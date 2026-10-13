@@ -73,6 +73,7 @@ def mem_journal_repo() -> TradeJournalRepository:
     storage = InMemoryTradeJournalStorage()
     repo = TradeJournalRepository.__new__(TradeJournalRepository)
     repo._storage = storage
+    repo.clear()
     return repo
 
 

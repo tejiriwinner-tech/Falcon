@@ -51,3 +51,4 @@ backend/logs/
 *.sqlite
 *.sqlite3
 *.exe
+*.apk

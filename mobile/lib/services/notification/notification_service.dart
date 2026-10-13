@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../models/signal.dart';
 
@@ -120,6 +121,11 @@ class NotificationService {
   }
 
   Future<void> showTradeAlert(Signal signal) async {
+    try {
+      HapticFeedback.heavyImpact();
+      SystemSound.play(SystemSoundType.alert);
+    } catch (_) {}
+
     final isBuy = signal.action.toUpperCase() == 'BUY';
     final emoji = isBuy ? '🟢 BUY' : '🔴 SELL';
     final title = '🦅 FALCON SIGNAL: ${signal.symbol} $emoji';
@@ -129,6 +135,44 @@ class NotificationService {
 
     await showSignalNotification(
       id: signal.id,
+      title: title,
+      body: body,
+      payload: '/signals',
+    );
+  }
+
+  Future<void> showBreakEvenAlert(Signal signal) async {
+    try {
+      HapticFeedback.mediumImpact();
+      SystemSound.play(SystemSoundType.alert);
+    } catch (_) {}
+
+    final title = '🛡️ FALCON RISK-FREE: ${signal.symbol}';
+    final body =
+        'Stop moved to Breakeven @ ${signal.entry}. Position is 100% risk-free!\n'
+        'Initial Target: ${signal.takeProfit}';
+
+    await showSignalNotification(
+      id: signal.id + 100000,
+      title: title,
+      body: body,
+      payload: '/signals',
+    );
+  }
+
+  Future<void> showTargetHitAlert(Signal signal, String targetDesc) async {
+    try {
+      HapticFeedback.heavyImpact();
+      SystemSound.play(SystemSoundType.alert);
+    } catch (_) {}
+
+    final title = '🎯 FALCON TARGET SECURED: ${signal.symbol}';
+    final body =
+        '$targetDesc achieved!\n'
+        'Entry: ${signal.entry} | Banked profit locked into Trade Journal.';
+
+    await showSignalNotification(
+      id: signal.id + 200000,
       title: title,
       body: body,
       payload: '/signals',

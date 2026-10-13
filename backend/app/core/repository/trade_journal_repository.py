@@ -452,7 +452,7 @@ class TradeJournalRepository:
 
     _instance: Optional["TradeJournalRepository"] = None
 
-    def __new__(cls) -> "TradeJournalRepository":
+    def __new__(cls, *args, **kwargs) -> "TradeJournalRepository":
         if cls._instance is None:
             cls._instance = super(TradeJournalRepository, cls).__new__(cls)
             cls._instance._init_storage()
@@ -465,10 +465,14 @@ class TradeJournalRepository:
             else InMemoryTradeJournalStorage()
         )
 
-    def __init__(self) -> None:
+    def __init__(self, storage: Optional[Union[InMemoryTradeJournalStorage, DatabaseTradeJournalStorage]] = None) -> None:
         self._cached_trades: Optional[List[TradeJournalItem]] = None
         self._cached_trades_at: float = 0.0
         self._cache_lock = threading.Lock()
+        if storage is not None:
+            self._storage = storage
+        else:
+            self._init_storage()
 
     def _invalidate_cache(self) -> None:
         with self._cache_lock:

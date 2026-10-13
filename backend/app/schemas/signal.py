@@ -32,6 +32,13 @@ class SignalItem(BaseModel):
     breakevenTrigger: Optional[float] = None
     breakevenPrice: Optional[float] = None
     isBreakeven: bool = False
+    # Multi-Stage Targets & Volatility Runners
+    takeProfit1: Optional[float] = None
+    takeProfit2: Optional[float] = None
+    scaleOutPercentage: Optional[float] = 50.0
+    trailingStopBuffer: Optional[float] = None
+    htfTrendBias: Optional[str] = None
+    atr14: Optional[float] = None
 
 class SignalListResponse(BaseModel):
     signals: List[SignalItem]

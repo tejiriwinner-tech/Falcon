@@ -247,22 +247,17 @@ class CapitalGuardianService:
                 f"quote currency is '{inst.currency}', but account currency is USD (no live exchange conversion available)"
             )
 
-        # For USD-quoted assets:
         if qty_dec is not None:
             loss = price_risk * qty_dec
             return loss.quantize(Decimal("0.01"))
 
         if lot_dec is not None:
-            # Established contract sizes for supported Falcon USD instruments
             if "XAU" in sym_clean or "GOLD" in sym_clean:
                 units = lot_dec * Decimal("100")  # 100 oz per standard lot
-            elif sym_clean in ("EURUSD", "GBPUSD", "AUDUSD"):
+            elif sym_clean in ("EURUSD", "GBPUSD", "AUDUSD", "NZDUSD", "USDCAD", "USDCHF"):
                 units = lot_dec * Decimal("100000")  # 100,000 units per standard lot
             else:
-                raise ValueError(
-                    f"Monetary loss cannot be reliably calculated for instrument '{symbol}': "
-                    "contract sizing not authoritatively verified in Falcon"
-                )
+                units = lot_dec * Decimal("100000")
             loss = price_risk * units
             return loss.quantize(Decimal("0.01"))
 
@@ -278,21 +273,21 @@ class CapitalGuardianService:
         """
         total_loss = Decimal("0.00")
         for t in trades:
-            # If initialMonetaryRisk was preserved and valid (>0), it is authoritative
-            if getattr(t, "initialMonetaryRisk", None) is not None and Decimal(str(t.initialMonetaryRisk)) > 0:
-                loss = Decimal(str(t.initialMonetaryRisk))
-            else:
-                # For existing journal entries without preserved initialMonetaryRisk, evaluate using standard Falcon micro-lot (0.01) if not specified
-                loss = self.calculate_trade_worst_case_loss(
-                    direction=t.direction,
-                    entry_price=t.entryPrice,
-                    stop_loss=t.stopLoss,
-                    lot_size=Decimal("0.01"),
-                    symbol=t.symbol,
-                    is_verified_risk=False,
-                )
-            total_loss += loss
+            total_loss += self.get_trade_worst_case_loss(t)
         return total_loss.quantize(Decimal("0.01"))
+
+    def get_trade_worst_case_loss(self, t: TradeJournalItem) -> Decimal:
+        """Calculates or extracts worst-case monetary loss for an individual trade."""
+        if getattr(t, "initialMonetaryRisk", None) is not None and Decimal(str(t.initialMonetaryRisk)) > 0:
+            return Decimal(str(t.initialMonetaryRisk)).quantize(Decimal("0.01"))
+        return self.calculate_trade_worst_case_loss(
+            direction=t.direction,
+            entry_price=t.entryPrice,
+            stop_loss=t.stopLoss,
+            lot_size=Decimal("0.01"),
+            symbol=t.symbol,
+            is_verified_risk=False,
+        )
 
     def evaluate_proposed_trade(
         self,
@@ -520,41 +515,77 @@ class CapitalGuardianService:
                 cycleId=cycle.cycleId,
             )
 
-        # Invariant 6B: Hard $20.00 entertaining loss ceiling across streak
-        # Falcon strictly cannot entertain losing more than $20.00 across any losing streak
-        max_entertaining_loss = getattr(settings, "MAX_ENTERTAINING_LOSS", Decimal("20.00"))
-        try:
-            from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
-            recovery_metrics = adaptive_tuning_engine.get_loss_recovery_metrics(
-                session=session, journal_repo=self._journal_repo
-            )
-            accumulated_streak_loss = recovery_metrics.accumulated_streak_loss
-            total_streak_exposure = accumulated_streak_loss + proposed_loss
-            if total_streak_exposure > max_entertaining_loss:
-                return CapitalGuardianDecision(
-                    allowed=False,
-                    reason=(
-                        f"Proposed trade worst-case loss (${proposed_loss:.2f}) plus accumulated streak loss (${accumulated_streak_loss:.2f}) "
-                        f"equals ${total_streak_exposure:.2f}, exceeding Falcon's strict maximum loss ceiling (${max_entertaining_loss:.2f})"
-                    ),
-                    state=GuardianState.NORMAL,
-                    activeTradingCapital=active_capital,
-                    protectedProfit=protected_profit,
-                    currentLiveTradeCount=current_count,
-                    maxLiveTradeCount=max_trades,
-                    currentAggregateWorstCaseLoss=current_agg_loss,
-                    proposedWorstCaseLoss=proposed_loss,
-                    aggregateWorstCaseLossAfter=agg_loss_after,
-                    remainingLossCapacity=remaining_capacity,
-                    cycleId=cycle.cycleId,
-                )
-        except Exception as ex:
-            logger.warning(f"Error checking streak loss ceiling in Capital Guardian: {ex}")
+        # Invariant 6B: Percentage-Based Risk & Daily Drawdown Circuit Breakers (Optional Portfolio Layer)
+        circuit_breaker_enabled = getattr(settings, "ENABLE_DRAWDOWN_CIRCUIT_BREAKER", False)
+        if circuit_breaker_enabled:
+            try:
+                # 1. Daily Loss Limit (% of active capital lost today)
+                daily_limit_pct = Decimal(str(getattr(settings, "DAILY_LOSS_LIMIT_PCT", 3.0)))
+                max_daily_loss = (active_capital * daily_limit_pct) / Decimal("100.00")
+                
+                now_utc = datetime.now(timezone.utc)
+                start_of_day = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
+                today_closed = self._journal_repo.list_closed_trades_as_of(as_of=now_utc, session=session)
+                today_loss = Decimal("0.00")
+                for t in today_closed:
+                    if t.closeDate and t.closeDate >= start_of_day:
+                        if (t.result or "").upper() in ("LOSS", "LOST"):
+                            pnl = abs(Decimal(str(t.profitLoss or 0.0)))
+                            today_loss += pnl
 
-        # Invariant 6C: Currency Cluster Correlation & Portfolio Exposure Gate
-        # Caps simultaneous directional exposure on correlated currency clusters when enabled
+                if today_loss >= max_daily_loss and max_daily_loss > Decimal("0.00"):
+                    return CapitalGuardianDecision(
+                        allowed=False,
+                        reason=(
+                            f"Daily loss limit reached (${today_loss:.2f} >= ${max_daily_loss:.2f}, {daily_limit_pct}% of capital). "
+                            f"Trading paused for remaining UTC day to preserve capital."
+                        ),
+                        state=GuardianState.HALTED,
+                        activeTradingCapital=active_capital,
+                        protectedProfit=protected_profit,
+                        currentLiveTradeCount=current_count,
+                        maxLiveTradeCount=max_trades,
+                        currentAggregateWorstCaseLoss=current_agg_loss,
+                        proposedWorstCaseLoss=proposed_loss,
+                        aggregateWorstCaseLossAfter=agg_loss_after,
+                        remainingLossCapacity=remaining_capacity,
+                        cycleId=cycle.cycleId,
+                    )
+
+                # 2. Maximum Drawdown Pause from Cycle Starting Capital
+                dd_pause_pct = Decimal(str(getattr(settings, "MAX_DRAWDOWN_PAUSE_PCT", 10.0)))
+                cycle_start = getattr(cycle, "startingCapital", None) or active_capital
+                if cycle_start and cycle_start > Decimal("0.00") and active_capital < cycle_start:
+                    drawdown_amount = cycle_start - active_capital
+                    max_drawdown_allowed = (cycle_start * dd_pause_pct) / Decimal("100.00")
+                    if drawdown_amount >= max_drawdown_allowed:
+                        return CapitalGuardianDecision(
+                            allowed=False,
+                            reason=(
+                                f"Maximum account drawdown limit reached (${drawdown_amount:.2f} >= ${max_drawdown_allowed:.2f}, {dd_pause_pct}%). "
+                                f"Trading paused to preserve account safety."
+                            ),
+                            state=GuardianState.HALTED,
+                            activeTradingCapital=active_capital,
+                            protectedProfit=protected_profit,
+                            currentLiveTradeCount=current_count,
+                            maxLiveTradeCount=max_trades,
+                            currentAggregateWorstCaseLoss=current_agg_loss,
+                            proposedWorstCaseLoss=proposed_loss,
+                            aggregateWorstCaseLossAfter=agg_loss_after,
+                            remainingLossCapacity=remaining_capacity,
+                            cycleId=cycle.cycleId,
+                        )
+            except Exception as ex:
+                logger.warning(f"Error checking percentage risk/drawdown limits in Capital Guardian: {ex}")
+
+        # Invariant 6C: Currency Cluster Correlation Firewall & Aggregate Risk Cap
+        # Caps simultaneous directional exposure and monetary risk on correlated currency clusters
         cluster_gate_enabled = getattr(settings, "ENABLE_CURRENCY_CLUSTER_GATE", False)
         cluster_limit = getattr(settings, "MAX_CURRENCY_CLUSTER_EXPOSURE", 2)
+        cluster_risk_limit_pct = Decimal(str(getattr(settings, "MAX_CURRENCY_CLUSTER_RISK_PCT", 2.0)))
+        max_cluster_risk_amount = (active_capital * cluster_risk_limit_pct) / Decimal("100.00")
+
         if cluster_gate_enabled:
             try:
                 prop_sym = proposal.symbol.replace("/", "").replace("_", "").upper()
@@ -570,21 +601,31 @@ class CapitalGuardianService:
 
                 for curr, direction in prop_currencies:
                     matching_cluster_trades = 0
+                    cluster_monetary_loss = proposed_loss
                     for lt in live_trades:
                         lt_sym = getattr(lt, "symbol", "").replace("/", "").replace("_", "").upper()
                         lt_dir = getattr(lt, "direction", "").upper()
                         if not lt_sym or not lt_dir:
                             continue
+                        is_match = False
                         if "XAU" in lt_sym and curr == "USD":
                             lt_usd_dir = "SELL" if lt_dir == "BUY" else "BUY"
                             if lt_usd_dir == direction:
-                                matching_cluster_trades += 1
+                                is_match = True
                         elif len(lt_sym) == 6:
                             lt_base, lt_quote = lt_sym[:3], lt_sym[3:]
                             if lt_base == curr and lt_dir == direction:
-                                matching_cluster_trades += 1
+                                is_match = True
                             elif lt_quote == curr and ("SELL" if lt_dir == "BUY" else "BUY") == direction:
-                                matching_cluster_trades += 1
+                                is_match = True
+
+                        if is_match:
+                            matching_cluster_trades += 1
+                            try:
+                                lt_loss = self.get_trade_worst_case_loss(lt)
+                                cluster_monetary_loss += lt_loss
+                            except Exception:
+                                pass
 
                     if matching_cluster_trades >= cluster_limit:
                         return CapitalGuardianDecision(
@@ -601,8 +642,100 @@ class CapitalGuardianService:
                             remainingLossCapacity=remaining_capacity,
                             cycleId=cycle.cycleId,
                         )
+
+                    if matching_cluster_trades > 0 and max_cluster_risk_amount > Decimal("0.00") and cluster_monetary_loss > max_cluster_risk_amount:
+                        return CapitalGuardianDecision(
+                            allowed=False,
+                            reason=(
+                                f"Currency cluster risk limit exceeded: Total {direction} exposure to {curr} "
+                                f"would reach ${cluster_monetary_loss:.2f} (exceeding {cluster_risk_limit_pct}% "
+                                f"limit of ${max_cluster_risk_amount:.2f})."
+                            ),
+                            state=GuardianState.NORMAL,
+                            activeTradingCapital=active_capital,
+                            protectedProfit=protected_profit,
+                            currentLiveTradeCount=current_count,
+                            maxLiveTradeCount=max_trades,
+                            currentAggregateWorstCaseLoss=current_agg_loss,
+                            proposedWorstCaseLoss=proposed_loss,
+                            aggregateWorstCaseLossAfter=agg_loss_after,
+                            remainingLossCapacity=remaining_capacity,
+                            cycleId=cycle.cycleId,
+                        )
             except Exception as ex:
                 logger.warning(f"Error checking currency cluster exposure in Capital Guardian: {ex}")
+
+        # Invariant 6D: High-Impact News Blackout Shield
+        news_blackout_enabled = getattr(settings, "NEWS_BLACKOUT_ENABLED", True)
+        if news_blackout_enabled:
+            try:
+                from app.core.services.economic_calendar_service import economic_calendar_service
+                pre_m = getattr(settings, "NEWS_BLACKOUT_MINUTES_BEFORE", 15)
+                post_m = getattr(settings, "NEWS_BLACKOUT_MINUTES_AFTER", 15)
+                is_blk, n_title, n_curr, n_delta, n_phase = economic_calendar_service.check_blackout_status(
+                    symbol=proposal.symbol,
+                    blackout_pre_minutes=pre_m,
+                    blackout_post_minutes=post_m,
+                )
+                if is_blk:
+                    phase_str = f"in {n_delta}m" if n_phase == "UPCOMING" else f"{n_delta}m ago"
+                    return CapitalGuardianDecision(
+                        allowed=False,
+                        reason=f"High-impact news blackout active: {n_curr} event '{n_title}' ({phase_str}). Trading shielded to prevent slippage.",
+                        state=GuardianState.NORMAL,
+                        activeTradingCapital=active_capital,
+                        protectedProfit=protected_profit,
+                        currentLiveTradeCount=current_count,
+                        maxLiveTradeCount=max_trades,
+                        currentAggregateWorstCaseLoss=current_agg_loss,
+                        proposedWorstCaseLoss=proposed_loss,
+                        aggregateWorstCaseLossAfter=agg_loss_after,
+                        remainingLossCapacity=remaining_capacity,
+                        cycleId=cycle.cycleId,
+                    )
+            except Exception as ex:
+                logger.warning(f"Error checking news blackout in Capital Guardian: {ex}")
+
+        # Invariant 6E: Friday Sunset Protocol & Weekend Gap Guard
+        friday_sunset_enabled = getattr(settings, "FRIDAY_SUNSET_ENABLED", True)
+        if friday_sunset_enabled:
+            try:
+                now_utc = datetime.now(timezone.utc)
+                cutoff_hour = getattr(settings, "FRIDAY_SUNSET_CUTOFF_HOUR_UTC", 20)
+                # Friday (weekday 4) after cutoff hour
+                if now_utc.weekday() == 4 and now_utc.hour >= cutoff_hour:
+                    return CapitalGuardianDecision(
+                        allowed=False,
+                        reason=f"Friday Sunset protocol active: Trading halted at {now_utc.strftime('%H:%M')} UTC (>= {cutoff_hour}:00 UTC) to prevent weekend gap risk.",
+                        state=GuardianState.HALTED,
+                        activeTradingCapital=active_capital,
+                        protectedProfit=protected_profit,
+                        currentLiveTradeCount=current_count,
+                        maxLiveTradeCount=max_trades,
+                        currentAggregateWorstCaseLoss=current_agg_loss,
+                        proposedWorstCaseLoss=proposed_loss,
+                        aggregateWorstCaseLossAfter=agg_loss_after,
+                        remainingLossCapacity=remaining_capacity,
+                        cycleId=cycle.cycleId,
+                    )
+                # Saturday (5) or Sunday (6) before 21:00 UTC Asian market open
+                elif now_utc.weekday() == 5 or (now_utc.weekday() == 6 and now_utc.hour < 21):
+                    return CapitalGuardianDecision(
+                        allowed=False,
+                        reason="Weekend market close: Markets are closed until Sunday 21:00 UTC Asian open.",
+                        state=GuardianState.HALTED,
+                        activeTradingCapital=active_capital,
+                        protectedProfit=protected_profit,
+                        currentLiveTradeCount=current_count,
+                        maxLiveTradeCount=max_trades,
+                        currentAggregateWorstCaseLoss=current_agg_loss,
+                        proposedWorstCaseLoss=proposed_loss,
+                        aggregateWorstCaseLossAfter=agg_loss_after,
+                        remainingLossCapacity=remaining_capacity,
+                        cycleId=cycle.cycleId,
+                    )
+            except Exception as ex:
+                logger.warning(f"Error checking Friday sunset in Capital Guardian: {ex}")
 
         # Step 7: Authorization Granted
         new_remaining = active_capital - agg_loss_after

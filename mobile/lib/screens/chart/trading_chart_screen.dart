@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
@@ -29,24 +30,31 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
   final ApiService _apiService = ApiService();
   late String _activeTimeframe;
   List<CandleData> _candles = [];
-  SMCStructureData? _smcStructure;
+  SessionBreakoutStructureData? _sessionStructure;
   bool _isLoading = true;
   String? _errorMessage;
   Timer? _liveRefreshTimer;
+  Timer? _liveQuoteTimer;
+  double? _livePrice;
 
   @override
   void initState() {
     super.initState();
     _activeTimeframe = widget.initialTimeframe;
     _loadChartData();
-    // Live tick / candle poll every 15 seconds
-    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+    // Fast live tick poll (every 3 seconds) for real-time candle breathing & pulsing marker
+    _liveQuoteTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      if (mounted) _pollLiveQuote();
+    });
+    // History backfill poll (every 20 seconds)
+    _liveRefreshTimer = Timer.periodic(const Duration(seconds: 20), (_) {
       if (mounted) _pollLatestCandle();
     });
   }
 
   @override
   void dispose() {
+    _liveQuoteTimer?.cancel();
     _liveRefreshTimer?.cancel();
     super.dispose();
   }
@@ -64,17 +72,17 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
         limit: 120,
       );
 
-      final smcFuture = _apiService.getSMCStructure(
+      final sessionFuture = _apiService.getSessionBreakoutStructure(
         symbol: widget.symbol,
         timeframe: _activeTimeframe,
-      ).catchError((_) => SMCStructureData.empty(widget.symbol, _activeTimeframe));
+      ).catchError((_) => SessionBreakoutStructureData.empty(widget.symbol, _activeTimeframe));
 
-      final results = await Future.wait([candlesFuture, smcFuture]);
+      final results = await Future.wait([candlesFuture, sessionFuture]);
 
       if (mounted) {
         setState(() {
           _candles = results[0] as List<CandleData>;
-          _smcStructure = results[1] as SMCStructureData;
+          _sessionStructure = results[1] as SessionBreakoutStructureData;
           _isLoading = false;
         });
       }
@@ -106,6 +114,72 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
         });
       }
     } catch (_) {}
+  }
+
+  Future<void> _pollLiveQuote() async {
+    try {
+      final quoteResp = await _apiService.getMarketQuote(widget.symbol);
+      final price = quoteResp.quote.lastPrice;
+      if (price > 0 && mounted) {
+        setState(() {
+          _livePrice = price;
+          _fuseLivePriceIntoActiveCandle(price, tickTime: quoteResp.quote.timestamp);
+        });
+      }
+    } catch (_) {}
+  }
+
+  int _parseTimeframeMinutes(String tf) {
+    final lower = tf.toLowerCase();
+    if (lower.contains('5m')) return 5;
+    if (lower.contains('15m')) return 15;
+    if (lower.contains('30m')) return 30;
+    if (lower.contains('1h')) return 60;
+    if (lower.contains('4h')) return 240;
+    if (lower.contains('1d')) return 1440;
+    return 15;
+  }
+
+  DateTime _normalizeBarBucket(DateTime dt, int minutes) {
+    final utc = dt.toUtc();
+    final bucketMinute = (utc.minute ~/ minutes) * minutes;
+    return DateTime.utc(utc.year, utc.month, utc.day, utc.hour, bucketMinute);
+  }
+
+  void _fuseLivePriceIntoActiveCandle(double price, {DateTime? tickTime}) {
+    if (_candles.isEmpty || price <= 0) return;
+
+    final now = (tickTime ?? DateTime.now()).toUtc();
+    final int tfMinutes = _parseTimeframeMinutes(_activeTimeframe);
+    final currentBucket = _normalizeBarBucket(now, tfMinutes);
+    final last = _candles.last;
+
+    if (currentBucket.isAfter(last.barTime)) {
+      // New candle interval has begun — instantiate new active candle
+      _candles.add(CandleData(
+        symbol: widget.symbol,
+        timeframe: _activeTimeframe,
+        barTime: currentBucket,
+        open: last.close,
+        high: math.max(last.close, price),
+        low: math.min(last.close, price),
+        close: price,
+        volume: 100.0,
+      ));
+    } else {
+      // Still inside current candle interval — expand wicks & breathe body live
+      final updatedCandle = CandleData(
+        symbol: widget.symbol,
+        timeframe: _activeTimeframe,
+        barTime: last.barTime,
+        open: last.open,
+        high: math.max(last.high, price),
+        low: math.min(last.low, price),
+        close: price,
+        volume: (last.volume ?? 100.0) + 1.0,
+      );
+      _candles[_candles.length - 1] = updatedCandle;
+    }
   }
 
   void _onTimeframeChanged(String tf) {
@@ -175,6 +249,30 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Weekend Standby Notice
+            if (DateTime.now().toUtc().weekday == 6 ||
+                (DateTime.now().toUtc().weekday == 7 && DateTime.now().toUtc().hour < 21))
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                color: const Color(0xFFF59E0B).withValues(alpha: 0.15),
+                child: const Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.lock_clock_rounded, size: 14, color: Color(0xFFF59E0B)),
+                    SizedBox(width: 6),
+                    Text(
+                      'WEEKEND STANDBY • Live Analysis Active • Market Reopens Sun 21:00 UTC',
+                      style: TextStyle(
+                        color: Color(0xFFF59E0B),
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
             // Conviction & Strategy Banner if opened from a Signal
             if (widget.convictionScore != null || widget.tradeOverlay != null)
               _buildSetupHeader(isDark),
@@ -189,7 +287,7 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
                           CircularProgressIndicator(strokeWidth: 2.5),
                           SizedBox(height: 12),
                           Text(
-                            'Loading Institutional Liquidity & SMC Data...',
+                            'Loading Session Corridors & Volatility Envelopes...',
                             style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
                           ),
                         ],
@@ -229,9 +327,10 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
                         )
                       : InteractiveTradingChart(
                           candles: _candles,
-                          smcStructure: _smcStructure,
+                          sessionStructure: _sessionStructure,
                           tradeOverlay: widget.tradeOverlay,
                           activeTimeframe: _activeTimeframe,
+                          livePrice: _livePrice,
                           onTimeframeChanged: _onTimeframeChanged,
                           onRefresh: _loadChartData,
                         ),

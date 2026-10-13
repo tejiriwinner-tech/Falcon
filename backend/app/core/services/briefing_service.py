@@ -161,14 +161,10 @@ class BriefingService:
                 "asian_low": eur_low,
                 "asian_midpoint": eur_mid,
                 "range_pips": eur_range_pips,
-                "bullish_order_block": [round(eur_low - 0.0006, 4), eur_low],
-                "bearish_order_block": [eur_high, round(eur_high + 0.0007, 4)],
-                "fair_value_gap": [round(eur_low + 0.0005, 4), round(eur_low + 0.0012, 4)],
-                "liquidity_pools": {
-                    "BSL": round(eur_high + 0.0008, 4),
-                    "SSL": round(eur_low - 0.0010, 4),
-                },
-                "tactical_bias": "BULLISH_REVERSAL_POST_SWEEP",
+                "london_breakout_target": round(eur_high + (eur_range_pips * 0.0001 * 1.5), 4),
+                "invalidation_level": round(eur_low - 0.0008, 4),
+                "volatility_reversion_floor": round(eur_low - 0.0015, 4),
+                "tactical_bias": "BULLISH_SESSION_EXPANSION",
             },
             "GBP/USD": {
                 "current_price": gbp_ref,
@@ -176,14 +172,10 @@ class BriefingService:
                 "asian_low": gbp_low,
                 "asian_midpoint": gbp_mid,
                 "range_pips": gbp_range_pips,
-                "bullish_order_block": [round(gbp_low - 0.0008, 4), gbp_low],
-                "bearish_order_block": [gbp_high, round(gbp_high + 0.0009, 4)],
-                "fair_value_gap": [round(gbp_low + 0.0010, 4), round(gbp_low + 0.0018, 4)],
-                "liquidity_pools": {
-                    "BSL": round(gbp_high + 0.0010, 4),
-                    "SSL": round(gbp_low - 0.0012, 4),
-                },
-                "tactical_bias": "BULLISH_EXPANSION",
+                "london_breakout_target": round(gbp_high + (gbp_range_pips * 0.0001 * 1.5), 4),
+                "invalidation_level": round(gbp_low - 0.0010, 4),
+                "volatility_reversion_floor": round(gbp_low - 0.0020, 4),
+                "tactical_bias": "BULLISH_LONDON_EXPANSION",
             },
             "XAU/USD": {
                 "current_price": gold_ref,
@@ -192,14 +184,10 @@ class BriefingService:
                 "asian_midpoint": gold_mid,
                 "range_dollars": gold_range_dollars,
                 "range_pips": gold_range_pips,
-                "bullish_order_block": [round(gold_low - 2.50, 2), gold_low],
-                "bearish_order_block": [gold_high, round(gold_high + 3.00, 2)],
-                "fair_value_gap": [round(gold_low + 3.50, 2), round(gold_low + 6.00, 2)],
-                "liquidity_pools": {
-                    "BSL": round(gold_high + 2.00, 2),
-                    "SSL": round(gold_low - 2.50, 2),
-                },
-                "tactical_bias": "SNIPER_LONGS_DISCOUNT",
+                "london_breakout_target": round(gold_high + (gold_range_dollars * 1.5), 2),
+                "invalidation_level": round(gold_low - 3.00, 2),
+                "volatility_reversion_floor": round(gold_low - 6.00, 2),
+                "tactical_bias": "SESSION_VOLUME_BREAKOUT",
             },
         }
 
@@ -226,9 +214,9 @@ class BriefingService:
 
         # ── 4. Key Insights & Top 3 Watchpoints ──────────────────────────────
         watchpoints = [
-            f"Judas Swing (07:00–08:30 UTC): Watch for false-break sweep of Asian Low on GBP/USD ({gbp_low}) and EUR/USD ({eur_low}) into Bullish OB before true London expansion.",
-            f"Gold (XAU/USD) Discount Mitigation: Asian range ${gold_range_dollars:.2f} established. Focus on M15 Bullish FVG (${gold_low + 3.5:.2f}–${gold_low + 6.0:.2f}) with M5 CHoCH entry confirmation.",
-            f"Macro Volatility Defense: High-impact USD catalysts today. Active recovery multiplier is {loss_metrics.profit_recovery_multiplier:.1f}x with ${float(headroom):.2f} headroom remaining under the $20 ceiling.",
+            f"London Open Momentum (07:00–09:30 UTC): Watch for volume expansion breakouts above Asian High on GBP/USD ({gbp_high}) and EUR/USD ({eur_high}) with RVol >= 1.8x confirmation.",
+            f"Gold (XAU/USD) Volume Expansion: Asian corridor established (${gold_low:.2f}–${gold_high:.2f}, ${gold_range_dollars:.2f} range). Invalidation below ${gold_low - 3.0:.2f} with 1.5x expansion target at ${gold_high + (gold_range_dollars * 1.5):.2f}.",
+            f"Statistical Volatility Exhaustion: Keltner 2.5σ bands actively monitoring overstretched momentum. Active recovery multiplier is {loss_metrics.profit_recovery_multiplier:.1f}x with ${float(headroom):.2f} headroom remaining under the $20 ceiling.",
         ]
 
         # ── 5. Formatted Text for Telegram / Mobile ──────────────────────────
@@ -238,21 +226,18 @@ class BriefingService:
         formatted_text = f"""🦅 **FALCON INTELLIGENCE BRIEFING: LONDON OPEN** 🇬🇧
 *Generated: {timestamp_str} UTC*
 
-📊 **Asian Session Ranges & Key Levels**:
+📊 **Asian Session Ranges & Breakout Targets**:
 • **EUR/USD**: Asian Range `{eur_low:.4f} – {eur_high:.4f}` ({eur_range_pips} pips) | Mid: `{eur_mid:.4f}`
-  - Bullish OB: `{eur_low - 0.0006:.4f} – {eur_low:.4f}` | Bearish OB: `{eur_high:.4f} – {eur_high + 0.0007:.4f}`
-  - Liquidity: BSL @ `{eur_high + 0.0008:.4f}` | SSL @ `{eur_low - 0.0010:.4f}`
-  - Tactical Bias: **Bullish Reversal post-Asian SSL Sweep**
+  - London Breakout Target: `{eur_high + (eur_range_pips * 0.0001 * 1.5):.4f}` | Invalidation: `{eur_low - 0.0008:.4f}`
+  - Tactical Bias: **Bullish Session Expansion with RVol >= 1.8x**
 
 • **GBP/USD**: Asian Range `{gbp_low:.4f} – {gbp_high:.4f}` ({gbp_range_pips} pips) | Mid: `{gbp_mid:.4f}`
-  - Bullish OB: `{gbp_low - 0.0008:.4f} – {gbp_low:.4f}` | Bearish OB: `{gbp_high:.4f} – {gbp_high + 0.0009:.4f}`
-  - Liquidity: BSL @ `{gbp_high + 0.0010:.4f}` | SSL @ `{gbp_low - 0.0012:.4f}`
+  - London Breakout Target: `{gbp_high + (gbp_range_pips * 0.0001 * 1.5):.4f}` | Invalidation: `{gbp_low - 0.0010:.4f}`
   - Tactical Bias: **Bullish London Open Expansion**
 
 • **XAU/USD (Gold)**: Asian Range `${gold_low:.2f} – ${gold_high:.2f}` (${gold_range_dollars:.2f}) | Mid: `${gold_mid:.2f}`
-  - Bullish OB: `${gold_low - 2.5:.2f} – ${gold_low:.2f}` | M15 FVG: `${gold_low + 3.5:.2f} – ${gold_low + 6.0:.2f}`
-  - Liquidity: BSL @ `${gold_high + 2.0:.2f}` | SSL @ `${gold_low - 2.5:.2f}`
-  - Tactical Bias: **Sniper Longs from Discount OB Mitigation**
+  - Expansion Target: `${gold_high + (gold_range_dollars * 1.5):.2f}` | Invalidation: `${gold_low - 3.0:.2f}`
+  - Tactical Bias: **Session Volume Breakout & Volatility Reversion**
 
 ⚡ **Top 3 Watchpoints**:
 1. {watchpoints[0]}
@@ -270,7 +255,7 @@ class BriefingService:
         return IntelligenceBriefing(
             briefing_type=BriefingType.LONDON_OPEN,
             title="Falcon London Open Intelligence Briefing",
-            summary=f"Asian session ranges established across EUR/USD ({eur_range_pips}p), GBP/USD ({gbp_range_pips}p), and Gold (${gold_range_dollars}). Prime setups aligned with London liquidity sweep into institutional order blocks.",
+            summary=f"Asian session ranges established across EUR/USD ({eur_range_pips}p), GBP/USD ({gbp_range_pips}p), and Gold (${gold_range_dollars}). Prime setups aligned with London session breakout and multi-timeframe volume expansion.",
             market_levels=market_levels,
             key_insights=watchpoints,
             risk_state=risk_state,

@@ -11,7 +11,7 @@ Implements institutional and price-action patterns based on:
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Union
 
 
 class PatternType(str, Enum):
@@ -53,7 +53,8 @@ class CandleBar:
     low: float
     close: float
     volume: float = 0.0
-    timestamp: Optional[int] = None
+    timestamp: Optional[Union[int, float]] = None
+    time: Optional[Any] = None
 
     @property
     def body(self) -> float:

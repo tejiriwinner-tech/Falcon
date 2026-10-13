@@ -14,12 +14,13 @@ from app.core.repository.signal_signature_repository import (
 )
 from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine, LossRecoveryMetrics
 from app.core.engines.strategy_engine import StrategyEngine
-from app.core.services.signal_authorization_service import signal_authorization_service
+from app.core.config import settings
 from app.schemas.decision_artifact import DecisionArtifact, DecisionStatus
 from app.schemas.execution_order import ExecutionSettings
 from app.schemas.signal_candidate import SignalCandidate, CandidateStatus, CandidateDirection
 from app.schemas.signal import SignalItem, SignalListResponse
 from app.schemas.trade_journal import TradeJournalCreate
+from app.core.services.signal_authorization_service import signal_authorization_service
 
 
 
@@ -48,7 +49,7 @@ def canonical_signal_signature(
 class SignalService:
     """
     Curates, ranks, and serves high-conviction sniper trading signals.
-    Enforces quality, authentic SMC price triggers, and complete lifecycle deduplication:
+    Enforces quality, authentic session breakout & volume triggers, and complete lifecycle deduplication:
     - Filters out low confidence (< 80%) and unconfirmed setups.
     - HOLD: Setup is on watchlist awaiting live market price to touch canonical entry.
     - ACTIVE: Live market touched entry price. Holds until TP or SL is hit (no 3-slot active cap).
@@ -136,6 +137,40 @@ class SignalService:
                     pass
 
                 live_px_str = f" | Current Market: {cur_live_px:.4f}" if cur_live_px else ""
+                from app.core.engines.session_breakout_engine import session_breakout_engine
+                from app.core.engines.candlestick_pattern_engine import CandleBar
+                from app.core.services.market_history_service import market_history_service
+
+                raw_candles = []
+                try:
+                    sym_clean = ot.symbol.replace("/", "")
+                    p_bars = market_history_service.get_bars(sym_clean, timeframe="1h", limit=50)
+                    raw_candles = [
+                        CandleBar(
+                            open=b.open,
+                            high=b.high,
+                            low=b.low,
+                            close=b.close,
+                            volume=b.volume or 0.0,
+                            timestamp=int(b.bar_time.timestamp()) if hasattr(b.bar_time, "timestamp") else None,
+                            time=b.bar_time,
+                        )
+                        for b in p_bars
+                    ]
+                except Exception:
+                    raw_candles = []
+
+                ot_dir_val = ot.direction.upper()
+                _, ot_tp1, ot_tp2, ot_trail_buf, ot_atr = session_breakout_engine.calculate_trade_levels(
+                    symbol=ot.symbol,
+                    direction=ot_dir_val,
+                    entry_price=ot.entryPrice,
+                    candles=raw_candles,
+                    structure_sl=ot.stopLoss,
+                    take_profit=ot.takeProfit,
+                )
+                ot_htf_bias, _, _ = session_breakout_engine.compute_htf_trend_bias(ot.symbol, raw_candles)
+
                 active_signal = SignalItem(
                     id=ot.signalId or ot.id,
                     symbol=ot.symbol,
@@ -146,7 +181,7 @@ class SignalService:
                     confidence=ot.confidence or 85,
                     timeframe=ot.timeframe or "M15",
                     status="ACTIVE",
-                    analysis=f"🎯 RUNNING (LIVE) [{ot.notes or 'Falcon Trade'}]: Live position active from entry {ot.entryPrice:.4f}{live_px_str}. Holding until Take Profit ({ot.takeProfit:.4f}) or Stop Loss ({ot.stopLoss:.4f}). Expiration disabled.",
+                    analysis=f"🎯 RUNNING (LIVE) [{ot.notes or 'Falcon Trade'}]: Live position active from entry {ot.entryPrice:.4f}{live_px_str}. TP1: {ot_tp1} (50% Bank) | TP2: {ot_tp2} (Runner) | Macro Bias: {ot_htf_bias}.",
                     timestamp=ot.tradeDate,
                     strategyId=ot.strategyId or "falcon-opt",
                     strategyName=ot.notes or "Falcon Strategy",
@@ -154,12 +189,18 @@ class SignalService:
                     dataAgeSeconds=0,
                     triggerCondition=f"Enter {ot.direction.upper()} at {ot.entryPrice:.4f}",
                     validUntil=ot.tradeDate + timedelta(hours=48),
-                    setupPattern=ot.notes or "Sniper Setup",
+                    setupPattern=ot.notes or ot.strategyId or "Falcon Trade",
                     riskReward=ot.riskReward,
                     isPinned=True,
                     breakevenTrigger=round(be_trig, dec),
                     breakevenPrice=round(ot.entryPrice, dec),
                     isBreakeven=False,
+                    takeProfit1=ot_tp1,
+                    takeProfit2=ot_tp2,
+                    scaleOutPercentage=50.0,
+                    trailingStopBuffer=ot_trail_buf,
+                    htfTrendBias=ot_htf_bias,
+                    atr14=ot_atr,
                 )
                 signals.append(active_signal)
 
@@ -238,7 +279,7 @@ class SignalService:
                     dataAgeSeconds=0,
                     triggerCondition="Trade Completed",
                     validUntil=ct.closeDate,
-                    setupPattern=ct.notes or "Sniper Setup",
+                    setupPattern=ct.notes or ct.strategyId or "Falcon Trade",
                     riskReward=ct.riskReward,
                     isPinned=False,
                     breakevenTrigger=round(be_trig, dec),
@@ -252,14 +293,14 @@ class SignalService:
         # Step 2: Ingest candidate setups from recent missions
         missions = None
         try:
-            missions = mission_repository.get_recent_missions(limit=mission_limit)
+            all_m = mission_repository.get_all_missions()
+            if all_m:
+                missions = all_m[-mission_limit:]
         except Exception:
             missions = None
         if not missions:
             try:
-                all_m = mission_repository.get_all_missions()
-                if all_m:
-                    missions = all_m[-mission_limit:]
+                missions = mission_repository.get_recent_missions(limit=mission_limit)
             except Exception:
                 missions = []
 
@@ -370,7 +411,10 @@ class SignalService:
                             q_data = cached_entry.data
                             if getattr(q_data, "lastPrice", None):
                                 cur_px = q_data.lastPrice
-                                quote_age_s = cached_entry.age_seconds
+                                try:
+                                    quote_age_s = float(cached_entry.age_seconds)
+                                except (TypeError, ValueError):
+                                    quote_age_s = 0.0
                             if isinstance(q_data, MarketQuote):
                                 quote_resp = MarketQuoteResponse(quote=q_data)
 
@@ -379,10 +423,20 @@ class SignalService:
                         resp = pm.get_market_quote(raw_sym)
                         if resp and resp.quote and resp.quote.lastPrice:
                             cur_px = resp.quote.lastPrice
-                            quote_age_s = getattr(resp.quote, "freshnessSeconds", 0.0) or 0.0
+                            raw_freshness = getattr(resp.quote, "freshnessSeconds", 0.0)
+                            try:
+                                quote_age_s = float(raw_freshness) if raw_freshness is not None else 0.0
+                            except (TypeError, ValueError):
+                                quote_age_s = 0.0
                             quote_resp = resp
                 except Exception:
                     pass
+
+                if cur_px is not None:
+                    try:
+                        cur_px = float(cur_px)
+                    except (TypeError, ValueError):
+                        cur_px = None
 
                 # Proximity band: 1.0 to 1.5 pips (0.00015 for 4-digit Forex, 0.50 for Gold)
                 pip_tolerance = 0.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.00015
@@ -498,10 +552,9 @@ class SignalService:
                         try:
                             exit_px = cand.takeProfit if hit_tp else cand.stopLoss
                             actual_exit = cur_px if cur_px is not None and cur_px > 0 else exit_px
-                            risk_dist = abs(cand.entryPrice - cand.stopLoss)
-                            pnl_dist = (actual_exit - cand.entryPrice) if direction_str.upper() == "BUY" else (cand.entryPrice - actual_exit)
-                            pnl_amount = round(pnl_dist * 100000, 2)
-                            r_multiple = round(pnl_dist / risk_dist, 2) if risk_dist > 0 else (1.5 if outcome == "WON" else -1.0)
+                            from app.core.analytics.trading_math import pnl_usd as _pnl_usd, realized_r as _realized_r
+                            pnl_amount = _pnl_usd(symbol, direction_str, cand.entryPrice, actual_exit, float(lot_size or 0.01))
+                            r_multiple = _realized_r(direction_str, cand.entryPrice, cand.stopLoss, actual_exit)
                             if outcome == "BREAKEVEN":
                                 pnl_amount = 0.0
                                 r_multiple = 0.0
@@ -547,7 +600,7 @@ class SignalService:
                                         entryPrice=cand.entryPrice,
                                         stopLoss=cand.stopLoss,
                                         takeProfit=cand.takeProfit,
-                                        timeframe=cand.timeframe or "M15",
+                                        timeframe=getattr(cand, "timeframe", None) or "M15",
                                         marketSession="London" if "London" in (cand.strategyName or "") else "New York",
                                         tradeDate=cand.generatedAt or now,
                                         closeDate=now,
@@ -580,14 +633,15 @@ class SignalService:
                 shield_reason = None
                 if not is_already_active:
                     # 1. Economic Calendar News Blackout Check
-                    try:
-                        from app.core.services.economic_calendar_service import economic_calendar_service
-                        is_blk, n_title, n_curr, n_delta, n_phase = economic_calendar_service.check_blackout_status(symbol)
-                        if is_blk:
-                            phase_str = f"in {n_delta}m" if n_phase == "UPCOMING" else f"{n_delta}m ago"
-                            shield_reason = f"NEWS BLACKOUT: {n_curr} High-Impact event '{n_title}' {phase_str}. Capital shield active."
-                    except Exception as ex:
-                        logger.debug(f"News blackout shield check error: {ex}")
+                    if getattr(settings, "NEWS_BLACKOUT_ENABLED", False):
+                        try:
+                            from app.core.services.economic_calendar_service import economic_calendar_service
+                            is_blk, n_title, n_curr, n_delta, n_phase = economic_calendar_service.check_blackout_status(symbol)
+                            if is_blk:
+                                phase_str = f"in {n_delta}m" if n_phase == "UPCOMING" else f"{n_delta}m ago"
+                                shield_reason = f"NEWS BLACKOUT: {n_curr} High-Impact event '{n_title}' {phase_str}. Capital shield active."
+                        except Exception as ex:
+                            logger.debug(f"News blackout shield check error: {ex}")
 
                     # 2. Dynamic, Volatility-Adjusted Spread Protection
                     if not shield_reason:
@@ -621,7 +675,7 @@ class SignalService:
                             cand_reasons = getattr(cand, "reasons", [])
                             for r in cand_reasons:
                                 t_desc = (getattr(r, "title", "") + " " + getattr(r, "description", "")).lower()
-                                if any(k in t_desc for k in ["counter-trend", "against 4h", "against 1h", "bearish 4h ob", "bullish 4h ob"]):
+                                if any(k in t_desc for k in ["counter-trend", "against 4h", "against 1h", "session corridor resistance", "volatility exhaustion"]):
                                     if getattr(cand, "confidence", 80) < 85:
                                         shield_reason = "MTF FILTER: Counter-trend setup against higher-timeframe order flow requires >= 85% conviction."
                                         break
@@ -673,7 +727,7 @@ class SignalService:
                                     entryPrice=cand.entryPrice,
                                     stopLoss=cand.stopLoss,
                                     takeProfit=cand.takeProfit,
-                                    timeframe=cand.timeframe or "M15",
+                                    timeframe=getattr(cand, "timeframe", None) or "M15",
                                     marketSession="London" if "London" in (cand.strategyName or "") else "New York",
                                     tradeDate=now,
                                     status="OPEN",
@@ -802,6 +856,42 @@ class SignalService:
         stop_loss = candidate.stopLoss
         take_profit = candidate.takeProfit
 
+        # Breakthrough Advancements:
+        # Dynamic ATR Stop Loss & Multi-Stage Scale-Out Targets (TP1: 50% @ 1.5R, TP2: Trailing Runner @ 3.0R)
+        from app.core.engines.session_breakout_engine import session_breakout_engine
+        from app.core.engines.candlestick_pattern_engine import CandleBar
+        from app.core.services.market_history_service import market_history_service
+
+        cand_candles = []
+        try:
+            cand_sym_clean = candidate.symbol.replace("/", "")
+            c_bars = market_history_service.get_bars(cand_sym_clean, timeframe="1h", limit=50)
+            cand_candles = [
+                CandleBar(
+                    open=b.open,
+                    high=b.high,
+                    low=b.low,
+                    close=b.close,
+                    volume=b.volume or 0.0,
+                    timestamp=int(b.bar_time.timestamp()) if hasattr(b.bar_time, "timestamp") else None,
+                    time=b.bar_time,
+                )
+                for b in c_bars
+            ]
+        except Exception:
+            cand_candles = []
+
+        cand_dir = direction_val
+        dyn_sl, tp1, tp2, trail_buf, atr_val = session_breakout_engine.calculate_trade_levels(
+            symbol=candidate.symbol,
+            direction=cand_dir,
+            entry_price=entry_price,
+            candles=cand_candles,
+            structure_sl=stop_loss,
+            take_profit=take_profit,
+        )
+        htf_bias, _, _ = session_breakout_engine.compute_htf_trend_bias(candidate.symbol, cand_candles)
+
         # Calculate Breakeven targets (1:1 Risk-Reward threshold for risk-free protection)
         risk_dist = abs(entry_price - stop_loss)
         if direction_val == "BUY":
@@ -812,7 +902,13 @@ class SignalService:
 
         # Determine if live market has already achieved Breakeven
         is_breakeven = False
-        current_px = current_market_px or entry_price
+        try:
+            current_px = float(current_market_px) if current_market_px is not None else float(entry_price)
+        except (TypeError, ValueError):
+            try:
+                current_px = float(entry_price)
+            except (TypeError, ValueError):
+                current_px = None
         if current_px is not None and current_px > 0:
             if direction_val == "BUY" and current_px >= be_trigger:
                 is_breakeven = True
@@ -839,8 +935,10 @@ class SignalService:
         else:
             status = "HOLD"
 
+        targets_str = f"TP1: {tp1:.4f} (50% Bank @ 1.5R) | TP2: {tp2:.4f} (Runner) | Macro Bias: {htf_bias}"
+
         if status == "ACTIVE":
-            trigger_rule = f"[MARKET EXECUTION - ENTER NOW] [ACTIVE IN POSITION] Price touched entry at {entry_price:.4f}. Holding until Take Profit ({take_profit:.4f}) or Stop Loss ({stop_loss:.4f})."
+            trigger_rule = f"[MARKET EXECUTION - ENTER NOW] [ACTIVE IN POSITION] Price touched entry at {entry_price:.4f}. {targets_str}."
             be_status_text = " [🛡️ BREAKEVEN LOCKED]" if is_breakeven else ""
             analysis = (
                 f"🎯 SNIPER SIGNAL ACTIVE [{setup_pattern}]{rec_badge}{be_status_text}: "
@@ -857,7 +955,7 @@ class SignalService:
             analysis = (
                 f"⏳ WATCHLIST WAITING [{setup_pattern}]: "
                 f"{guard_text}{spread_val}"
-                f"Awaiting Capital Guardian clearance and entry trigger. "
+                f"Awaiting Capital Guardian clearance and entry trigger. {targets_str}. "
                 f"Do not enter MT5 order until status turns ACTIVE."
             )
         elif status == "HOLD":
@@ -866,7 +964,7 @@ class SignalService:
                 f"⏳ WATCHLIST HOLD [{setup_pattern}]: "
                 f"Awaiting market entry touch at {entry_price:.4f}. Current market: {current_px:.4f}. "
                 f"SL: {stop_loss:.4f} | TP: {take_profit:.4f} (1:{candidate.riskReward:.1f} R:R). "
-                f"{spread_val}"
+                f"{targets_str}. {spread_val}"
                 f"Valid for 1h on watchlist. Do not enter MT5 order until status turns ACTIVE."
             )
         elif status == "EXPIRED":
@@ -916,6 +1014,12 @@ class SignalService:
             breakevenTrigger=be_trigger,
             breakevenPrice=be_price,
             isBreakeven=is_breakeven,
+            takeProfit1=tp1,
+            takeProfit2=tp2,
+            scaleOutPercentage=50.0,
+            trailingStopBuffer=trail_buf,
+            htfTrendBias=htf_bias,
+            atr14=atr_val,
         )
 
     @staticmethod

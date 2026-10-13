@@ -253,6 +253,55 @@ class SignalOutcomeResolver:
 
         # Step 1: Query ALL currently OPEN and PENDING trades from the database
         all_stored_trades = trade_journal_repository.list_trades(session=session)
+
+        # Ingest any actionable active signals from signal_service as PENDING watchlist records
+        try:
+            sig_resp = signal_service.build_signals()
+            sigs = getattr(sig_resp, "signals", []) if sig_resp else []
+            for s in sigs:
+                s_id = getattr(s, "id", None)
+                s_st = (getattr(s, "status", "") or "").upper()
+                s_act = (getattr(s, "action", "") or "").upper()
+                if s_id and s_act in ("BUY", "SELL") and s_st in ("ACTIVE", "GENERATED"):
+                    if not any(t.signalId == s_id for t in all_stored_trades):
+                        s_sym = getattr(s, "symbol", "")
+                        s_hour = now.hour
+                        if 0 <= s_hour < 7:
+                            s_session = "Asian"
+                        elif 7 <= s_hour < 12:
+                            s_session = "London"
+                        elif 12 <= s_hour < 16:
+                            s_session = "NY_Overlap"
+                        elif 16 <= s_hour < 21:
+                            s_session = "New York"
+                        else:
+                            s_session = "Asian"
+
+                        new_t = trade_journal_repository.create_trade(
+                            TradeJournalCreate(
+                                signalId=s_id,
+                                strategyId=getattr(s, "strategyId", "strat") or "strat",
+                                symbol=s_sym,
+                                direction=s_act,
+                                entryPrice=float(getattr(s, "entry", 0.0)),
+                                stopLoss=float(getattr(s, "stopLoss", 0.0)),
+                                takeProfit=float(getattr(s, "takeProfit", 0.0)),
+                                timeframe=getattr(s, "timeframe", "H1") or "H1",
+                                marketSession=s_session,
+                                tradeDate=getattr(s, "timestamp", now) or now,
+                                status="PENDING",
+                                result="PENDING",
+                                fillPrice=None,
+                                fillTime=None,
+                                confidence=getattr(s, "confidence", 80) or 80,
+                                reasonForEntry=getattr(s, "triggerCondition", "Falcon Signal Execution"),
+                            ),
+                            session=session,
+                        )
+                        all_stored_trades.append(new_t)
+        except Exception as ex:
+            logger.debug(f"Signal ingestion in resolver: {ex}")
+
         active_trades = [
             t for t in all_stored_trades
             if (t.status or "").upper() in ("OPEN", "PENDING", "FILLED")
@@ -274,21 +323,21 @@ class SignalOutcomeResolver:
             elapsed_seconds = (now - t_date).total_seconds()
 
             # -------------------------------------------------------------
-            # Case 1: PENDING / HOLD Watchlist Lifecycle (1h Expiration & Live Entry Hit Activation)
+            # Case 1: PENDING Reservations (Section 6)
             # -------------------------------------------------------------
             if trade_status in ("PENDING", "HOLD", "WAITING"):
-                # Expiration: 1 hour (60 minutes) elapsed on watchlist without hitting entry price
-                if elapsed_seconds > 60 * 60:
+                # Expiration: 45 minutes elapsed without fill
+                if elapsed_seconds > 45 * 60:
                     trade_update = TradeJournalUpdate(
                         status="EXPIRED",
                         result="EXPIRED",
                         closeDate=now,
-                        reasonForExit="Signal validity window (1h) elapsed on watchlist without hitting entry price",
-                        notes=f"{trade.notes or 'Falcon'} | Auto-expired from watchlist after 1h",
+                        reasonForExit="Reservation expired: 45m elapsed without fill",
+                        notes=f"{trade.notes or 'Falcon'} | Auto-expired unexecuted reservation after 45m",
                     )
                     trade_journal_repository.update_trade(trade.id, trade_update, session=session)
                     resolved_count += 1
-                    logger.info(f"Expired unexecuted watchlist signal #{trade.id} (Signal #{trade.signalId}) after 1h")
+                    logger.info(f"Expired unexecuted PENDING reservation #{trade.id} (Signal #{trade.signalId})")
                     continue
 
                 # Authoritative market data check
@@ -316,11 +365,12 @@ class SignalOutcomeResolver:
 
                     # Check if live price hit entry price
                     entry_hit = False
+                    entry_tolerance = trade.entryPrice * 0.0003
                     if trade.direction.upper() == "BUY":
-                        if cur_px <= trade.entryPrice or abs(cur_px - trade.entryPrice) <= (trade.entryPrice * 0.0003):
+                        if cur_px <= trade.entryPrice or abs(cur_px - trade.entryPrice) <= entry_tolerance:
                             entry_hit = True
                     elif trade.direction.upper() == "SELL":
-                        if cur_px >= trade.entryPrice or abs(cur_px - trade.entryPrice) <= (trade.entryPrice * 0.0003):
+                        if cur_px >= trade.entryPrice or abs(cur_px - trade.entryPrice) <= entry_tolerance:
                             entry_hit = True
 
                     if entry_hit:
@@ -335,7 +385,7 @@ class SignalOutcomeResolver:
                         open_count += 1
                         continue
 
-                # Within 1h and entry not hit: remain HOLD/PENDING on watchlist
+                # Within 45m and SL not breached: remain PENDING to preserve user's execution window
                 open_count += 1
                 continue
 
@@ -402,11 +452,11 @@ class SignalOutcomeResolver:
                         result = "BREAKEVEN"
                         exit_price = stop_loss
                     else:
-                        result = "LOST"
+                        result = "LOSS"
                         exit_price = stop_loss
-                # If current price or bid is at/above TP -> WON
+                # If current price or bid is at/above TP -> WIN
                 elif current_price >= take_profit or (bid > 0 and bid >= take_profit):
-                    result = "WON"
+                    result = "WIN"
                     exit_price = take_profit
             elif direction == "SELL":
                 # For a SELL position, if current price or ask is at/above SL
@@ -415,21 +465,21 @@ class SignalOutcomeResolver:
                         result = "BREAKEVEN"
                         exit_price = stop_loss
                     else:
-                        result = "LOST"
+                        result = "LOSS"
                         exit_price = stop_loss
-                # If current price or ask is at/below TP -> WON
+                # If current price or ask is at/below TP -> WIN
                 elif current_price <= take_profit or (ask > 0 and ask <= take_profit):
-                    result = "WON"
+                    result = "WIN"
                     exit_price = take_profit
 
             # Handle optional simulation trigger for testing
             if result is None and force_simulate:
                 sig_key = trade.signalId or trade.id
                 if sig_key % 3 == 0:
-                    result = "WON"
+                    result = "WIN"
                     exit_price = take_profit
                 elif sig_key % 3 == 1:
-                    result = "LOST"
+                    result = "LOSS"
                     exit_price = stop_loss
                 else:
                     result = "BREAKEVEN"
@@ -437,6 +487,30 @@ class SignalOutcomeResolver:
 
             if result is None:
                 open_count += 1
+                # Breakthrough 2: Dynamic Multi-Stage Take-Profit (Scale-Out & Breakeven Protection)
+                if (trade.status or "").upper() in ("OPEN", "FILLED"):
+                    risk_d = abs(entry - stop_loss)
+                    if risk_d > 0:
+                        is_buy = direction == "BUY"
+                        be_threshold = entry + risk_d if is_buy else entry - risk_d
+                        tp1_threshold = entry + (1.5 * risk_d) if is_buy else entry - (1.5 * risk_d)
+                        be_reached = (current_price >= be_threshold or (bid > 0 and bid >= be_threshold)) if is_buy else (current_price <= be_threshold or (ask > 0 and ask <= be_threshold))
+
+                        if be_reached and "BE_PROTECTED" not in (trade.notes or ""):
+                            new_notes = f"{trade.notes or 'Falcon'} | [BE_PROTECTED: Locked at entry]"
+                            tp1_hit = (current_price >= tp1_threshold or (bid > 0 and bid >= tp1_threshold)) if is_buy else (current_price <= tp1_threshold or (ask > 0 and ask <= tp1_threshold))
+                            if tp1_hit:
+                                new_notes += " | [TP1_REACHED: +1.5R target reached]"
+                            trade_update = TradeJournalUpdate(
+                                stopLoss=entry,
+                                notes=new_notes,
+                            )
+                            try:
+                                trade_journal_repository.update_trade(trade.id, trade_update, session=session)
+                                logger.info(f"Promoted trade #{trade.id} to Breakeven protection (stopLoss={entry})")
+                            except Exception as ex:
+                                logger.warning(f"Error shifting trade #{trade.id} to breakeven: {ex}")
+
                 # Phase 5C: Track post-fill excursion for OPEN/FILLED trades
                 if (trade.status or "").upper() in ("OPEN", "FILLED") and trade.fillPrice is not None:
                     obs_time = getattr(quote, "timestamp", now)
@@ -554,7 +628,12 @@ class SignalOutcomeResolver:
                 session=session,
             )
 
-            reason_exit = diagnostic.rationale
+            if result in ("LOSS", "LOST") and "stop loss" not in diagnostic.rationale.lower():
+                reason_exit = f"Stop Loss hit: {diagnostic.rationale}"
+            elif result in ("WIN", "WON") and "take profit" not in diagnostic.rationale.lower():
+                reason_exit = f"Take Profit hit: {diagnostic.rationale}"
+            else:
+                reason_exit = diagnostic.rationale
             lesson = diagnostic.lesson_learned
 
             trade_update = TradeJournalUpdate(

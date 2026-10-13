@@ -49,18 +49,18 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
   bool _isDispatchingTelegram = false;
   String? _briefingError;
 
-  // SMC state
-  SMCStructureData? _smcData;
-  bool _isLoadingSMC = false;
-  String _smcSymbol = 'EURUSD';
-  String? _smcError;
+  // Session Breakout & Volatility state
+  SessionBreakoutStructureData? _sessionData;
+  bool _isLoadingSession = false;
+  String _sessionSymbol = 'EURUSD';
+  String? _sessionError;
 
   final List<String> _quickPrompts = [
     'Why did you trigger this Gold buy?',
     'What is our current streak and recovery headroom?',
     'What did you learn from the last loss?',
     'What is the active capital cycle?',
-    'Explain the SMC order blocks for EURUSD',
+    'Explain the session breakout corridors for EURUSD',
   ];
 
   @override
@@ -72,7 +72,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     _messages.add(
       _ChatMessage(
         isUser: false,
-        text: 'Greetings Trader. I am Falcon AI Co-Pilot—your institutional Smart Money, Forensic Learning, and Capital Guardian intelligence.\n\nAsk me about trade rationales, current streak recovery progress, forensic lessons committed to memory, or institutional SMC structures.',
+        text: 'Greetings Trader. I am Falcon AI Co-Pilot—your institutional Session Momentum, Forensic Learning, and Capital Guardian intelligence.\n\nAsk me about trade rationales, current streak recovery progress, forensic lessons committed to memory, or session breakout corridors.',
         intent: 'GREETING',
         confidence: 1.0,
         timestamp: DateTime.now(),
@@ -80,7 +80,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     );
 
     _loadBriefing();
-    _loadSMC();
+    _loadSessionStructure();
   }
 
   @override
@@ -188,13 +188,13 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
       keyInsights: [
         'Cloud server connection retry available via top action bar.',
         'Asian session manipulation phase monitored for liquidity sweep entries.',
-        'Capital Guardian actively enforcing \$20.00 max entertaining streak ceiling.',
+        'Capital Guardian actively enforcing dynamic capital preservation and profit reserves.',
       ],
       riskState: {
         'consecutive_losses': 0,
         'profit_recovery_multiplier': 1.0,
-        'max_entertaining_loss': 20.0,
-        'loss_ceiling_headroom': 20.0,
+        'max_entertaining_loss': 999999.0,
+        'loss_ceiling_headroom': 999999.0,
         'recovery_status': 'BASELINE_1X',
       },
       formattedText: 'Falcon offline benchmark report. Tap Retry to fetch live cloud intelligence.',
@@ -202,53 +202,54 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     );
   }
 
-  SMCStructureData _buildFallbackSMC(String symbol) {
+  SessionBreakoutStructureData _buildFallbackSession(String symbol) {
     final isGold = symbol.toUpperCase().contains('XAU') || symbol.toUpperCase().contains('GOLD');
     final isGbp = symbol.toUpperCase().contains('GBP');
-    final now = DateTime.now();
-    return SMCStructureData(
+    return SessionBreakoutStructureData(
       symbol: symbol,
       timeframe: '15m',
-      totalOrderBlocks: 2,
-      totalFairValueGaps: 1,
-      unmitigatedOrderBlocks: 1,
-      unmitigatedFairValueGaps: 1,
-      orderBlocks: [
-        OrderBlockOverlay(
-          symbol: symbol,
-          timeframe: '15m',
-          blockType: 'BULLISH',
-          high: isGold ? 4175.5 : (isGbp ? 1.3245 : 1.1335),
-          low: isGold ? 4171.0 : (isGbp ? 1.3235 : 1.1325),
-          openPrice: isGold ? 4171.0 : (isGbp ? 1.3235 : 1.1325),
-          closePrice: isGold ? 4175.5 : (isGbp ? 1.3245 : 1.1335),
-          isMitigated: false,
-          formedAt: now,
+      sessionRanges: [
+        SessionRangeOverlay(
+          sessionName: 'ASIAN',
+          high: isGold ? 4185.0 : (isGbp ? 1.3300 : 1.1375),
+          low: isGold ? 4172.0 : (isGbp ? 1.3240 : 1.1320),
+          openPrice: isGold ? 4175.0 : (isGbp ? 1.3250 : 1.1330),
+          closePrice: isGold ? 4182.0 : (isGbp ? 1.3290 : 1.1365),
+          status: 'INTACT',
+          rangePips: isGold ? 130.0 : 60.0,
         ),
-        OrderBlockOverlay(
-          symbol: symbol,
-          timeframe: '15m',
-          blockType: 'BEARISH',
-          high: isGold ? 4198.0 : (isGbp ? 1.3315 : 1.1385),
-          low: isGold ? 4195.0 : (isGbp ? 1.3300 : 1.1370),
-          openPrice: isGold ? 4198.0 : (isGbp ? 1.3315 : 1.1385),
-          closePrice: isGold ? 4195.0 : (isGbp ? 1.3300 : 1.1370),
-          isMitigated: true,
-          formedAt: now,
+        SessionRangeOverlay(
+          sessionName: 'LONDON',
+          high: isGold ? 4198.0 : (isGbp ? 1.3325 : 1.1395),
+          low: isGold ? 4168.0 : (isGbp ? 1.3220 : 1.1305),
+          openPrice: isGold ? 4182.0 : (isGbp ? 1.3290 : 1.1365),
+          closePrice: isGold ? 4195.0 : (isGbp ? 1.3320 : 1.1385),
+          status: 'BROKEN_UP',
+          rangePips: isGold ? 300.0 : 105.0,
         ),
       ],
-      fairValueGaps: [
-        FvgOverlay(
-          symbol: symbol,
-          timeframe: '15m',
-          gapType: 'BULLISH',
-          top: isGold ? 4182.0 : (isGbp ? 1.3265 : 1.1348),
-          bottom: isGold ? 4178.0 : (isGbp ? 1.3255 : 1.1342),
-          sizePips: 4.0,
-          isMitigated: false,
-          formedAt: now,
+      volumeExpansions: [
+        VolumeExpansionOverlay(
+          timestamp: DateTime.now(),
+          direction: 'BULLISH',
+          rvol: 2.4,
+          breakoutPrice: isGold ? 4188.0 : (isGbp ? 1.3305 : 1.1380),
+          targetPrice: isGold ? 4210.0 : (isGbp ? 1.3360 : 1.1420),
+          invalidationPrice: isGold ? 4172.0 : (isGbp ? 1.3240 : 1.1320),
+          spreadRatio: 0.72,
         ),
       ],
+      volatilityZone: VolatilityZoneOverlay(
+        upperBand: isGold ? 4205.0 : (isGbp ? 1.3350 : 1.1420),
+        lowerBand: isGold ? 4165.0 : (isGbp ? 1.3210 : 1.1290),
+        meanLevel: isGold ? 4185.0 : (isGbp ? 1.3280 : 1.1355),
+        currentSigma: 1.1,
+        isExhausted: false,
+        exhaustionState: 'NORMAL',
+        rsiValue: 56.4,
+      ),
+      activeSession: 'LONDON',
+      isBreakoutConfirmed: true,
     );
   }
 
@@ -318,26 +319,26 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     }
   }
 
-  Future<void> _loadSMC() async {
+  Future<void> _loadSessionStructure() async {
     setState(() {
-      _isLoadingSMC = true;
-      _smcError = null;
+      _isLoadingSession = true;
+      _sessionError = null;
     });
     try {
-      final data = await _apiService.getSMCStructure(symbol: _smcSymbol);
+      final data = await _apiService.getSessionBreakoutStructure(symbol: _sessionSymbol);
       if (!mounted) return;
       setState(() {
-        _smcData = data;
-        _smcError = null;
+        _sessionData = data;
+        _sessionError = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _smcError = 'Could not load live SMC structure: ${e.toString().replaceAll("Exception:", "").trim()}';
-        _smcData ??= _buildFallbackSMC(_smcSymbol);
+        _sessionError = 'Could not load live session structure: ${e.toString().replaceAll("Exception:", "").trim()}';
+        _sessionData ??= _buildFallbackSession(_sessionSymbol);
       });
     } finally {
-      if (mounted) setState(() => _isLoadingSMC = false);
+      if (mounted) setState(() => _isLoadingSession = false);
     }
   }
 
@@ -388,7 +389,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           unselectedLabelColor: AppColors.textSecondary,
           tabs: const [
             Tab(icon: Icon(Icons.chat_outlined), text: 'AI Co-Pilot'),
-            Tab(icon: Icon(Icons.newspaper_outlined), text: 'Briefings & SMC'),
+            Tab(icon: Icon(Icons.newspaper_outlined), text: 'Briefings & Sessions'),
           ],
         ),
       ),
@@ -396,7 +397,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
         controller: _tabController,
         children: [
           _buildChatTab(),
-          _buildBriefingsAndSMCTab(),
+          _buildBriefingsAndSessionsTab(),
         ],
       ),
     );
@@ -651,7 +652,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
                       const SizedBox(width: 6),
                       Expanded(
                         child: Text(
-                          'Recovery Multiplier: ${msg.riskContext!['recovery_multiplier'] ?? '1.0x'} | Streak Headroom: \$${msg.riskContext!['remaining_loss_headroom'] ?? '20.00'}',
+                          'Recovery Multiplier: ${msg.riskContext!['recovery_multiplier'] ?? '1.0x'} | Risk Headroom: \$${msg.riskContext!['remaining_loss_headroom'] ?? 'Active'}',
                           style: const TextStyle(color: AppColors.warning, fontSize: 11, fontWeight: FontWeight.bold),
                         ),
                       ),
@@ -666,12 +667,12 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     );
   }
 
-  // ── Tab 2: Intelligence Briefings & SMC Structure ─────────────────────────
+  // ── Tab 2: Intelligence Briefings & Session Corridors ─────────────────────
 
-  Widget _buildBriefingsAndSMCTab() {
+  Widget _buildBriefingsAndSessionsTab() {
     return RefreshIndicator(
       onRefresh: () async {
-        await Future.wait([_loadBriefing(), _loadSMC()]);
+        await Future.wait([_loadBriefing(), _loadSessionStructure()]);
       },
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
@@ -744,16 +745,16 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
 
             const SizedBox(height: 24),
 
-            // SMC Institutional Structure Section
+            // Session Corridors & Volatility Section
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 const Text(
-                  'Smart Money Concepts (SMC)',
+                  'Session Breakouts & Volatility',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
                 ),
                 DropdownButton<String>(
-                  value: _smcSymbol,
+                  value: _sessionSymbol,
                   dropdownColor: AppColors.surface,
                   underline: const SizedBox(),
                   style: const TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
@@ -767,23 +768,23 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
                   ],
                   onChanged: (val) {
                     if (val != null) {
-                      setState(() => _smcSymbol = val);
-                      _loadSMC();
+                      setState(() => _sessionSymbol = val);
+                      _loadSessionStructure();
                     }
                   },
                 ),
               ],
             ),
             const SizedBox(height: 12),
-            if (_smcError != null)
-              _buildErrorBanner(_smcError!, _loadSMC),
-            if (_isLoadingSMC)
+            if (_sessionError != null)
+              _buildErrorBanner(_sessionError!, _loadSessionStructure),
+            if (_isLoadingSession)
               const Center(child: Padding(padding: EdgeInsets.all(16), child: CircularProgressIndicator()))
-            else if (_smcData != null)
-              _buildSMCCard(_smcData!)
+            else if (_sessionData != null)
+              _buildSessionCard(_sessionData!)
             else
               const AppCard(
-                child: Center(child: Text('SMC structure data unavailable.', style: TextStyle(color: AppColors.textSecondary))),
+                child: Center(child: Text('Session structure data unavailable.', style: TextStyle(color: AppColors.textSecondary))),
               ),
 
           ],
@@ -869,7 +870,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
                 children: [
                   _buildMetric('Consecutive Losses', '${briefing.riskState['consecutive_losses'] ?? 0}'),
                   _buildMetric('Recovery Target', '${briefing.riskState['recovery_multiplier'] ?? '1.0'}x'),
-                  _buildMetric('Loss Headroom', '\$${briefing.riskState['remaining_streak_loss_headroom'] ?? '20.00'}'),
+                  _buildMetric('Risk Headroom', briefing.riskState['remaining_streak_loss_headroom'] != null ? '\$${briefing.riskState['remaining_streak_loss_headroom']}' : 'Unrestricted'),
                 ],
               ),
             ),
@@ -879,7 +880,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildSMCCard(SMCStructureData smc) {
+  Widget _buildSessionCard(SessionBreakoutStructureData data) {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -888,7 +889,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                '${smc.symbol} • ${smc.timeframe.toUpperCase()}',
+                '${data.symbol} • ${data.timeframe.toUpperCase()}',
                 style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
               ),
               Container(
@@ -897,7 +898,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
                   color: AppColors.primary.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text('Live Institutional Perception', style: TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
+                child: Text('${data.activeSession} ACTIVE', style: const TextStyle(color: AppColors.primary, fontSize: 10, fontWeight: FontWeight.bold)),
               ),
             ],
           ),
@@ -905,22 +906,22 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           Row(
             children: [
               Expanded(
-                child: _buildSMCBox(
-                  'Order Blocks (OB)',
-                  '${smc.totalOrderBlocks}',
-                  '${smc.unmitigatedOrderBlocks} Unmitigated',
-                  Icons.layers_outlined,
-                  AppColors.info,
+                child: _buildSessionBox(
+                  'Session Corridors',
+                  '${data.sessionRanges.length}',
+                  data.isBreakoutConfirmed ? 'Breakout Confirmed' : 'Range Intact',
+                  Icons.view_column_outlined,
+                  const Color(0xFF06B6D4),
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: _buildSMCBox(
-                  'Fair Value Gaps (FVG)',
-                  '${smc.totalFairValueGaps}',
-                  '${smc.unmitigatedFairValueGaps} Open Gaps',
-                  Icons.water_damage_outlined,
-                  AppColors.warning,
+                child: _buildSessionBox(
+                  '2.5σ Volatility',
+                  data.volatilityZone?.exhaustionState ?? 'NORMAL',
+                  data.volatilityZone != null ? 'RSI: ${data.volatilityZone!.rsiValue.toStringAsFixed(1)}' : 'Envelope Calibrated',
+                  Icons.stacked_line_chart,
+                  const Color(0xFF818CF8),
                 ),
               ),
             ],
@@ -930,7 +931,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     );
   }
 
-  Widget _buildSMCBox(String title, String count, String subtitle, IconData icon, Color color) {
+  Widget _buildSessionBox(String title, String count, String subtitle, IconData icon, Color color) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -957,7 +958,8 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           const SizedBox(height: 8),
           Text(
             count,
-            style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: color),
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color),
+            overflow: TextOverflow.ellipsis,
           ),
           const SizedBox(height: 2),
           Text(

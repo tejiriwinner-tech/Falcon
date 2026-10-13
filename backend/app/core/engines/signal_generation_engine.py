@@ -1,6 +1,9 @@
 import json
+import logging
 from datetime import datetime, timezone, timedelta
 from typing import Any, Dict, List, Optional, Tuple, Union
+
+logger = logging.getLogger("falcon.signal_generation_engine")
 from app.schemas.market_state import MarketState
 from app.schemas.strategy import StrategyItem, StrategyStatus
 from app.schemas.signal_candidate import (
@@ -36,9 +39,11 @@ class SignalGenerationEngine:
     ) -> Tuple[float, float, float]:
         """
         Calculates entry, stopLoss, and takeProfit using dynamic 1.5 * ATR fallback or pattern swing stops.
-        Applies recovery_mult (1.0x, 2.0x, 4.0x) to Take Profit distance for autonomous loss recovery.
+        `recovery_mult` is accepted for backward compatibility but IGNORED: take-profit
+        distance is never stretched after losses (removed martingale-style 2x/4x targets).
         Returns: (entry_price, stop_loss, take_profit)
         """
+        recovery_mult = 1.0
         raw_symbol = (symbol or "").upper()
         dec_places = 2 if ("XAU" in raw_symbol or "GOLD" in raw_symbol or current_price > 500) else (3 if "JPY" in raw_symbol else 5)
 
@@ -212,7 +217,7 @@ class SignalGenerationEngine:
 
         def _load_bars(sym):
             try:
-                b1h = market_history_service.get_bars(sym, timeframe="1h", limit=25)
+                b1h = market_history_service.get_bars(sym, timeframe="1h", limit=120)
                 return sym, b1h
             except Exception:
                 return sym, []
@@ -238,6 +243,15 @@ class SignalGenerationEngine:
                 entry_price = price_item.currentPrice
                 spread = price_item.spread
             else:
+                bars_for_sym = cached_bars_1h.get(canonical_symbol) or market_history_service.get_bars(canonical_symbol, "1h", limit=1)
+                if bars_for_sym:
+                    entry_price = bars_for_sym[-1].close
+                    spread = 2.5 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (1.5 if "JPY" in canonical_symbol else 0.8)
+                else:
+                    entry_price = None
+                    spread = None
+
+            if not entry_price or entry_price <= 0:
                 # No live price available — emit insufficient candidate
                 insufficient_candidate = SignalCandidate(
                     id=cand_id,
@@ -322,7 +336,15 @@ class SignalGenerationEngine:
             bars_1h = cached_bars_1h.get(canonical_symbol, [])
 
             candles_1h = [
-                CandleBar(open=b.open, high=b.high, low=b.low, close=b.close, volume=b.volume)
+                CandleBar(
+                    open=b.open,
+                    high=b.high,
+                    low=b.low,
+                    close=b.close,
+                    volume=b.volume or 0.0,
+                    timestamp=int(b.bar_time.timestamp()) if hasattr(b.bar_time, "timestamp") else None,
+                    time=b.bar_time,
+                )
                 for b in bars_1h
             ]
 
@@ -333,7 +355,10 @@ class SignalGenerationEngine:
                     open=last_c.close,
                     high=max(last_c.close, entry_price),
                     low=min(last_c.close, entry_price),
-                    close=entry_price
+                    close=entry_price,
+                    volume=100.0,
+                    timestamp=int(started_at.timestamp()),
+                    time=started_at,
                 ))
 
             ema_20 = None
@@ -341,9 +366,11 @@ class SignalGenerationEngine:
             key_sup = None
             if candles_1h and len(candles_1h) >= 5:
                 closes = [c.close for c in candles_1h]
-                ema_20 = sum(closes[-5:]) / 5.0
-                key_res = max(c.high for c in candles_1h[-10:])
-                key_sup = min(c.low for c in candles_1h[-10:])
+                from app.core.engines.session_breakout_engine import session_breakout_engine
+                ema_20 = session_breakout_engine.compute_ema(closes, 20)
+                lookback = min(len(candles_1h), 20)
+                key_res = max(c.high for c in candles_1h[-lookback:])
+                key_sup = min(c.low for c in candles_1h[-lookback:])
 
             detected_patterns = self.pattern_engine.analyze_patterns(
                 candles_1h=candles_1h,
@@ -367,9 +394,17 @@ class SignalGenerationEngine:
 
             sniper_pattern = detected_patterns[0] if detected_patterns else None
             strat_type_val = strategy.type.value if hasattr(strategy.type, 'value') else str(strategy.type)
+            has_sniper_setup = False
 
-            # Determine direction & trigger parameters
-            if sniper_pattern:
+            # 1. Candlestick Pattern / Price Action Sniper Confirmation
+            # Breakout strategies require structural corridor/volume confirmation (Section 2), not isolated candle patterns
+            if (
+                sniper_pattern
+                and getattr(sniper_pattern, "conviction_score", 0.0) >= 0.65
+                and sniper_pattern.pattern_type != PatternType.NO_PATTERN
+                and strat_type_val not in ["BREAKOUT", "SESSION_BREAKOUT"]
+            ):
+                has_sniper_setup = True
                 direction = (
                     CandidateDirection.BUY
                     if sniper_pattern.direction == PatSignalDirection.BUY
@@ -389,35 +424,88 @@ class SignalGenerationEngine:
                 sniper_rationale = None
                 pattern_name = None
 
-                if strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
-                    direction = CandidateDirection.BUY if asset_trend in ["Bearish", "Neutral"] else CandidateDirection.SELL
-                elif strat_type_val == "BREAKOUT":
-                    if rsi_val is not None and rsi_val >= 50.0:
+                # 2. Institutional Session Breakout Integration
+                if strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"] or getattr(strategy, "id", "") in ("strat-008", "session_momentum_liquidity_breakout"):
+                    try:
+                        from app.core.engines.session_breakout_engine import session_breakout_engine
+                        from app.schemas.session_breakout import SessionStatus
+                        corridors = session_breakout_engine.compute_session_corridors(canonical_symbol, candles_1h, allow_benchmark=False)
+                        broken_up = any(c.status == SessionStatus.BROKEN_UP for c in corridors)
+                        broken_down = any(c.status == SessionStatus.BROKEN_DOWN for c in corridors)
+                        expansions = session_breakout_engine.detect_volume_expansions(canonical_symbol, candles_1h)
+                        # Clean breakout: exactly one direction broken, not both (whipsaw prevention)
+                        if (broken_up ^ broken_down) and len(expansions) > 0:
+                            b_dir_str = "BUY" if broken_up else "SELL"
+                            recent_exp = expansions[-1]
+                            # Expansion surge must align with breakout direction
+                            exp_matches = (broken_up and recent_exp.direction == "BULLISH") or (broken_down and recent_exp.direction == "BEARISH")
+                            if exp_matches:
+                                conv_obj = session_breakout_engine.calculate_conviction(
+                                    symbol=canonical_symbol,
+                                    direction=b_dir_str,
+                                    candles=candles_1h,
+                                    macro_news_impact=news_impact.upper() if news_impact else None,
+                                    spread_pips=spread,
+                                )
+                                # Ensure macro flow does not directly contradict breakout
+                                macro_conflicts = (broken_up and conv_obj.htf_trend_bias == "BEARISH") or (broken_down and conv_obj.htf_trend_bias == "BULLISH")
+                                if conv_obj.total_score >= 60.0 and not macro_conflicts:
+                                    direction = CandidateDirection.BUY if broken_up else CandidateDirection.SELL
+                                    sl_b, tp1_b, tp2_b, _, _ = session_breakout_engine.calculate_trade_levels(
+                                        symbol=canonical_symbol,
+                                        direction=b_dir_str,
+                                        entry_price=entry_price,
+                                        candles=candles_1h,
+                                    )
+                                    has_sniper_setup = True
+                                    pattern_conviction = conv_obj.composite_score / 100.0
+                                    sniper_trigger_rule = f"Session Corridor ({session}) confirmed breakout with {recent_exp.rvol:.1f}x RVol surge"
+                                    sniper_stop = sl_b
+                                    sniper_target = tp1_b
+                                    sniper_rationale = f"Institutional session breakout confirmed in {session}. Target TP1 @ {tp1_b}, TP2 @ {tp2_b}."
+                                    pattern_name = "Session Momentum Liquidity Breakout"
+                    except Exception as ex:
+                        logger.warning(f"Session breakout evaluation error for {canonical_symbol}: {ex}")
+
+                # 3. Unconfirmed / Generic Fallback: strict discipline, no phantom directions
+                if not has_sniper_setup:
+                    if strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
+                        if rsi_val is not None and rsi_val <= 38.0:
+                            direction = CandidateDirection.BUY
+                        elif rsi_val is not None and rsi_val >= 62.0:
+                            direction = CandidateDirection.SELL
+                        else:
+                            direction = CandidateDirection.WAIT
+                    elif strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"]:
+                        # Unconfirmed breakout stays in WAIT until volume surge or corridor break
+                        direction = CandidateDirection.WAIT
+                    elif asset_trend == "Bullish":
                         direction = CandidateDirection.BUY
-                    elif rsi_val is not None and rsi_val < 50.0:
-                        direction = CandidateDirection.SELL
                     elif asset_trend == "Bearish":
                         direction = CandidateDirection.SELL
                     else:
-                        direction = CandidateDirection.BUY
-                elif asset_trend == "Bullish":
-                    direction = CandidateDirection.BUY
-                elif asset_trend == "Bearish":
-                    direction = CandidateDirection.SELL
-                else:
-                    direction = CandidateDirection.BUY if (rsi_val or 50.0) >= 50.0 else CandidateDirection.SELL
+                        direction = CandidateDirection.WAIT
 
             # ── 3. Evaluate Strategy Execution Filters ────────────────────────
             # Condition 1: Trend Alignment / Technical Setup
-            if sniper_pattern:
+            if has_sniper_setup:
                 trend_passed = True
                 trend_desc = f"🎯 Sniper Setup Identified: {pattern_name} with {pattern_conviction*100:.0f}% conviction. {sniper_trigger_rule}"
-            elif strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE", "BREAKOUT"]:
-                trend_passed = True
-                trend_desc = f"Asset {raw_symbol} in structural setup window. Trend: {asset_trend}, volatility: {volatility}."
+            elif strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
+                trend_passed = direction != CandidateDirection.WAIT and rsi_val is not None and (
+                    (direction == CandidateDirection.BUY and rsi_val <= 42.0)
+                    or (direction == CandidateDirection.SELL and rsi_val >= 58.0)
+                )
+                trend_desc = f"Mean reversion technical bounds: RSI={rsi_val if rsi_val is not None else 'N/A'}, direction={direction.value}."
+            elif strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"]:
+                trend_passed = False
+                trend_desc = "Awaiting confirmed volume expansion or corridor breach trigger."
             else:
-                trend_passed = asset_trend in ["Bullish", "Bearish"] and asset_trend != "Neutral"
-                trend_desc = f"Asset {raw_symbol} specific trend is {asset_trend}."
+                trend_passed = (
+                    (direction == CandidateDirection.BUY and asset_trend == "Bullish")
+                    or (direction == CandidateDirection.SELL and asset_trend == "Bearish")
+                )
+                trend_desc = f"Asset {raw_symbol} specific trend alignment: {asset_trend} vs {direction.value}."
 
             trend_cond = CandidateCondition(
                 title="Technical & Trend Alignment",
@@ -434,12 +522,8 @@ class SignalGenerationEngine:
                 passed=spread_passed
             )
 
-            # Condition 3: Session Match (Multi-session enabled)
-            # Passes if explicitly listed, or if in active liquid global session with optimal spread
-            session_passed = (
-                any(pref.lower() in session.lower() for pref in strategy.preferredSessions)
-                or (session in ["London", "New York", "Asian", "Tokyo", "Sydney", "London-NY Overlap"] and spread_passed)
-            )
+            # Condition 3: Session Match (Strict preferred sessions adherence)
+            session_passed = any(pref.lower() in session.lower() for pref in strategy.preferredSessions)
             session_cond = CandidateCondition(
                 title="Session Match",
                 description=f"Session '{session}' execution window (preferred: {', '.join(strategy.preferredSessions)}).",
@@ -457,17 +541,29 @@ class SignalGenerationEngine:
             conditions = [trend_cond, session_cond, spread_cond, news_cond]
 
             # ── 4. Calculate Confidence Breakdown & Final Conviction ──────────
-            trend_score = 30 if trend_passed else 10
-            strategy_score = 25 if strategy.readyForExecution else 15
-            session_score = 20 if session_passed else 5
-            sentiment_score = 15 if market_sentiment in ["Greedy", "Bullish", "Neutral"] else 5
+            # Realistic institutional scoring: max confidence bounded at 88% to avoid artificial certainty
+            trend_score = 25 if trend_passed else 8
+            strategy_score = 22 if strategy.readyForExecution else 12
+            if session in ["London", "New York", "London-NY Overlap"] and session_passed:
+                session_score = 18
+            elif session_passed:
+                session_score = 12
+            else:
+                session_score = 4
+            sentiment_score = 12 if market_sentiment in ["Greedy", "Bullish", "Neutral"] else 4
             news_score = 10 if news_passed else 0
 
-            confidence = trend_score + strategy_score + session_score + sentiment_score + news_score
+            base_confidence = trend_score + strategy_score + session_score + sentiment_score + news_score
 
-            if sniper_pattern:
-                # Institutional pattern boost
-                confidence = max(confidence, int(round(pattern_conviction * 100)))
+            if has_sniper_setup:
+                # Weighted blend: 60% candlestick/volume pattern conviction + 40% environmental base
+                pattern_score = int(round(pattern_conviction * 100))
+                confidence = int(round(0.60 * pattern_score + 0.40 * base_confidence))
+                # Institutional hard bounds: high-grade setups calibrated between 55% and 88%
+                confidence = max(55, min(88, confidence))
+            else:
+                # Generic setups cap at 80% to enforce confluence discipline
+                confidence = max(45, min(80, base_confidence))
 
             breakdown = ConfidenceBreakdown(
                 trendScore=trend_score,
@@ -492,20 +588,23 @@ class SignalGenerationEngine:
 
             readiness_score = readiness_session + readiness_spread + readiness_news + readiness_vol + readiness_fresh
 
-            if sniper_pattern and spread_passed and news_passed:
+            if has_sniper_setup and spread_passed and news_passed and session_passed:
                 readiness_score = max(readiness_score, 88)
+            elif not has_sniper_setup:
+                # Without an authentic confirmed technical setup, cap readiness so it cannot prematurely trigger a live position
+                readiness_score = min(readiness_score, 78)
 
             # Determine Candidate Status
-            if readiness_score >= 85 and direction != CandidateDirection.WAIT:
+            if readiness_score >= 85 and direction != CandidateDirection.WAIT and has_sniper_setup:
                 status = CandidateStatus.GENERATED
-            elif readiness_score >= 50:
+            elif readiness_score >= 45 and direction != CandidateDirection.WAIT:
                 status = CandidateStatus.WAITING_CONFIRMATION
             else:
                 status = CandidateStatus.REJECTED
 
             # Reasons
             reasons = []
-            if sniper_pattern:
+            if has_sniper_setup:
                 reasons.append(CandidateReason(
                     title=f"Sniper Setup: {pattern_name}",
                     description=f"{sniper_rationale} Trigger Rule: {sniper_trigger_rule}",

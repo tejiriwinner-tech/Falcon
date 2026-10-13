@@ -15,22 +15,38 @@ class SignalMonitorService {
   final NotificationService _notificationService = NotificationService();
   Timer? _timer;
   final Set<int> _notifiedSignalIds = {};
+  final Set<int> _breakevenNotifiedIds = {};
+  final Set<int> _targetHitNotifiedIds = {};
   bool _initialized = false;
 
   static const String _prefKey = 'falcon_notified_signal_ids';
+  static const String _prefBeKey = 'falcon_breakeven_notified_ids';
+  static const String _prefTpKey = 'falcon_target_hit_notified_ids';
 
   Future<void> init() async {
     if (_initialized) return;
 
     try {
       final prefs = await SharedPreferences.getInstance();
+      
       final savedIds = prefs.getStringList(_prefKey) ?? [];
       for (final idStr in savedIds) {
         final parsed = int.tryParse(idStr);
-        if (parsed != null) {
-          _notifiedSignalIds.add(parsed);
-        }
+        if (parsed != null) _notifiedSignalIds.add(parsed);
       }
+
+      final savedBeIds = prefs.getStringList(_prefBeKey) ?? [];
+      for (final idStr in savedBeIds) {
+        final parsed = int.tryParse(idStr);
+        if (parsed != null) _breakevenNotifiedIds.add(parsed);
+      }
+
+      final savedTpIds = prefs.getStringList(_prefTpKey) ?? [];
+      for (final idStr in savedTpIds) {
+        final parsed = int.tryParse(idStr);
+        if (parsed != null) _targetHitNotifiedIds.add(parsed);
+      }
+
       _initialized = true;
       debugPrint(
           '[SignalMonitorService] Initialized with ${_notifiedSignalIds.length} known signals');
@@ -39,7 +55,7 @@ class SignalMonitorService {
     }
   }
 
-  void startMonitoring({Duration interval = const Duration(seconds: 60)}) {
+  void startMonitoring({Duration interval = const Duration(seconds: 45)}) {
     _timer?.cancel();
     // Immediate check
     checkAndNotify();
@@ -71,8 +87,10 @@ class SignalMonitorService {
     for (final signal in signals) {
       final action = signal.action.toUpperCase();
       final status = signal.status.toUpperCase();
-      // Only notify for actual actionable trades (BUY or SELL) that are approved (ACTIVE)
-      if ((action == 'BUY' || action == 'SELL') && status == 'ACTIVE') {
+      final analysis = signal.analysis.toUpperCase();
+
+      // 1. Initial Entry Alert for Actionable Trades
+      if ((action == 'BUY' || action == 'SELL') && (status == 'ACTIVE' || status == 'OPEN')) {
         if (!_notifiedSignalIds.contains(signal.id)) {
           _notifiedSignalIds.add(signal.id);
           hasNew = true;
@@ -81,12 +99,43 @@ class SignalMonitorService {
           await _notificationService.showTradeAlert(signal);
         }
       }
+
+      // 2. Breakeven Protection Alert (+1.0R Reached / Risk-Free)
+      final isBreakevenStatus = signal.isBreakeven ||
+          status == 'BREAKEVEN' ||
+          status == 'BE' ||
+          analysis.contains('BE_PROTECTED') ||
+          analysis.contains('BREAKEVEN');
+
+      if (isBreakevenStatus && !_breakevenNotifiedIds.contains(signal.id)) {
+        _breakevenNotifiedIds.add(signal.id);
+        hasNew = true;
+        debugPrint(
+            '[SignalMonitorService] BREAKEVEN TRIGGERED: ${signal.symbol} @ ${signal.entry}');
+        await _notificationService.showBreakEvenAlert(signal);
+      }
+
+      // 3. Target Hit / Scale-Out Alert (TP1 / TP2)
+      final isTargetHit = status == 'WON' ||
+          status == 'WIN' ||
+          status == 'TP1_HIT' ||
+          analysis.contains('TP1_SCALED_OUT') ||
+          analysis.contains('TARGET HIT');
+
+      if (isTargetHit && !_targetHitNotifiedIds.contains(signal.id)) {
+        _targetHitNotifiedIds.add(signal.id);
+        hasNew = true;
+        final targetDesc = analysis.contains('TP1') ? 'Target 1 (1.5R Scale-Out)' : 'Target Take-Profit';
+        debugPrint(
+            '[SignalMonitorService] TARGET SECURED: ${signal.symbol} $targetDesc');
+        await _notificationService.showTargetHitAlert(signal, targetDesc);
+      }
     }
 
     if (hasNew) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        // Keep last 100 notified IDs to prevent SharedPreferences bloat
+        // Persist last 100 notified IDs to prevent SharedPreferences bloat
         final listToSave = _notifiedSignalIds
             .toList()
             .reversed
@@ -94,6 +143,22 @@ class SignalMonitorService {
             .map((id) => id.toString())
             .toList();
         await prefs.setStringList(_prefKey, listToSave);
+
+        final beListToSave = _breakevenNotifiedIds
+            .toList()
+            .reversed
+            .take(100)
+            .map((id) => id.toString())
+            .toList();
+        await prefs.setStringList(_prefBeKey, beListToSave);
+
+        final tpListToSave = _targetHitNotifiedIds
+            .toList()
+            .reversed
+            .take(100)
+            .map((id) => id.toString())
+            .toList();
+        await prefs.setStringList(_prefTpKey, tpListToSave);
       } catch (e) {
         debugPrint('[SignalMonitorService] Failed to persist signal IDs: $e');
       }

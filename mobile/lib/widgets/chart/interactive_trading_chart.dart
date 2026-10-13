@@ -5,18 +5,20 @@ import 'falcon_candlestick_painter.dart';
 
 class InteractiveTradingChart extends StatefulWidget {
   final List<CandleData> candles;
-  final SMCStructureData? smcStructure;
+  final SessionBreakoutStructureData? sessionStructure;
   final TradeCorridorOverlay? tradeOverlay;
   final String activeTimeframe;
+  final double? livePrice;
   final Function(String timeframe)? onTimeframeChanged;
   final VoidCallback? onRefresh;
 
   const InteractiveTradingChart({
     super.key,
     required this.candles,
-    this.smcStructure,
+    this.sessionStructure,
     this.tradeOverlay,
     this.activeTimeframe = '15m',
+    this.livePrice,
     this.onTimeframeChanged,
     this.onRefresh,
   });
@@ -25,17 +27,35 @@ class InteractiveTradingChart extends StatefulWidget {
   State<InteractiveTradingChart> createState() => _InteractiveTradingChartState();
 }
 
-class _InteractiveTradingChartState extends State<InteractiveTradingChart> {
+class _InteractiveTradingChartState extends State<InteractiveTradingChart>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pulseController;
   double _candleWidth = 8.0;
   final double _candleSpacing = 4.0;
   double _scrollOffset = 0.0;
   Offset? _crosshairPosition;
   CandleData? _inspectedCandle;
 
-  bool _showSmcZones = true;
+  bool _showSessionCorridors = true;
+  bool _showVolatilityBands = true;
   bool _showTradeLevels = true;
 
   double _baseCandleWidth = 8.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -65,7 +85,7 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart> {
 
     return Column(
       children: [
-        // ── Controls Header: Timeframes & SMC Toggles ──────────────────
+        // ── Controls Header: Timeframes & Layer Toggles ──────────────────
         _buildControlsHeader(isDark),
 
         // ── HUD Crosshair Inspector Bar ──────────────────────────────
@@ -113,27 +133,35 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart> {
               }
             },
             child: ClipRect(
-              child: CustomPaint(
-                size: Size.infinite,
-                painter: FalconCandlestickPainter(
-                  candles: widget.candles,
-                  smcStructure: widget.smcStructure,
-                  tradeOverlay: widget.tradeOverlay,
-                  candleWidth: _candleWidth,
-                  candleSpacing: _candleSpacing,
-                  scrollOffset: _scrollOffset,
-                  crosshairPosition: _crosshairPosition,
-                  showSmcZones: _showSmcZones,
-                  showTradeLevels: _showTradeLevels,
-                  isDarkMode: isDark,
-                ),
+              child: AnimatedBuilder(
+                animation: _pulseController,
+                builder: (context, _) {
+                  return CustomPaint(
+                    size: Size.infinite,
+                    painter: FalconCandlestickPainter(
+                      candles: widget.candles,
+                      sessionStructure: widget.sessionStructure,
+                      tradeOverlay: widget.tradeOverlay,
+                      candleWidth: _candleWidth,
+                      candleSpacing: _candleSpacing,
+                      scrollOffset: _scrollOffset,
+                      crosshairPosition: _crosshairPosition,
+                      showSessionCorridors: _showSessionCorridors,
+                      showVolatilityBands: _showVolatilityBands,
+                      showTradeLevels: _showTradeLevels,
+                      isDarkMode: isDark,
+                      livePrice: widget.livePrice,
+                      pulseValue: _pulseController.value,
+                    ),
+                  );
+                },
               ),
             ),
           ),
         ),
 
-        // ── SMC Legend Indicator ──────────────────────────────────────
-        _buildSmcLegend(isDark),
+        // ── Session & Volatility Legend Indicator ──────────────────────────────
+        _buildSessionLegend(isDark),
       ],
     );
   }
@@ -185,23 +213,23 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart> {
 
           const Spacer(),
 
-          // SMC Layer Toggle
+          // Session Corridor Layer Toggle
           GestureDetector(
             onTap: () {
               setState(() {
-                _showSmcZones = !_showSmcZones;
+                _showSessionCorridors = !_showSessionCorridors;
               });
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: _showSmcZones
-                    ? const Color(0xFF3B82F6).withValues(alpha: 0.18)
+                color: _showSessionCorridors
+                    ? const Color(0xFF06B6D4).withValues(alpha: 0.18)
                     : Colors.transparent,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: _showSmcZones
-                      ? const Color(0xFF3B82F6).withValues(alpha: 0.6)
+                  color: _showSessionCorridors
+                      ? const Color(0xFF06B6D4).withValues(alpha: 0.6)
                       : Colors.grey.withValues(alpha: 0.3),
                   width: 1.0,
                 ),
@@ -209,15 +237,59 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart> {
               child: Row(
                 children: [
                   Icon(
-                    Icons.layers_outlined,
+                    Icons.view_column_outlined,
                     size: 13,
-                    color: _showSmcZones ? const Color(0xFF3B82F6) : AppColors.textTertiary,
+                    color: _showSessionCorridors ? const Color(0xFF06B6D4) : AppColors.textTertiary,
                   ),
                   const SizedBox(width: 4),
                   Text(
-                    'SMC',
+                    'SESSIONS',
                     style: TextStyle(
-                      color: _showSmcZones ? const Color(0xFF3B82F6) : AppColors.textTertiary,
+                      color: _showSessionCorridors ? const Color(0xFF06B6D4) : AppColors.textTertiary,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 8),
+
+          // 2.5σ Volatility Bands Toggle
+          GestureDetector(
+            onTap: () {
+              setState(() {
+                _showVolatilityBands = !_showVolatilityBands;
+              });
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _showVolatilityBands
+                    ? const Color(0xFF818CF8).withValues(alpha: 0.18)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: _showVolatilityBands
+                      ? const Color(0xFF818CF8).withValues(alpha: 0.6)
+                      : Colors.grey.withValues(alpha: 0.3),
+                  width: 1.0,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.stacked_line_chart,
+                    size: 13,
+                    color: _showVolatilityBands ? const Color(0xFF818CF8) : AppColors.textTertiary,
+                  ),
+                  const SizedBox(width: 4),
+                  Text(
+                    'VOLATILITY',
+                    style: TextStyle(
+                      color: _showVolatilityBands ? const Color(0xFF818CF8) : AppColors.textTertiary,
                       fontSize: 10,
                       fontWeight: FontWeight.bold,
                     ),
@@ -254,13 +326,13 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart> {
                 child: Row(
                   children: [
                     Icon(
-                      Icons.track_changes_rounded,
+                      Icons.navigation_outlined,
                       size: 13,
                       color: _showTradeLevels ? AppColors.success : AppColors.textTertiary,
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'TARGETS',
+                      'TRADE',
                       style: TextStyle(
                         color: _showTradeLevels ? AppColors.success : AppColors.textTertiary,
                         fontSize: 10,
@@ -271,92 +343,61 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart> {
                 ),
               ),
             ),
-
-          const SizedBox(width: 8),
-
-          // Reset View
-          IconButton(
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(),
-            icon: const Icon(Icons.center_focus_strong, size: 18, color: AppColors.textTertiary),
-            tooltip: 'Reset Chart View',
-            onPressed: () {
-              setState(() {
-                _scrollOffset = 0.0;
-                _candleWidth = 8.0;
-              });
-            },
-          ),
         ],
       ),
     );
   }
 
   Widget _buildHudInspector(bool isDark) {
-    final candle = _inspectedCandle ?? (widget.candles.isNotEmpty ? widget.candles.last : null);
-    if (candle == null) return const SizedBox.shrink();
+    if (_inspectedCandle == null) return const SizedBox.shrink();
 
-    final isJpy = candle.symbol.contains('JPY') || candle.close > 50.0;
-    final int dec = isJpy ? 3 : 5;
-    final isBull = candle.isBullish;
+    final c = _inspectedCandle!;
+    final isBull = c.isBullish;
     final color = isBull ? AppColors.success : AppColors.error;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-      color: isDark ? const Color(0xFF0D1117) : const Color(0xFFFFFFFF),
+      color: isDark ? const Color(0xFF0F141C) : const Color(0xFFE5E7EB),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Row(
-            children: [
-              Text(
-                _inspectedCandle != null ? '🔍 INSPECT' : '⚡ LIVE',
-                style: TextStyle(
-                  color: _inspectedCandle != null ? AppColors.primary : AppColors.success,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 0.5,
-                ),
-              ),
-              const SizedBox(width: 10),
-              _buildHudItem('O', candle.open.toStringAsFixed(dec), color),
-              const SizedBox(width: 8),
-              _buildHudItem('H', candle.high.toStringAsFixed(dec), color),
-              const SizedBox(width: 8),
-              _buildHudItem('L', candle.low.toStringAsFixed(dec), color),
-              const SizedBox(width: 8),
-              _buildHudItem('C', candle.close.toStringAsFixed(dec), color),
-            ],
+          Text(
+            '${c.barTime.hour.toString().padLeft(2, '0')}:${c.barTime.minute.toString().padLeft(2, '0')}',
+            style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: AppColors.textSecondary),
           ),
-          if (candle.volume != null && candle.volume! > 0)
+          _buildHudMetric('O', c.open, isDark),
+          _buildHudMetric('H', c.high, isDark),
+          _buildHudMetric('L', c.low, isDark),
+          _buildHudMetric('C', c.close, isDark, highlightColor: color),
+          if (c.volume != null)
             Text(
-              'Vol: ${candle.volume!.toInt()}',
-              style: const TextStyle(fontSize: 9.5, color: AppColors.textTertiary),
+              'Vol: ${c.volume!.toStringAsFixed(0)}',
+              style: const TextStyle(fontSize: 10, color: AppColors.textTertiary),
             ),
         ],
       ),
     );
   }
 
-  Widget _buildHudItem(String label, String value, Color color) {
+  Widget _buildHudMetric(String label, double val, bool isDark, {Color? highlightColor}) {
+    final color = highlightColor ?? (isDark ? Colors.white70 : Colors.black87);
     return Row(
       children: [
+        Text('$label: ', style: const TextStyle(fontSize: 10, color: AppColors.textTertiary)),
         Text(
-          '$label: ',
-          style: const TextStyle(fontSize: 10, color: AppColors.textTertiary, fontWeight: FontWeight.bold),
-        ),
-        Text(
-          value,
+          val >= 100 ? val.toStringAsFixed(2) : val.toStringAsFixed(5),
           style: TextStyle(fontSize: 10, color: color, fontWeight: FontWeight.w600),
         ),
       ],
     );
   }
 
-  Widget _buildSmcLegend(bool isDark) {
-    if (!_showSmcZones || widget.smcStructure == null) return const SizedBox.shrink();
+  Widget _buildSessionLegend(bool isDark) {
+    if ((!_showSessionCorridors && !_showVolatilityBands) || widget.sessionStructure == null) {
+      return const SizedBox.shrink();
+    }
 
-    final smc = widget.smcStructure!;
+    final data = widget.sessionStructure!;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(
@@ -369,12 +410,16 @@ class _InteractiveTradingChartState extends State<InteractiveTradingChart> {
       ),
       child: Row(
         children: [
-          _buildLegendTag('Order Blocks', '${smc.totalOrderBlocks} (${smc.unmitigatedOrderBlocks} Unmitigated)', const Color(0xFF3B82F6)),
+          _buildLegendTag('Active Session', data.activeSession, const Color(0xFF06B6D4)),
           const SizedBox(width: 14),
-          _buildLegendTag('FVGs', '${smc.totalFairValueGaps} (${smc.unmitigatedFairValueGaps} Active)', AppColors.success),
+          _buildLegendTag('Corridors', '${data.sessionRanges.length} Active', const Color(0xFF8B5CF6)),
+          if (data.volatilityZone != null) ...[
+            const SizedBox(width: 14),
+            _buildLegendTag('2.5σ Status', data.volatilityZone!.exhaustionState, const Color(0xFF818CF8)),
+          ],
           const Spacer(),
           Text(
-            'ICT Institutional SMC Engine',
+            'Session Volume Engine',
             style: TextStyle(
               color: AppColors.textTertiary.withValues(alpha: 0.8),
               fontSize: 9,

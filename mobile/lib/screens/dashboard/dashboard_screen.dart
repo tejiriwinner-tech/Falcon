@@ -416,7 +416,7 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
                   ),
                   SizedBox(height: 4),
                   Text(
-                    'Conversational Q&A, SMC structure & session briefings',
+                    'Conversational Q&A, session breakouts & market briefings',
                     style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,

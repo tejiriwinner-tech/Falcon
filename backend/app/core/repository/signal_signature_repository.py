@@ -258,7 +258,23 @@ class SignalSignatureRepository:
         take_profit: float,
     ) -> bool:
         status = self.get_status(symbol, direction, entry_price, stop_loss, take_profit)
-        return status == "ACTIVE"
+        if status == "ACTIVE":
+            return True
+
+        # Fuzzy check in-memory signatures in case float rounding slightly differed
+        sym_clean = (symbol or "").replace("/", "").upper()
+        dir_clean = (direction or "").upper()
+        tol = 0.50 if ("XAU" in sym_clean or entry_price > 100) else 0.00025
+        with self._in_memory._lock:
+            for v in self._in_memory._signatures.values():
+                if (
+                    v.get("symbol") == sym_clean
+                    and v.get("direction") == dir_clean
+                    and (v.get("status") or "").upper() == "ACTIVE"
+                    and abs(float(v.get("entry_price", 0.0)) - float(entry_price)) <= tol
+                ):
+                    return True
+        return False
 
     def has_signature(
         self,
@@ -362,6 +378,8 @@ class SignalSignatureRepository:
 
     def clear(self) -> None:
         self._in_memory.clear()
+        self._cached_resolved = None
+        self._cached_resolved_at = 0.0
         if database_enabled():
             self._ensure_schema()
             try:

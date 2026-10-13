@@ -250,8 +250,7 @@ def test_setup():
     journal_storage = InMemoryTradeJournalStorage()
 
     cycle_repo = CapitalCycleRepository(storage=cycle_storage)
-    journal_repo = TradeJournalRepository.__new__(TradeJournalRepository)
-    journal_repo._storage = journal_storage
+    journal_repo = TradeJournalRepository(storage=journal_storage)
 
     cycle_service = CapitalCycleService(repository=cycle_repo)
     guardian_service = CapitalGuardianService(
@@ -283,6 +282,7 @@ def test_setup():
     # Global trade_journal_repository redirection
     orig_storage = trade_journal_repository._storage
     trade_journal_repository._storage = journal_storage
+    trade_journal_repository._invalidate_cache()
 
     yield {
         "cycle_storage": cycle_storage,
@@ -296,6 +296,7 @@ def test_setup():
     }
 
     trade_journal_repository._storage = orig_storage
+    trade_journal_repository._invalidate_cache()
 
 
 # -----------------------------------------------------------------------------

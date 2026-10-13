@@ -29,7 +29,7 @@ class _SignalCardState extends State<SignalCard> {
 
   bool get _isWon => widget.signal.status.toUpperCase() == 'WON' || widget.signal.status.toUpperCase() == 'WIN';
   bool get _isLost => widget.signal.status.toUpperCase() == 'LOST' || widget.signal.status.toUpperCase() == 'LOSS';
-  bool get _isBreakeven => widget.signal.status.toUpperCase() == 'BREAKEVEN' || widget.signal.status.toUpperCase() == 'BE';
+  bool get _isBreakeven => widget.signal.status.toUpperCase() == 'BREAKEVEN' || widget.signal.status.toUpperCase() == 'BE' || widget.signal.isBreakeven || widget.signal.analysis.toUpperCase().contains('BE_PROTECTED');
   bool get _isExpired => !_isLocallyLive && (widget.signal.status.toUpperCase() == 'EXPIRED' || widget.signal.status.toUpperCase() == 'INVALIDATED');
   bool get _isHold => !_isLocallyLive && (widget.signal.status.toUpperCase() == 'HOLD' || widget.signal.status.toUpperCase() == 'WAITING' || widget.signal.status.toUpperCase() == 'PENDING');
   bool get _isActive => _isLocallyLive || widget.signal.status.toUpperCase() == 'ACTIVE' || widget.signal.status.toUpperCase() == 'OPEN' || widget.signal.status.toUpperCase() == 'FILLED';

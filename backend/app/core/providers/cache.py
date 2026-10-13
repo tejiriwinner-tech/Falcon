@@ -110,7 +110,7 @@ class MarketDataCache:
             self._misses += 1
             return None
 
-        if entry.is_expired or (not allow_stale and not entry.is_fresh):
+        if not allow_stale and not entry.is_fresh:
             self._misses += 1
             return None
 

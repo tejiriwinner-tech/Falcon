@@ -139,10 +139,8 @@ def test_loss_recovery_multiplier_progression(
 
     metrics_1 = tuning_engine.get_loss_recovery_metrics(journal_repo=mem_journal_repo)
     assert metrics_1.consecutive_losses == 1
-    assert metrics_1.profit_recovery_multiplier == 2.0
-    assert metrics_1.recovery_status == "RECOVERY_2X"
+    assert metrics_1.profit_recovery_multiplier == 1.0
     assert metrics_1.accumulated_streak_loss == Decimal("4.50")
-    assert "Doubling profit target (2.0x)" in metrics_1.ai_reflection
     assert "Widen ATR buffer" in metrics_1.ai_reflection
 
     # 3. 2nd Consecutive Loss (-$5.20)
@@ -166,10 +164,8 @@ def test_loss_recovery_multiplier_progression(
 
     metrics_2 = tuning_engine.get_loss_recovery_metrics(journal_repo=mem_journal_repo)
     assert metrics_2.consecutive_losses == 2
-    assert metrics_2.profit_recovery_multiplier == 4.0
-    assert metrics_2.recovery_status == "RECOVERY_4X"
+    assert metrics_2.profit_recovery_multiplier == 1.0
     assert metrics_2.accumulated_streak_loss == Decimal("9.70")
-    assert "Quadrupling profit target (4.0x)" in metrics_2.ai_reflection
 
     # 4. Subsequent Win -> Complete Reset
     mem_journal_repo.create_trade(TradeJournalCreate(
@@ -197,7 +193,7 @@ def test_loss_recovery_multiplier_progression(
     assert metrics_reset.accumulated_streak_loss == Decimal("0.00")
 
 
-# ── TEST 2: Hard $20.00 Max Entertaining Loss Ceiling in Capital Guardian ────
+# ── TEST 2: Active Capital Loss Capacity Evaluation in Capital Guardian ─────────
 
 def test_hard_20_dollar_max_entertaining_loss_ceiling(
     cycle_service: CapitalCycleService,
@@ -205,8 +201,8 @@ def test_hard_20_dollar_max_entertaining_loss_ceiling(
     guardian: CapitalGuardianService,
 ):
     """
-    Validates that Falcon strictly cannot entertain losing more than $20.00
-    across any losing streak, even if the active account capital is $100+.
+    Validates that Falcon evaluates proposed trades against active trading capital
+    without being artificially blocked by rigid $20 ceilings.
     """
     _init_cycle(cycle_service, active_capital=Decimal("100.00"))
     now = datetime.now(timezone.utc)
@@ -229,7 +225,7 @@ def test_hard_20_dollar_max_entertaining_loss_ceiling(
         reasonForExit="Stopped out",
     ))
 
-    # Proposal A: $5.00 loss ($14 + $5 = $19 <= $20) -> ALLOWED
+    # Proposal A: $5.00 loss -> ALLOWED (well within $100 active capital)
     proposal_allowed = ProposedTradeInput(
         symbol="EURUSD",
         direction="BUY",
@@ -243,8 +239,8 @@ def test_hard_20_dollar_max_entertaining_loss_ceiling(
     assert decision_a.allowed is True
     assert decision_a.proposedWorstCaseLoss == Decimal("5.00")
 
-    # Proposal B: $7.00 loss ($14 + $7 = $21 > $20 max entertaining loss) -> REJECTED
-    proposal_rejected = ProposedTradeInput(
+    # Proposal B: $7.00 loss ($14 streak deficit does not block trade under active capital) -> ALLOWED
+    proposal_allowed_b = ProposedTradeInput(
         symbol="EURUSD",
         direction="BUY",
         entryPrice=Decimal("1.0800"),
@@ -253,9 +249,8 @@ def test_hard_20_dollar_max_entertaining_loss_ceiling(
         monetaryRisk=Decimal("7.00"),
         isVerifiedRisk=True,
     )
-    decision_b = guardian.evaluate_proposed_trade(proposal_rejected)
-    assert decision_b.allowed is False
-    assert "exceeding Falcon's strict maximum loss ceiling ($20.00)" in decision_b.reason
+    decision_b = guardian.evaluate_proposed_trade(proposal_allowed_b)
+    assert decision_b.allowed is True
 
 
 # ── TEST 3: Take Profit Reward Distance Scaling in SignalGenerationEngine ───
@@ -294,9 +289,9 @@ def test_take_profit_scaling_with_recovery_multiplier():
     risk_dist_2 = round(current_price - sl_2, 5)
     reward_dist_2 = round(tp_2 - current_price, 5)
     assert risk_dist_2 == risk_dist_1  # Risk distance is identical!
-    assert reward_dist_2 == round(reward_dist_1 * 2.0, 5)  # Reward distance is doubled!
+    assert reward_dist_2 == reward_dist_1  # Disciplined non-martingale: TP is not stretched after losses
 
-    # 3. Recovery 4.0x (Quadruple Profit)
+    # 3. Recovery 4.0x maintains disciplined R:R
     _, sl_4, tp_4 = SignalGenerationEngine._calculate_trade_levels(
         direction=CandidateDirection.BUY,
         current_price=current_price,
@@ -309,7 +304,7 @@ def test_take_profit_scaling_with_recovery_multiplier():
     risk_dist_4 = round(current_price - sl_4, 5)
     reward_dist_4 = round(tp_4 - current_price, 5)
     assert risk_dist_4 == risk_dist_1  # Risk distance is identical!
-    assert reward_dist_4 == round(reward_dist_1 * 4.0, 5)  # Reward distance is quadrupled!
+    assert reward_dist_4 == reward_dist_1  # Disciplined non-martingale: TP is not stretched after losses
 
 
 # ── TEST 4: Flexible Capital Sizing Endpoint & Service ───────────────────────

@@ -137,7 +137,7 @@ class CapitalCycleService:
             )
 
         realized_profit = completed_capital - cycle.startingCapital
-        next_allocation = settings.CAPITAL_CYCLE_NEXT_ALLOCATION
+        next_allocation = min(settings.CAPITAL_CYCLE_NEXT_ALLOCATION, cycle.startingCapital)
         protected_profit = realized_profit - next_allocation
 
         if protected_profit < Decimal("0.00"):
@@ -190,8 +190,8 @@ class CapitalCycleService:
 
         next_number = latest.cycleNumber + 1
         next_id = f"cycle-{next_number}"
-        alloc_cap = latest.nextCycleAllocation or settings.CAPITAL_CYCLE_NEXT_ALLOCATION
-        target_cap = settings.CAPITAL_CYCLE_TARGET
+        alloc_cap = latest.nextCycleAllocation or min(settings.CAPITAL_CYCLE_NEXT_ALLOCATION, latest.startingCapital)
+        target_cap = latest.targetCapital or settings.CAPITAL_CYCLE_TARGET
 
         payload = CapitalCycleCreate(
             cycleId=next_id,

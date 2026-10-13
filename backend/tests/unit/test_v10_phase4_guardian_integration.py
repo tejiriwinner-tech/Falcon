@@ -94,6 +94,7 @@ def test_setup():
     cycle_repo = CapitalCycleRepository(storage=cycle_storage)
     journal_repo = TradeJournalRepository.__new__(TradeJournalRepository)
     journal_repo._storage = journal_storage
+    journal_repo.clear()
 
     cycle_service = CapitalCycleService(repository=cycle_repo)
     guardian_service = CapitalGuardianService(

@@ -2,7 +2,7 @@
 Falcon AI Co-Pilot Service (Pillar 3)
 Conversational reasoning engine providing structured, deterministic answers for:
 1. Trade Rationale: Technical confirmation, sniper entry, risk-reward, and SMC context.
-2. Streak & Risk State: Consecutive losses, recovery multiplier (1x/2x/4x), $20 loss ceiling headroom.
+2. Streak & Risk State: Consecutive losses, recovery multiplier (1x/2x/4x), and loss recovery headroom.
 3. Forensic Learning: Root cause diagnostics, lesson learned, adaptive parameter tuning.
 4. Strategy & Capital: Active capital cycles, strategy portfolio health, and system parameters.
 """
@@ -123,9 +123,9 @@ class CopilotService:
             # Live market grounded benchmark for symbol
             entry, sl, tp, rr, pattern, timeframe, analysis = self._get_benchmark_trade(symbol, direction, multiplier)
 
-        smc_alignment = (
-            f"Institutional {direction} order flow mitigation. Clean sweep of external session liquidity "
-            f"followed by internal Fair Value Gap (FVG) rebalance and discount/premium pricing."
+        session_alignment = (
+            f"Institutional {direction} session breakout execution. Clean corridor expansion outside session boundaries "
+            f"confirmed by Relative Volume (RVol >= 1.8x) and statistical volatility exhaustion margins."
         )
 
         entry_str = f"{entry:.2f}" if "XAU" in symbol else f"{entry:.4f}"
@@ -136,18 +136,18 @@ class CopilotService:
 
 **1. Technical Confirmation & Trigger Condition**
 - **Pattern**: `{pattern}` on timeframe `{timeframe}`.
-- **Trigger**: Price executed at market `{entry_str}` upon liquidity sweep confirmation and M5 Change of Character (CHoCH).
+- **Trigger**: Price executed at market `{entry_str}` upon session boundary breakout and volume expansion confirmation.
 - **Market Structure**: {analysis}
 
-**2. Smart Money Concepts (SMC) Alignment**
-- {smc_alignment}
-- **Structural Invalidation**: Stop Loss set strictly beyond invalidation wick at `{sl_str}`.
-- **Target Liquidity**: Take Profit aimed at unmitigated opposing liquidity at `{tp_str}`.
+**2. Session Momentum & Volume Expansion Alignment**
+- {session_alignment}
+- **Structural Invalidation**: Stop Loss set strictly beyond session corridor boundary at `{sl_str}`.
+- **Target Liquidity**: Take Profit aimed at volume expansion projection at `{tp_str}`.
 
 **3. Risk-Reward & Recovery Target**
 - **Risk-to-Reward Ratio**: `1:{rr:.1f} R:R`
 - **Dynamic Loss-Recovery Multiplier**: `{multiplier:.1f}x` ({recovery_status})
-- **Capital Guardian Gate**: Trade authorized within the **$20.00 maximum entertaining loss ceiling**.
+- **Capital Guardian Gate**: Trade authorized within active capital risk allocation limits.
 """
 
         tech_context = {
@@ -159,7 +159,7 @@ class CopilotService:
             "risk_reward": rr,
             "timeframe": timeframe,
             "sniper_pattern": pattern,
-            "smc_alignment": smc_alignment,
+            "session_alignment": session_alignment,
             "confidence": 88.0,
         }
 
@@ -209,11 +209,11 @@ class CopilotService:
   * `2 Losses` ➔ `4.0x` quadrupled target with strict structural invalidation
   * `1 Win` ➔ Clean instant reset back to `1.0x` baseline and `$0.00` deficit
 
-**2. Hard Loss Ceiling Headroom**
-- **Max Entertaining Loss Ceiling**: `${float(max_loss):.2f}`
+**2. Risk & Capital Capacity**
+- **Risk Capacity Ceiling**: `${float(max_loss):.2f}`
 - **Accumulated Streak Deficit**: `-${float(streak_loss):.2f}`
 - **Remaining Headroom**: `${float(headroom):.2f}`
-- **Circuit Breaker Rule**: Falcon will reject any proposed trade if accumulated loss + trade risk exceeds `${float(max_loss):.2f}`.
+- **Protection Rule**: Capital Guardian actively safeguards trading equity and isolates protected profit reserves.
 
 **3. Active Capital & Protected Reserves**
 - **Active Trading Capital**: `${active_cap:.2f}` (Cycle `#{cycle_num}`)
@@ -322,12 +322,12 @@ class CopilotService:
 - **Cycle Status**: `{cycle_status}`
 
 **2. Active Core Strategies**
-1. **SMC Liquidity Hunter (M15/H1)**: Specializes in Asian session high/low sweeps and institutional order blocks.
-2. **Trend Continuation Sniper (M5/M15)**: Executes on break-of-structure (BOS) and Fair Value Gap (FVG) retests.
-3. **Mean Reversion Wick Defense (M5)**: Deploys adaptive ATR expansion buffers during erratic market volatility.
+1. **Session Momentum & Liquidity Breakout (M5/M15)**: Capitalizes on London Open / NY Overlap momentum expansions.
+2. **Multi-Timeframe Volume Expansion (M15/H1)**: Confirms institutional order flow and volume participation.
+3. **Statistical Volatility Exhaustion (M5)**: Deploys dynamic ATR expansion buffers during erratic market volatility.
 
 **3. Autonomous Governance & Risk Safeguards**
-- **Capital Guardian**: ACTIVE (Enforces hard $20.00 loss ceiling across streak).
+- **Capital Guardian**: ACTIVE (Enforces active capital preservation and isolates banked profits).
 - **Dynamic Loss-Recovery Engine**: Multiplier `{loss_metrics.profit_recovery_multiplier:.1f}x` ({loss_metrics.recovery_status}).
 - **Instant Market Execution**: Grounded to live real-time bid/ask quotes.
 """
@@ -361,7 +361,7 @@ class CopilotService:
 
         response = f"""### 🦅 Welcome to Falcon AI Co-Pilot
 
-Falcon is an autonomous institutional trading system operating under Smart Money Concepts (SMC) and rigid Capital Guardian safeguards.
+Falcon is an autonomous institutional trading system operating under Session Momentum & Multi-Timeframe Volume Expansion with rigid Capital Guardian safeguards.
 
 **You can ask me:**
 - **Trade Rationale**: *"Why did you trigger this Gold buy?"* or *"Why SELL GBP/USD?"*
@@ -373,7 +373,7 @@ Falcon is an autonomous institutional trading system operating under Smart Money
 **Active System Quick-Facts:**
 - Active Trading Capital: `${active_cap:.2f}`
 - Loss-Recovery Multiplier: `{loss_metrics.profit_recovery_multiplier:.1f}x` ({loss_metrics.recovery_status})
-- Headroom Remaining: `${float(loss_metrics.max_entertaining_loss - loss_metrics.accumulated_streak_loss):.2f}` under `$20.00` ceiling
+- Remaining Risk Capacity: `${float(loss_metrics.max_entertaining_loss - loss_metrics.accumulated_streak_loss):.2f}`
 """
 
         tech_context = {

@@ -286,40 +286,29 @@ class AdaptiveRuleTuningEngine:
 
         max_loss = getattr(settings, "MAX_ENTERTAINING_LOSS", Decimal("20.00"))
 
+        # Targets are NEVER stretched after losses (no martingale-style 2x/4x).
+        # Stretching TP after a loss lowers the next trade's hit probability exactly
+        # when the account is in drawdown. Streaks are reported only; drawdown is
+        # controlled by percentage risk / daily loss limits in RiskBudgetService.
+        multiplier = 1.0
         if consecutive_losses == 0:
-            multiplier = 1.0
             status = "BASELINE"
             reflection = "Falcon AI: Baseline risk/reward active. Prior trades closed profitably or at breakeven."
-        elif consecutive_losses == 1:
-            multiplier = 2.0
-            status = "RECOVERY_2X"
-            diag = f" Learned from prior exit: {last_lesson_learned}" if last_lesson_learned else ""
+        elif consecutive_losses < 3:
+            status = f"STREAK_{consecutive_losses}"
+            diag = f" Lesson from last exit: {last_lesson_learned}" if last_lesson_learned else ""
             reflection = (
-                f"Falcon AI Adaptation [1 Loss Detected | -${accumulated_streak_loss:.2f}]: "
-                f"Doubling profit target (2.0x) on next signal to recover prior loss in one clean execution.{diag}"
-            )
-        elif consecutive_losses == 2:
-            multiplier = 4.0
-            status = "RECOVERY_4X"
-            diag = f" Strategic diagnostic: {last_lesson_learned}" if last_lesson_learned else ""
-            reflection = (
-                f"Falcon AI Adaptation [2 Consecutive Losses | -${accumulated_streak_loss:.2f}]: "
-                f"Quadrupling profit target (4.0x) with tight structural invalidation to recover streak deficit.{diag}"
+                f"Falcon AI [{consecutive_losses} consecutive loss(es) | -${accumulated_streak_loss:.2f}]: "
+                f"Targets unchanged at strategy R:R; position size follows fixed % risk.{diag}"
             )
         else:
-            multiplier = 1.0
-            status = "RECOVERY_LOCKED"
+            status = "STREAK_CAUTION"
             reflection = (
-                f"Falcon AI Circuit Breaker [{consecutive_losses} Consecutive Losses | -${accumulated_streak_loss:.2f}]: "
-                f"Maximum loss ceiling defense engaged. Multiplier locked to 1.0x baseline to preserve capital."
+                f"Falcon AI Caution [{consecutive_losses} consecutive losses | -${accumulated_streak_loss:.2f}]: "
+                f"Losing streak detected. Daily loss limit and drawdown pause protect the account."
             )
 
-        if accumulated_streak_loss >= max_loss:
-            status = "RECOVERY_LOCKED"
-            reflection = (
-                f"Falcon AI Circuit Breaker: Accumulated streak loss (-${accumulated_streak_loss:.2f}) "
-                f"reached or exceeded Falcon's ${max_loss:.2f} maximum entertaining loss ceiling. Circuit breaker active."
-            )
+
 
         return LossRecoveryMetrics(
             consecutive_losses=consecutive_losses,

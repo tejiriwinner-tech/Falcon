@@ -79,12 +79,37 @@ class Settings:
     # Account equity the trade journal analytics are measured against
     STARTING_EQUITY: float = float(os.getenv("STARTING_EQUITY", "10000"))
 
-    # Capital Cycle Configuration (V10 Phase 2 & 3)
-    CAPITAL_CYCLE_STARTING_CAPITAL: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_STARTING_CAPITAL", "20.00"))
-    CAPITAL_CYCLE_TARGET: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_TARGET", "500.00"))
-    CAPITAL_CYCLE_NEXT_ALLOCATION: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_NEXT_ALLOCATION", "20.00"))
+    # Capital Cycle Configuration (Unconstrained Institutional Mode)
+    CAPITAL_CYCLE_STARTING_CAPITAL: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_STARTING_CAPITAL", "10000.00"))
+    CAPITAL_CYCLE_TARGET: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_TARGET", "50000.00"))
+    CAPITAL_CYCLE_NEXT_ALLOCATION: Decimal = Decimal(os.getenv("CAPITAL_CYCLE_NEXT_ALLOCATION", "10000.00"))
     MAX_SIMULTANEOUS_TRADES: int = int(os.getenv("MAX_SIMULTANEOUS_TRADES", "3"))
-    MAX_ENTERTAINING_LOSS: Decimal = Decimal(os.getenv("MAX_ENTERTAINING_LOSS", "20.00"))
+    MAX_ENTERTAINING_LOSS: Decimal = Decimal(os.getenv("MAX_ENTERTAINING_LOSS", "999999.00"))
+
+    # Percentage-based risk management (replaces fixed $ ceilings; scales with equity)
+    RISK_PER_TRADE_PCT: float = float(os.getenv("RISK_PER_TRADE_PCT", "1.0"))        # % of equity risked per trade
+    DAILY_LOSS_LIMIT_PCT: float = float(os.getenv("DAILY_LOSS_LIMIT_PCT", "3.0"))    # stop opening trades for the UTC day
+    MAX_DRAWDOWN_PAUSE_PCT: float = float(os.getenv("MAX_DRAWDOWN_PAUSE_PCT", "10.0"))  # pause new trades from equity peak
+    MAX_OPEN_RISK_PCT: float = float(os.getenv("MAX_OPEN_RISK_PCT", "5.0"))          # total risk across open trades
+
+    # Currency cluster correlation firewall & aggregate risk cap (Cluster Risk Cap)
+    ENABLE_CURRENCY_CLUSTER_GATE: bool = os.getenv("ENABLE_CURRENCY_CLUSTER_GATE", "false").lower() == "true"
+    MAX_CURRENCY_CLUSTER_EXPOSURE: int = int(os.getenv("MAX_CURRENCY_CLUSTER_EXPOSURE", "2"))
+    MAX_CURRENCY_CLUSTER_RISK_PCT: float = float(os.getenv("MAX_CURRENCY_CLUSTER_RISK_PCT", "2.0"))
+
+    # Strategy auto-disable: pause a strategy whose rolling expectancy turns negative
+    STRATEGY_AUTODISABLE_ENABLED: bool = os.getenv("STRATEGY_AUTODISABLE_ENABLED", "true").lower() == "true"
+    STRATEGY_AUTODISABLE_WINDOW: int = int(os.getenv("STRATEGY_AUTODISABLE_WINDOW", "30"))
+    STRATEGY_AUTODISABLE_MIN_TRADES: int = int(os.getenv("STRATEGY_AUTODISABLE_MIN_TRADES", "20"))
+
+    # High-impact news blackout window (minutes before/after event)
+    NEWS_BLACKOUT_ENABLED: bool = os.getenv("NEWS_BLACKOUT_ENABLED", "true").lower() == "true"
+    NEWS_BLACKOUT_MINUTES_BEFORE: int = int(os.getenv("NEWS_BLACKOUT_MINUTES_BEFORE", "15"))
+    NEWS_BLACKOUT_MINUTES_AFTER: int = int(os.getenv("NEWS_BLACKOUT_MINUTES_AFTER", "15"))
+
+    # Friday Market Close & Weekend Gap Guard (Friday Sunset Protocol)
+    FRIDAY_SUNSET_ENABLED: bool = os.getenv("FRIDAY_SUNSET_ENABLED", "true").lower() == "true"
+    FRIDAY_SUNSET_CUTOFF_HOUR_UTC: int = int(os.getenv("FRIDAY_SUNSET_CUTOFF_HOUR_UTC", "20"))
 
     # Signal pipeline data source configuration
     # When true: TrendService and IndicatorService read from price_history via MarketHistoryAdapter

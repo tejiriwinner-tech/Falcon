@@ -52,127 +52,158 @@ class CandleData {
       };
 }
 
-class OrderBlockOverlay {
-  final String symbol;
-  final String timeframe;
-  final String blockType; // 'BULLISH' or 'BEARISH'
+class SessionRangeOverlay {
+  final String sessionName; // 'ASIAN', 'LONDON', 'NY_OVERLAP', 'NEW_YORK'
   final double high;
   final double low;
   final double openPrice;
   final double closePrice;
-  final bool isMitigated;
-  final DateTime formedAt;
+  final String status; // 'INTACT', 'BROKEN_UP', 'BROKEN_DOWN'
+  final double rangePips;
 
-  const OrderBlockOverlay({
-    required this.symbol,
-    required this.timeframe,
-    required this.blockType,
+  const SessionRangeOverlay({
+    required this.sessionName,
     required this.high,
     required this.low,
     required this.openPrice,
     required this.closePrice,
-    required this.isMitigated,
-    required this.formedAt,
+    required this.status,
+    required this.rangePips,
   });
 
-  bool get isBullish => blockType.toUpperCase() == 'BULLISH';
+  bool get isAsian => sessionName.toUpperCase() == 'ASIAN';
+  bool get isLondon => sessionName.toUpperCase() == 'LONDON';
+  bool get isNy => sessionName.toUpperCase().contains('NY');
 
-  factory OrderBlockOverlay.fromJson(Map<String, dynamic> json) {
-    return OrderBlockOverlay(
-      symbol: json['symbol'] as String? ?? '',
-      timeframe: json['timeframe'] as String? ?? '',
-      blockType: json['block_type'] as String? ?? 'BULLISH',
+  factory SessionRangeOverlay.fromJson(Map<String, dynamic> json) {
+    return SessionRangeOverlay(
+      sessionName: json['session_name'] as String? ?? 'ASIAN',
       high: (json['high'] as num).toDouble(),
       low: (json['low'] as num).toDouble(),
-      openPrice: (json['open_price'] as num?)?.toDouble() ?? (json['low'] as num).toDouble(),
-      closePrice: (json['close_price'] as num?)?.toDouble() ?? (json['high'] as num).toDouble(),
-      isMitigated: json['is_mitigated'] as bool? ?? false,
-      formedAt: json['formed_at'] != null ? DateTime.parse(json['formed_at'] as String) : DateTime.now(),
+      openPrice: (json['open_price'] as num?)?.toDouble() ?? 0.0,
+      closePrice: (json['close_price'] as num?)?.toDouble() ?? 0.0,
+      status: json['status'] as String? ?? 'INTACT',
+      rangePips: (json['range_pips'] as num?)?.toDouble() ?? 0.0,
     );
   }
 }
 
-class FvgOverlay {
-  final String symbol;
-  final String timeframe;
-  final String gapType; // 'BULLISH' or 'BEARISH'
-  final double top;
-  final double bottom;
-  final double sizePips;
-  final bool isMitigated;
-  final DateTime formedAt;
+class VolumeExpansionOverlay {
+  final DateTime timestamp;
+  final String direction; // 'BULLISH' or 'BEARISH'
+  final double rvol;
+  final double breakoutPrice;
+  final double targetPrice;
+  final double invalidationPrice;
+  final double spreadRatio;
 
-  const FvgOverlay({
-    required this.symbol,
-    required this.timeframe,
-    required this.gapType,
-    required this.top,
-    required this.bottom,
-    required this.sizePips,
-    required this.isMitigated,
-    required this.formedAt,
+  const VolumeExpansionOverlay({
+    required this.timestamp,
+    required this.direction,
+    required this.rvol,
+    required this.breakoutPrice,
+    required this.targetPrice,
+    required this.invalidationPrice,
+    required this.spreadRatio,
   });
 
-  bool get isBullish => gapType.toUpperCase() == 'BULLISH';
+  bool get isBullish => direction.toUpperCase() == 'BULLISH';
 
-  factory FvgOverlay.fromJson(Map<String, dynamic> json) {
-    return FvgOverlay(
-      symbol: json['symbol'] as String? ?? '',
-      timeframe: json['timeframe'] as String? ?? '',
-      gapType: json['gap_type'] as String? ?? 'BULLISH',
-      top: (json['top'] as num).toDouble(),
-      bottom: (json['bottom'] as num).toDouble(),
-      sizePips: (json['size_pips'] as num?)?.toDouble() ?? 0.0,
-      isMitigated: json['is_mitigated'] as bool? ?? false,
-      formedAt: json['formed_at'] != null ? DateTime.parse(json['formed_at'] as String) : DateTime.now(),
+  factory VolumeExpansionOverlay.fromJson(Map<String, dynamic> json) {
+    return VolumeExpansionOverlay(
+      timestamp: json['timestamp'] != null
+          ? DateTime.tryParse(json['timestamp'].toString()) ?? DateTime.now()
+          : DateTime.now(),
+      direction: json['direction'] as String? ?? 'BULLISH',
+      rvol: (json['rvol'] as num?)?.toDouble() ?? 1.8,
+      breakoutPrice: (json['breakout_price'] as num).toDouble(),
+      targetPrice: (json['target_price'] as num).toDouble(),
+      invalidationPrice: (json['invalidation_price'] as num).toDouble(),
+      spreadRatio: (json['spread_ratio'] as num?)?.toDouble() ?? 0.65,
     );
   }
 }
 
-class SMCStructureData {
-  final String symbol;
-  final String timeframe;
-  final List<OrderBlockOverlay> orderBlocks;
-  final List<FvgOverlay> fairValueGaps;
-  final int totalOrderBlocks;
-  final int totalFairValueGaps;
-  final int unmitigatedOrderBlocks;
-  final int unmitigatedFairValueGaps;
+class VolatilityZoneOverlay {
+  final double upperBand;
+  final double lowerBand;
+  final double meanLevel;
+  final double currentSigma;
+  final bool isExhausted;
+  final String exhaustionState;
+  final double rsiValue;
 
-  const SMCStructureData({
-    required this.symbol,
-    required this.timeframe,
-    required this.orderBlocks,
-    required this.fairValueGaps,
-    required this.totalOrderBlocks,
-    required this.totalFairValueGaps,
-    required this.unmitigatedOrderBlocks,
-    required this.unmitigatedFairValueGaps,
+  const VolatilityZoneOverlay({
+    required this.upperBand,
+    required this.lowerBand,
+    required this.meanLevel,
+    required this.currentSigma,
+    required this.isExhausted,
+    required this.exhaustionState,
+    required this.rsiValue,
   });
 
-  factory SMCStructureData.empty([String symbol = '', String timeframe = '']) => SMCStructureData(
-    symbol: symbol,
-    timeframe: timeframe,
-    orderBlocks: const [],
-    fairValueGaps: const [],
-    totalOrderBlocks: 0,
-    totalFairValueGaps: 0,
-    unmitigatedOrderBlocks: 0,
-    unmitigatedFairValueGaps: 0,
-  );
+  factory VolatilityZoneOverlay.fromJson(Map<String, dynamic> json) {
+    return VolatilityZoneOverlay(
+      upperBand: (json['upper_band'] as num).toDouble(),
+      lowerBand: (json['lower_band'] as num).toDouble(),
+      meanLevel: (json['mean_level'] as num).toDouble(),
+      currentSigma: (json['current_sigma'] as num?)?.toDouble() ?? 0.0,
+      isExhausted: json['is_exhausted'] as bool? ?? false,
+      exhaustionState: json['exhaustion_state'] as String? ?? 'NORMAL',
+      rsiValue: (json['rsi_value'] as num?)?.toDouble() ?? 50.0,
+    );
+  }
+}
 
-  factory SMCStructureData.fromJson(Map<String, dynamic> json) {
-    final rawObs = json['order_blocks'] as List<dynamic>? ?? [];
-    final rawFvgs = json['fair_value_gaps'] as List<dynamic>? ?? [];
-    return SMCStructureData(
+class SessionBreakoutStructureData {
+  final String symbol;
+  final String timeframe;
+  final List<SessionRangeOverlay> sessionRanges;
+  final List<VolumeExpansionOverlay> volumeExpansions;
+  final VolatilityZoneOverlay? volatilityZone;
+  final String activeSession;
+  final bool isBreakoutConfirmed;
+
+  const SessionBreakoutStructureData({
+    required this.symbol,
+    required this.timeframe,
+    required this.sessionRanges,
+    required this.volumeExpansions,
+    this.volatilityZone,
+    required this.activeSession,
+    required this.isBreakoutConfirmed,
+  });
+
+  factory SessionBreakoutStructureData.empty([String symbol = '', String timeframe = '']) =>
+      SessionBreakoutStructureData(
+        symbol: symbol,
+        timeframe: timeframe,
+        sessionRanges: const [],
+        volumeExpansions: const [],
+        volatilityZone: null,
+        activeSession: 'LONDON',
+        isBreakoutConfirmed: false,
+      );
+
+  factory SessionBreakoutStructureData.fromJson(Map<String, dynamic> json) {
+    final rawRanges = json['session_ranges'] as List<dynamic>? ?? [];
+    final rawVol = json['volume_expansions'] as List<dynamic>? ?? [];
+    return SessionBreakoutStructureData(
       symbol: json['symbol'] as String? ?? '',
       timeframe: json['timeframe'] as String? ?? '',
-      orderBlocks: rawObs.map((x) => OrderBlockOverlay.fromJson(x as Map<String, dynamic>)).toList(),
-      fairValueGaps: rawFvgs.map((x) => FvgOverlay.fromJson(x as Map<String, dynamic>)).toList(),
-      totalOrderBlocks: json['total_order_blocks'] as int? ?? rawObs.length,
-      totalFairValueGaps: json['total_fair_value_gaps'] as int? ?? rawFvgs.length,
-      unmitigatedOrderBlocks: json['unmitigated_order_blocks'] as int? ?? 0,
-      unmitigatedFairValueGaps: json['unmitigated_fair_value_gaps'] as int? ?? 0,
+      sessionRanges: rawRanges
+          .map((x) => SessionRangeOverlay.fromJson(x as Map<String, dynamic>))
+          .toList(),
+      volumeExpansions: rawVol
+          .map((x) => VolumeExpansionOverlay.fromJson(x as Map<String, dynamic>))
+          .toList(),
+      volatilityZone: json['volatility_zone'] != null
+          ? VolatilityZoneOverlay.fromJson(
+              json['volatility_zone'] as Map<String, dynamic>)
+          : null,
+      activeSession: json['active_session'] as String? ?? 'LONDON',
+      isBreakoutConfirmed: json['is_breakout_confirmed'] as bool? ?? false,
     );
   }
 }
