@@ -1,3 +1,31 @@
+class ActionChipData {
+  final String label;
+  final String action;
+  final Map<String, dynamic> payload;
+
+  ActionChipData({
+    required this.label,
+    required this.action,
+    required this.payload,
+  });
+
+  factory ActionChipData.fromJson(Map<String, dynamic> json) {
+    return ActionChipData(
+      label: json['label'] ?? '',
+      action: json['action'] ?? '',
+      payload: (json['payload'] as Map<String, dynamic>?) ?? {},
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'label': label,
+      'action': action,
+      'payload': payload,
+    };
+  }
+}
+
 class CopilotQueryResponse {
   final String query;
   final String intent;
@@ -5,6 +33,8 @@ class CopilotQueryResponse {
   final double confidence;
   final Map<String, dynamic>? technicalContext;
   final Map<String, dynamic>? riskContext;
+  final List<ActionChipData> suggestedActions;
+  final String providerUsed;
   final String timestamp;
 
   CopilotQueryResponse({
@@ -14,6 +44,8 @@ class CopilotQueryResponse {
     required this.confidence,
     this.technicalContext,
     this.riskContext,
+    this.suggestedActions = const [],
+    this.providerUsed = 'Falcon Institutional Engine',
     required this.timestamp,
   });
 
@@ -25,6 +57,11 @@ class CopilotQueryResponse {
       confidence: (json['confidence'] as num?)?.toDouble() ?? 0.0,
       technicalContext: json['technical_context'] as Map<String, dynamic>?,
       riskContext: json['risk_context'] as Map<String, dynamic>?,
+      suggestedActions: (json['suggested_actions'] as List<dynamic>?)
+              ?.map((e) => ActionChipData.fromJson(e as Map<String, dynamic>))
+              .toList() ??
+          [],
+      providerUsed: json['provider_used'] ?? 'Falcon Institutional Engine',
       timestamp: json['timestamp'] ?? '',
     );
   }
@@ -37,6 +74,8 @@ class CopilotQueryResponse {
       'confidence': confidence,
       'technical_context': technicalContext,
       'risk_context': riskContext,
+      'suggested_actions': suggestedActions.map((e) => e.toJson()).toList(),
+      'provider_used': providerUsed,
       'timestamp': timestamp,
     };
   }

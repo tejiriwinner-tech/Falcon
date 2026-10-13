@@ -4,6 +4,8 @@ import '../../models/copilot_models.dart';
 import '../../models/candle_data.dart';
 import '../../widgets/cards/app_card.dart';
 import '../../core/constants/app_colors.dart';
+import '../chart/trading_chart_screen.dart';
+import '../signals/signals_screen.dart';
 
 class CopilotScreen extends StatefulWidget {
   const CopilotScreen({super.key});
@@ -19,6 +21,8 @@ class _ChatMessage {
   final double? confidence;
   final Map<String, dynamic>? technicalContext;
   final Map<String, dynamic>? riskContext;
+  final List<ActionChipData>? suggestedActions;
+  final String? providerUsed;
   final DateTime timestamp;
 
   _ChatMessage({
@@ -28,6 +32,8 @@ class _ChatMessage {
     this.confidence,
     this.technicalContext,
     this.riskContext,
+    this.suggestedActions,
+    this.providerUsed,
     required this.timestamp,
   });
 }
@@ -41,6 +47,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
   final List<_ChatMessage> _messages = [];
   bool _isQuerying = false;
   String _selectedSymbol = 'XAUUSD';
+  String _activeModelBadge = 'Gemini 3.5 Flash Lite';
 
   // Briefing state
   IntelligenceBriefing? _currentBriefing;
@@ -63,6 +70,81 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     'Explain the session breakout corridors for EURUSD',
   ];
 
+  String _formatProviderBadge(String provider) {
+    final lower = provider.toLowerCase();
+    if (lower.contains('gemini-3.5-flash-lite')) {
+      return 'Gemini 3.5 Flash Lite';
+    } else if (lower.contains('gemini-3.8-flash')) {
+      return 'Gemini 3.8 Flash';
+    } else if (lower.contains('gemini')) {
+      return 'Google Gemini';
+    } else if (lower.contains('gpt-4o')) {
+      return 'OpenAI GPT-4o';
+    } else if (lower.contains('claude')) {
+      return 'Claude 3.5 Sonnet';
+    } else if (lower.contains('deterministic')) {
+      return 'Deterministic Fallback';
+    }
+    return provider;
+  }
+
+  void _handleActionChip(ActionChipData chip) {
+    final action = chip.action.toUpperCase();
+    if (action == 'OPEN_CHART') {
+      final symbol = (chip.payload['symbol'] as String?) ?? _selectedSymbol;
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => TradingChartScreen(symbol: symbol),
+        ),
+      );
+    } else if (action == 'VIEW_SIGNAL') {
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => const SignalsScreen(),
+        ),
+      );
+    } else if (action == 'VIEW_CALENDAR' || action == 'VIEW_BRIEFING' || action == 'VIEW_CORRIDORS') {
+      _tabController.animateTo(1);
+    } else if (action == 'AUDIT_RISK') {
+      final query = chip.payload['query'] as String? ?? 'What is our current streak and recovery headroom?';
+      _sendQuery(query);
+    } else if (action == 'QUERY') {
+      final query = chip.payload['query'] as String? ?? chip.label;
+      _sendQuery(query);
+    } else {
+      if (chip.payload.containsKey('query')) {
+        _sendQuery(chip.payload['query'] as String);
+      } else if (chip.payload.containsKey('symbol')) {
+        final symbol = chip.payload['symbol'] as String;
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => TradingChartScreen(symbol: symbol),
+          ),
+        );
+      }
+    }
+  }
+
+  IconData _getIconForAction(String action) {
+    switch (action.toUpperCase()) {
+      case 'OPEN_CHART':
+        return Icons.candlestick_chart_rounded;
+      case 'VIEW_SIGNAL':
+        return Icons.sensors_rounded;
+      case 'AUDIT_RISK':
+        return Icons.shield_outlined;
+      case 'VIEW_CALENDAR':
+        return Icons.calendar_today_rounded;
+      case 'VIEW_BRIEFING':
+      case 'VIEW_CORRIDORS':
+        return Icons.newspaper_rounded;
+      case 'QUERY':
+        return Icons.chat_bubble_outline_rounded;
+      default:
+        return Icons.arrow_forward_rounded;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -75,6 +157,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
         text: 'Greetings Trader. I am Falcon AI Co-Pilot—your institutional Session Momentum, Forensic Learning, and Capital Guardian intelligence.\n\nAsk me about trade rationales, current streak recovery progress, forensic lessons committed to memory, or session breakout corridors.',
         intent: 'GREETING',
         confidence: 1.0,
+        providerUsed: 'Google Gemini (gemini-3.5-flash-lite)',
         timestamp: DateTime.now(),
       ),
     );
@@ -95,6 +178,18 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     final clean = queryText.trim();
     if (clean.isEmpty || _isQuerying) return;
 
+    // Collect multi-turn conversation history (last 6 turns before this prompt)
+    final priorTurns = _messages
+        .where((m) => m.intent != 'ERROR')
+        .toList();
+    final recentTurns = priorTurns.length > 6
+        ? priorTurns.sublist(priorTurns.length - 6)
+        : priorTurns;
+    final conversationHistory = recentTurns.map((m) => {
+      'role': m.isUser ? 'user' : 'assistant',
+      'content': m.text,
+    }).toList();
+
     setState(() {
       _messages.add(_ChatMessage(
         isUser: true,
@@ -108,9 +203,14 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     _scrollToBottom();
 
     try {
-      final response = await _apiService.queryCopilot(clean, symbol: _selectedSymbol);
+      final response = await _apiService.queryCopilot(
+        clean,
+        symbol: _selectedSymbol,
+        conversationHistory: conversationHistory,
+      );
       if (!mounted) return;
       setState(() {
+        _activeModelBadge = _formatProviderBadge(response.providerUsed);
         _messages.add(_ChatMessage(
           isUser: false,
           text: response.response,
@@ -118,6 +218,8 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
           confidence: response.confidence,
           technicalContext: response.technicalContext,
           riskContext: response.riskContext,
+          suggestedActions: response.suggestedActions,
+          providerUsed: response.providerUsed,
           timestamp: DateTime.now(),
         ));
         _isQuerying = false;
@@ -375,11 +477,39 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.auto_awesome, color: AppColors.primary, size: 22),
-            SizedBox(width: 8),
-            Text('Falcon AI Co-Pilot'),
+            const Row(
+              children: [
+                Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
+                SizedBox(width: 8),
+                Text('Falcon AI Co-Pilot', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 2),
+            Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFF00E676),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 5),
+                Text(
+                  _activeModelBadge,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
         bottom: TabBar(
@@ -568,9 +698,11 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
                     child: const Icon(Icons.auto_awesome, color: AppColors.primary, size: 16),
                   ),
                   const SizedBox(width: 8),
-                  const Text(
-                    'Falcon Intelligence',
-                    style: TextStyle(
+                  Text(
+                    msg.providerUsed != null
+                        ? _formatProviderBadge(msg.providerUsed!)
+                        : 'Falcon Intelligence',
+                    style: const TextStyle(
                       color: AppColors.primary,
                       fontSize: 13,
                       fontWeight: FontWeight.bold,
@@ -658,6 +790,35 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
                       ),
                     ],
                   ),
+                ),
+              ],
+
+              // Interactive Action Chips
+              if (msg.suggestedActions != null && msg.suggestedActions!.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: msg.suggestedActions!.map((actionChip) {
+                    return ActionChip(
+                      avatar: Icon(
+                        _getIconForAction(actionChip.action),
+                        size: 14,
+                        color: AppColors.primary,
+                      ),
+                      label: Text(
+                        actionChip.label,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      backgroundColor: AppColors.surfaceLight,
+                      side: BorderSide(color: AppColors.primary.withValues(alpha: 0.35)),
+                      onPressed: () => _handleActionChip(actionChip),
+                    );
+                  }).toList(),
                 ),
               ],
             ],

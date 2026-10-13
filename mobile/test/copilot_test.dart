@@ -21,6 +21,14 @@ void main() {
           'recovery_multiplier': '2.0x',
           'remaining_loss_headroom': '14.50',
         },
+        'suggested_actions': [
+          {
+            'label': 'View XAUUSD Chart',
+            'action': 'OPEN_CHART',
+            'payload': {'symbol': 'XAUUSD'},
+          }
+        ],
+        'provider_used': 'Google Gemini (gemini-3.5-flash-lite)',
         'timestamp': '2026-09-29T14:00:00Z',
       };
 
@@ -32,6 +40,11 @@ void main() {
       expect(response.technicalContext?['symbol'], 'XAUUSD');
       expect(response.riskContext?['recovery_multiplier'], '2.0x');
       expect(response.riskContext?['remaining_loss_headroom'], '14.50');
+      expect(response.suggestedActions.length, 1);
+      expect(response.suggestedActions[0].action, 'OPEN_CHART');
+      expect(response.suggestedActions[0].label, 'View XAUUSD Chart');
+      expect(response.suggestedActions[0].payload['symbol'], 'XAUUSD');
+      expect(response.providerUsed, 'Google Gemini (gemini-3.5-flash-lite)');
     });
 
     test('IntelligenceBriefing deserializes correctly', () {
@@ -110,8 +123,9 @@ void main() {
         ),
       );
 
-      // Verify app bar title
+      // Verify app bar title and active model badge (in AppBar & welcome message bubble)
       expect(find.text('Falcon AI Co-Pilot'), findsOneWidget);
+      expect(find.text('Gemini 3.5 Flash Lite'), findsNWidgets(2));
 
       // Verify tabs exist
       expect(find.text('AI Co-Pilot'), findsOneWidget);

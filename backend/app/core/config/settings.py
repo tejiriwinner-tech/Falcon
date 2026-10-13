@@ -148,6 +148,15 @@ class Settings:
     SIGNAL_QUALITY_EXPERIMENT_VERSION: str = os.getenv("SIGNAL_QUALITY_EXPERIMENT_VERSION", "1.0.0")
     SIGNAL_QUALITY_MIN_SAMPLE_SIZE: int = int(os.getenv("SIGNAL_QUALITY_MIN_SAMPLE_SIZE", "10"))
 
+    # Falcon AI Co-Pilot Intelligence Layer
+    GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    OPENAI_API_KEY: Optional[str] = os.getenv("OPENAI_API_KEY")
+    ANTHROPIC_API_KEY: Optional[str] = os.getenv("ANTHROPIC_API_KEY")
+    COPILOT_PRIMARY_PROVIDER: str = os.getenv("COPILOT_PRIMARY_PROVIDER", "gemini").lower()
+    COPILOT_MODEL_NAME: str = os.getenv("COPILOT_MODEL_NAME", "gemini-3.5-flash-lite")
+    COPILOT_MAX_TOKENS: int = int(os.getenv("COPILOT_MAX_TOKENS", "1024"))
+    COPILOT_TEMPERATURE: float = float(os.getenv("COPILOT_TEMPERATURE", "0.2"))
+
 settings = Settings()
 
 

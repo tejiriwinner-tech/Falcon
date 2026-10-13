@@ -47,7 +47,7 @@ class ApiService {
   }
   static const int timeoutSeconds = 30; // Resilient cloud cold-start & network buffer (30s)
   static const int briefingTimeoutSeconds = 15;
-  static const int copilotTimeoutSeconds = 15;
+  static const int copilotTimeoutSeconds = 30;
 
   // Simple in-memory cache to reduce server load
   static final Map<String, dynamic> _cache = {};
@@ -620,13 +620,19 @@ class ApiService {
   // ── Pillar 1 & 3 — Falcon AI Co-Pilot, Briefings & Session Breakouts ───────
 
   /// POST /copilot/query — Ask Falcon AI Co-Pilot a natural language question.
-  Future<CopilotQueryResponse> queryCopilot(String query, {String? symbol}) async {
+  Future<CopilotQueryResponse> queryCopilot(
+    String query, {
+    String? symbol,
+    List<Map<String, String>>? conversationHistory,
+  }) async {
     final url = '$baseUrl/copilot/query';
     print('Calling: $url');
     try {
       final body = jsonEncode({
         'query': query,
         if (symbol != null && symbol.isNotEmpty) 'symbol': symbol,
+        if (conversationHistory != null && conversationHistory.isNotEmpty)
+          'conversation_history': conversationHistory,
       });
       final response = await http
           .post(

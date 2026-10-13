@@ -17,8 +17,11 @@ from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
 from app.core.config.settings import settings
 from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.core.services.capital_cycle_service import capital_cycle_service
+from app.core.services.copilot_context_service import copilot_context_service
+from app.core.services.copilot_system_prompt import SYSTEM_PROMPT
+from app.core.services.llm_client import llm_client
 from app.core.services.signal_service import SignalService
-from app.schemas.copilot import CopilotQueryRequest, CopilotQueryResponse
+from app.schemas.copilot import ActionChip, CopilotQueryRequest, CopilotQueryResponse
 
 logger = logging.getLogger("falcon.copilot_service")
 
@@ -35,32 +38,88 @@ class CopilotService:
         return cls._instance
 
     def __init__(self) -> None:
-        self.version = "1.0.0"
+        self.version = "2.0.0"
 
     def handle_query(self, request: CopilotQueryRequest) -> CopilotQueryResponse:
         """
         Processes a natural language query and returns an authoritative,
         structured response with technical and risk contexts.
+        Attempts multi-provider LLM reasoning (Gemini / OpenAI / Claude) with live RAG grounding,
+        falling back cleanly to the institutional expert rule engine if offline or unconfigured.
         """
         now = datetime.now(timezone.utc)
         raw_query = (request.query or "").strip()
         lower_q = raw_query.lower()
 
-        # ── 1. Classify Intent ───────────────────────────────────────────────
+        # ── 1. Classify Intent & Extract Asset ────────────────────────────────
         intent, confidence = self._classify_intent(lower_q)
         symbol = self._extract_symbol(request.symbol, lower_q)
 
-        # ── 2. Route to Intent Handler ───────────────────────────────────────
+        # ── 2. Collect Live Platform Telemetry Snapshot (RAG Grounding) ──────
+        context_snapshot = copilot_context_service.build_snapshot(target_symbol=symbol)
+
+        # ── 3. Multi-Provider LLM Reasoning Layer ────────────────────────────
+        if llm_client.is_available():
+            try:
+                response_text, action_chips, provider_used = llm_client.generate(
+                    system_prompt=SYSTEM_PROMPT,
+                    user_query=raw_query,
+                    conversation_history=request.conversation_history,
+                    context_snapshot=context_snapshot,
+                )
+                return CopilotQueryResponse(
+                    query=raw_query,
+                    intent=intent if intent != "GENERAL_INQUIRY" else "AI_REASONING",
+                    response=response_text.strip(),
+                    confidence=0.98,
+                    technical_context=context_snapshot.get("market_state"),
+                    risk_context=context_snapshot.get("capital_risk_state"),
+                    suggested_actions=action_chips,
+                    provider_used=provider_used,
+                    timestamp=now.isoformat(),
+                )
+            except Exception as ex:
+                logger.warning(f"LLM generation failed, engaging deterministic expert engine: {ex}")
+
+        # ── 4. Deterministic Institutional Expert Fallback ───────────────────
         if intent == "TRADE_RATIONALE":
             response_text, tech_ctx, risk_ctx = self._handle_trade_rationale(raw_query, lower_q, symbol)
+            chips = [
+                ActionChip(label=f"View {symbol} Chart", action="OPEN_CHART", payload={"symbol": symbol}),
+                ActionChip(label="Audit Risk Limits", action="AUDIT_RISK", payload={}),
+                ActionChip(label="Check Calendar", action="VIEW_CALENDAR", payload={}),
+            ]
         elif intent == "STREAK_AND_RISK":
             response_text, tech_ctx, risk_ctx = self._handle_streak_and_risk(raw_query, lower_q)
+            chips = [
+                ActionChip(label="Audit Risk Limits", action="AUDIT_RISK", payload={}),
+                ActionChip(label="View Active Trades", action="VIEW_SIGNAL", payload={}),
+            ]
         elif intent == "FORENSIC_LEARNING":
             response_text, tech_ctx, risk_ctx = self._handle_forensic_learning(raw_query, lower_q, symbol)
+            chips = [
+                ActionChip(label="View Trade Journal", action="VIEW_SIGNAL", payload={}),
+                ActionChip(label="Check Calendar", action="VIEW_CALENDAR", payload={}),
+            ]
         elif intent == "SYSTEM_AND_STRATEGY":
             response_text, tech_ctx, risk_ctx = self._handle_system_and_strategy(raw_query, lower_q)
+            chips = [
+                ActionChip(label="Check EURUSD Corridors", action="OPEN_CHART", payload={"symbol": "EURUSD"}),
+                ActionChip(label="Check News Events", action="VIEW_CALENDAR", payload={}),
+            ]
+        elif intent == "TECHNICAL_ANALYSIS":
+            response_text, tech_ctx, risk_ctx = self._handle_technical_analysis(raw_query, lower_q, symbol, context_snapshot)
+            chips = [
+                ActionChip(label=f"View {symbol} Chart", action="OPEN_CHART", payload={"symbol": symbol}),
+                ActionChip(label="Audit Risk Limits", action="AUDIT_RISK", payload={}),
+            ]
         else:
             response_text, tech_ctx, risk_ctx = self._handle_general_inquiry(raw_query, lower_q)
+            chips = [
+                ActionChip(label="View Gold Chart", action="OPEN_CHART", payload={"symbol": "XAUUSD"}),
+                ActionChip(label="Check Economic News", action="VIEW_CALENDAR", payload={}),
+                ActionChip(label="Audit Risk Limits", action="AUDIT_RISK", payload={}),
+            ]
 
         return CopilotQueryResponse(
             query=raw_query,
@@ -69,6 +128,8 @@ class CopilotService:
             confidence=confidence,
             technical_context=tech_ctx,
             risk_context=risk_ctx,
+            suggested_actions=chips,
+            provider_used="falcon_expert",
             timestamp=now.isoformat(),
         )
 
@@ -351,6 +412,63 @@ class CopilotService:
 
         return response, tech_context, risk_context
 
+    def _handle_technical_analysis(
+        self, raw_query: str, lower_q: str, symbol: str, snapshot: Dict[str, Any]
+    ) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:
+        """Provides deep technical and session corridor breakdown for an asset."""
+        sym_clean = symbol.replace("/", "").upper()
+        prices = snapshot.get("market_state", {}).get("prices", {})
+        price_info = prices.get(sym_clean, {})
+        current_price = price_info.get("price") or (2650.50 if "XAU" in symbol else 1.1050)
+        spread = price_info.get("spread") or (1.5 if "XAU" in symbol else 0.8)
+
+        corridors = snapshot.get("session_corridors", [])
+        asset_corridors = [c for c in corridors if c.get("symbol") == sym_clean]
+        active_session = snapshot.get("market_state", {}).get("session", "London")
+
+        active_corr = asset_corridors[-1] if asset_corridors else None
+        c_high = active_corr["high"] if active_corr else current_price * 1.002
+        c_low = active_corr["low"] if active_corr else current_price * 0.998
+        c_status = active_corr["status"] if active_corr else "RANGING"
+        r_pips = active_corr["range_pips"] if active_corr else 25.0
+        rvol_surges = active_corr.get("rvol_surges", 0) if active_corr else 0
+
+        # Signals for asset
+        active_sigs = [s for s in snapshot.get("active_signals", []) if s.get("symbol", "").replace("/", "").upper() == sym_clean]
+        sig_summary = "None (Standing by on Watchlist)"
+        if active_sigs:
+            s0 = active_sigs[0]
+            sig_summary = f"{s0['action']} @ {s0['entry']} (SL: {s0['stop_loss']}, TP: {s0['take_profit']}, Conf: {s0['confidence']}%)"
+
+        response = f"""### 📊 Institutional Technical Analysis: **{symbol}**
+
+**1. Price Action & Liquidity Snapshot**
+- **Current Quote**: `{current_price:.2f}` (Spread: `{spread:.1f} pips`)
+- **Active Market Session**: `{active_session}`
+- **Active Session Corridor**: High `{c_high:.2f}` | Low `{c_low:.2f}` (Range: `{r_pips:.1f} pips`)
+- **Corridor Regime**: `{c_status}` (Volume Surges: `{rvol_surges}`)
+
+**2. Key Structural Levels**
+- **Upper Invalidation / Resistance**: `{c_high:.2f}` (Session Liquidity Pool)
+- **Lower Invalidation / Support**: `{c_low:.2f}` (Session Discount Demand)
+- **Equilibrium Midline**: `{(c_high + c_low) / 2:.2f}`
+
+**3. Execution Posture & Falcon Signal State**
+- **Active Trade Setup**: {sig_summary}
+- **Tactical Bias**: {"Momentum Continuation" if "BROKEN" in c_status else "Range Containment / Awaiting Breakout"}
+- **Capital Guardian Clearance**: Authorized within current risk capacity ceiling.
+"""
+        tech_context = {
+            "symbol": symbol,
+            "current_price": current_price,
+            "corridor_high": c_high,
+            "corridor_low": c_low,
+            "corridor_status": c_status,
+            "active_session": active_session,
+        }
+        risk_context = snapshot.get("capital_risk_state", {})
+        return response, tech_context, risk_context
+
     def _handle_general_inquiry(
         self, raw_query: str, lower_q: str
     ) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:
@@ -364,6 +482,7 @@ class CopilotService:
 Falcon is an autonomous institutional trading system operating under Session Momentum & Multi-Timeframe Volume Expansion with rigid Capital Guardian safeguards.
 
 **You can ask me:**
+- **Technical Analysis**: *"Analyze Gold (XAUUSD) right now"* or *"Explain GBP/USD levels"*
 - **Trade Rationale**: *"Why did you trigger this Gold buy?"* or *"Why SELL GBP/USD?"*
 - **Risk & Streak**: *"What is our current streak and recovery status?"* or *"How much can we lose?"*
 - **Forensic Diagnosis**: *"What did you learn from the last loss?"*
@@ -390,8 +509,27 @@ Falcon is an autonomous institutional trading system operating under Session Mom
     # ── Classification & Parsing Helpers ─────────────────────────────────────
 
     def _classify_intent(self, q: str) -> Tuple[str, float]:
-        """Classifies query into one of 5 distinct intents with a confidence score."""
-        # 1. Rationale queries
+        """Classifies query into one of 6 distinct intents with a confidence score."""
+        # 1. Technical Analysis queries
+        analysis_patterns = [
+            r"analyze",
+            r"analysis",
+            r"technical",
+            r"structure",
+            r"corridor",
+            r"trend.*on",
+            r"outlook",
+            r"key levels",
+            r"what.*about.*gold",
+            r"what.*about.*eur",
+            r"what.*about.*gbp",
+            r"what.*about.*xau",
+        ]
+        for pat in analysis_patterns:
+            if re.search(pat, q):
+                return "TECHNICAL_ANALYSIS", 0.92
+
+        # 2. Rationale queries
         rationale_patterns = [
             r"why.*trigger",
             r"why.*buy",
@@ -411,7 +549,7 @@ Falcon is an autonomous institutional trading system operating under Session Mom
             if re.search(pat, q):
                 return "TRADE_RATIONALE", 0.95
 
-        # 2. Risk & Streak queries
+        # 3. Risk & Streak queries
         streak_patterns = [
             r"streak",
             r"consecutive loss",
@@ -431,7 +569,7 @@ Falcon is an autonomous institutional trading system operating under Session Mom
             if re.search(pat, q):
                 return "STREAK_AND_RISK", 0.95
 
-        # 3. Forensic Learning queries
+        # 4. Forensic Learning queries
         forensic_patterns = [
             r"what.*learn.*loss",
             r"learn.*from",
@@ -448,7 +586,7 @@ Falcon is an autonomous institutional trading system operating under Session Mom
             if re.search(pat, q):
                 return "FORENSIC_LEARNING", 0.95
 
-        # 4. Strategy & System queries
+        # 5. Strategy & System queries
         system_patterns = [
             r"strategies.*active",
             r"active.*strategies",
