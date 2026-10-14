@@ -139,7 +139,8 @@ class ApiService {
         
         return fromJson(data as Map<String, dynamic>);
       } else {
-        throw Exception('Server error: ${response.statusCode} - ${response.reasonPhrase} for $url');
+        final errorDetail = _extractErrorMessage(response);
+        throw Exception('Server error: ${response.statusCode} - $errorDetail');
       }
     } on http.ClientException catch (e) {
       print("ClientException ($url): $e");
@@ -197,6 +198,24 @@ class ApiService {
     }
   }
 
+  String _extractErrorMessage(http.Response response) {
+    try {
+      final decoded = jsonDecode(response.body);
+      if (decoded is Map<String, dynamic>) {
+        if (decoded.containsKey('detail') && decoded['detail'] != null) {
+          return decoded['detail'].toString();
+        } else if (decoded.containsKey('message') && decoded['message'] != null) {
+          return decoded['message'].toString();
+        }
+      }
+    } catch (_) {
+      if (response.body.isNotEmpty && response.body.length < 250) {
+        return response.body;
+      }
+    }
+    return response.reasonPhrase ?? 'Unknown Server Error';
+  }
+
   Future<T> _send<T>(
     String method,
     String endpoint,
@@ -219,7 +238,8 @@ class ApiService {
       if (response.statusCode == 200 || response.statusCode == 201) {
         return fromJson(jsonDecode(response.body) as Map<String, dynamic>);
       }
-      throw Exception('Server error: ${response.statusCode} - ${response.reasonPhrase} for $url');
+      final errorDetail = _extractErrorMessage(response);
+      throw Exception('Server error: ${response.statusCode} - $errorDetail');
     } on http.ClientException catch (e) {
       print("ClientException ($url): $e");
       throw Exception('Network connection failed. Please check your connection to the server.');
@@ -254,7 +274,8 @@ class ApiService {
         final List<dynamic> data = jsonDecode(response.body);
         return data.map((e) => fromJson(e as Map<String, dynamic>)).toList();
       } else {
-        throw Exception('Server error: ${response.statusCode} - ${response.reasonPhrase} for $url');
+        final errorDetail = _extractErrorMessage(response);
+        throw Exception('Server error: ${response.statusCode} - $errorDetail');
       }
     } on http.ClientException catch (e) {
       print("ClientException ($url): $e");

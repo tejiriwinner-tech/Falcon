@@ -133,14 +133,15 @@ class CapitalGuardianService:
         monetary_risk: Optional[Decimal | float] = None,
         symbol: Optional[str] = None,
         is_verified_risk: bool = False,
+        allow_breakeven: bool = False,
     ) -> Decimal:
         """
         Deterministically calculate account-currency monetary worst-case loss at stop-loss.
         
         Strict Safety Invariants:
         1. Direction must be 'BUY' or 'SELL'.
-        2. BUY: stop_loss must be strictly < entry_price and > 0.
-        3. SELL: stop_loss must be strictly > entry_price and > 0.
+        2. BUY: stop_loss must be strictly < entry_price and > 0 (unless allow_breakeven=True).
+        3. SELL: stop_loss must be strictly > entry_price and > 0 (unless allow_breakeven=True).
         4. Arbitrary caller monetary_risk is ignored unless is_verified_risk is True.
         5. Position quantity or lot_size must be strictly positive.
         6. Instrument must have validated USD quote currency or conversion layer.
@@ -161,12 +162,16 @@ class CapitalGuardianService:
 
         if dir_clean == "BUY":
             if sl >= entry:
+                if allow_breakeven:
+                    return Decimal("0.00")
                 raise ValueError(
                     f"Invalid stop loss for BUY trade: stop loss ({sl}) must be strictly below entry price ({entry})"
                 )
             price_risk = entry - sl
         else:  # SELL
             if sl <= entry:
+                if allow_breakeven:
+                    return Decimal("0.00")
                 raise ValueError(
                     f"Invalid stop loss for SELL trade: stop loss ({sl}) must be strictly above entry price ({entry})"
                 )
@@ -278,6 +283,16 @@ class CapitalGuardianService:
 
     def get_trade_worst_case_loss(self, t: TradeJournalItem) -> Decimal:
         """Calculates or extracts worst-case monetary loss for an individual trade."""
+        # 1. Check if trade is at or beyond breakeven (BE_PROTECTED or stopLoss at/beyond entry)
+        dir_clean = str(t.direction).strip().upper()
+        try:
+            entry = Decimal(str(t.entryPrice))
+            sl = Decimal(str(t.stopLoss))
+            if (dir_clean == "BUY" and sl >= entry) or (dir_clean == "SELL" and sl <= entry) or "BE_PROTECTED" in (t.notes or ""):
+                return Decimal("0.00")
+        except Exception:
+            pass
+
         if getattr(t, "initialMonetaryRisk", None) is not None and Decimal(str(t.initialMonetaryRisk)) > 0:
             return Decimal(str(t.initialMonetaryRisk)).quantize(Decimal("0.01"))
         return self.calculate_trade_worst_case_loss(
@@ -287,6 +302,7 @@ class CapitalGuardianService:
             lot_size=Decimal("0.01"),
             symbol=t.symbol,
             is_verified_risk=False,
+            allow_breakeven=True,
         )
 
     def evaluate_proposed_trade(
@@ -402,8 +418,11 @@ class CapitalGuardianService:
 
         remaining_capacity = active_capital - current_agg_loss
 
-        # Enforce Hard 3-Trade Limit
-        if current_count >= max_trades:
+        # Enforce Hard 3-Trade Limit on capital-reserving risk trades
+        risk_bearing_trades = [t for t in live_trades if self.get_trade_worst_case_loss(t) > Decimal("0.00")]
+        risk_bearing_count = len(risk_bearing_trades)
+
+        if risk_bearing_count >= max_trades:
             return CapitalGuardianDecision(
                 allowed=False,
                 reason=f"Maximum simultaneous capital-reserving trades ({max_trades}) reached",

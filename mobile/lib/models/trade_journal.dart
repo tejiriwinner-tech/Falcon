@@ -111,6 +111,7 @@ class TradeJournalItem {
 }
 
 class TradeJournalDraft {
+  final int? signalId;
   final String? strategyId;
   final String symbol;
   final String direction;
@@ -124,8 +125,14 @@ class TradeJournalDraft {
   final int confidence;
   final String reasonForEntry;
   final String? notes;
+  final String? strategyVersion;
+  final String? adaptiveRuleVersion;
+  final double? adaptiveStopMultiplier;
+  final double? spreadAtEntry;
+  final double? atrAtEntry;
 
   TradeJournalDraft({
+    this.signalId,
     this.strategyId,
     required this.symbol,
     required this.direction,
@@ -139,10 +146,16 @@ class TradeJournalDraft {
     this.confidence = 0,
     required this.reasonForEntry,
     this.notes,
+    this.strategyVersion,
+    this.adaptiveRuleVersion,
+    this.adaptiveStopMultiplier,
+    this.spreadAtEntry,
+    this.atrAtEntry,
   });
 
   Map<String, dynamic> toJson() {
     return {
+      'signalId': signalId,
       'strategyId': strategyId,
       'symbol': symbol,
       'direction': direction,
@@ -158,6 +171,11 @@ class TradeJournalDraft {
       'confidence': confidence,
       'reasonForEntry': reasonForEntry,
       'notes': notes,
+      'strategyVersion': strategyVersion,
+      'adaptiveRuleVersion': adaptiveRuleVersion,
+      'adaptiveStopMultiplier': adaptiveStopMultiplier,
+      'spreadAtEntry': spreadAtEntry,
+      'atrAtEntry': atrAtEntry,
     };
   }
 }

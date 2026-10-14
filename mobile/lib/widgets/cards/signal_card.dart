@@ -1011,6 +1011,7 @@ class _SignalCardState extends State<SignalCard> {
     try {
       final apiService = ApiService();
       final draft = TradeJournalDraft(
+        signalId: widget.signal.id,
         strategyId: widget.signal.strategyId.isNotEmpty ? widget.signal.strategyId : 'falcon-sniper',
         symbol: widget.signal.symbol,
         direction: widget.signal.action,
@@ -1024,6 +1025,7 @@ class _SignalCardState extends State<SignalCard> {
         confidence: widget.signal.confidence,
         reasonForEntry: 'Manual Execution via Mobile (⚡ I Placed This)',
         notes: 'Tracked Live [Falcon Mobile Execution: ${widget.signal.symbol} ${widget.signal.action}]',
+        strategyVersion: widget.signal.strategyVersion,
       );
 
       await apiService.createTradeJournal(draft);

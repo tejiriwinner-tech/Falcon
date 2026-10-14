@@ -55,6 +55,20 @@ def create_trade_journal(trade: TradeJournalCreate):
             atr_at_entry=trade.atrAtEntry,
         )
         if not decision.allowed or res_item is None:
+            # Check if this is a manual user execution via mobile UI ("⚡ I Placed This")
+            is_manual = (
+                "Manual Execution" in (trade.reasonForEntry or "")
+                or "⚡ I Placed This" in (trade.reasonForEntry or "")
+                or "Tracked Live" in (trade.notes or "")
+                or "Falcon Mobile Execution" in (trade.notes or "")
+            )
+            if is_manual:
+                # User has already entered on MT5; record the trade in the journal with advisory note
+                # so the position is actively tracked and protected rather than rejected.
+                notes_advisory = f"{trade.notes or ''} | [MANUAL_OVERRIDE | GUARDIAN_ADVISORY: {decision.reason}]"
+                trade.notes = notes_advisory.strip(" | ")
+                return trade_journal_repository.create_trade(trade)
+
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Capital Guardian rejected trade: {decision.reason}",
