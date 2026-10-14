@@ -39,6 +39,11 @@ class SignalItem(BaseModel):
     trailingStopBuffer: Optional[float] = None
     htfTrendBias: Optional[str] = None
     atr14: Optional[float] = None
+    # Institutional Precision & Intra-Candle Delta Fields
+    quantGrade: Optional[str] = None
+    estDeltaBadge: Optional[str] = None
+    tacticalAdvice: Optional[str] = None
+    isBreakevenProtected: Optional[bool] = False
 
 class SignalListResponse(BaseModel):
     signals: List[SignalItem]

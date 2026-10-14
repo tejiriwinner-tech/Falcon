@@ -441,36 +441,110 @@ class SignalOutcomeResolver:
                 ask = quote.bidAsk.ask
                 spread = quote.bidAsk.spread
 
+            # Phase 5C & Precision: Track post-fill excursion first for OPEN/FILLED trades
+            if (trade.status or "").upper() in ("OPEN", "FILLED"):
+                obs_time = getattr(quote, "timestamp", now)
+                obs_price = bid if (direction == "BUY" and bid and bid > 0) else (
+                    ask if (direction == "SELL" and ask and ask > 0) else current_price
+                )
+                if obs_price and obs_price > 0:
+                    from app.core.analytics.execution_quality_service import execution_quality_service
+                    new_peak, new_trough, cur_mfe_r, cur_mae_r = execution_quality_service.update_open_trade_excursion(
+                        trade=trade,
+                        observed_price=obs_price,
+                        observation_time=obs_time,
+                    )
+                    if new_peak != trade.peakPrice or new_trough != trade.troughPrice:
+                        trade.peakPrice = new_peak
+                        trade.troughPrice = new_trough
+                        trade.mfeR = cur_mfe_r
+                        trade.maeR = cur_mae_r
+                        trade_update = TradeJournalUpdate(
+                            peakPrice=new_peak,
+                            troughPrice=new_trough,
+                            mfeR=cur_mfe_r,
+                            maeR=cur_mae_r,
+                        )
+                        try:
+                            trade_journal_repository.update_trade(trade.id, trade_update, session=session)
+                        except Exception as ex:
+                            logger.warning(f"Error updating open trade excursion for trade #{trade.id}: {ex}")
+
+            # Institutional Round-Trip Protection: Evaluate Breakeven and TP1 Scale-Out BEFORE exit breach
+            initial_sl = getattr(trade, "initialStopLoss", None) or trade.stopLoss
+            risk_d = abs(entry - initial_sl)
+            if risk_d <= 1e-6:
+                risk_d = abs(entry - stop_loss)
+
+            is_buy = direction == "BUY"
+            be_threshold = entry + risk_d if is_buy else entry - risk_d
+            tp1_threshold = entry + (1.5 * risk_d) if is_buy else entry - (1.5 * risk_d)
+
+            # Max excursion reached across lifetime of this trade
+            max_reach = trade.peakPrice if (is_buy and trade.peakPrice) else (trade.troughPrice if (not is_buy and trade.troughPrice) else current_price)
+
+            be_reached = (
+                (trade.mfeR is not None and trade.mfeR >= 1.0)
+                or "BE_PROTECTED" in (trade.notes or "")
+                or (is_buy and (current_price >= be_threshold or (bid > 0 and bid >= be_threshold) or max_reach >= be_threshold))
+                or (not is_buy and (current_price <= be_threshold or (ask > 0 and ask <= be_threshold) or max_reach <= be_threshold))
+            )
+
+            tp1_hit = (
+                (trade.mfeR is not None and trade.mfeR >= 1.5)
+                or "TP1_REACHED" in (trade.notes or "")
+                or "TP1_SCALED_OUT_50" in (trade.notes or "")
+                or (is_buy and (current_price >= tp1_threshold or (bid > 0 and bid >= tp1_threshold) or max_reach >= tp1_threshold))
+                or (not is_buy and (current_price <= tp1_threshold or (ask > 0 and ask <= tp1_threshold) or max_reach <= tp1_threshold))
+            )
+
+            if be_reached and "BE_PROTECTED" not in (trade.notes or ""):
+                notes_append = " | [BE_PROTECTED: Locked at entry at +1.0R]"
+                if tp1_hit and "TP1" not in (trade.notes or ""):
+                    notes_append += " | [TP1_SCALED_OUT_50: 50% profit banked at +1.5R]"
+                new_notes = f"{trade.notes or 'Falcon'}{notes_append}"
+                trade.stopLoss = entry
+                trade.notes = new_notes
+                stop_loss = entry
+                try:
+                    trade_journal_repository.update_trade(trade.id, TradeJournalUpdate(stopLoss=entry, notes=new_notes), session=session)
+                    logger.info(f"Promoted trade #{trade.id} to Breakeven protection (stopLoss={entry})")
+                except Exception as ex:
+                    logger.warning(f"Error shifting trade #{trade.id} to breakeven: {ex}")
+            elif be_reached:
+                stop_loss = entry
+                trade.stopLoss = entry
+
             result: Optional[str] = None
             exit_price = current_price
 
             # Evaluate boundary hits
             if direction == "BUY":
-                # For a BUY position, if current price or bid is at/below SL
-                if current_price <= stop_loss or (bid > 0 and bid <= stop_loss):
-                    if "BE_PROTECTED" in (trade.notes or "") or stop_loss >= entry:
+                # Take profit achieved
+                if current_price >= take_profit or (bid > 0 and bid >= take_profit):
+                    result = "WIN"
+                    exit_price = take_profit
+                # Invalidation hit
+                elif current_price <= stop_loss or (bid > 0 and bid <= stop_loss):
+                    if be_reached or "BE_PROTECTED" in (trade.notes or "") or stop_loss >= entry:
                         result = "BREAKEVEN"
-                        exit_price = stop_loss
+                        exit_price = entry
                     else:
                         result = "LOSS"
                         exit_price = stop_loss
-                # If current price or bid is at/above TP -> WIN
-                elif current_price >= take_profit or (bid > 0 and bid >= take_profit):
-                    result = "WIN"
-                    exit_price = take_profit
             elif direction == "SELL":
-                # For a SELL position, if current price or ask is at/above SL
-                if current_price >= stop_loss or (ask > 0 and ask >= stop_loss):
-                    if "BE_PROTECTED" in (trade.notes or "") or stop_loss <= entry:
+                # Take profit achieved
+                if current_price <= take_profit or (ask > 0 and ask <= take_profit):
+                    result = "WIN"
+                    exit_price = take_profit
+                # Invalidation hit
+                elif current_price >= stop_loss or (ask > 0 and ask >= stop_loss):
+                    if be_reached or "BE_PROTECTED" in (trade.notes or "") or stop_loss <= entry:
                         result = "BREAKEVEN"
-                        exit_price = stop_loss
+                        exit_price = entry
                     else:
                         result = "LOSS"
                         exit_price = stop_loss
-                # If current price or ask is at/below TP -> WIN
-                elif current_price <= take_profit or (ask > 0 and ask <= take_profit):
-                    result = "WIN"
-                    exit_price = take_profit
 
             # Handle optional simulation trigger for testing
             if result is None and force_simulate:
@@ -487,54 +561,6 @@ class SignalOutcomeResolver:
 
             if result is None:
                 open_count += 1
-                # Breakthrough 2: Dynamic Multi-Stage Take-Profit (Scale-Out & Breakeven Protection)
-                if (trade.status or "").upper() in ("OPEN", "FILLED"):
-                    risk_d = abs(entry - stop_loss)
-                    if risk_d > 0:
-                        is_buy = direction == "BUY"
-                        be_threshold = entry + risk_d if is_buy else entry - risk_d
-                        tp1_threshold = entry + (1.5 * risk_d) if is_buy else entry - (1.5 * risk_d)
-                        be_reached = (current_price >= be_threshold or (bid > 0 and bid >= be_threshold)) if is_buy else (current_price <= be_threshold or (ask > 0 and ask <= be_threshold))
-
-                        if be_reached and "BE_PROTECTED" not in (trade.notes or ""):
-                            new_notes = f"{trade.notes or 'Falcon'} | [BE_PROTECTED: Locked at entry]"
-                            tp1_hit = (current_price >= tp1_threshold or (bid > 0 and bid >= tp1_threshold)) if is_buy else (current_price <= tp1_threshold or (ask > 0 and ask <= tp1_threshold))
-                            if tp1_hit:
-                                new_notes += " | [TP1_REACHED: +1.5R target reached]"
-                            trade_update = TradeJournalUpdate(
-                                stopLoss=entry,
-                                notes=new_notes,
-                            )
-                            try:
-                                trade_journal_repository.update_trade(trade.id, trade_update, session=session)
-                                logger.info(f"Promoted trade #{trade.id} to Breakeven protection (stopLoss={entry})")
-                            except Exception as ex:
-                                logger.warning(f"Error shifting trade #{trade.id} to breakeven: {ex}")
-
-                # Phase 5C: Track post-fill excursion for OPEN/FILLED trades
-                if (trade.status or "").upper() in ("OPEN", "FILLED") and trade.fillPrice is not None:
-                    obs_time = getattr(quote, "timestamp", now)
-                    obs_price = bid if (direction == "BUY" and bid and bid > 0) else (
-                        ask if (direction == "SELL" and ask and ask > 0) else current_price
-                    )
-                    if obs_price and obs_price > 0:
-                        from app.core.analytics.execution_quality_service import execution_quality_service
-                        new_peak, new_trough, cur_mfe_r, cur_mae_r = execution_quality_service.update_open_trade_excursion(
-                            trade=trade,
-                            observed_price=obs_price,
-                            observation_time=obs_time,
-                        )
-                        if new_peak != trade.peakPrice or new_trough != trade.troughPrice:
-                            trade_update = TradeJournalUpdate(
-                                peakPrice=new_peak,
-                                troughPrice=new_trough,
-                                mfeR=cur_mfe_r,
-                                maeR=cur_mae_r,
-                            )
-                            try:
-                                trade_journal_repository.update_trade(trade.id, trade_update, session=session)
-                            except Exception as ex:
-                                logger.warning(f"Error updating open trade excursion for trade #{trade.id}: {ex}")
                 continue
 
             # Step 4: Calculate PnL and excursion metrics
@@ -572,7 +598,7 @@ class SignalOutcomeResolver:
                 elif result in ("LOSS", "LOST"):
                     realized_r = -round(abs(float(monetary_pnl)) / float(initial_risk), 2)
                 elif result in ("BREAKEVEN", "BE"):
-                    realized_r = 0.75 if "BE_PROTECTED" in (trade.notes or "") else 0.0
+                    realized_r = 0.75 if ("TP1" in (trade.notes or "") or "SCALED_OUT" in (trade.notes or "")) else 0.0
 
             if realized_r is None:
                 if result in ("WIN", "WON"):
@@ -580,7 +606,7 @@ class SignalOutcomeResolver:
                 elif result in ("LOSS", "LOST"):
                     realized_r = -1.0
                 elif result in ("BREAKEVEN", "BE"):
-                    realized_r = 0.75 if "BE_PROTECTED" in (trade.notes or "") else 0.0
+                    realized_r = 0.75 if ("TP1" in (trade.notes or "") or "SCALED_OUT" in (trade.notes or "")) else 0.0
 
             # Phase 5C: Excursion peak / trough & R finalization on close
             from app.core.analytics.execution_quality_service import execution_quality_service

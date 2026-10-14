@@ -16,6 +16,7 @@ Implements deterministic algorithms for:
 """
 
 from datetime import datetime, timezone
+from dataclasses import dataclass
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
 
@@ -44,6 +45,15 @@ def _get_pip_size(symbol: str) -> float:
     elif any(idx in sym for idx in ["US30", "NAS100", "SPX", "GER40", "UK100"]):
         return 1.0
     return 0.0001
+
+
+@dataclass
+class SweepRetestEvaluation:
+    phase: str  # "SWEEP_PROBE", "RETEST_FORMING", "EXPANSION_CONFIRMED", "NO_SWEEP"
+    is_confirmed: bool
+    is_sweep_reversal: bool
+    retest_price: Optional[float]
+    tactical_note: str
 
 
 class SessionBreakoutEngine:
@@ -620,6 +630,141 @@ class SessionBreakoutEngine:
             exhaustion_state="NORMAL",
             rsi_value=54.2,
         )
+
+    def evaluate_sweep_retest(
+        self,
+        symbol: str,
+        direction: str,
+        candles: List[CandleBar],
+        corridors: Optional[List[SessionRange]] = None,
+    ) -> SweepRetestEvaluation:
+        """
+        3-Phase Liquidity Sweep & Retest State Machine:
+        1. SWEEP_PROBE: Price pierced session boundary by 1-12 pips but closed back inside;
+           trapped retail breakout traders (liquidity hunt reversal threat).
+        2. RETEST_FORMING: Clean breakout has occurred, price is actively pulling back to test
+           the broken corridor boundary.
+        3. EXPANSION_CONFIRMED: Retest pulled back, held the level, and printed a confirmation candle
+           closing in the breakout direction.
+        """
+        pip = _get_pip_size(symbol)
+        if not corridors:
+            corridors = self.compute_session_corridors(symbol, candles, allow_benchmark=False)
+
+        if not corridors or len(candles) < 3:
+            return SweepRetestEvaluation(
+                phase="NO_SWEEP",
+                is_confirmed=True,
+                is_sweep_reversal=False,
+                retest_price=None,
+                tactical_note="Direct momentum expansion.",
+            )
+
+        # Focus on Asian corridor first, fallback to first available
+        target_corridor = next((c for c in corridors if c.session_name == SessionName.ASIAN), corridors[0])
+        dir_upper = direction.upper()
+        recent = candles[-4:]
+        curr = recent[-1]
+
+        if dir_upper == "BUY":
+            level = target_corridor.high
+            # Check for sweep probe (wick pierced above level, but close is below)
+            for c in recent:
+                if c.high > level + (0.5 * pip) and curr.close <= level:
+                    return SweepRetestEvaluation(
+                        phase="SWEEP_PROBE",
+                        is_confirmed=False,
+                        is_sweep_reversal=True,
+                        retest_price=level,
+                        tactical_note=f"⚠️ Liquidity Sweep Probe at {level:.5f}. High pierced but closed below. Potential false breakout / reversal trap.",
+                    )
+
+            # Check if breakout occurred
+            if curr.close > level:
+                # Did any recent bar retest the level?
+                retested = any(abs(c.low - level) <= (3.0 * pip) for c in recent[:-1])
+                dist_to_level = (curr.close - level) / pip
+                if retested and curr.close > curr.open:
+                    return SweepRetestEvaluation(
+                        phase="EXPANSION_CONFIRMED",
+                        is_confirmed=True,
+                        is_sweep_reversal=False,
+                        retest_price=level,
+                        tactical_note=f"🟢 Breakout & Retest Confirmed at {level:.5f}. Clean structural expansion.",
+                    )
+                elif dist_to_level <= 4.0:
+                    return SweepRetestEvaluation(
+                        phase="RETEST_FORMING",
+                        is_confirmed=True,
+                        is_sweep_reversal=False,
+                        retest_price=level,
+                        tactical_note=f"⏳ Retest forming at broken session high {level:.5f}. Sniper limit order candidate.",
+                    )
+                else:
+                    return SweepRetestEvaluation(
+                        phase="EXPANSION_CONFIRMED",
+                        is_confirmed=True,
+                        is_sweep_reversal=False,
+                        retest_price=level,
+                        tactical_note=f"Breakout active above session high {level:.5f}.",
+                    )
+            else:
+                return SweepRetestEvaluation(
+                    phase="NO_SWEEP",
+                    is_confirmed=True,
+                    is_sweep_reversal=False,
+                    retest_price=None,
+                    tactical_note="Consolidating inside session corridor.",
+                )
+        else:  # SELL
+            level = target_corridor.low
+            # Check for sweep probe (wick pierced below level, but close is above)
+            for c in recent:
+                if c.low < level - (0.5 * pip) and curr.close >= level:
+                    return SweepRetestEvaluation(
+                        phase="SWEEP_PROBE",
+                        is_confirmed=False,
+                        is_sweep_reversal=True,
+                        retest_price=level,
+                        tactical_note=f"⚠️ Liquidity Sweep Probe at {level:.5f}. Low pierced but closed above. Potential false breakdown / reversal trap.",
+                    )
+
+            # Check if breakdown occurred
+            if curr.close < level:
+                retested = any(abs(c.high - level) <= (3.0 * pip) for c in recent[:-1])
+                dist_to_level = (level - curr.close) / pip
+                if retested and curr.close < curr.open:
+                    return SweepRetestEvaluation(
+                        phase="EXPANSION_CONFIRMED",
+                        is_confirmed=True,
+                        is_sweep_reversal=False,
+                        retest_price=level,
+                        tactical_note=f"🔴 Breakdown & Retest Confirmed at {level:.5f}. Clean structural expansion.",
+                    )
+                elif dist_to_level <= 4.0:
+                    return SweepRetestEvaluation(
+                        phase="RETEST_FORMING",
+                        is_confirmed=True,
+                        is_sweep_reversal=False,
+                        retest_price=level,
+                        tactical_note=f"⏳ Retest forming at broken session low {level:.5f}. Sniper limit order candidate.",
+                    )
+                else:
+                    return SweepRetestEvaluation(
+                        phase="EXPANSION_CONFIRMED",
+                        is_confirmed=True,
+                        is_sweep_reversal=False,
+                        retest_price=level,
+                        tactical_note=f"Breakdown active below session low {level:.5f}.",
+                    )
+            else:
+                return SweepRetestEvaluation(
+                    phase="NO_SWEEP",
+                    is_confirmed=True,
+                    is_sweep_reversal=False,
+                    retest_price=None,
+                    tactical_note="Consolidating inside session corridor.",
+                )
 
 
 session_breakout_engine = SessionBreakoutEngine()

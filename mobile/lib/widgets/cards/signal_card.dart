@@ -346,6 +346,108 @@ class _SignalCardState extends State<SignalCard> {
               ),
             ),
 
+            // Institutional Precision & Quant Audit Pill Row
+            if (widget.signal.quantGrade != null || widget.signal.estDeltaBadge != null || widget.signal.isBreakevenProtected)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  children: [
+                    if (widget.signal.quantGrade != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: (widget.signal.quantGrade == 'A'
+                              ? AppColors.success
+                              : (widget.signal.quantGrade == 'B'
+                                  ? AppColors.primary
+                                  : AppColors.warning)).withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: (widget.signal.quantGrade == 'A'
+                                ? AppColors.success
+                                : (widget.signal.quantGrade == 'B'
+                                    ? AppColors.primary
+                                    : AppColors.warning)).withValues(alpha: 0.35),
+                          ),
+                        ),
+                        child: Text(
+                          widget.signal.quantGrade == 'A'
+                              ? '🏆 GRADE A (PRIME)'
+                              : (widget.signal.quantGrade == 'B'
+                                  ? '🛡️ GRADE B (EXTENDED)'
+                                  : '⚡ GRADE C (ABSORPTION)'),
+                          style: TextStyle(
+                            color: widget.signal.quantGrade == 'A'
+                                ? AppColors.success
+                                : (widget.signal.quantGrade == 'B'
+                                    ? AppColors.primary
+                                    : AppColors.warning),
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    if (widget.signal.estDeltaBadge != null)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceLight,
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.surfaceBorder),
+                        ),
+                        child: Text(
+                          widget.signal.estDeltaBadge!,
+                          style: const TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    if (widget.signal.isBreakevenProtected)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.info.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: AppColors.info.withValues(alpha: 0.4)),
+                        ),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.shield_rounded, size: 11, color: AppColors.info),
+                            SizedBox(width: 4),
+                            Text(
+                              'BE DEFENDED (\$0.00)',
+                              style: TextStyle(
+                                color: AppColors.info,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+            // Tactical Advice Note
+            if (widget.signal.tacticalAdvice != null && widget.signal.tacticalAdvice!.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: Text(
+                  widget.signal.tacticalAdvice!,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 11,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+
             // Price & Risk/Reward details (Tap any value to copy pure number)
             Container(
               color: AppColors.surfaceLight.withValues(alpha: 0.4),

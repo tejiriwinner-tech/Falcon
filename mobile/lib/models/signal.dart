@@ -22,6 +22,10 @@ class Signal {
   final double? breakevenTrigger;
   final double? breakevenPrice;
   final bool isBreakeven;
+  final String? quantGrade;
+  final String? estDeltaBadge;
+  final String? tacticalAdvice;
+  final bool isBreakevenProtected;
 
   const Signal({
     required this.id,
@@ -47,6 +51,10 @@ class Signal {
     this.breakevenTrigger,
     this.breakevenPrice,
     this.isBreakeven = false,
+    this.quantGrade,
+    this.estDeltaBadge,
+    this.tacticalAdvice,
+    this.isBreakevenProtected = false,
   });
 
   /// Unique setup signature for strict deduplication
@@ -76,6 +84,10 @@ class Signal {
     double? breakevenTrigger,
     double? breakevenPrice,
     bool? isBreakeven,
+    String? quantGrade,
+    String? estDeltaBadge,
+    String? tacticalAdvice,
+    bool? isBreakevenProtected,
   }) {
     return Signal(
       id: id ?? this.id,
@@ -101,6 +113,10 @@ class Signal {
       breakevenTrigger: breakevenTrigger ?? this.breakevenTrigger,
       breakevenPrice: breakevenPrice ?? this.breakevenPrice,
       isBreakeven: isBreakeven ?? this.isBreakeven,
+      quantGrade: quantGrade ?? this.quantGrade,
+      estDeltaBadge: estDeltaBadge ?? this.estDeltaBadge,
+      tacticalAdvice: tacticalAdvice ?? this.tacticalAdvice,
+      isBreakevenProtected: isBreakevenProtected ?? this.isBreakevenProtected,
     );
   }
 
@@ -137,6 +153,10 @@ class Signal {
           ? (json['breakevenPrice'] as num).toDouble()
           : null,
       isBreakeven: json['isBreakeven'] as bool? ?? false,
+      quantGrade: json['quantGrade'] as String?,
+      estDeltaBadge: json['estDeltaBadge'] as String?,
+      tacticalAdvice: json['tacticalAdvice'] as String?,
+      isBreakevenProtected: json['isBreakevenProtected'] as bool? ?? false,
     );
   }
 
@@ -165,6 +185,10 @@ class Signal {
       'breakevenTrigger': breakevenTrigger,
       'breakevenPrice': breakevenPrice,
       'isBreakeven': isBreakeven,
+      'quantGrade': quantGrade,
+      'estDeltaBadge': estDeltaBadge,
+      'tacticalAdvice': tacticalAdvice,
+      'isBreakevenProtected': isBreakevenProtected,
     };
   }
 }

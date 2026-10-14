@@ -28,6 +28,7 @@ class CopilotContextService:
             "target_symbol": target_symbol,
             "market_state": self._get_market_state(),
             "session_corridors": self._get_session_corridors(target_symbol),
+            "order_flow_telemetry": self._get_order_flow_telemetry(target_symbol),
             "active_signals": self._get_active_signals(target_symbol),
             "trade_journal_stats": self._get_journal_stats(),
             "capital_risk_state": self._get_capital_risk_state(),
@@ -121,10 +122,52 @@ class CopilotContextService:
                     "timeframe": s.timeframe,
                     "pattern": s.setupPattern,
                     "risk_reward": s.riskReward,
+                    "quant_grade": getattr(s, "quantGrade", None),
+                    "est_delta": getattr(s, "estDeltaBadge", None),
+                    "tactical_advice": getattr(s, "tacticalAdvice", None),
+                    "is_breakeven_protected": getattr(s, "isBreakevenProtected", False),
                 })
         except Exception as ex:
             logger.debug(f"Active signals fetch failed for copilot: {ex}")
         return signals_out
+
+    def _get_order_flow_telemetry(self, target_symbol: Optional[str]) -> List[Dict[str, Any]]:
+        """Extracts intra-candle volume delta and footprint telemetry for active symbols."""
+        results = []
+        try:
+            from app.core.engines.order_flow_engine import order_flow_engine
+            from app.core.services.market_history_service import market_history_service
+
+            syms = [target_symbol.replace("/", "")] if target_symbol else self.CORE_SYMBOLS[:3]
+            for sym in syms:
+                bars = market_history_service.get_bars(sym, timeframe="1h", limit=25)
+                if bars:
+                    from app.core.engines.candlestick_pattern_engine import CandleBar
+                    cb_bars = [
+                        CandleBar(
+                            open=b.open,
+                            high=b.high,
+                            low=b.low,
+                            close=b.close,
+                            volume=b.volume or 0.0,
+                            timestamp=int(b.bar_time.timestamp()) if hasattr(b.bar_time, "timestamp") else None,
+                            time=b.bar_time,
+                        )
+                        for b in bars
+                    ]
+                    decomp = order_flow_engine.analyze_order_flow(candles=cb_bars, symbol=sym)
+                    results.append({
+                        "symbol": sym,
+                        "bar_delta": decomp.bar_delta,
+                        "cvd_20": decomp.cvd_20,
+                        "ofi": decomp.ofi,
+                        "confluence_tag": decomp.confluence_tag,
+                        "is_upper_absorption": decomp.is_upper_absorption,
+                        "is_lower_absorption": decomp.is_lower_absorption,
+                    })
+        except Exception as ex:
+            logger.debug(f"Order flow telemetry aggregation failed: {ex}")
+        return results
 
     def _get_journal_stats(self) -> Dict[str, Any]:
         """Summarizes recent trade journal performance and forensic lessons."""

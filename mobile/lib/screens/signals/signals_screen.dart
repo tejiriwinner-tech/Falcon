@@ -195,6 +195,9 @@ class _SignalsScreenState extends State<SignalsScreen> {
                   // Header section info
                   _buildHeaderInfo(activeSignals.length),
 
+                  if (activeSignals.isEmpty && watchlistSignals.isNotEmpty)
+                    _buildCapitalDefenseBanner(),
+
                   // Signal List
                   Expanded(
                     child: _buildFilteredSignalList(

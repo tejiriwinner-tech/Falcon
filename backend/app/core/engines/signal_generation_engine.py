@@ -62,13 +62,16 @@ class SignalGenerationEngine:
         if base_stop_dist < min_dist:
             base_stop_dist = min_dist
 
+        pip_val = 0.1 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.01 if "JPY" in raw_symbol else 0.0001)
+        struct_buf = 2.0 * pip_val
+
         sniper_stop = None
         sniper_target = None
         if pattern_details:
             if direction == CandidateDirection.BUY and "swing_low" in pattern_details:
-                sniper_stop = pattern_details["swing_low"]
+                sniper_stop = round(pattern_details["swing_low"] - struct_buf, dec_places)
             elif direction == CandidateDirection.SELL and "swing_high" in pattern_details:
-                sniper_stop = pattern_details["swing_high"]
+                sniper_stop = round(pattern_details["swing_high"] + struct_buf, dec_places)
             if "target_price" in pattern_details:
                 sniper_target = pattern_details["target_price"]
             elif sniper_stop is not None:
@@ -449,17 +452,31 @@ class SignalGenerationEngine:
                                 )
                                 # Ensure macro flow does not directly contradict breakout
                                 macro_conflicts = (broken_up and conv_obj.htf_trend_bias == "BEARISH") or (broken_down and conv_obj.htf_trend_bias == "BULLISH")
-                                if conv_obj.total_score >= 60.0 and not macro_conflicts:
+                                sweep_eval = session_breakout_engine.evaluate_sweep_retest(canonical_symbol, b_dir_str, candles_1h, corridors)
+                                if conv_obj.total_score >= 60.0 and not macro_conflicts and sweep_eval.phase != "SWEEP_PROBE":
                                     direction = CandidateDirection.BUY if broken_up else CandidateDirection.SELL
+                                    
+                                    # Sniper Limit / Retest Order framing
+                                    if sweep_eval.retest_price:
+                                        entry_price = sweep_eval.retest_price
+
+                                    # True Structural Stop anchored 2 pips beyond corridor
+                                    target_corr = next((c for c in corridors if getattr(c, "session_name", None) in (SessionStatus.ASIAN, "Asian")), corridors[0]) if corridors else None
+                                    struct_sl = None
+                                    if target_corr:
+                                        pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
+                                        struct_sl = (target_corr.low - 2.0 * pip_u) if broken_up else (target_corr.high + 2.0 * pip_u)
+
                                     sl_b, tp1_b, tp2_b, _, _ = session_breakout_engine.calculate_trade_levels(
                                         symbol=canonical_symbol,
                                         direction=b_dir_str,
                                         entry_price=entry_price,
                                         candles=candles_1h,
+                                        structure_sl=struct_sl,
                                     )
                                     has_sniper_setup = True
                                     pattern_conviction = conv_obj.composite_score / 100.0
-                                    sniper_trigger_rule = f"Session Corridor ({session}) confirmed breakout with {recent_exp.rvol:.1f}x RVol surge"
+                                    sniper_trigger_rule = f"Session Corridor ({session}) {sweep_eval.tactical_note} with {recent_exp.rvol:.1f}x RVol surge"
                                     sniper_stop = sl_b
                                     sniper_target = tp1_b
                                     sniper_rationale = f"Institutional session breakout confirmed in {session}. Target TP1 @ {tp1_b}, TP2 @ {tp2_b}."

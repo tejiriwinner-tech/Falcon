@@ -171,6 +171,7 @@ class SignalService:
                 )
                 ot_htf_bias, _, _ = session_breakout_engine.compute_htf_trend_bias(ot.symbol, raw_candles)
 
+                is_be_prot = "BE_PROTECTED" in (ot.notes or "") or (ot.stopLoss >= ot.entryPrice if ot.direction.upper() == "BUY" else ot.stopLoss <= ot.entryPrice)
                 active_signal = SignalItem(
                     id=ot.signalId or ot.id,
                     symbol=ot.symbol,
@@ -194,13 +195,17 @@ class SignalService:
                     isPinned=True,
                     breakevenTrigger=round(be_trig, dec),
                     breakevenPrice=round(ot.entryPrice, dec),
-                    isBreakeven=False,
+                    isBreakeven=is_be_prot,
                     takeProfit1=ot_tp1,
                     takeProfit2=ot_tp2,
                     scaleOutPercentage=50.0,
                     trailingStopBuffer=ot_trail_buf,
                     htfTrendBias=ot_htf_bias,
                     atr14=ot_atr,
+                    quantGrade="A" if is_be_prot else "B",
+                    estDeltaBadge="🛡️ BE Protected ($0.00 Risk)" if is_be_prot else "🟢 Active Momentum",
+                    tacticalAdvice="Trade defended at breakeven ($0.00 risk)" if is_be_prot else "Target TP1 and TP2 runners",
+                    isBreakevenProtected=is_be_prot,
                 )
                 signals.append(active_signal)
 
@@ -261,6 +266,7 @@ class SignalService:
                 risk_d = abs(ct.entryPrice - ct.stopLoss)
                 be_trig = ct.entryPrice + risk_d if ct.direction.upper() == "BUY" else ct.entryPrice - risk_d
 
+                is_be_res = res_str in ("BREAKEVEN", "BE") or "BE_PROTECTED" in (ct.notes or "")
                 resolved_signal = SignalItem(
                     id=ct.signalId or ct.id,
                     symbol=ct.symbol,
@@ -284,7 +290,11 @@ class SignalService:
                     isPinned=False,
                     breakevenTrigger=round(be_trig, dec),
                     breakevenPrice=round(ct.entryPrice, dec),
-                    isBreakeven=res_str in ("BREAKEVEN", "BE"),
+                    isBreakeven=is_be_res,
+                    quantGrade="A" if outcome_status == "WON" else ("B" if is_be_res else "C"),
+                    estDeltaBadge="🏆 Win Secured" if outcome_status == "WON" else ("🛡️ Capital Defended" if is_be_res else "🛑 Stopped Out"),
+                    tacticalAdvice=analysis_msg,
+                    isBreakevenProtected=is_be_res,
                 )
                 signals.append(resolved_signal)
         except Exception as ex:
@@ -331,7 +341,7 @@ class SignalService:
                             continue
                         if candidate.status == CandidateStatus.REJECTED:
                             continue
-                        if candidate.confidence < 80:
+                        if candidate.confidence < 50:
                             continue
 
                         # Omit candidates older than 6 hours to eliminate ancient stale clutter
@@ -892,6 +902,34 @@ class SignalService:
         )
         htf_bias, _, _ = session_breakout_engine.compute_htf_trend_bias(candidate.symbol, cand_candles)
 
+        # Quantitative Intra-Candle & Institutional Risk Auditor
+        from app.core.engines.htf_structure_engine import htf_structure_engine
+        from app.core.engines.order_flow_engine import order_flow_engine
+        from app.core.engines.risk_auditor_engine import institutional_risk_auditor
+
+        htf_res = htf_structure_engine.check_htf_alignment(
+            symbol=candidate.symbol,
+            direction=cand_dir,
+            entry_price=entry_price,
+            bars_1h=cand_candles,
+        )
+        of_res = order_flow_engine.analyze_order_flow(
+            candles=cand_candles,
+            symbol=candidate.symbol,
+        )
+        vol_zone = session_breakout_engine.compute_volatility_exhaustion(candidate.symbol, cand_candles)
+        sweep_eval = session_breakout_engine.evaluate_sweep_retest(candidate.symbol, cand_dir, cand_candles)
+
+        audit_res = institutional_risk_auditor.audit(
+            symbol=candidate.symbol,
+            direction=cand_dir,
+            base_conviction=float(candidate.confidence),
+            htf_result=htf_res,
+            order_flow=of_res,
+            current_sigma=vol_zone.current_sigma,
+            is_sweep_confirmed=sweep_eval.is_confirmed,
+        )
+
         # Calculate Breakeven targets (1:1 Risk-Reward threshold for risk-free protection)
         risk_dist = abs(entry_price - stop_loss)
         if direction_val == "BUY":
@@ -1020,6 +1058,10 @@ class SignalService:
             trailingStopBuffer=trail_buf,
             htfTrendBias=htf_bias,
             atr14=atr_val,
+            quantGrade=audit_res.grade,
+            estDeltaBadge=audit_res.est_delta_badge,
+            tacticalAdvice=audit_res.tactical_advice,
+            isBreakevenProtected=is_breakeven,
         )
 
     @staticmethod
