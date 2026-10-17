@@ -427,8 +427,30 @@ class SignalGenerationEngine:
                 sniper_rationale = None
                 pattern_name = None
 
-                # 2. Institutional Session Breakout Integration
-                if strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"] or getattr(strategy, "id", "") in ("strat-008", "session_momentum_liquidity_breakout"):
+                # 2. Institutional Smart Money Liquidity Sweep & FVG Integration (Pillar 2 / strat-012)
+                if getattr(strategy, "id", "") == "strat-012" or (
+                    not has_sniper_setup and strat_type_val in ["PRICE_ACTION", "SWING_STRUCTURE", "SUPPORT_RESISTANCE"]
+                ):
+                    try:
+                        from app.core.engines.smart_money_engine import smart_money_engine
+                        smc_sig = smart_money_engine.analyze_liquidity_sweep(canonical_symbol, candles_1h)
+                        if smc_sig.detected and smc_sig.direction in ("BUY", "SELL"):
+                            has_sniper_setup = True
+                            direction = CandidateDirection.BUY if smc_sig.direction == "BUY" else CandidateDirection.SELL
+                            pattern_conviction = 0.88 if smc_sig.fvg is not None else 0.82
+                            sniper_trigger_rule = (
+                                f"SMC {smc_sig.swept_pool_type} Sweep @ {smc_sig.swept_level} "
+                                f"+ {'3-Candle FVG Imbalance' if smc_sig.fvg else 'Wick Rejection Close'}"
+                            )
+                            sniper_stop = smc_sig.stop_loss
+                            sniper_target = smc_sig.take_profit
+                            sniper_rationale = smc_sig.rationale
+                            pattern_name = f"Institutional Liquidity Sweep ({smc_sig.swept_pool_type}) & FVG"
+                    except Exception as ex:
+                        logger.warning(f"Smart Money sweep evaluation error for {canonical_symbol}: {ex}")
+
+                # 2B. Institutional Session Breakout Integration
+                if not has_sniper_setup and (strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"] or getattr(strategy, "id", "") in ("strat-008", "session_momentum_liquidity_breakout")):
                     try:
                         from app.core.engines.session_breakout_engine import session_breakout_engine
                         from app.schemas.session_breakout import SessionStatus
@@ -555,7 +577,20 @@ class SignalGenerationEngine:
                 passed=news_passed
             )
 
-            conditions = [trend_cond, session_cond, spread_cond, news_cond]
+            # Condition 5: Pillar 1 — Cross-Asset & Macro Directional Filter (DXY & Yields)
+            from app.core.engines.decision.evaluators.macro_cross_asset_evaluator import macro_cross_asset_engine
+            macro_eval = macro_cross_asset_engine.evaluate_alignment(
+                symbol=canonical_symbol,
+                direction=direction.value,
+                candles_by_symbol=cached_bars_1h,
+            )
+            macro_cond = CandidateCondition(
+                title="Macro & DXY Alignment",
+                description=macro_eval.rationale,
+                passed=not macro_eval.is_macro_trap,
+            )
+
+            conditions = [trend_cond, session_cond, spread_cond, news_cond, macro_cond]
 
             # ── 4. Calculate Confidence Breakdown & Final Conviction ──────────
             # Realistic institutional scoring: max confidence bounded at 88% to avoid artificial certainty
@@ -576,11 +611,14 @@ class SignalGenerationEngine:
                 # Weighted blend: 60% candlestick/volume pattern conviction + 40% environmental base
                 pattern_score = int(round(pattern_conviction * 100))
                 confidence = int(round(0.60 * pattern_score + 0.40 * base_confidence))
-                # Institutional hard bounds: high-grade setups calibrated between 55% and 88%
-                confidence = max(55, min(88, confidence))
+                # Apply Macro Cross-Asset modifier
+                confidence = int(round(confidence + macro_eval.confidence_modifier))
+                # Institutional hard bounds: high-grade setups calibrated between 40% and 88%
+                confidence = max(40, min(88, confidence))
             else:
                 # Generic setups cap at 80% to enforce confluence discipline
-                confidence = max(45, min(80, base_confidence))
+                confidence = int(round(base_confidence + macro_eval.confidence_modifier))
+                confidence = max(35, min(80, confidence))
 
             breakdown = ConfidenceBreakdown(
                 trendScore=trend_score,
@@ -605,14 +643,18 @@ class SignalGenerationEngine:
 
             readiness_score = readiness_session + readiness_spread + readiness_news + readiness_vol + readiness_fresh
 
-            if has_sniper_setup and spread_passed and news_passed and session_passed:
+            if macro_eval.is_macro_trap:
+                readiness_score = min(readiness_score, 40)
+            elif has_sniper_setup and spread_passed and news_passed and session_passed:
                 readiness_score = max(readiness_score, 88)
             elif not has_sniper_setup:
                 # Without an authentic confirmed technical setup, cap readiness so it cannot prematurely trigger a live position
                 readiness_score = min(readiness_score, 78)
 
             # Determine Candidate Status
-            if readiness_score >= 85 and direction != CandidateDirection.WAIT and has_sniper_setup:
+            if macro_eval.is_macro_trap:
+                status = CandidateStatus.REJECTED
+            elif readiness_score >= 85 and direction != CandidateDirection.WAIT and has_sniper_setup:
                 status = CandidateStatus.GENERATED
             elif readiness_score >= 45 and direction != CandidateDirection.WAIT:
                 status = CandidateStatus.WAITING_CONFIRMATION
@@ -621,7 +663,13 @@ class SignalGenerationEngine:
 
             # Reasons
             reasons = []
-            if has_sniper_setup:
+            if macro_eval.is_macro_trap:
+                reasons.append(CandidateReason(
+                    title="Macro Cross-Asset Trap Veto",
+                    description=macro_eval.rationale,
+                    passed=False,
+                ))
+            elif has_sniper_setup:
                 reasons.append(CandidateReason(
                     title=f"Sniper Setup: {pattern_name}",
                     description=f"{sniper_rationale} Trigger Rule: {sniper_trigger_rule}",
@@ -650,12 +698,24 @@ class SignalGenerationEngine:
                     passed=False
                 ))
 
-            # ── 6. Precise Invalidation and Target Calculation with Adaptive Tuning ──
-            rr = strategy.minimumRiskReward or 2.0
+            # ── 6. Precise Invalidation and Target Calculation with Adaptive Tuning & Asymmetric R:R ──
+            base_rr = strategy.minimumRiskReward or 2.0
+            if getattr(strategy, "id", "") == "strat-012":
+                rr = max(base_rr, 3.0)
+            elif has_sniper_setup:
+                rr = max(base_rr, 2.5)
+            else:
+                rr = base_rr
             vol_mult = 1.4 if volatility == "High" else (1.0 if volatility == "Moderate" else 0.8)
 
-            # Query autonomous adaptive tuning for this strategy and asset
-            tuning_profile = adaptive_tuning_engine.get_strategy_tuning(strategy.id, raw_symbol, as_of=eval_time)
+            # Query autonomous adaptive tuning for this strategy and asset (includes Pillar 3 regime allocation)
+            tuning_profile = adaptive_tuning_engine.get_strategy_tuning(
+                strategy.id,
+                raw_symbol,
+                as_of=eval_time,
+                strategy_type=strat_type_val,
+                session_name=session,
+            )
             adaptive_mult = tuning_profile.adaptive_stop_multiplier
             recovery_mult = getattr(tuning_profile, "profit_recovery_multiplier", 1.0) or 1.0
             recovery_status = getattr(tuning_profile, "recovery_status", "BASELINE") or "BASELINE"

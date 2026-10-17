@@ -39,6 +39,7 @@ from app.core.engines.decision.evaluators.liquidity_evaluator import LiquidityEv
 from app.core.engines.decision.evaluators.session_evaluator import SessionEvaluator
 from app.core.engines.decision.evaluators.spread_evaluator import SpreadEvaluator
 from app.core.engines.decision.evaluators.volatility_evaluator import VolatilityEvaluator
+from app.core.engines.decision.evaluators.macro_cross_asset_evaluator import MacroCrossAssetEvaluator
 from app.core.engines.decision.strategy_evaluators.base_strategy_evaluator import BaseStrategyEvaluator
 
 logger = logging.getLogger(__name__)
@@ -50,7 +51,7 @@ _WARN_CONFIDENCE_THRESHOLD = 65.0
 
 
 def _build_default_evaluators() -> List[BaseEvaluator]:
-    """Return the standard set of 7 technical evaluators."""
+    """Return the standard set of technical evaluators including Macro Cross-Asset Gate."""
     return [
         TrendEvaluator(),
         StructureEvaluator(),
@@ -59,6 +60,7 @@ def _build_default_evaluators() -> List[BaseEvaluator]:
         SessionEvaluator(),
         SpreadEvaluator(),
         VolatilityEvaluator(),
+        MacroCrossAssetEvaluator(),
     ]
 
 

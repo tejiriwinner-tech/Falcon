@@ -512,8 +512,49 @@ class SignalOutcomeResolver:
                 except Exception as ex:
                     logger.warning(f"Error shifting trade #{trade.id} to breakeven: {ex}")
             elif be_reached:
-                stop_loss = entry
-                trade.stopLoss = entry
+                if (is_buy and stop_loss < entry) or (not is_buy and stop_loss > entry):
+                    stop_loss = entry
+                    trade.stopLoss = entry
+
+            # Pillar 4: Structural Swing Trailing Stop for Asymmetric Runners (>= +2.0R excursion)
+            trail_2r_threshold = entry + (2.0 * risk_d) if is_buy else entry - (2.0 * risk_d)
+            trail_2r_reached = (
+                (trade.mfeR is not None and trade.mfeR >= 2.0)
+                or (is_buy and max_reach >= trail_2r_threshold)
+                or (not is_buy and max_reach <= trail_2r_threshold)
+            )
+            if trail_2r_reached and risk_d > 1e-6:
+                decimals = 2 if ("XAU" in symbol or "GOLD" in symbol) else (3 if "JPY" in symbol else 5)
+                if is_buy:
+                    structural_trail_sl = round(max(entry + risk_d, max_reach - risk_d), decimals)
+                    if structural_trail_sl > stop_loss and current_price > structural_trail_sl:
+                        stop_loss = structural_trail_sl
+                        trade.stopLoss = structural_trail_sl
+                        if "STRUCTURAL_TRAIL_LOCKED" not in (trade.notes or ""):
+                            trade.notes = f"{trade.notes or 'Falcon'} | [STRUCTURAL_TRAIL_LOCKED: Stop trailed to {structural_trail_sl}]"
+                        try:
+                            trade_journal_repository.update_trade(
+                                trade.id,
+                                TradeJournalUpdate(stopLoss=structural_trail_sl, notes=trade.notes),
+                                session=session,
+                            )
+                        except Exception:
+                            pass
+                else:
+                    structural_trail_sl = round(min(entry - risk_d, max_reach + risk_d), decimals)
+                    if structural_trail_sl < stop_loss and current_price < structural_trail_sl:
+                        stop_loss = structural_trail_sl
+                        trade.stopLoss = structural_trail_sl
+                        if "STRUCTURAL_TRAIL_LOCKED" not in (trade.notes or ""):
+                            trade.notes = f"{trade.notes or 'Falcon'} | [STRUCTURAL_TRAIL_LOCKED: Stop trailed to {structural_trail_sl}]"
+                        try:
+                            trade_journal_repository.update_trade(
+                                trade.id,
+                                TradeJournalUpdate(stopLoss=structural_trail_sl, notes=trade.notes),
+                                session=session,
+                            )
+                        except Exception:
+                            pass
 
             result: Optional[str] = None
             exit_price = current_price
@@ -524,9 +565,12 @@ class SignalOutcomeResolver:
                 if current_price >= take_profit or (bid > 0 and bid >= take_profit):
                     result = "WIN"
                     exit_price = take_profit
-                # Invalidation hit
+                # Invalidation / Trailed Stop hit
                 elif current_price <= stop_loss or (bid > 0 and bid <= stop_loss):
-                    if be_reached or "BE_PROTECTED" in (trade.notes or "") or stop_loss >= entry:
+                    if stop_loss >= entry + (0.5 * risk_d) and "STRUCTURAL_TRAIL_LOCKED" in (trade.notes or ""):
+                        result = "WIN"
+                        exit_price = stop_loss
+                    elif be_reached or "BE_PROTECTED" in (trade.notes or "") or stop_loss >= entry:
                         result = "BREAKEVEN"
                         exit_price = entry
                     else:
@@ -537,9 +581,12 @@ class SignalOutcomeResolver:
                 if current_price <= take_profit or (ask > 0 and ask <= take_profit):
                     result = "WIN"
                     exit_price = take_profit
-                # Invalidation hit
+                # Invalidation / Trailed Stop hit
                 elif current_price >= stop_loss or (ask > 0 and ask >= stop_loss):
-                    if be_reached or "BE_PROTECTED" in (trade.notes or "") or stop_loss <= entry:
+                    if stop_loss <= entry - (0.5 * risk_d) and "STRUCTURAL_TRAIL_LOCKED" in (trade.notes or ""):
+                        result = "WIN"
+                        exit_price = stop_loss
+                    elif be_reached or "BE_PROTECTED" in (trade.notes or "") or stop_loss <= entry:
                         result = "BREAKEVEN"
                         exit_price = entry
                     else:

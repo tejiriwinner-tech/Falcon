@@ -40,6 +40,8 @@ class StrategyTuningProfile:
     ai_reflection: str = ""                  # Falcon AI self-reflection and learning insight
     recommended_weight: float = 1.0          # Health allocation weight (e.g. 0.0 for QUARANTINED_PAPER, 1.5 for BOOSTED)
     health_status: str = "HEALTHY"           # "HEALTHY", "CAUTION", "QUARANTINED_PAPER", "BOOSTED"
+    regime_allocation_multiplier: float = 1.0  # Pillar 3: Dynamic regime-gated capital multiplier (0.25x to 1.25x)
+    consecutive_loss_throttle_active: bool = False  # Pillar 3: True when >= 2 consecutive losses trigger 0.25x throttle
 
 
 @dataclass
@@ -67,8 +69,75 @@ class AdaptiveRuleTuningEngine:
         return cls._instance
 
     def __init__(self) -> None:
-        self.version = "1.0.0"
+        self.version = "1.1.0"
         self._profiles: Dict[str, StrategyTuningProfile] = {}
+
+    def get_regime_capital_multiplier(
+        self,
+        strategy_id: str,
+        strategy_type: str = "",
+        session_name: Optional[str] = None,
+        consecutive_losses: int = 0,
+        as_of: Optional[datetime] = None,
+    ) -> tuple[float, bool, str]:
+        """
+        Pillar 3: Dynamic Regime-Gated Capital Allocator & Consecutive-Loss Risk Throttle.
+        Returns (capital_multiplier, is_loss_throttled, rationale).
+        """
+        # 1. Consecutive-Loss Risk Throttle: >= 2 consecutive losses throttles risk to 0.25x (0.25% risk)
+        if consecutive_losses >= 2:
+            return (
+                0.25,
+                True,
+                f"Consecutive-Loss Throttle Active ({consecutive_losses} losses): Risk throttled to 0.25x until next winning trade.",
+            )
+
+        now_utc = as_of or datetime.now(timezone.utc)
+        hour = now_utc.hour
+        sess = (session_name or "").upper()
+        if not sess:
+            if 0 <= hour < 7:
+                sess = "ASIAN"
+            elif 7 <= hour < 12:
+                sess = "LONDON"
+            elif 12 <= hour < 16:
+                sess = "NY_OVERLAP"
+            elif 16 <= hour < 20:
+                sess = "NEW_YORK"
+            else:
+                sess = "ROLLOVER"
+
+        stype = (strategy_type or "").upper()
+        sid = (strategy_id or "").lower()
+
+        is_mean_reversion = "MEAN_REVERSION" in stype or "RANGE" in stype or sid in ("strat-003", "strat-006")
+        is_smc_sweep = sid == "strat-012" or "SWEEP" in stype or "PRICE_ACTION" in stype
+        is_breakout_or_trend = (
+            "BREAKOUT" in stype
+            or "TREND" in stype
+            or "MOMENTUM" in stype
+            or sid in ("strat-001", "strat-002", "strat-004", "strat-005", "strat-007", "strat-008", "strat-010")
+        )
+
+        # Asian Session (00:00 - 07:00 UTC): 80% capital focus to Mean Reversion & SMC Range Sweeps; throttle Trend Breakouts
+        if "ASIAN" in sess:
+            if is_mean_reversion or is_smc_sweep:
+                return 1.0, False, "Asian Session Regime: Full capital weight (1.0x) allocated to Mean Reversion / Liquidity Sweep."
+            if is_breakout_or_trend:
+                return 0.25, False, "Asian Session Regime: Trend/Breakout strategy throttled to 0.25x during low-volume range hours."
+
+        # London Open & NY Overlap (07:00 - 16:00 UTC): Boost Momentum, Breakout, and SMC Sweeps; throttle static range scalping
+        if any(k in sess for k in ("LONDON", "OVERLAP", "NEW_YORK", "NEW YORK")):
+            if is_smc_sweep or is_breakout_or_trend:
+                return 1.20, False, f"{sess.title()} Expansion Regime: Priority capital weight (1.20x) allocated to Momentum/SMC Sweep."
+            if is_mean_reversion and "OVERLAP" in sess:
+                return 0.35, False, "NY Overlap Expansion Regime: Mean-reversion range strategy dampened to 0.35x."
+
+        # Late NY / Rollover (20:00 - 23:59 UTC): Defensive dampening
+        if "ROLLOVER" in sess:
+            return 0.50, False, "Rollover Liquidity Regime: Defensive 0.50x capital allocation active."
+
+        return 1.0, False, "Standard session capital allocation (1.0x)."
 
     def get_strategy_tuning(
         self,
@@ -76,6 +145,8 @@ class AdaptiveRuleTuningEngine:
         symbol: Optional[str] = None,
         as_of: Optional[datetime] = None,
         session: Optional[object] = None,
+        strategy_type: str = "",
+        session_name: Optional[str] = None,
     ) -> StrategyTuningProfile:
         """Calculate or fetch real-time adaptive tuning profile for a given strategy as of an optional point in time."""
         if as_of is not None:
@@ -123,6 +194,13 @@ class AdaptiveRuleTuningEngine:
             pass
 
         if total == 0:
+            reg_mult, is_throttled, reg_reason = self.get_regime_capital_multiplier(
+                strategy_id=strategy_id,
+                strategy_type=strategy_type,
+                session_name=session_name,
+                consecutive_losses=loss_metrics.consecutive_losses,
+                as_of=as_of_utc,
+            )
             profile = StrategyTuningProfile(
                 strategy_id=strategy_id,
                 symbol=symbol or "ALL",
@@ -132,14 +210,16 @@ class AdaptiveRuleTuningEngine:
                 consecutive_losses=loss_metrics.consecutive_losses,
                 recent_win_rate=1.0,
                 total_evaluated=0,
-                rationale="No historical losses detected. Baseline risk buffers active.",
+                rationale=f"No historical losses detected. Baseline risk buffers active. {reg_reason}",
                 last_tuned_at=as_of_utc,
                 profit_recovery_multiplier=loss_metrics.profit_recovery_multiplier,
                 accumulated_streak_loss=float(loss_metrics.accumulated_streak_loss),
                 recovery_status=loss_metrics.recovery_status,
                 ai_reflection=loss_metrics.ai_reflection,
-                recommended_weight=rec_weight,
+                recommended_weight=round(rec_weight * reg_mult, 3),
                 health_status=health_status,
+                regime_allocation_multiplier=reg_mult,
+                consecutive_loss_throttle_active=is_throttled,
             )
             self._profiles[f"{strategy_id}_{symbol or 'ALL'}"] = profile
             return profile
@@ -201,6 +281,15 @@ class AdaptiveRuleTuningEngine:
                 f"Moderate market noise: Applying slight +15% ATR buffer padding."
             )
 
+        reg_mult, is_throttled, reg_reason = self.get_regime_capital_multiplier(
+            strategy_id=strategy_id,
+            strategy_type=strategy_type,
+            session_name=session_name,
+            consecutive_losses=consecutive_losses,
+            as_of=as_of_utc,
+        )
+        rationale_parts.append(reg_reason)
+
         profile = StrategyTuningProfile(
             strategy_id=strategy_id,
             symbol=symbol or "ALL",
@@ -216,8 +305,10 @@ class AdaptiveRuleTuningEngine:
             accumulated_streak_loss=float(loss_metrics.accumulated_streak_loss),
             recovery_status=loss_metrics.recovery_status,
             ai_reflection=loss_metrics.ai_reflection,
-            recommended_weight=rec_weight,
+            recommended_weight=round(rec_weight * reg_mult, 3),
             health_status=health_status,
+            regime_allocation_multiplier=reg_mult,
+            consecutive_loss_throttle_active=is_throttled,
         )
         self._profiles[f"{strategy_id}_{symbol or 'ALL'}"] = profile
         return profile

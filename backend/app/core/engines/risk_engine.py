@@ -166,6 +166,39 @@ class RiskEngine:
             ))
             is_blocking_overall = True
 
+        # Pillar 3: Dynamic Regime-Gated Capital Allocator & Consecutive-Loss Risk Throttle
+        tuning_profile = None
+        try:
+            from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
+            tuning_profile = adaptive_tuning_engine.get_strategy_tuning(
+                strategy_id=strategy.id,
+                symbol=candidate.symbol,
+                strategy_type=getattr(strategy.type, "value", str(strategy.type)),
+                session_name=str(getattr(candidate.marketSnapshot, "session", "") or ""),
+            )
+            if tuning_profile.consecutive_loss_throttle_active:
+                reasons.append(RiskReason(
+                    title="Consecutive-Loss Risk Throttle (0.25%)",
+                    description=(
+                        f"Strategy has {tuning_profile.consecutive_losses} consecutive losses. "
+                        f"Risk allocation throttled to 0.25% until market conditions realign."
+                    ),
+                    severity=RiskSeverity.WARNING,
+                    isBlocking=False,
+                ))
+            elif tuning_profile.regime_allocation_multiplier < 0.6:
+                reasons.append(RiskReason(
+                    title="Regime Capital Dampener Active",
+                    description=(
+                        f"Session regime weight is {tuning_profile.regime_allocation_multiplier:.2f}x "
+                        f"for {strategy.name} during {candidate.marketSnapshot.session} session."
+                    ),
+                    severity=RiskSeverity.INFO,
+                    isBlocking=False,
+                ))
+        except Exception:
+            pass
+
         if not reasons:
             reasons.append(RiskReason(
                 title="Risk Parameters Normal",

@@ -609,7 +609,66 @@ class StrategyEngine:
             latestValidation=_empty_validation()
         )
 
-        strategies = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11]
+        # 12. Institutional Liquidity Sweep & Fair Value Gap (SMC Sniper)
+        s12 = StrategyItem(
+            id="strat-012",
+            name="Institutional Liquidity Sweep & FVG",
+            type=StrategyType.PRICE_ACTION,
+            category=StrategyCategory.INTRADAY,
+            symbol="XAU/USD",
+            description="Hunts institutional stop-loss sweeps above Previous Day/Session Highs (PDH/ASH) or below Lows (PDL/ASL) paired with a 3-candle Fair Value Gap (FVG) displacement. Enters on rejection with tight wick-anchored stops for asymmetric 1:3.0 to 1:4.5 R:R.",
+            marketCondition="Liquidity Sweeps & Displacement Reversals",
+            bestSession="London / New York",
+            bestTimeframe="H1",
+            riskLevel=RiskLevel.LOW,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Exploits retail stop hunts before institutional reversal",
+                "Ultra-tight stop loss anchored beyond sweep wick (10-18 pips)",
+                "Asymmetric 1:3.0 to 1:4.5 risk-to-reward profile"
+            ],
+            weaknesses=["Selective sniper frequency (waits for key pool sweep)"],
+            entryChecklist=[
+                "Wick sweep of PDH/PDL or Asian High/Low with body close back inside range",
+                "3-candle Fair Value Gap (FVG) displacement confirmed",
+                "Cross-Asset DXY Macro Gate aligned",
+                "Risk/Reward >= 3.0"
+            ],
+            exitChecklist=[
+                "Opposite liquidity pool target reached (1:3.0+ R:R)",
+                "Breakeven + 2 pips locked at +1.5R",
+                "Structural Higher-Low / Lower-High trailing stop"
+            ],
+            idealVolatility="Medium to High",
+            avoidDuring=["Unscheduled Flash Crashes", "DXY Macro Bull/Bear Trap"],
+            confirmationIndicators=["Smart Money Sweep Engine", "3-Candle FVG Imbalance", "Synthetic DXY Macro Gate"],
+            successConditions=["Liquidity Pool Pierced & Rejected", "FVG Imbalance Created", "Macro DXY Aligned"],
+            minimumConfidence=85,
+            minimumRiskReward=3.0,
+            preferredSessions=["London", "New York", "NY Overlap"],
+            avoidConditions=["Macro DXY Contradiction", "Wide Rollover Spreads"],
+            requiredConfirmations=["Liquidity Sweep Rejection Close", "Fair Value Gap Displacement"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Reversals", "Breakouts", "Trending", "Volatile"],
+            estimatedHoldingTime="1-6 hours",
+            maxConsecutiveLosses=2,
+            createdAt=datetime(2026, 9, 10, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 9, 10, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId=None,
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Institutional Smart Money Concepts (SMC) Liquidity Sweep & FVG sniper engine.",
+            dependencies=["Smart Money Engine", "Macro Cross-Asset Gate", "Structure Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        strategies = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12]
         for strategy in strategies:
             strategy.strategyScore.riskRating = strategy.riskLevel
         return strategies
