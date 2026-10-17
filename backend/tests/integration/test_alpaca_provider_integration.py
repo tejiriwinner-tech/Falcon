@@ -370,24 +370,20 @@ class TestAlpacaProviderCrossProviderCompatibility:
         assert "LIVE_PRICE" in alpaca_caps
         assert "SPREAD" in alpaca_caps
 
-    def test_alpaca_quote_structure_matches_twelve_data_structure(self):
-        """Test that Alpaca quote structure matches TwelveData quote structure."""
-        # All providers should return the same normalized quote structure
-        # This is enforced by the BaseProvider contract
-        from app.core.providers.twelve_data_provider import TwelveDataProvider
+    def test_alpaca_quote_structure_matches_provider_structure(self):
+        """Test that Alpaca quote structure matches base provider capability structure."""
+        from app.core.providers.fmp_provider import FmpProvider
         
         alpaca = AlpacaProvider(api_key="test_key", secret_key="test_secret")
-        twelve_data = TwelveDataProvider()
+        fmp = FmpProvider()
         
-        # Both should have the same capabilities
+        # Both should have capabilities
         alpaca_caps = alpaca.capabilities
-        twelve_caps = twelve_data.capabilities
+        fmp_caps = fmp.capabilities
         
-        # Both should support the same core capabilities
+        # Both should support core capabilities
         assert "LIVE_PRICE" in alpaca_caps
-        assert "LIVE_PRICE" in twelve_caps
-        assert "SPREAD" in alpaca_caps
-        assert "SPREAD" in twelve_caps
+        assert "LIVE_PRICE" in fmp_caps
 
 
 class TestAlpacaProviderFeatureFlagCompatibility:

@@ -64,10 +64,10 @@ class LiveIntelligenceService:
         self.decision_engine = DecisionEngine()
         self.health_engine = HealthEngine()
         
-        # Provider priority: Twelve Data → Yahoo Finance → Mock
+        # Provider priority: OANDA → FMP → Mock
         self.provider_priority = [
-            "twelve_data",
-            "yahoo_finance", 
+            "oanda",
+            "fmp",
             "falcon_mock"
         ]
         

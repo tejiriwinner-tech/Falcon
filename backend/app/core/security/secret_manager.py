@@ -16,9 +16,9 @@ class SecretManager:
         'DATABASE_URL',
         'DB_PASSWORD',
         'FALCON_API_KEY',
-        'TWELVEDATA_API_KEY',
+        'OANDA_API_KEY',
+        'OANDA_ACCOUNT_ID',
         'FMP_API_KEY',
-        'ALPHA_VANTAGE_API_KEY'
     }
     
     @staticmethod

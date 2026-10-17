@@ -90,21 +90,7 @@ _ALIAS_MAP: Dict[str, str] = {
     "eth":      "ETHUSD",
 }
 
-# Canonical symbol → Provider-specific ticker mappings
 _PROVIDER_SYMBOL_MAP: Dict[str, Dict[str, str]] = {
-    "twelve_data": {
-        "XAUUSD": "XAU/USD",
-        "GBPUSD": "GBP/USD",
-        "EURUSD": "EUR/USD",
-        "GBPJPY": "GBP/JPY",
-        "USDJPY": "USD/JPY",
-        "AUDUSD": "AUD/USD",
-        "USDCAD": "USD/CAD",
-        "NAS100": "NAS100",
-        "US30": "DJI",
-        "BTCUSD": "BTC/USD",
-        "ETHUSD": "ETH/USD",
-    },
     "yahoo_finance": {
         "XAUUSD": "GC=F",
         "GBPUSD": "GBPUSD=X",
@@ -114,17 +100,6 @@ _PROVIDER_SYMBOL_MAP: Dict[str, Dict[str, str]] = {
         "US30": "^DJI",
         "BTCUSD": "BTC-USD",
         "ETHUSD": "ETH-USD",
-    },
-    "alpha_vantage": {
-        "XAUUSD": "XAU/USD",
-        "GBPUSD": "GBP/USD",
-        "EURUSD": "EUR/USD",
-        "GBPJPY": "GBP/JPY",
-        "USDJPY": "USD/JPY",
-        "AUDUSD": "AUD/USD",
-        "USDCAD": "USD/CAD",
-        "BTCUSD": "BTC/USD",
-        "ETHUSD": "ETH/USD",
     },
     "mock_price": {
         "XAUUSD": "XAUUSD",

@@ -32,17 +32,9 @@ class Settings:
     # Debug & logging
     DEBUG_MODE: bool = True
     
-    # Twelve Data Configuration
-    TWELVEDATA_BASE_URL: str = os.getenv("TWELVEDATA_BASE_URL", "https://api.twelvedata.com")
-    TWELVEDATA_API_KEY: Optional[str] = os.getenv("TWELVEDATA_API_KEY") or os.getenv("TWELVE_DATA_API_KEY")
-
-    # Financial Modeling Prep — economic calendar
+    # Financial Modeling Prep — economic calendar & fallback quotes
     FMP_BASE_URL: str = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com/stable")
     FMP_API_KEY: Optional[str] = os.getenv("FMP_API_KEY")
-
-    # Alpha Vantage — quotes and historical bars
-    ALPHA_BASE_URL: str = os.getenv("ALPHA_BASE_URL", "https://www.alphavantage.co/query")
-    ALPHA_VANTAGE_API_KEY: Optional[str] = os.getenv("ALPHA_VANTAGE_API_KEY")
 
     # OANDA v20 Configuration (Priority 1 Live Broker Feed)
     OANDA_API_KEY: Optional[str] = os.getenv("OANDA_API_KEY")

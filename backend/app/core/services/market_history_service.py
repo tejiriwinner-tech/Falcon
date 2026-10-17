@@ -21,8 +21,6 @@ from app.core.database import PriceBarRecord, database_enabled, get_session
 from app.core.providers.symbol_mapper import symbol_mapper
 from app.core.services.session_budget_manager import session_budget_manager
 
-TWELVE_DATA_PROVIDER = "TwelveData"
-ALPHA_VANTAGE_PROVIDER = "AlphaVantage"
 OANDA_PROVIDER = "OANDA"
 
 _OANDA_GRANULARITY = {
@@ -38,16 +36,6 @@ _OANDA_GRANULARITY = {
     "4h": "H4",
     "1d": "D",
     "1D": "D",
-}
-
-_ALPHA_INTERVAL = {"1h": "60min", "30min": "30min", "15min": "15min"}
-_ALPHA_FX_PAIRS = {
-    "EURUSD": ("EUR", "USD"),
-    "GBPUSD": ("GBP", "USD"),
-    "USDJPY": ("USD", "JPY"),
-    "GBPJPY": ("GBP", "JPY"),
-    "AUDUSD": ("AUD", "USD"),
-    "XAUUSD": ("XAU", "USD"),
 }
 
 
@@ -149,113 +137,6 @@ class MarketHistoryService:
                 )
             )
         return bars
-
-    def _fetch_twelve_data(self, symbol: str, timeframe: str, limit: int) -> List[PriceBar]:
-        if not settings.TWELVEDATA_API_KEY:
-            return []
-        params = {
-            "symbol": symbol_mapper.to_provider_symbol(symbol, "twelve_data"),
-            "interval": timeframe,
-            "outputsize": limit,
-            "apikey": settings.TWELVEDATA_API_KEY,
-        }
-        try:
-            session_budget_manager.record_call(TWELVE_DATA_PROVIDER)
-            response = requests.get(
-                f"{settings.TWELVEDATA_BASE_URL.rstrip('/')}/time_series",
-                params=params,
-                timeout=REQUEST_TIMEOUT_SECONDS,
-            )
-            response.raise_for_status()
-            payload = response.json()
-        except (requests.RequestException, ValueError) as exc:
-            self.last_error = f"TwelveData {type(exc).__name__}: {exc}"
-            return []
-        values = payload.get("values") if isinstance(payload, dict) else None
-        if not isinstance(values, list):
-            self.last_error = f"TwelveData error: {payload.get('message', 'no values')}" if isinstance(payload, dict) else "TwelveData: bad payload"
-            return []
-        bars: List[PriceBar] = []
-        for row in values:
-            bar_time = _parse_bar_time(str(row.get("datetime", "")))
-            close = _to_float(row.get("close"))
-            if bar_time is None or close is None:
-                continue
-            bars.append(
-                PriceBar(
-                    symbol=symbol,
-                    timeframe=timeframe,
-                    bar_time=bar_time,
-                    open=_to_float(row.get("open")) or close,
-                    high=_to_float(row.get("high")) or close,
-                    low=_to_float(row.get("low")) or close,
-                    close=close,
-                    volume=_to_float(row.get("volume")),
-                    provider=TWELVE_DATA_PROVIDER,
-                )
-            )
-        return bars
-
-    def _fetch_alpha_vantage(self, symbol: str, timeframe: str, limit: int) -> List[PriceBar]:
-        if not settings.ALPHA_VANTAGE_API_KEY:
-            return []
-        pair = _ALPHA_FX_PAIRS.get(symbol)
-        if pair is None:
-            self.last_error = f"AlphaVantage: {symbol} is not a supported FX pair"
-            return []
-        from_symbol, to_symbol = pair
-        interval = _ALPHA_INTERVAL.get(timeframe)
-        params: Dict[str, Any] = {
-            "from_symbol": from_symbol,
-            "to_symbol": to_symbol,
-            "apikey": settings.ALPHA_VANTAGE_API_KEY,
-            "outputsize": "compact" if limit <= 100 else "full",
-        }
-        if interval is None:
-            # Unsupported timeframe for Alpha Vantage intraday (e.g., 4h)
-            # Alpha Vantage FX_INTRADAY does not support 4-hour intervals
-            self.last_error = f"AlphaVantage: {timeframe} not supported for intraday, skipping"
-            return []
-        else:
-            params["function"] = "FX_INTRADAY"
-            params["interval"] = interval
-            series_key = f"Time Series FX ({interval})"
-        try:
-            response = requests.get(
-                settings.ALPHA_BASE_URL, params=params, timeout=REQUEST_TIMEOUT_SECONDS
-            )
-            response.raise_for_status()
-            payload = response.json()
-        except (requests.RequestException, ValueError) as exc:
-            self.last_error = f"AlphaVantage {type(exc).__name__}: {exc}"
-            return []
-        series = payload.get(series_key) if isinstance(payload, dict) else None
-        if not isinstance(series, dict):
-            note = ""
-            if isinstance(payload, dict):
-                note = str(payload.get("Note") or payload.get("Error Message") or "")
-            self.last_error = f"AlphaVantage: {note or 'no series returned'}"
-            return []
-        bars: List[PriceBar] = []
-        for raw_time, row in series.items():
-            bar_time = _parse_bar_time(str(raw_time))
-            close = _to_float(row.get("4. close"))
-            if bar_time is None or close is None:
-                continue
-            bars.append(
-                PriceBar(
-                    symbol=symbol,
-                    timeframe=timeframe,
-                    bar_time=bar_time,
-                    open=_to_float(row.get("1. open")) or close,
-                    high=_to_float(row.get("2. high")) or close,
-                    low=_to_float(row.get("3. low")) or close,
-                    close=close,
-                    volume=None,
-                    provider=ALPHA_VANTAGE_PROVIDER,
-                )
-            )
-        return sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
 
     # ------------------------------------------------------------------
     # Storage
@@ -463,10 +344,6 @@ class MarketHistoryService:
                 return 0
             self._last_refresh[key] = time.monotonic()
         bars = self._fetch_oanda(symbol, timeframe, limit)
-        if not bars:
-            bars = self._fetch_twelve_data(symbol, timeframe, limit)
-        if not bars:
-            bars = self._fetch_alpha_vantage(symbol, timeframe, limit)
         if bars:
             self.last_error = None
         return self.store_bars(bars)

@@ -1565,3 +1565,41 @@
 2026-10-07 11:18:43,357 - falcon.paper_trading_engine - INFO - [PAPER_FILLED] Trade #1 filled @ 1.10000 (EURUSD BUY). Status -> OPEN.
 2026-10-07 11:18:43,357 - falcon.paper_trading_engine - INFO - [PAPER_CLOSED] Trade #1 CLOSED -> LOSS (PnL: -50.00, Realized R: -1.0) @ 1.09500. Reservation released. Real capital cycle untouched.
 2026-10-07 11:18:43,358 - falcon.signal_authorization_service - WARNING - Capital Guardian rejected trade proposal: Proposed trade worst-case loss ($5.00) plus accumulated streak loss ($50.00) equals $55.00, exceeding Falcon's strict maximum loss ceiling ($20.00) (Live trades: 0/3, Agg Loss: $0.00 + $5.00 vs $20.00)
+2026-10-17 20:21:19,289 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-17 20:21:20,036 - asyncio - WARNING - Executing <Handle BaseProactorEventLoop._loop_self_reading() created at C:\Python313\Lib\asyncio\windows_events.py:320> took 0.155 seconds
+2026-10-17 20:21:20,076 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-17 20:21:20,528 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-17 20:21:20,534 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:20,546 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-17 20:21:20,549 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-17 20:21:20,601 - app.core.services.market_data_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market data ingestion to conserve free API quota.
+2026-10-17 20:21:20,616 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-17 20:21:20,620 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-17 20:21:20,656 - app.services.scheduler.market_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market scanning to preserve free API quota.
+2026-10-17 20:21:20,809 - asyncio - WARNING - Executing <Task pending name='Task-15' coro=<TestSchedulerStandbyProtection.test_market_scheduler_skips_in_standby() running at C:\Users\ACER\Documents\SCHOOLWORKS\Falcon\backend\tests\unit\test_session_budget_manager.py:154> wait_for=<Future pending cb=[_chain_future.<locals>._call_check_cancel() at C:\Python313\Lib\asyncio\futures.py:384, Task.task_wakeup()] created at C:\Python313\Lib\asyncio\base_events.py:459> cb=[_run_until_complete_cb() at C:\Python313\Lib\asyncio\base_events.py:181] created at C:\Python313\Lib\asyncio\runners.py:100> took 0.179 seconds
+2026-10-17 20:21:20,986 - asyncio - WARNING - Executing <Task finished name='Task-18' coro=<BaseEventLoop.shutdown_default_executor() done, defined at C:\Python313\Lib\asyncio\base_events.py:601> result=None created at C:\Python313\Lib\asyncio\tasks.py:748> took 0.134 seconds
+2026-10-17 20:21:20,988 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-17 20:21:21,033 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:21,033 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:21,034 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:21,034 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:21,034 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:44,143 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:44,144 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:44,144 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:44,144 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:21:44,145 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:22:32,589 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-17 20:22:32,607 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:22:32,623 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-17 20:22:32,626 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-17 20:22:32,634 - app.core.services.market_data_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market data ingestion to conserve free API quota.
+2026-10-17 20:22:32,652 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-17 20:22:32,655 - asyncio - DEBUG - Using proactor: IocpProactor
+2026-10-17 20:22:32,667 - app.services.scheduler.market_scheduler - INFO - Session budget manager: STANDBY mode (outside 07:00-19:00 UTC or weekend). Skipping market scanning to preserve free API quota.
+2026-10-17 20:22:32,689 - asyncio - DEBUG - Close <ProactorEventLoop running=False closed=False debug=True>
+2026-10-17 20:22:32,708 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping EURUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:22:32,708 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping XAUUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:22:32,709 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping USDJPY: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:22:32,709 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping BTCUSD: FMP is strictly restricted to GBPUSD only.
+2026-10-17 20:22:32,709 - falcon.providers.fmp - INFO - [Financial Modeling Prep] Skipping AUDUSD: FMP is strictly restricted to GBPUSD only.

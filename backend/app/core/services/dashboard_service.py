@@ -189,7 +189,7 @@ class DashboardService:
             degraded=degraded_count,
             offline=offline_count
         )
-        connected_provider = snapshots[0].metadata.providerName if snapshots else "TwelveData"
+        connected_provider = snapshots[0].metadata.providerName if snapshots else "OANDA"
 
         try:
             total_missions = mission_repository.count_missions() if hasattr(mission_repository, 'count_missions') else 0

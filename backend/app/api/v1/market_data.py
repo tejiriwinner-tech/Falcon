@@ -48,9 +48,7 @@ def refresh_market_data(
     return RefreshResponse(
         barsStored=stored,
         eventsStored=events,
-        historyProvidersConfigured=bool(
-            settings.TWELVEDATA_API_KEY or settings.ALPHA_VANTAGE_API_KEY
-        ),
+        historyProvidersConfigured=bool(settings.OANDA_API_KEY),
         calendarConfigured=economic_calendar_service.configured,
         lastHistoryError=market_history_service.last_error,
         lastCalendarError=economic_calendar_service.last_error,

@@ -3,9 +3,9 @@ Falcon Provider Framework — Provider Settings Configuration
 Centralized configuration for market data providers, caching, and failover behavior.
 """
 
-PRIMARY_PROVIDER: str = "twelve_data"
-FALLBACK_PROVIDER: str = "alpha_vantage"
-TERTIARY_PROVIDER: str = "fmp"
+PRIMARY_PROVIDER: str = "oanda"
+FALLBACK_PROVIDER: str = "fmp"
+TERTIARY_PROVIDER: str = "mock_provider"
 
 CACHE_TTL_SECONDS: int = 300
 REQUEST_TIMEOUT_SECONDS: int = 5

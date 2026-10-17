@@ -41,17 +41,17 @@ _SKIP_STATUSES = {ProviderStatus.RATE_LIMITED, ProviderStatus.OFFLINE}
 
 # Instrument-aware provider routing matrix (canonical -> ordered allowed providers)
 # OANDA is Priority 1 for all Forex pairs and Gold (zero delay, broker ticks);
-# GBPUSD / GPBUSD falls back to FMP; ALL other instruments strictly exclude FMP
+# GBPUSD / GPBUSD falls back to FMP; other instruments route to OANDA / mock
 _INSTRUMENT_PROVIDER_ROUTE: Dict[str, List[str]] = {
-    "XAUUSD": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
-    "GBPUSD": ["oanda", "fmp", "twelve_data", "alpha_vantage", "mock_provider"],
-    "GPBUSD": ["oanda", "fmp", "twelve_data", "alpha_vantage", "mock_provider"],
-    "EURUSD": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
-    "GBPJPY": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
-    "USDJPY": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
-    "AUDUSD": ["oanda", "twelve_data", "alpha_vantage", "mock_provider"],
+    "XAUUSD": ["oanda", "mock_provider"],
+    "GBPUSD": ["oanda", "fmp", "mock_provider"],
+    "GPBUSD": ["oanda", "fmp", "mock_provider"],
+    "EURUSD": ["oanda", "mock_provider"],
+    "GBPJPY": ["oanda", "mock_provider"],
+    "USDJPY": ["oanda", "mock_provider"],
+    "AUDUSD": ["oanda", "mock_provider"],
 }
-_DEFAULT_PROVIDER_ROUTE: List[str] = ["oanda", "twelve_data", "alpha_vantage", "mock_provider"]
+_DEFAULT_PROVIDER_ROUTE: List[str] = ["oanda", "fmp", "mock_provider"]
 
 _EVT_PROVIDER_SKIPPED_UNSUPPORTED = "ProviderSkippedUnsupported"
 
