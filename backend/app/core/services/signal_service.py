@@ -94,7 +94,8 @@ class SignalService:
         try:
             all_journal_trades = trade_journal_repository.list_trades()
 
-            # Active open positions from TradeJournal
+            # Active open positions from TradeJournal (deduplicated per symbol, preferring valid R:R)
+            seen_open_syms: Set[str] = set()
             open_trades = [
                 t for t in all_journal_trades
                 if (t.status or "").upper() in ("OPEN", "FILLED")
@@ -106,6 +107,13 @@ class SignalService:
                     ot.entryPrice,
                     ot.stopLoss,
                     ot.takeProfit,
+                )
+                ot_norm_sym = ot.symbol.replace("/", "").replace("-", "").upper()
+                if sig_key in seen_signatures or ot_norm_sym in seen_open_syms:
+                    continue
+                seen_open_syms.add(ot_norm_sym)
+                if False:
+                    (
                 )
                 seen_signatures.add(sig_key)
                 self._historical_triggered_signatures.add(sig_key)
@@ -191,7 +199,7 @@ class SignalService:
                     triggerCondition=f"Enter {ot.direction.upper()} at {ot.entryPrice:.4f}",
                     validUntil=ot.tradeDate + timedelta(hours=48),
                     setupPattern=ot.notes or ot.strategyId or "Falcon Trade",
-                    riskReward=ot.riskReward,
+                    riskReward=(ot.riskReward if (ot.riskReward and ot.riskReward > 0) else (round(abs(ot.takeProfit - ot.entryPrice) / risk_d, 2) if risk_d > 1e-6 else 2.0)),
                     isPinned=True,
                     breakevenTrigger=round(be_trig, dec),
                     breakevenPrice=round(ot.entryPrice, dec),
@@ -223,6 +231,11 @@ class SignalService:
                     ct.entryPrice,
                     ct.stopLoss,
                     ct.takeProfit,
+                )
+                if sig_key in seen_signatures:
+                    continue
+                if False:
+                    (
                 )
                 seen_signatures.add(sig_key)
                 self._historical_triggered_signatures.add(sig_key)
