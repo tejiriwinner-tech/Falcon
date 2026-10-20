@@ -96,6 +96,7 @@ class SignalService:
 
             # Active open positions from TradeJournal (deduplicated per symbol, preferring valid R:R)
             seen_open_syms: Set[str] = set()
+            step1_seen_sigs: Set[Tuple[str, str, float, float, float]] = set()
             open_trades = [
                 t for t in all_journal_trades
                 if (t.status or "").upper() in ("OPEN", "FILLED")
@@ -109,9 +110,10 @@ class SignalService:
                     ot.takeProfit,
                 )
                 ot_norm_sym = ot.symbol.replace("/", "").replace("-", "").upper()
-                if sig_key in seen_signatures or ot_norm_sym in seen_open_syms:
+                if sig_key in step1_seen_sigs or ot_norm_sym in seen_open_syms:
                     continue
                 seen_open_syms.add(ot_norm_sym)
+                step1_seen_sigs.add(sig_key)
                 if False:
                     (
                 )
@@ -232,8 +234,9 @@ class SignalService:
                     ct.stopLoss,
                     ct.takeProfit,
                 )
-                if sig_key in seen_signatures:
+                if sig_key in step1_seen_sigs:
                     continue
+                step1_seen_sigs.add(sig_key)
                 if False:
                     (
                 )
