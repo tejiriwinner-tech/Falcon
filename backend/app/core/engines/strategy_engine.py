@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, Set
 from app.schemas.strategy import (
     StrategyItem, StrategyType, StrategyCategory, StrategyStatus,
     StrategyHealth, RiskLevel, StrategyPerformance, StrategyScore,
@@ -48,10 +48,131 @@ def _empty_validation() -> StrategyValidation:
     )
 
 
+EXPANSION_STRATEGY_IDS: Set[str] = {
+    "strat-013",
+    "strat-014",
+    "strat-015",
+    "strat-016",
+    "strat-017",
+    "strat-018",
+}
+
+
 class StrategyEngine:
+    # Shared process-wide runtime pause controls (controllable via REST API and Falcon AI Co-Pilot)
+    _paused_strategy_ids: Set[str] = set()
+    _paused_symbols: Set[str] = set()
+    _expansion_paused: bool = False
+
     def __init__(self):
-        self.version = "2.0.0"
+        self.version = "2.1.0"
         self._strategies = self._init_strategies()
+
+    @classmethod
+    def _is_strategy_paused(cls, strategy: StrategyItem) -> bool:
+        if strategy.id in cls._paused_strategy_ids:
+            return True
+        norm_sym = (strategy.symbol or "").replace("/", "").replace("_", "").upper()
+        if norm_sym in cls._paused_symbols:
+            return True
+        if cls._expansion_paused and strategy.id in EXPANSION_STRATEGY_IDS:
+            return True
+        return False
+
+    def pause_strategy(self, strategy_id: str) -> Optional[StrategyItem]:
+        """Pause a specific strategy by ID (e.g. 'strat-013')."""
+        sid = (strategy_id or "").strip().lower()
+        for s in self._strategies:
+            if s.id.lower() == sid or s.name.lower() == sid:
+                self.__class__._paused_strategy_ids.add(s.id)
+                out = s.model_copy(deep=True)
+                out.status = StrategyStatus.PAUSED
+                out.readyForExecution = False
+                return out
+        return None
+
+    def resume_strategy(self, strategy_id: str) -> Optional[StrategyItem]:
+        """Resume a specific strategy by ID."""
+        sid = (strategy_id or "").strip().lower()
+        for s in self._strategies:
+            if s.id.lower() == sid or s.name.lower() == sid:
+                self.__class__._paused_strategy_ids.discard(s.id)
+                norm_sym = (s.symbol or "").replace("/", "").replace("_", "").upper()
+                self.__class__._paused_symbols.discard(norm_sym)
+                if s.id in EXPANSION_STRATEGY_IDS and self.__class__._expansion_paused:
+                    # Keep other expansion strategies paused while unpausing this specific one
+                    self.__class__._expansion_paused = False
+                    for exp_id in EXPANSION_STRATEGY_IDS:
+                        if exp_id != s.id:
+                            self.__class__._paused_strategy_ids.add(exp_id)
+                out = s.model_copy(deep=True)
+                out.status = StrategyStatus.ACTIVE
+                out.readyForExecution = True
+                return out
+        return None
+
+    def pause_symbol(self, symbol: str) -> List[str]:
+        """Pause all strategies trading a specific symbol (e.g. 'GBP/JPY', 'AUD/USD', 'USD/JPY')."""
+        norm_sym = (symbol or "").replace("/", "").replace("_", "").upper()
+        if not norm_sym:
+            return []
+        self.__class__._paused_symbols.add(norm_sym)
+        affected = [
+            s.id for s in self._strategies
+            if (s.symbol or "").replace("/", "").replace("_", "").upper() == norm_sym
+        ]
+        for sid in affected:
+            self.__class__._paused_strategy_ids.add(sid)
+        return affected
+
+    def resume_symbol(self, symbol: str) -> List[str]:
+        """Resume all strategies trading a specific symbol."""
+        norm_sym = (symbol or "").replace("/", "").replace("_", "").upper()
+        if not norm_sym:
+            return []
+        self.__class__._paused_symbols.discard(norm_sym)
+        affected = [
+            s.id for s in self._strategies
+            if (s.symbol or "").replace("/", "").replace("_", "").upper() == norm_sym
+        ]
+        for sid in affected:
+            self.__class__._paused_strategy_ids.discard(sid)
+        return affected
+
+    def pause_expansion_strategies(self) -> List[str]:
+        """Pause the 6 multi-pair expansion strategies (strat-013 through strat-018)."""
+        self.__class__._expansion_paused = True
+        for sid in EXPANSION_STRATEGY_IDS:
+            self.__class__._paused_strategy_ids.add(sid)
+        return sorted(EXPANSION_STRATEGY_IDS)
+
+    def resume_expansion_strategies(self) -> List[str]:
+        """Resume the 6 multi-pair expansion strategies (strat-013 through strat-018)."""
+        self.__class__._expansion_paused = False
+        for sid in EXPANSION_STRATEGY_IDS:
+            self.__class__._paused_strategy_ids.discard(sid)
+        for sym in ("USDJPY", "GBPJPY", "AUDUSD"):
+            self.__class__._paused_symbols.discard(sym)
+        return sorted(EXPANSION_STRATEGY_IDS)
+
+    def get_pause_state(self) -> Dict[str, Any]:
+        """Return structured telemetry on active vs paused strategies and symbols (zero DB I/O)."""
+        active_list: List[str] = []
+        paused_list: List[str] = []
+        for s in self._strategies:
+            if self._is_strategy_paused(s):
+                paused_list.append(s.id)
+            else:
+                active_list.append(s.id)
+        return {
+            "total_strategies": len(self._strategies),
+            "active_count": len(active_list),
+            "paused_count": len(paused_list),
+            "active_strategy_ids": active_list,
+            "paused_strategy_ids": paused_list,
+            "paused_symbols": sorted(self.__class__._paused_symbols),
+            "expansion_paused": self.__class__._expansion_paused,
+        }
 
     def get_strategies(self) -> List[StrategyItem]:
         """Strategy definitions with performance and validation from stored data."""
@@ -62,6 +183,9 @@ class StrategyEngine:
         strategies: List[StrategyItem] = []
         for definition in self._strategies:
             strategy = definition.model_copy(deep=True)
+            if self._is_strategy_paused(strategy):
+                strategy.status = StrategyStatus.PAUSED
+                strategy.readyForExecution = False
             strategy.performance = performance.get(
                 strategy.id, EMPTY_PERFORMANCE.model_copy()
             )
@@ -647,7 +771,7 @@ class StrategyEngine:
             successConditions=["Liquidity Pool Pierced & Rejected", "FVG Imbalance Created", "Macro DXY Aligned"],
             minimumConfidence=85,
             minimumRiskReward=3.0,
-            preferredSessions=["London", "New York", "NY Overlap"],
+            preferredSessions=["London", "New York", "London-NY Overlap", "NY Overlap"],
             avoidConditions=["Macro DXY Contradiction", "Wide Rollover Spreads"],
             requiredConfirmations=["Liquidity Sweep Rejection Close", "Fair Value Gap Displacement"],
             grade="A+",
@@ -668,7 +792,357 @@ class StrategyEngine:
             latestValidation=_empty_validation()
         )
 
-        strategies = [s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12]
+        # 13. Tokyo Fix & Asian Range Liquidity Sweep (USD/JPY — Paired with strat-009)
+        s13 = StrategyItem(
+            id="strat-013",
+            name="Tokyo Fix & Asian Range Liquidity Sweep",
+            type=StrategyType.PRICE_ACTION,
+            category=StrategyCategory.INTRADAY,
+            symbol="USD/JPY",
+            description="Pairs with Asian Mean Reversion Range (strat-009) on USD/JPY. Captures the institutional stop hunt when Tokyo Fix or early London liquidity pierces the overnight Asian High/Low by 5-15 pips and snaps back with a 3-candle Fair Value Gap (FVG) displacement.",
+            marketCondition="Asian Boundary Liquidity Sweeps & Reversals",
+            bestSession="Asian / London",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.LOW,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Directly turns strat-009 Asian range boundary stop-hunts into high-R:R entries",
+                "Tight stop loss anchored 2 pips beyond the sweep wick",
+                "High 1:2.8+ risk-to-reward profile"
+            ],
+            weaknesses=["Requires established Asian session high/low pool"],
+            entryChecklist=[
+                "Wick sweep of Asian High/Low or Previous Day High/Low on USD/JPY",
+                "Immediate candle body rejection close back inside range",
+                "3-candle FVG displacement or reversal candlestick confirmed",
+                "DXY / US Yield Macro Gate aligned"
+            ],
+            exitChecklist=[
+                "Asian range opposite boundary or 1:2.8+ R:R reached",
+                "Breakeven + 1.5 pips locked at +1.5R"
+            ],
+            idealVolatility="Low to Medium",
+            avoidDuring=["BOJ Unscheduled Intervention", "US NFP / CPI Release Minute"],
+            confirmationIndicators=["Smart Money Sweep Engine", "3-Candle FVG Imbalance", "RSI 14"],
+            successConditions=["Asian Boundary Swept & Rejected", "FVG Imbalance Confirmed", "Spread <= 1.5 pips"],
+            minimumConfidence=82,
+            minimumRiskReward=2.8,
+            preferredSessions=["Asian", "Tokyo", "London", "London-NY Overlap"],
+            avoidConditions=["BOJ Emergency Press Conference", "Wide Rollover Spreads"],
+            requiredConfirmations=["Liquidity Sweep Rejection Close", "FVG or Reversal Candle"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Reversals", "Ranging", "Liquidity Sweeps"],
+            estimatedHoldingTime="1-4 hours",
+            maxConsecutiveLosses=2,
+            createdAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId="strat-009",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Paired with strat-009 to harvest Tokyo Fix and London Open liquidity sweeps on USD/JPY.",
+            dependencies=["Smart Money Engine", "Market Session Engine", "Macro Cross-Asset Gate"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 14. US Yield & NY Momentum Breakout (USD/JPY — Paired with strat-009)
+        s14 = StrategyItem(
+            id="strat-014",
+            name="US Yield & NY Momentum Breakout",
+            type=StrategyType.SESSION_BREAKOUT,
+            category=StrategyCategory.INTRADAY,
+            symbol="USD/JPY",
+            description="Complements Asian Mean Reversion Range (strat-009) by switching USD/JPY from range-fading to directional momentum expansion during London and New York sessions when US 10Y Yields and Synthetic DXY break out with Relative Volume >= 1.8x.",
+            marketCondition="London / NY Yield-Driven Trend Expansion",
+            bestSession="New York",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.MEDIUM,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Captures explosive 60-120 pip USD/JPY waves during US Treasury Yield moves",
+                "Eliminates Asian-only blindspot on USD/JPY during London & NY hours",
+                "Confirmed by Synthetic DXY + RISING/FALLING_YIELDS macro gate"
+            ],
+            weaknesses=["Avoid during dead Asian consolidation (handled by strat-009)"],
+            entryChecklist=[
+                "Asian or London session corridor broken cleanly on USD/JPY",
+                "Relative Volume surge (RVol >= 1.8x) confirmed",
+                "Synthetic DXY & US Yield Proxy aligned with breakout direction"
+            ],
+            exitChecklist=[
+                "TP1 partial scale-out at +1.5R, TP2 runner at +2.5R+",
+                "Structural swing trailing stop engaged at +2.0R"
+            ],
+            idealVolatility="Medium to High",
+            avoidDuring=["Low Volume Asian Range", "Pre-FOMC Blackout"],
+            confirmationIndicators=["Session Breakout Corridors", "RVol >= 1.8x", "Synthetic DXY & Yield Proxy"],
+            successConditions=["Corridor Breakout Close", "Volume Expansion", "Macro Yield Alignment"],
+            minimumConfidence=84,
+            minimumRiskReward=2.5,
+            preferredSessions=["London", "New York", "London-NY Overlap", "NY Overlap"],
+            avoidConditions=["Asian Low-Volume Chop", "Macro DXY Contradiction"],
+            requiredConfirmations=["Session Boundary Breakout", "RVol >= 1.8x Surge", "DXY/Yield Alignment"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Trending", "High Volatility", "Macro Expansion"],
+            estimatedHoldingTime="45-180 minutes",
+            maxConsecutiveLosses=3,
+            createdAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId="strat-009",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Pairs with strat-009 so USD/JPY transitions seamlessly from Asian mean reversion to London/NY yield breakouts.",
+            dependencies=["Session Breakout Engine", "Macro Cross-Asset Gate", "Volume Expansion Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 15. Dragon London Open Volatility Breakout (GBP/JPY)
+        s15 = StrategyItem(
+            id="strat-015",
+            name="Dragon London Open Volatility Breakout",
+            type=StrategyType.SESSION_BREAKOUT,
+            category=StrategyCategory.INTRADAY,
+            symbol="GBP/JPY",
+            description="Captures high-beta 'Dragon' (GBP/JPY) volatility expansions at the London Open and London-NY Overlap. Waits for the Tokyo consolidation box to break with RVol >= 1.8x and enters on the structural retest.",
+            marketCondition="High-Beta Session Volatility Expansion",
+            bestSession="London",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.MEDIUM,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Exploits the highest average daily range (120-180 pips) among FX crosses",
+                "Filters out London Open Judas fakeouts via sweep-retest validation",
+                "Asymmetric 1:2.8+ risk-to-reward profile"
+            ],
+            weaknesses=["Requires strict 3.2-pip spread shield protection"],
+            entryChecklist=[
+                "Tokyo session range high/low broken with candle body >= 60% of range",
+                "Relative Volume (RVol) >= 1.8x surge confirmed",
+                "GBP/USD and USD/JPY cross-pair flows aligned (no divergence)"
+            ],
+            exitChecklist=[
+                "1.5R TP1 partial bank + breakeven lock",
+                "2.8R+ TP2 runner with structural swing trail"
+            ],
+            idealVolatility="High",
+            avoidDuring=["BOE / BOJ Rate Decisions", "Rollover Spread Widening"],
+            confirmationIndicators=["Session Breakout Corridors", "RVol >= 1.8x", "Yen-Cross Alignment Filter"],
+            successConditions=["London/Overlap Active", "Corridor Breakout + Retest", "Spread <= 3.2 pips"],
+            minimumConfidence=85,
+            minimumRiskReward=2.8,
+            preferredSessions=["London", "New York", "London-NY Overlap", "NY Overlap"],
+            avoidConditions=["Spread > 3.2 Pips", "GBP/USD vs USD/JPY Opposing Whipsaw"],
+            requiredConfirmations=["Tokyo Corridor Breakout", "RVol >= 1.8x Confirmation", "HTF EMA Bias Alignment"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Volatile", "Trending", "Session Breakouts"],
+            estimatedHoldingTime="30-120 minutes",
+            maxConsecutiveLosses=2,
+            createdAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId=None,
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Dedicated institutional session breakout strategy for GBP/JPY.",
+            dependencies=["Session Breakout Engine", "Smart Money Engine", "Volatility Filter"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 16. Dragon Institutional FVG & Trend Pullback (GBP/JPY)
+        s16 = StrategyItem(
+            id="strat-016",
+            name="Dragon Institutional FVG & Trend Pullback",
+            type=StrategyType.PRICE_ACTION,
+            category=StrategyCategory.INTRADAY,
+            symbol="GBP/JPY",
+            description="Trades GBP/JPY institutional liquidity sweeps and 3-candle Fair Value Gap (FVG) pullbacks aligned with H1 EMA 20/50 trend structure. Avoids chasing extended breakouts by entering on discount/premium imbalance fills.",
+            marketCondition="Trending Impulses & SMC Imbalance Pullbacks",
+            bestSession="London / New York",
+            bestTimeframe="H1",
+            riskLevel=RiskLevel.LOW,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Eliminates FOMO chasing on GBP/JPY by demanding FVG/sweep pullback",
+                "High-precision invalidation anchored below structural swing low/high",
+                "Superior 1:3.0+ risk-to-reward ratio"
+            ],
+            weaknesses=["Selective entry frequency; waits for clean imbalance retest"],
+            entryChecklist=[
+                "Liquidity sweep of session/previous-day high/low OR 3-candle FVG created",
+                "H1 EMA 20 / EMA 50 trend structure aligned",
+                "Confirmation candle close at key zone"
+            ],
+            exitChecklist=[
+                "Opposite structural liquidity pool reached (1:3.0 R:R)",
+                "Automated breakeven at +1.5R and structural trail at +2.0R"
+            ],
+            idealVolatility="Medium to High",
+            avoidDuring=["Low Liquidity Rollover", "High Impact GBP/JPY News"],
+            confirmationIndicators=["Smart Money Sweep & FVG Engine", "Candlestick Pattern Engine", "EMA 20 / 50"],
+            successConditions=["SMC Sweep or FVG Retest", "HTF Structure Aligned", "Risk/Reward >= 3.0"],
+            minimumConfidence=85,
+            minimumRiskReward=3.0,
+            preferredSessions=["London", "New York", "Asian", "London-NY Overlap"],
+            avoidConditions=["Middle-of-Range Chop", "Wide Spreads"],
+            requiredConfirmations=["Liquidity Sweep or FVG Fill", "Candlestick Confirmation Close"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Trending", "Reversals", "Institutional Flow"],
+            estimatedHoldingTime="1-6 hours",
+            maxConsecutiveLosses=2,
+            createdAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId=None,
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Institutional SMC & FVG pullback sniper for GBP/JPY.",
+            dependencies=["Smart Money Engine", "Candlestick Pattern Engine", "Structure Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 17. Pacific Liquidity Sweep & Gold-Macro Confluence (AUD/USD)
+        s17 = StrategyItem(
+            id="strat-017",
+            name="Pacific Liquidity Sweep & Gold-Macro Confluence",
+            type=StrategyType.PRICE_ACTION,
+            category=StrategyCategory.INTRADAY,
+            symbol="AUD/USD",
+            description="Exploits Sydney/Tokyo and London Open liquidity sweeps on AUD/USD confirmed by 3-candle Fair Value Gaps (FVG) and positive commodity correlation with Gold (XAU/USD) and inverse Synthetic DXY flows.",
+            marketCondition="Session Liquidity Sweeps & Commodity-FX Alignment",
+            bestSession="Asian / London",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.LOW,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Active during Sydney/Tokyo Asian hours as well as London/NY transitions",
+                "Cross-asset Gold (XAU/USD) + DXY confirmation filters out false AUD breakouts",
+                "Tight 12-18 pip structural stops with 1:2.8+ R:R"
+            ],
+            weaknesses=["Avoid during RBA rate statements"],
+            entryChecklist=[
+                "Wick sweep of Asian/Previous-Day High or Low on AUD/USD",
+                "3-candle FVG displacement or institutional reversal candle close",
+                "XAU/USD (Gold) and Synthetic DXY macro gate aligned"
+            ],
+            exitChecklist=[
+                "1:2.8+ R:R target pool reached",
+                "Breakeven stop locked at +1.5R"
+            ],
+            idealVolatility="Medium",
+            avoidDuring=["RBA Rate Decision", "US CPI / NFP"],
+            confirmationIndicators=["Smart Money Sweep Engine", "Synthetic DXY & Gold Confluence", "3-Candle FVG"],
+            successConditions=["Liquidity Sweep Confirmed", "Macro DXY & Gold Aligned", "Spread <= 1.2 pips"],
+            minimumConfidence=83,
+            minimumRiskReward=2.8,
+            preferredSessions=["Asian", "Sydney", "Tokyo", "London", "New York", "London-NY Overlap"],
+            avoidConditions=["Macro DXY Bull/Bear Trap", "Gold Divergence"],
+            requiredConfirmations=["Sweep Rejection Close", "FVG or Candlestick Confirmation", "Macro Gate Pass"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Reversals", "Trending", "Commodity-FX Flow"],
+            estimatedHoldingTime="1-5 hours",
+            maxConsecutiveLosses=2,
+            createdAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId=None,
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Pairs AUD/USD SMC liquidity sweeps with Gold and DXY cross-asset confirmation.",
+            dependencies=["Smart Money Engine", "Macro Cross-Asset Gate", "Candlestick Pattern Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 18. AUD/USD Structural Trend & EMA Pullback (AUD/USD)
+        s18 = StrategyItem(
+            id="strat-018",
+            name="AUD/USD Structural Trend & EMA Pullback",
+            type=StrategyType.TREND_CONTINUATION,
+            category=StrategyCategory.INTRADAY,
+            symbol="AUD/USD",
+            description="Rides clean, low-whipsaw intraday and multi-session trends on AUD/USD. Enters on structural pullbacks to the H1 20/50 EMA dynamic zone confirmed by institutional candlestick patterns and DXY macro alignment.",
+            marketCondition="Steady Directional Trend & Pullback Continuation",
+            bestSession="London / New York",
+            bestTimeframe="H1",
+            riskLevel=RiskLevel.LOW,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "AUD/USD respects EMA 20/50 trend structure with minimal retail stop-hunting noise",
+                "Low drawdown and high consistency across London and NY sessions",
+                "1:2.5+ asymmetric risk-to-reward with structural trailing stops"
+            ],
+            weaknesses=["Lower frequency during tight horizontal consolidation"],
+            entryChecklist=[
+                "H1 trend aligned with EMA 20 & EMA 50 slope",
+                "Pullback to dynamic EMA support/resistance completed",
+                "Bullish/Bearish Engulfing, Pinbar, or Morning/Evening Star confirmation",
+                "DXY Macro Gate aligned"
+            ],
+            exitChecklist=[
+                "1:2.5+ R:R structural target reached",
+                "Swing trailing stop ratcheted at +2.0R"
+            ],
+            idealVolatility="Low to Medium",
+            avoidDuring=["RBA Rate Statement", "US FOMC"],
+            confirmationIndicators=["EMA 20 / 50", "Candlestick Pattern Engine", "Synthetic DXY Macro Gate"],
+            successConditions=["Trend Alignment", "Candlestick Pullback Trigger", "Macro DXY Aligned"],
+            minimumConfidence=82,
+            minimumRiskReward=2.5,
+            preferredSessions=["Asian", "London", "New York", "London-NY Overlap"],
+            avoidConditions=["Choppy Range Consolidation", "Macro DXY Contradiction"],
+            requiredConfirmations=["EMA 20/50 Trend Alignment", "Candlestick Pattern Close", "DXY Gate Pass"],
+            grade="A",
+            lastUsed=now,
+            marketCompatibility=["Trending", "Low Volatility", "High Liquidity"],
+            estimatedHoldingTime="2-6 hours",
+            maxConsecutiveLosses=3,
+            createdAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 9, 15, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId=None,
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Institutional trend-continuation and EMA pullback strategy for AUD/USD.",
+            dependencies=["Trend Bias", "Candlestick Pattern Engine", "Macro Cross-Asset Gate"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        strategies = [
+            s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12,
+            s13, s14, s15, s16, s17, s18,
+        ]
         for strategy in strategies:
             strategy.strategyScore.riskRating = strategy.riskLevel
         return strategies
+
+
+strategy_engine = StrategyEngine()

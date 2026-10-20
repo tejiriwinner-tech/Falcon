@@ -116,7 +116,7 @@ class SignalService:
                 except Exception:
                     pass
 
-                dec = 2 if "XAU" in ot.symbol or ot.entryPrice > 100 else 4
+                dec = 2 if ("XAU" in ot.symbol.upper() or "GOLD" in ot.symbol.upper() or ot.entryPrice > 500) else (3 if "JPY" in ot.symbol.upper() else 4)
                 risk_d = abs(ot.entryPrice - ot.stopLoss)
                 be_trig = ot.entryPrice + risk_d if ot.direction.upper() == "BUY" else ot.entryPrice - risk_d
 
@@ -262,7 +262,7 @@ class SignalService:
                 except Exception:
                     pass
 
-                dec = 2 if "XAU" in ct.symbol or ct.entryPrice > 100 else 4
+                dec = 2 if ("XAU" in ct.symbol.upper() or "GOLD" in ct.symbol.upper() or ct.entryPrice > 500) else (3 if "JPY" in ct.symbol.upper() else 4)
                 risk_d = abs(ct.entryPrice - ct.stopLoss)
                 be_trig = ct.entryPrice + risk_d if ct.direction.upper() == "BUY" else ct.entryPrice - risk_d
 
@@ -449,8 +449,10 @@ class SignalService:
                         cur_px = None
 
                 # Proximity band: 1.0 to 1.5 pips (0.00015 for 4-digit Forex, 0.50 for Gold)
-                pip_tolerance = 0.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.00015
-                slip_invalidation = 1.50 if ("XAU" in symbol or cand.entryPrice > 100) else 0.00030  # 3 pips
+                is_gold_sym = "XAU" in symbol.upper() or "GOLD" in symbol.upper() or cand.entryPrice > 500
+                is_jpy_sym = "JPY" in symbol.upper()
+                pip_tolerance = 0.50 if is_gold_sym else (0.020 if is_jpy_sym else 0.00015)
+                slip_invalidation = 1.50 if is_gold_sym else (0.045 if is_jpy_sym else 0.00030)  # 3-4.5 pips
 
                 # Check if this setup is ALREADY recorded as ACTIVE in repository or open trades
                 is_already_active = signal_signature_repository.is_active(
@@ -858,7 +860,7 @@ class SignalService:
         valid_until = candidate.generatedAt + timedelta(hours=1)
         is_expired = now > valid_until
 
-        dec = 2 if "XAU" in candidate.symbol or candidate.entryPrice > 100 else 4
+        dec = 2 if ("XAU" in candidate.symbol.upper() or "GOLD" in candidate.symbol.upper() or candidate.entryPrice > 500) else (3 if "JPY" in candidate.symbol.upper() else 4)
         direction_val = candidate.direction.value.upper()
 
         # Strict adherence: preserve authentic candidate entry, stop loss, and take profit (no artificial shifting)

@@ -110,13 +110,16 @@ class AdaptiveRuleTuningEngine:
         stype = (strategy_type or "").upper()
         sid = (strategy_id or "").lower()
 
-        is_mean_reversion = "MEAN_REVERSION" in stype or "RANGE" in stype or sid in ("strat-003", "strat-006")
-        is_smc_sweep = sid == "strat-012" or "SWEEP" in stype or "PRICE_ACTION" in stype
+        is_mean_reversion = "MEAN_REVERSION" in stype or "RANGE" in stype or sid in ("strat-003", "strat-009")
+        is_smc_sweep = sid in ("strat-012", "strat-013", "strat-016", "strat-017") or "SWEEP" in stype or "PRICE_ACTION" in stype
         is_breakout_or_trend = (
             "BREAKOUT" in stype
             or "TREND" in stype
             or "MOMENTUM" in stype
-            or sid in ("strat-001", "strat-002", "strat-004", "strat-005", "strat-007", "strat-008", "strat-010")
+            or sid in (
+                "strat-001", "strat-002", "strat-004", "strat-005", "strat-006",
+                "strat-007", "strat-008", "strat-010", "strat-014", "strat-015", "strat-018"
+            )
         )
 
         # Asian Session (00:00 - 07:00 UTC): 80% capital focus to Mean Reversion & SMC Range Sweeps; throttle Trend Breakouts

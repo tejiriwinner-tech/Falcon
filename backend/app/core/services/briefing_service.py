@@ -109,8 +109,18 @@ class BriefingService:
         # Strategy: read in-memory stale cache first (microseconds), then live fetch as fallback.
         if not quotes:
             try:
+                from concurrent.futures import ThreadPoolExecutor
                 from app.core.providers import provider_manager
-                for sym, key in [("EURUSD", "EUR/USD"), ("GBPUSD", "GBP/USD"), ("XAUUSD", "XAU/USD")]:
+                pairs_to_fetch = [
+                    ("EURUSD", "EUR/USD"),
+                    ("GBPUSD", "GBP/USD"),
+                    ("XAUUSD", "XAU/USD"),
+                    ("USDJPY", "USD/JPY"),
+                    ("GBPJPY", "GBP/JPY"),
+                    ("AUDUSD", "AUD/USD"),
+                ]
+                missing_pairs = []
+                for sym, key in pairs_to_fetch:
                     # Fast path: use stale-allowed cached price (zero network I/O)
                     try:
                         cached_entry = provider_manager._cache.get(sym, allow_stale=True)
@@ -120,18 +130,36 @@ class BriefingService:
                             continue
                     except Exception:
                         pass
-                    # Slow path: live HTTP fetch only when cache is empty
+                    missing_pairs.append((sym, key))
+
+                # Concurrent bounded fetch (max 2.5s total) for any uncached pairs
+                if missing_pairs:
+                    def _fetch_one(pair_tuple):
+                        s_code, k_code = pair_tuple
+                        try:
+                            q_resp = provider_manager.get_market_quote(s_code)
+                            if q_resp and q_resp.quote and q_resp.quote.lastPrice > 0:
+                                return s_code, k_code, q_resp.quote.lastPrice
+                        except Exception as ex_inner:
+                            logger.debug(f"Live quote fetch failed for {s_code}: {ex_inner}")
+                        return s_code, k_code, None
+
+                    ex_pool = ThreadPoolExecutor(max_workers=len(missing_pairs))
+                    futures = [ex_pool.submit(_fetch_one, pt) for pt in missing_pairs]
                     try:
-                        q_resp = provider_manager.get_market_quote(sym)
-                        if q_resp and q_resp.quote and q_resp.quote.lastPrice > 0:
-                            quotes[key] = q_resp.quote.lastPrice
-                            quotes[sym] = q_resp.quote.lastPrice
-                    except Exception as e:
-                        logger.debug(f"Live quote fetch failed for {sym}: {e}")
+                        for fut in futures:
+                            s_code, k_code, px_val = fut.result(timeout=2.5)
+                            if px_val:
+                                quotes[k_code] = px_val
+                                quotes[s_code] = px_val
+                    except Exception:
+                        pass
+                    finally:
+                        ex_pool.shutdown(wait=False, cancel_futures=True)
             except Exception as e:
                 logger.debug(f"Failed to fetch live quotes for briefing: {e}")
 
-        # ── 1. Asian Session Analysis & Institutional Key Levels ─────────────
+        # ── 1. Asian Session Analysis & Institutional Key Levels (All 6 Core Pairs) ─
         # EUR/USD
         eur_ref = self._extract_price(quotes, "EUR/USD", "EURUSD", fallback=1.1350)
         eur_high = round(self._extract_key(quotes, "EUR/USD", "EURUSD", "asian_high", default=eur_ref + 0.0015), 4)
@@ -146,13 +174,34 @@ class BriefingService:
         gbp_range_pips = round((gbp_high - gbp_low) * 10000, 1)
         gbp_mid = round((gbp_high + gbp_low) / 2, 4)
 
-        # XAU/USD (Gold) - Real live market grounded (no mock prices)
+        # XAU/USD (Gold)
         gold_ref = self._extract_price(quotes, "XAU/USD", "XAUUSD", "GOLD", fallback=4185.00)
         gold_high = round(self._extract_key(quotes, "XAU/USD", "XAUUSD", "asian_high", default=gold_ref + 8.50), 2)
         gold_low = round(self._extract_key(quotes, "XAU/USD", "XAUUSD", "asian_low", default=gold_ref - 8.00), 2)
         gold_range_dollars = round(gold_high - gold_low, 2)
         gold_range_pips = round(gold_range_dollars * 10, 1)
         gold_mid = round((gold_high + gold_low) / 2, 2)
+
+        # USD/JPY (Asian Mean Reversion + Tokyo Fix Sweep + US Yield Breakout)
+        uj_ref = self._extract_price(quotes, "USD/JPY", "USDJPY", fallback=150.250)
+        uj_high = round(self._extract_key(quotes, "USD/JPY", "USDJPY", "asian_high", default=uj_ref + 0.220), 3)
+        uj_low = round(self._extract_key(quotes, "USD/JPY", "USDJPY", "asian_low", default=uj_ref - 0.230), 3)
+        uj_range_pips = round((uj_high - uj_low) * 100, 1)
+        uj_mid = round((uj_high + uj_low) / 2, 3)
+
+        # GBP/JPY ("The Dragon" — London Open Volatility Breakout + FVG Pullback)
+        gj_ref = self._extract_price(quotes, "GBP/JPY", "GBPJPY", fallback=198.500)
+        gj_high = round(self._extract_key(quotes, "GBP/JPY", "GBPJPY", "asian_high", default=gj_ref + 0.350), 3)
+        gj_low = round(self._extract_key(quotes, "GBP/JPY", "GBPJPY", "asian_low", default=gj_ref - 0.350), 3)
+        gj_range_pips = round((gj_high - gj_low) * 100, 1)
+        gj_mid = round((gj_high + gj_low) / 2, 3)
+
+        # AUD/USD (Pacific Liquidity Sweep + Gold-Macro Confluence)
+        aud_ref = self._extract_price(quotes, "AUD/USD", "AUDUSD", fallback=0.6580)
+        aud_high = round(self._extract_key(quotes, "AUD/USD", "AUDUSD", "asian_high", default=aud_ref + 0.0016), 4)
+        aud_low = round(self._extract_key(quotes, "AUD/USD", "AUDUSD", "asian_low", default=aud_ref - 0.0016), 4)
+        aud_range_pips = round((aud_high - aud_low) * 10000, 1)
+        aud_mid = round((aud_high + aud_low) / 2, 4)
 
         market_levels = {
             "EUR/USD": {
@@ -189,10 +238,44 @@ class BriefingService:
                 "volatility_reversion_floor": round(gold_low - 6.00, 2),
                 "tactical_bias": "SESSION_VOLUME_BREAKOUT",
             },
+            "USD/JPY": {
+                "current_price": uj_ref,
+                "asian_high": uj_high,
+                "asian_low": uj_low,
+                "asian_midpoint": uj_mid,
+                "range_pips": uj_range_pips,
+                "london_breakout_target": round(uj_high + (uj_range_pips * 0.01 * 1.5), 3),
+                "invalidation_level": round(uj_low - 0.080, 3),
+                "tactical_bias": "TOKYO_SWEEP_AND_NY_YIELD_BREAKOUT",
+            },
+            "GBP/JPY": {
+                "current_price": gj_ref,
+                "asian_high": gj_high,
+                "asian_low": gj_low,
+                "asian_midpoint": gj_mid,
+                "range_pips": gj_range_pips,
+                "london_breakout_target": round(gj_high + (gj_range_pips * 0.01 * 1.5), 3),
+                "invalidation_level": round(gj_low - 0.120, 3),
+                "tactical_bias": "DRAGON_LONDON_VOLATILITY_BREAKOUT",
+            },
+            "AUD/USD": {
+                "current_price": aud_ref,
+                "asian_high": aud_high,
+                "asian_low": aud_low,
+                "asian_midpoint": aud_mid,
+                "range_pips": aud_range_pips,
+                "london_breakout_target": round(aud_high + (aud_range_pips * 0.0001 * 1.5), 4),
+                "invalidation_level": round(aud_low - 0.0008, 4),
+                "tactical_bias": "PACIFIC_SWEEP_GOLD_CONFLUENCE",
+            },
         }
 
-        # ── 2. Macro Calendar Events Today ───────────────────────────────────
+        # ── 2. Macro Calendar & Strategy Portfolio Governance ────────────────
         calendar_highlights = self._get_high_impact_events()
+        from app.core.engines.strategy_engine import strategy_engine
+        from app.core.engines.decision.evaluators.macro_cross_asset_evaluator import macro_cross_asset_engine
+        pause_state = strategy_engine.get_pause_state()
+        dxy_snap = macro_cross_asset_engine.get_live_dxy_snapshot()
 
         # ── 3. Risk State & Headroom ─────────────────────────────────────────
         loss_metrics = adaptive_tuning_engine.get_loss_recovery_metrics()
@@ -210,13 +293,26 @@ class BriefingService:
             "max_entertaining_loss": float(max_loss),
             "loss_ceiling_headroom": float(headroom),
             "ai_reflection": loss_metrics.ai_reflection,
+            "active_strategies_count": pause_state["active_count"],
+            "paused_strategies_count": pause_state["paused_count"],
+            "paused_strategy_ids": pause_state["paused_strategy_ids"],
+            "expansion_paused": pause_state["expansion_paused"],
+            "dxy_bias": dxy_snap.dxy_bias,
+            "yield_proxy_bias": dxy_snap.yield_proxy_bias,
         }
 
-        # ── 4. Key Insights & Top 3 Watchpoints ──────────────────────────────
+        paused_note = (
+            f"Paused ({pause_state['paused_count']}): {', '.join(pause_state['paused_strategy_ids'])}"
+            if pause_state["paused_strategy_ids"]
+            else f"All {pause_state['total_strategies']} strategies ACTIVE"
+        )
+
+        # ── 4. Key Insights & Top Watchpoints ────────────────────────────────
         watchpoints = [
-            f"London Open Momentum (07:00–09:30 UTC): Watch for volume expansion breakouts above Asian High on GBP/USD ({gbp_high}) and EUR/USD ({eur_high}) with RVol >= 1.8x confirmation.",
-            f"Gold (XAU/USD) Volume Expansion: Asian corridor established (${gold_low:.2f}–${gold_high:.2f}, ${gold_range_dollars:.2f} range). Invalidation below ${gold_low - 3.0:.2f} with 1.5x expansion target at ${gold_high + (gold_range_dollars * 1.5):.2f}.",
-            f"Statistical Volatility Exhaustion: Keltner 2.5σ bands actively monitoring overstretched momentum. Active recovery multiplier is {loss_metrics.profit_recovery_multiplier:.1f}x with ${float(headroom):.2f} headroom remaining under the $20 ceiling.",
+            f"London Open Momentum (07:00–09:30 UTC): Watch for volume expansion breakouts above Asian High on GBP/USD ({gbp_high}), EUR/USD ({eur_high}), and GBP/JPY ({gj_high:.3f}) with RVol >= 1.8x confirmation.",
+            f"Gold (XAU/USD) & AUD/USD Commodity Confluence: Gold Asian corridor (${gold_low:.2f}–${gold_high:.2f}, ${gold_range_dollars:.2f} range) paired with AUD/USD ({aud_low:.4f}–{aud_high:.4f}, {aud_range_pips}p) and Synthetic DXY ({dxy_snap.dxy_bias}).",
+            f"USD/JPY 24-Hour Trio (`strat-009` + `strat-013` + `strat-014`): Asian range `{uj_low:.3f}–{uj_high:.3f}` ({uj_range_pips}p). Monitoring Tokyo Fix liquidity sweeps and US Yield breakouts.",
+            f"Strategy Governance & Capital Guardian: {paused_note}. Recovery multiplier at {loss_metrics.profit_recovery_multiplier:.1f}x with ${float(headroom):.2f} headroom under the $20 ceiling.",
         ]
 
         # ── 5. Formatted Text for Telegram / Mobile ──────────────────────────
@@ -226,20 +322,19 @@ class BriefingService:
         formatted_text = f"""🦅 **FALCON INTELLIGENCE BRIEFING: LONDON OPEN** 🇬🇧
 *Generated: {timestamp_str} UTC*
 
-📊 **Asian Session Ranges & Breakout Targets**:
-• **EUR/USD**: Asian Range `{eur_low:.4f} – {eur_high:.4f}` ({eur_range_pips} pips) | Mid: `{eur_mid:.4f}`
-  - London Breakout Target: `{eur_high + (eur_range_pips * 0.0001 * 1.5):.4f}` | Invalidation: `{eur_low - 0.0008:.4f}`
-  - Tactical Bias: **Bullish Session Expansion with RVol >= 1.8x**
+📊 **Asian Session Ranges & Breakout Targets (All 6 Core Pairs)**:
+• **XAU/USD (Gold)**: `${gold_low:.2f} – ${gold_high:.2f}` (${gold_range_dollars:.2f}) | Target: `${gold_high + (gold_range_dollars * 1.5):.2f}` | SL: `${gold_low - 3.0:.2f}`
+• **EUR/USD**: `{eur_low:.4f} – {eur_high:.4f}` ({eur_range_pips}p) | Target: `{eur_high + (eur_range_pips * 0.0001 * 1.5):.4f}` | SL: `{eur_low - 0.0008:.4f}`
+• **GBP/USD**: `{gbp_low:.4f} – {gbp_high:.4f}` ({gbp_range_pips}p) | Target: `{gbp_high + (gbp_range_pips * 0.0001 * 1.5):.4f}` | SL: `{gbp_low - 0.0010:.4f}`
+• **USD/JPY**: `{uj_low:.3f} – {uj_high:.3f}` ({uj_range_pips}p) | Target: `{uj_high + (uj_range_pips * 0.01 * 1.5):.3f}` | Bias: **Asian Range + Tokyo Fix Sweep + NY Yield Breakout**
+• **GBP/JPY (Dragon)**: `{gj_low:.3f} – {gj_high:.3f}` ({gj_range_pips}p) | Target: `{gj_high + (gj_range_pips * 0.01 * 1.5):.3f}` | Bias: **London Open Volatility Breakout & FVG**
+• **AUD/USD**: `{aud_low:.4f} – {aud_high:.4f}` ({aud_range_pips}p) | Target: `{aud_high + (aud_range_pips * 0.0001 * 1.5):.4f}` | Bias: **Pacific Sweep & Gold-Macro Confluence**
 
-• **GBP/USD**: Asian Range `{gbp_low:.4f} – {gbp_high:.4f}` ({gbp_range_pips} pips) | Mid: `{gbp_mid:.4f}`
-  - London Breakout Target: `{gbp_high + (gbp_range_pips * 0.0001 * 1.5):.4f}` | Invalidation: `{gbp_low - 0.0010:.4f}`
-  - Tactical Bias: **Bullish London Open Expansion**
+🌐 **Macro Cross-Asset Gate & Strategy Governance**:
+• Synthetic DXY Bias: `{dxy_snap.dxy_bias}` ({dxy_snap.dxy_momentum_pct:+.2f}%) | US Yield Proxy: `{dxy_snap.yield_proxy_bias}`
+• Strategy Portfolio: `{pause_state['active_count']}/{pause_state['total_strategies']} Active` ({paused_note})
 
-• **XAU/USD (Gold)**: Asian Range `${gold_low:.2f} – ${gold_high:.2f}` (${gold_range_dollars:.2f}) | Mid: `${gold_mid:.2f}`
-  - Expansion Target: `${gold_high + (gold_range_dollars * 1.5):.2f}` | Invalidation: `${gold_low - 3.0:.2f}`
-  - Tactical Bias: **Session Volume Breakout & Volatility Reversion**
-
-⚡ **Top 3 Watchpoints**:
+⚡ **Top Watchpoints**:
 1. {watchpoints[0]}
 2. {watchpoints[1]}
 3. {watchpoints[2]}
@@ -255,7 +350,7 @@ class BriefingService:
         return IntelligenceBriefing(
             briefing_type=BriefingType.LONDON_OPEN,
             title="Falcon London Open Intelligence Briefing",
-            summary=f"Asian session ranges established across EUR/USD ({eur_range_pips}p), GBP/USD ({gbp_range_pips}p), and Gold (${gold_range_dollars}). Prime setups aligned with London session breakout and multi-timeframe volume expansion.",
+            summary=f"Asian session ranges established across all 6 pairs: Gold (${gold_range_dollars}), EUR/USD ({eur_range_pips}p), GBP/USD ({gbp_range_pips}p), USD/JPY ({uj_range_pips}p), GBP/JPY ({gj_range_pips}p), and AUD/USD ({aud_range_pips}p). {pause_state['active_count']}/{pause_state['total_strategies']} strategies active.",
             market_levels=market_levels,
             key_insights=watchpoints,
             risk_state=risk_state,
@@ -353,6 +448,14 @@ class BriefingService:
         protected_profit = float(cycle_summary.totalProtectedProfit)
         cycle_num = cycle_summary.activeCycle.cycleNumber if cycle_summary.activeCycle else 1
 
+        from app.core.engines.strategy_engine import strategy_engine
+        pause_state = strategy_engine.get_pause_state()
+        paused_note = (
+            f"Paused ({pause_state['paused_count']}): {', '.join(pause_state['paused_strategy_ids'])}"
+            if pause_state["paused_strategy_ids"]
+            else f"All {pause_state['total_strategies']} strategies ACTIVE"
+        )
+
         risk_state = {
             "consecutive_losses": loss_metrics.consecutive_losses,
             "profit_recovery_multiplier": loss_metrics.profit_recovery_multiplier,
@@ -363,6 +466,10 @@ class BriefingService:
             "active_trading_capital": active_cap,
             "protected_profit_total": protected_profit,
             "cycle_number": cycle_num,
+            "active_strategies_count": pause_state["active_count"],
+            "paused_strategies_count": pause_state["paused_count"],
+            "paused_strategy_ids": pause_state["paused_strategy_ids"],
+            "expansion_paused": pause_state["expansion_paused"],
         }
 
         # ── 3. Forensic Lessons & Parameter Adjustments ──────────────────────
@@ -385,6 +492,7 @@ class BriefingService:
             f"Adaptive ATR Stop Buffer: Configured at {stop_mult:.2f}x to bypass liquidity sweeps.",
             f"Pullback Requirement: Configured at {pullback_mult:.2f}x for high-conviction discount fills.",
             f"Target Multiplier: Active at {loss_metrics.profit_recovery_multiplier:.1f}x ({loss_metrics.recovery_status}).",
+            f"Strategy Portfolio Governance: {pause_state['active_count']}/{pause_state['total_strategies']} strategies active ({paused_note}).",
         ]
 
         key_insights = forensic_findings + adjustments

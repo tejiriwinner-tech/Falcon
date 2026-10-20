@@ -36,6 +36,8 @@ DXY_BASKET_WEIGHTS: Dict[str, Tuple[float, int]] = {
 INVERSE_USD_ASSETS = {"XAUUSD", "XAGUSD", "EURUSD", "GBPUSD", "AUDUSD", "NZDUSD"}
 # Assets directly correlated with DXY / US Real Yields (USD is the base currency)
 DIRECT_USD_ASSETS = {"USDJPY", "USDCAD", "USDCHF"}
+# High-Beta Yen Crosses (driven by US/Global Yields + Risk Appetite)
+YEN_CROSS_ASSETS = {"GBPJPY", "EURJPY", "AUDJPY"}
 
 
 @dataclass
@@ -196,6 +198,26 @@ class MacroCrossAssetEngine:
 
         # Case 1: Inverse USD assets (XAUUSD, EURUSD, GBPUSD, AUDUSD)
         if norm_sym in INVERSE_USD_ASSETS:
+            # Optional Gold-AUD commodity-FX confluence check for AUDUSD
+            gold_bonus = 0.0
+            gold_note = ""
+            if norm_sym == "AUDUSD" and candles_by_symbol and "XAUUSD" in candles_by_symbol:
+                xau_bars = candles_by_symbol.get("XAUUSD") or []
+                if len(xau_bars) >= 4:
+                    try:
+                        x_now = float(getattr(xau_bars[-1], "close", 0.0) or xau_bars[-1].get("close", 0.0))
+                        x_prev = float(getattr(xau_bars[-4], "close", 0.0) or xau_bars[-4].get("close", 0.0))
+                        if x_prev > 0 and x_now > 0:
+                            x_ret = ((x_now - x_prev) / x_prev) * 100.0
+                            if dir_upper == "BUY" and x_ret >= 0.12:
+                                gold_bonus = 4.0
+                                gold_note = f" + Gold commodity tailwind ({x_ret:+.2f}%)"
+                            elif dir_upper == "SELL" and x_ret <= -0.12:
+                                gold_bonus = 4.0
+                                gold_note = f" + Gold commodity weakness ({x_ret:+.2f}%)"
+                    except Exception:
+                        pass
+
             if dir_upper == "BUY":
                 if snap.dxy_bias == "STRONG_BULLISH":
                     return MacroGateAssessment(
@@ -218,13 +240,13 @@ class MacroCrossAssetEngine:
                         direction=dir_upper,
                         aligned=True,
                         is_macro_trap=False,
-                        confidence_modifier=+8.0,
+                        confidence_modifier=8.0 + gold_bonus,
                         score=100.0,
                         dxy_bias=snap.dxy_bias,
                         dxy_momentum_pct=snap.dxy_momentum_pct,
                         rationale=(
                             f"Macro Tailwind Confirmed: {norm_sym} BUY supported by weakening "
-                            f"DXY ({snap.dxy_momentum_pct:+.2f}%, {snap.dxy_bias})."
+                            f"DXY ({snap.dxy_momentum_pct:+.2f}%, {snap.dxy_bias}){gold_note}."
                         ),
                     )
                 elif snap.dxy_bias == "BULLISH":
@@ -233,13 +255,13 @@ class MacroCrossAssetEngine:
                         direction=dir_upper,
                         aligned=False,
                         is_macro_trap=False,
-                        confidence_modifier=-10.0,
+                        confidence_modifier=-10.0 + gold_bonus,
                         score=45.0,
                         dxy_bias=snap.dxy_bias,
                         dxy_momentum_pct=snap.dxy_momentum_pct,
                         rationale=(
                             f"Macro Headwind Warning: {norm_sym} BUY faces mildly firming "
-                            f"DXY ({snap.dxy_momentum_pct:+.2f}%)."
+                            f"DXY ({snap.dxy_momentum_pct:+.2f}%){gold_note}."
                         ),
                     )
             elif dir_upper == "SELL":
@@ -264,13 +286,13 @@ class MacroCrossAssetEngine:
                         direction=dir_upper,
                         aligned=True,
                         is_macro_trap=False,
-                        confidence_modifier=+8.0,
+                        confidence_modifier=8.0 + gold_bonus,
                         score=100.0,
                         dxy_bias=snap.dxy_bias,
                         dxy_momentum_pct=snap.dxy_momentum_pct,
                         rationale=(
                             f"Macro Tailwind Confirmed: {norm_sym} SELL supported by strengthening "
-                            f"DXY ({snap.dxy_momentum_pct:+.2f}%, {snap.dxy_bias})."
+                            f"DXY ({snap.dxy_momentum_pct:+.2f}%, {snap.dxy_bias}){gold_note}."
                         ),
                     )
                 elif snap.dxy_bias == "BEARISH":
@@ -279,13 +301,13 @@ class MacroCrossAssetEngine:
                         direction=dir_upper,
                         aligned=False,
                         is_macro_trap=False,
-                        confidence_modifier=-10.0,
+                        confidence_modifier=-10.0 + gold_bonus,
                         score=45.0,
                         dxy_bias=snap.dxy_bias,
                         dxy_momentum_pct=snap.dxy_momentum_pct,
                         rationale=(
                             f"Macro Headwind Warning: {norm_sym} SELL faces mildly softening "
-                            f"DXY ({snap.dxy_momentum_pct:+.2f}%)."
+                            f"DXY ({snap.dxy_momentum_pct:+.2f}%){gold_note}."
                         ),
                     )
 
@@ -353,6 +375,39 @@ class MacroCrossAssetEngine:
                             f"weakness ({snap.dxy_momentum_pct:+.2f}%, {snap.dxy_bias})."
                         ),
                     )
+
+        # Case 3: High-Beta Yen Crosses (GBPJPY, EURJPY, AUDJPY)
+        elif norm_sym in YEN_CROSS_ASSETS:
+            if dir_upper == "BUY" and snap.yield_proxy_bias == "RISING_YIELDS":
+                return MacroGateAssessment(
+                    symbol=norm_sym,
+                    direction=dir_upper,
+                    aligned=True,
+                    is_macro_trap=False,
+                    confidence_modifier=+8.0,
+                    score=100.0,
+                    dxy_bias=snap.dxy_bias,
+                    dxy_momentum_pct=snap.dxy_momentum_pct,
+                    rationale=(
+                        f"Yen-Cross Yield Tailwind: {norm_sym} BUY supported by rising yields / "
+                        f"Yen weakness ({snap.yield_proxy_bias})."
+                    ),
+                )
+            elif dir_upper == "SELL" and snap.yield_proxy_bias == "FALLING_YIELDS":
+                return MacroGateAssessment(
+                    symbol=norm_sym,
+                    direction=dir_upper,
+                    aligned=True,
+                    is_macro_trap=False,
+                    confidence_modifier=+8.0,
+                    score=100.0,
+                    dxy_bias=snap.dxy_bias,
+                    dxy_momentum_pct=snap.dxy_momentum_pct,
+                    rationale=(
+                        f"Yen-Cross Safe-Haven Tailwind: {norm_sym} SELL supported by falling yields / "
+                        f"Yen strength ({snap.yield_proxy_bias})."
+                    ),
+                )
 
         # Default Neutral / Uncorrelated pass
         return MacroGateAssessment(

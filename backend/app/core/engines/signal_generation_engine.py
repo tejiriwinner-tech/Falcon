@@ -210,12 +210,12 @@ class SignalGenerationEngine:
         data_age = market_state.dataAgeSeconds or 0
         volatility = market_state.volatility or "Moderate"
 
-        # Pre-fetch bars concurrently per unique symbol
+        # Pre-fetch bars concurrently per unique symbol (always include all 6 core watchlist symbols for DXY & cross-asset gates)
         from concurrent.futures import ThreadPoolExecutor
         unique_symbols = {
             (s.symbol if s.symbol != "ALL" else "XAU/USD").replace("/", "")
             for s in active_strategies
-        }
+        } | {"XAUUSD", "GBPUSD", "EURUSD", "GBPJPY", "USDJPY", "AUDUSD"}
         cached_bars_1h = {}
 
         def _load_bars(sym):
@@ -226,7 +226,7 @@ class SignalGenerationEngine:
                 return sym, []
 
         if unique_symbols:
-            with ThreadPoolExecutor(max_workers=min(len(unique_symbols), 4)) as executor:
+            with ThreadPoolExecutor(max_workers=min(len(unique_symbols), 6)) as executor:
                 for sym, b1h in executor.map(_load_bars, unique_symbols):
                     cached_bars_1h[sym] = b1h
 
@@ -405,7 +405,7 @@ class SignalGenerationEngine:
                 sniper_pattern
                 and getattr(sniper_pattern, "conviction_score", 0.0) >= 0.65
                 and sniper_pattern.pattern_type != PatternType.NO_PATTERN
-                and strat_type_val not in ["BREAKOUT", "SESSION_BREAKOUT"]
+                and strat_type_val not in ["BREAKOUT", "SESSION_BREAKOUT", "MEAN_REVERSION"]
             ):
                 has_sniper_setup = True
                 direction = (
@@ -427,8 +427,8 @@ class SignalGenerationEngine:
                 sniper_rationale = None
                 pattern_name = None
 
-                # 2. Institutional Smart Money Liquidity Sweep & FVG Integration (Pillar 2 / strat-012)
-                if getattr(strategy, "id", "") == "strat-012" or (
+                # 2. Institutional Smart Money Liquidity Sweep & FVG Integration (Pillar 2 / strat-012, strat-013, strat-016, strat-017)
+                if getattr(strategy, "id", "") in ("strat-012", "strat-013", "strat-016", "strat-017") or (
                     not has_sniper_setup and strat_type_val in ["PRICE_ACTION", "SWING_STRUCTURE", "SUPPORT_RESISTANCE"]
                 ):
                     try:
@@ -449,8 +449,8 @@ class SignalGenerationEngine:
                     except Exception as ex:
                         logger.warning(f"Smart Money sweep evaluation error for {canonical_symbol}: {ex}")
 
-                # 2B. Institutional Session Breakout Integration
-                if not has_sniper_setup and (strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"] or getattr(strategy, "id", "") in ("strat-008", "session_momentum_liquidity_breakout")):
+                # 2B. Institutional Session Breakout Integration (strat-008, strat-014, strat-015, etc.)
+                if not has_sniper_setup and (strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"] or getattr(strategy, "id", "") in ("strat-008", "strat-014", "strat-015", "session_momentum_liquidity_breakout")):
                     try:
                         from app.core.engines.session_breakout_engine import session_breakout_engine
                         from app.schemas.session_breakout import SessionStatus
@@ -506,6 +506,44 @@ class SignalGenerationEngine:
                     except Exception as ex:
                         logger.warning(f"Session breakout evaluation error for {canonical_symbol}: {ex}")
 
+                # 2C. Bollinger Band (20, 2) + RSI Exhaustion Sniper Integration (strat-009 / MEAN_REVERSION)
+                if not has_sniper_setup and (strat_type_val == "MEAN_REVERSION" or getattr(strategy, "id", "") == "strat-009"):
+                    try:
+                        if len(candles_1h) >= 20:
+                            import math
+                            recent_20_closes = [c.close for c in candles_1h[-20:]]
+                            bb_mid = sum(recent_20_closes) / 20.0
+                            variance = sum((px - bb_mid) ** 2 for px in recent_20_closes) / 20.0
+                            bb_std = math.sqrt(variance) if variance > 0 else 0.0
+                            if bb_std > 0:
+                                upper_bb = bb_mid + 2.0 * bb_std
+                                lower_bb = bb_mid - 2.0 * bb_std
+                                last_low = min(entry_price, candles_1h[-1].low)
+                                last_high = max(entry_price, candles_1h[-1].high)
+                                pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
+                                dec_p = 2 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (3 if "JPY" in canonical_symbol else 5)
+
+                                if last_low <= lower_bb * 1.0003 and (rsi_val is None or rsi_val <= 38.0):
+                                    has_sniper_setup = True
+                                    direction = CandidateDirection.BUY
+                                    pattern_conviction = 0.84
+                                    sniper_stop = round(min(c.low for c in candles_1h[-5:]) - 2.0 * pip_u, dec_p)
+                                    sniper_target = round(bb_mid, dec_p)
+                                    sniper_trigger_rule = f"Price tested Lower Bollinger Band ({lower_bb:.{dec_p}f}) with RSI exhaustion ({rsi_val if rsi_val is not None else 32.0:.1f})"
+                                    sniper_rationale = f"Asian range mean-reversion sniper: Lower Bollinger Band (20,2) exhaustion targeting 20-SMA midline ({bb_mid:.{dec_p}f})."
+                                    pattern_name = "Bollinger Band Lower Exhaustion + RSI Oversold"
+                                elif last_high >= upper_bb * 0.9997 and (rsi_val is None or rsi_val >= 62.0):
+                                    has_sniper_setup = True
+                                    direction = CandidateDirection.SELL
+                                    pattern_conviction = 0.84
+                                    sniper_stop = round(max(c.high for c in candles_1h[-5:]) + 2.0 * pip_u, dec_p)
+                                    sniper_target = round(bb_mid, dec_p)
+                                    sniper_trigger_rule = f"Price tested Upper Bollinger Band ({upper_bb:.{dec_p}f}) with RSI exhaustion ({rsi_val if rsi_val is not None else 68.0:.1f})"
+                                    sniper_rationale = f"Asian range mean-reversion sniper: Upper Bollinger Band (20,2) exhaustion targeting 20-SMA midline ({bb_mid:.{dec_p}f})."
+                                    pattern_name = "Bollinger Band Upper Exhaustion + RSI Overbought"
+                    except Exception as ex:
+                        logger.warning(f"Bollinger Band mean-reversion evaluation error for {canonical_symbol}: {ex}")
+
                 # 3. Unconfirmed / Generic Fallback: strict discipline, no phantom directions
                 if not has_sniper_setup:
                     if strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
@@ -553,7 +591,16 @@ class SignalGenerationEngine:
             )
 
             # Condition 2: Spread Limit (asset-specific)
-            spread_limit = 2.5 if ("XAU" in strategy.symbol or "GOLD" in strategy.symbol) else (1.5 if "JPY" in strategy.symbol else 0.8)
+            if "XAU" in strategy.symbol or "GOLD" in strategy.symbol:
+                spread_limit = 2.5
+            elif "GBP" in strategy.symbol and "JPY" in strategy.symbol:
+                spread_limit = 3.2
+            elif "JPY" in strategy.symbol:
+                spread_limit = 1.5
+            elif "AUD" in strategy.symbol:
+                spread_limit = 1.2
+            else:
+                spread_limit = 0.8
             spread_passed = spread <= spread_limit
             spread_cond = CandidateCondition(
                 title="Spread Limit",
@@ -561,8 +608,13 @@ class SignalGenerationEngine:
                 passed=spread_passed
             )
 
-            # Condition 3: Session Match (Strict preferred sessions adherence)
-            session_passed = any(pref.lower() in session.lower() for pref in strategy.preferredSessions)
+            # Condition 3: Session Match (Strict preferred sessions adherence, including Overlap matching)
+            sess_low = session.lower()
+            session_passed = any(
+                pref.lower() in sess_low
+                or ("overlap" in sess_low and pref.lower() in ("london", "new york", "ny overlap", "london-ny overlap"))
+                for pref in strategy.preferredSessions
+            )
             session_cond = CandidateCondition(
                 title="Session Match",
                 description=f"Session '{session}' execution window (preferred: {', '.join(strategy.preferredSessions)}).",
@@ -801,6 +853,7 @@ class SignalGenerationEngine:
                 if strict_match is not None:
                     res_ctx = strict_match
 
+            cand_dec = 2 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (3 if "JPY" in raw_symbol else 5)
             candidates.append(SignalCandidate(
                 id=cand_id,
                 symbol=raw_symbol,
@@ -812,9 +865,9 @@ class SignalGenerationEngine:
                 direction=direction,
                 confidence=confidence,
                 readinessScore=readiness_score,
-                entryPrice=round(entry_price, 2 if "XAU" in raw_symbol else 5),
-                stopLoss=round(stop_loss, 2 if "XAU" in raw_symbol else 5),
-                takeProfit=round(take_profit, 2 if "XAU" in raw_symbol else 5),
+                entryPrice=round(entry_price, cand_dec),
+                stopLoss=round(stop_loss, cand_dec),
+                takeProfit=round(take_profit, cand_dec),
                 riskReward=rr,
                 status=status,
                 generatedAt=completed_at,

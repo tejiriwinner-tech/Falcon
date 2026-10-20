@@ -27,6 +27,8 @@ class CopilotContextService:
             "timestamp": now.isoformat(),
             "target_symbol": target_symbol,
             "market_state": self._get_market_state(),
+            "macro_dxy_state": self._get_macro_dxy_state(),
+            "strategy_portfolio_state": self._get_strategy_portfolio_state(),
             "session_corridors": self._get_session_corridors(target_symbol),
             "order_flow_telemetry": self._get_order_flow_telemetry(target_symbol),
             "active_signals": self._get_active_signals(target_symbol),
@@ -35,6 +37,42 @@ class CopilotContextService:
             "economic_calendar": self._get_upcoming_news(),
         }
         return snapshot
+
+    def _get_macro_dxy_state(self) -> Dict[str, Any]:
+        """Fetches Synthetic DXY and US Yield proxy telemetry."""
+        try:
+            from app.core.engines.decision.evaluators.macro_cross_asset_evaluator import macro_cross_asset_engine
+            snap = macro_cross_asset_engine.get_live_dxy_snapshot()
+            return {
+                "dxy_index": snap.dxy_index,
+                "dxy_momentum_pct": snap.dxy_momentum_pct,
+                "dxy_bias": snap.dxy_bias,
+                "yield_proxy_bias": snap.yield_proxy_bias,
+            }
+        except Exception as ex:
+            logger.debug(f"Failed to fetch macro DXY state for copilot: {ex}")
+            return {
+                "dxy_index": 104.0,
+                "dxy_momentum_pct": 0.0,
+                "dxy_bias": "NEUTRAL",
+                "yield_proxy_bias": "NEUTRAL",
+            }
+
+    def _get_strategy_portfolio_state(self) -> Dict[str, Any]:
+        """Fetches active vs paused state across all 18 strategies."""
+        try:
+            from app.core.engines.strategy_engine import strategy_engine
+            return strategy_engine.get_pause_state()
+        except Exception as ex:
+            logger.debug(f"Failed to fetch strategy portfolio state for copilot: {ex}")
+            return {
+                "total_strategies": 18,
+                "active_count": 18,
+                "paused_count": 0,
+                "paused_strategy_ids": [],
+                "paused_symbols": [],
+                "expansion_paused": False,
+            }
 
     def _get_market_state(self) -> Dict[str, Any]:
         """Fetches active market state, quotes, and session."""
@@ -73,7 +111,7 @@ class CopilotContextService:
             from app.core.engines.session_breakout_engine import session_breakout_engine
             from app.core.services.market_history_service import market_history_service
 
-            symbols_to_check = [target_symbol.replace("/", "")] if target_symbol else self.CORE_SYMBOLS[:3]
+            symbols_to_check = [target_symbol.replace("/", "")] if target_symbol else self.CORE_SYMBOLS
             for sym in symbols_to_check:
                 try:
                     bars = market_history_service.get_bars(sym, timeframe="1h", limit=40)
@@ -138,7 +176,7 @@ class CopilotContextService:
             from app.core.engines.order_flow_engine import order_flow_engine
             from app.core.services.market_history_service import market_history_service
 
-            syms = [target_symbol.replace("/", "")] if target_symbol else self.CORE_SYMBOLS[:3]
+            syms = [target_symbol.replace("/", "")] if target_symbol else self.CORE_SYMBOLS
             for sym in syms:
                 bars = market_history_service.get_bars(sym, timeframe="1h", limit=25)
                 if bars:

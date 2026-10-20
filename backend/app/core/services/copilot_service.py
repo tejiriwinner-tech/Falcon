@@ -55,6 +55,21 @@ class CopilotService:
         intent, confidence = self._classify_intent(lower_q)
         symbol = self._extract_symbol(request.symbol, lower_q)
 
+        # Execute direct strategy/pair pause or resume control before LLM or fallback
+        if intent == "STRATEGY_CONTROL":
+            response_text, tech_ctx, risk_ctx, chips = self._handle_strategy_control(raw_query, lower_q, symbol)
+            return CopilotQueryResponse(
+                query=raw_query,
+                intent=intent,
+                response=response_text.strip(),
+                confidence=0.99,
+                technical_context=tech_ctx,
+                risk_context=risk_ctx,
+                suggested_actions=chips,
+                provider_used="falcon_expert",
+                timestamp=now.isoformat(),
+            )
+
         # ── 2. Collect Live Platform Telemetry Snapshot (RAG Grounding) ──────
         context_snapshot = copilot_context_service.build_snapshot(target_symbol=symbol)
 
@@ -189,9 +204,9 @@ class CopilotService:
             f"confirmed by Relative Volume (RVol >= 1.8x) and statistical volatility exhaustion margins."
         )
 
-        entry_str = f"{entry:.2f}" if "XAU" in symbol else f"{entry:.4f}"
-        sl_str = f"{sl:.2f}" if "XAU" in symbol else f"{sl:.4f}"
-        tp_str = f"{tp:.2f}" if "XAU" in symbol else f"{tp:.4f}"
+        entry_str = f"{entry:.2f}" if "XAU" in symbol else (f"{entry:.3f}" if "JPY" in symbol else f"{entry:.4f}")
+        sl_str = f"{sl:.2f}" if "XAU" in symbol else (f"{sl:.3f}" if "JPY" in symbol else f"{sl:.4f}")
+        tp_str = f"{tp:.2f}" if "XAU" in symbol else (f"{tp:.3f}" if "JPY" in symbol else f"{tp:.4f}")
 
         response = f"""### 🦅 Trade Execution Rationale: **{symbol} ({direction})**
 
@@ -351,10 +366,129 @@ class CopilotService:
 
         return response, tech_context, risk_context
 
+    def _handle_strategy_control(
+        self, raw_query: str, lower_q: str, symbol: str
+    ) -> Tuple[str, Dict[str, Any], Dict[str, Any], List[ActionChip]]:
+        """Handles pausing and resuming strategies, currency pairs, or expansion sets via Co-Pilot."""
+        from app.core.engines.strategy_engine import strategy_engine
+        from app.core.services.watchlist_poller_service import watchlist_poller_service
+
+        is_pause = any(k in lower_q for k in ("pause", "disable", "stop", "halt", "suspend", "mute", "turn off"))
+        is_resume = any(k in lower_q for k in ("resume", "unpause", "enable", "start", "activate", "restore", "turn on"))
+        if not is_pause and not is_resume:
+            is_pause = True
+
+        # Check for explicit strategy ID (e.g. strat-013, strat-009)
+        strat_match = re.search(r"(strat-\d{3})", lower_q)
+        action_summary = ""
+        affected_ids: List[str] = []
+
+        if strat_match:
+            sid = strat_match.group(1)
+            if is_pause:
+                s_item = strategy_engine.pause_strategy(sid)
+                if s_item:
+                    affected_ids = [s_item.id]
+                    action_summary = f"Paused strategy **`{s_item.id}` ({s_item.name})** on **{s_item.symbol}**."
+                else:
+                    action_summary = f"Strategy `{sid}` was not found in the 18-strategy registry."
+            else:
+                s_item = strategy_engine.resume_strategy(sid)
+                if s_item:
+                    affected_ids = [s_item.id]
+                    action_summary = f"Resumed strategy **`{s_item.id}` ({s_item.name})** on **{s_item.symbol}**."
+                else:
+                    action_summary = f"Strategy `{sid}` was not found in the 18-strategy registry."
+        elif any(k in lower_q for k in ("expansion", "new strategies", "multi-pair", "new pairs")):
+            if is_pause:
+                affected_ids = strategy_engine.pause_expansion_strategies()
+                action_summary = (
+                    f"Paused all **6 Multi-Pair Expansion Strategies** (`{', '.join(affected_ids)}`) "
+                    "across **USD/JPY**, **GBP/JPY**, and **AUD/USD**."
+                )
+            else:
+                affected_ids = strategy_engine.resume_expansion_strategies()
+                action_summary = (
+                    f"Resumed all **6 Multi-Pair Expansion Strategies** (`{', '.join(affected_ids)}`) "
+                    "across **USD/JPY**, **GBP/JPY**, and **AUD/USD**."
+                )
+        elif any(k in lower_q for k in ("background", "poller", "mission refresh", "auto refresh")):
+            watchlist_poller_service.autonomous_mission_refresh_enabled = not is_pause
+            state_lbl = "PAUSED" if is_pause else "ACTIVE"
+            action_summary = f"Autonomous 5-minute background mission refresh is now **{state_lbl}**."
+        else:
+            # Symbol-level pause/resume (e.g., "pause GBP/JPY", "resume AUD/USD", "pause USD/JPY")
+            if is_pause:
+                affected_ids = strategy_engine.pause_symbol(symbol)
+                action_summary = (
+                    f"Paused all **{len(affected_ids)} strategies** for **{symbol}** "
+                    f"(`{', '.join(affected_ids) if affected_ids else 'none'}`)."
+                )
+            else:
+                affected_ids = strategy_engine.resume_symbol(symbol)
+                action_summary = (
+                    f"Resumed all **{len(affected_ids)} strategies** for **{symbol}** "
+                    f"(`{', '.join(affected_ids) if affected_ids else 'none'}`)."
+                )
+
+        pause_state = strategy_engine.get_pause_state()
+        loss_metrics = adaptive_tuning_engine.get_loss_recovery_metrics()
+
+        paused_str = ", ".join(pause_state["paused_strategy_ids"]) if pause_state["paused_strategy_ids"] else "None (All 18 Active)"
+        paused_syms_str = ", ".join(pause_state["paused_symbols"]) if pause_state["paused_symbols"] else "None"
+
+        response = f"""### 🎛️ Falcon AI Co-Pilot — Strategy & Pair Governance Control
+
+**1. Command Executed**
+- {action_summary}
+
+**2. Live Strategy Portfolio Telemetry**
+- **Total Registered Strategies**: `{pause_state['total_strategies']}` across 6 core pairs (`XAU/USD`, `GBP/USD`, `EUR/USD`, `USD/JPY`, `GBP/JPY`, `AUD/USD`)
+- **Currently Active Strategies**: `{pause_state['active_count']}`
+- **Currently Paused Strategies**: `{pause_state['paused_count']}` (`{paused_str}`)
+- **Paused Currency Pairs**: `{paused_syms_str}`
+- **Multi-Pair Expansion Group (`strat-013`–`strat-018`)**: `{"PAUSED" if pause_state["expansion_paused"] else "ACTIVE"}`
+
+**3. How to Toggle at Any Time**
+- Ask Co-Pilot: *"Pause expansion strategies"* or *"Resume expansion strategies"*
+- Ask Co-Pilot: *"Pause GBP/JPY"*, *"Pause AUD/USD"*, or *"Resume USD/JPY"*
+- Ask Co-Pilot: *"Pause strat-013"* or *"Resume strat-013"*
+"""
+        tech_context = {
+            "command": "PAUSE" if is_pause else "RESUME",
+            "target_symbol": symbol,
+            "affected_strategy_ids": affected_ids,
+            "portfolio_state": pause_state,
+        }
+        risk_context = {
+            "recovery_multiplier": loss_metrics.profit_recovery_multiplier,
+            "recovery_status": loss_metrics.recovery_status,
+            "loss_ceiling_headroom": float(loss_metrics.max_entertaining_loss - loss_metrics.accumulated_streak_loss),
+        }
+        chips = [
+            ActionChip(
+                label="Resume Expansion" if pause_state["expansion_paused"] else "Pause Expansion",
+                action="QUERY",
+                payload={"prompt": "Resume expansion strategies" if pause_state["expansion_paused"] else "Pause expansion strategies"},
+            ),
+            ActionChip(
+                label=f"Resume {symbol}" if is_pause else f"Pause {symbol}",
+                action="QUERY",
+                payload={"prompt": f"Resume {symbol}" if is_pause else f"Pause {symbol}"},
+            ),
+            ActionChip(
+                label="View Active Strategies",
+                action="QUERY",
+                payload={"prompt": "What strategies are active?"},
+            ),
+        ]
+        return response, tech_context, risk_context, chips
+
     def _handle_system_and_strategy(
         self, raw_query: str, lower_q: str
     ) -> Tuple[str, Dict[str, Any], Dict[str, Any]]:
         """Answers 'What strategies are active?' or 'What is active capital?'."""
+        from app.core.engines.strategy_engine import strategy_engine
         cycle_summary = capital_cycle_service.get_summary()
         loss_metrics = adaptive_tuning_engine.get_loss_recovery_metrics()
 
@@ -368,13 +502,27 @@ class CopilotService:
         ) if cycle_summary.activeCycle else "ACTIVE"
         target_cap = float(cycle_summary.activeCycle.targetCapital) if cycle_summary.activeCycle else 500.0
 
+        all_strats = strategy_engine.get_strategies()
+        pause_state = strategy_engine.get_pause_state()
         strategies = [
-            {"id": "falcon-smc-liquidity", "name": "SMC Liquidity Hunter", "timeframe": "M15/H1", "status": "ACTIVE", "edge": "Asian Session Sweep & Order Blocks"},
-            {"id": "falcon-trend-sniper", "name": "Trend Continuation Sniper", "timeframe": "M5/M15", "status": "ACTIVE", "edge": "Displacement & Fair Value Gap Mitigation"},
-            {"id": "falcon-wick-reversal", "name": "Mean Reversion Wick Defense", "timeframe": "M5", "status": "ACTIVE", "edge": "Liquidity Pool Exhaustion & ATR Padding"},
+            {
+                "id": s.id,
+                "name": s.name,
+                "symbol": s.symbol,
+                "timeframe": s.bestTimeframe,
+                "status": s.status.value if hasattr(s.status, "value") else str(s.status),
+                "min_rr": s.minimumRiskReward,
+            }
+            for s in all_strats
         ]
 
-        response = f"""### ⚙️ Falcon System Health & Strategy Architecture
+        paused_note = (
+            f"Paused ({pause_state['paused_count']}): `{', '.join(pause_state['paused_strategy_ids'])}`"
+            if pause_state["paused_strategy_ids"]
+            else "All 18 strategies are currently **ACTIVE**."
+        )
+
+        response = f"""### ⚙️ Falcon System Health & 18-Strategy Multi-Pair Architecture
 
 **1. Active Capital Allocation**
 - **Active Trading Capital**: `${active_cap:.2f}` (Cycle `#{cycle_num}`)
@@ -382,19 +530,23 @@ class CopilotService:
 - **Banked Protected Reserves**: `${protected_profit:.2f}`
 - **Cycle Status**: `{cycle_status}`
 
-**2. Active Core Strategies**
-1. **Session Momentum & Liquidity Breakout (M5/M15)**: Capitalizes on London Open / NY Overlap momentum expansions.
-2. **Multi-Timeframe Volume Expansion (M15/H1)**: Confirms institutional order flow and volume participation.
-3. **Statistical Volatility Exhaustion (M5)**: Deploys dynamic ATR expansion buffers during erratic market volatility.
+**2. Multi-Pair Strategy Portfolio ({pause_state['active_count']}/{pause_state['total_strategies']} Active)**
+- **XAU/USD (Gold — 7 Strategies)**: `strat-001` London Breakout, `strat-002` Trend Continuation, `strat-003` S/R Bounce, `strat-008` Session Momentum Breakout, `strat-010` Macro Swing Wave, `strat-011` Candlestick Confluence, `strat-012` Institutional Liquidity Sweep & FVG (1:3.0 R:R).
+- **USD/JPY (Yen — 3 Paired Strategies)**: `strat-009` Asian Mean Reversion Range + `strat-013` Tokyo Fix & Asian Range Liquidity Sweep + `strat-014` US Yield & NY Momentum Breakout.
+- **GBP/JPY (Dragon — 2 Strategies)**: `strat-015` Dragon London Open Volatility Breakout + `strat-016` Dragon Institutional FVG & Trend Pullback (1:3.0 R:R).
+- **AUD/USD (Aussie — 2 Strategies)**: `strat-017` Pacific Liquidity Sweep & Gold-Macro Confluence + `strat-018` AUD/USD Structural Trend & EMA Pullback.
+- **GBP/USD & EUR/USD (4 Strategies)**: `strat-004` London Momentum, `strat-005` GBP/USD Pullback, `strat-006` European Breakout, `strat-007` EUR/USD Trend Continuation.
+- **Pause State**: {paused_note} *(Say "Pause expansion strategies" or "Pause GBP/JPY" to toggle at any time).*
 
-**3. Autonomous Governance & Risk Safeguards**
-- **Capital Guardian**: ACTIVE (Enforces active capital preservation and isolates banked profits).
-- **Dynamic Loss-Recovery Engine**: Multiplier `{loss_metrics.profit_recovery_multiplier:.1f}x` ({loss_metrics.recovery_status}).
-- **Instant Market Execution**: Grounded to live real-time bid/ask quotes.
+**3. Autonomous Governance & 4 Institutional Edges**
+- **Capital Guardian & Loss Recovery**: Multiplier `{loss_metrics.profit_recovery_multiplier:.1f}x` ({loss_metrics.recovery_status}).
+- **Macro Cross-Asset Gate**: Synthetic DXY + US Yield Proxy + Gold-AUD confluence active.
+- **Dynamic Regime Allocator**: Automatically weights range vs. breakout strategies by session and throttles to `0.25x` on 2 consecutive losses.
 """
 
         tech_context = {
             "active_strategies": strategies,
+            "portfolio_pause_state": pause_state,
             "active_trading_capital": active_cap,
             "target_capital": target_cap,
             "banked_protected_reserves": protected_profit,
@@ -497,7 +649,7 @@ Falcon is an autonomous institutional trading system operating under Session Mom
 
         tech_context = {
             "falcon_version": "10.0.0",
-            "supported_assets": ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY"],
+            "supported_assets": ["XAU/USD", "EUR/USD", "GBP/USD", "USD/JPY", "GBP/JPY", "AUD/USD"],
         }
         risk_context = {
             "recovery_multiplier": loss_metrics.profit_recovery_multiplier,
@@ -509,7 +661,21 @@ Falcon is an autonomous institutional trading system operating under Session Mom
     # ── Classification & Parsing Helpers ─────────────────────────────────────
 
     def _classify_intent(self, q: str) -> Tuple[str, float]:
-        """Classifies query into one of 6 distinct intents with a confidence score."""
+        """Classifies query into distinct intents with a confidence score."""
+        # 0. Strategy / Pair Pause & Resume Control queries
+        control_patterns = [
+            r"\bpause\b",
+            r"\bresume\b",
+            r"\bunpause\b",
+            r"\bdisable\b.*(strat|expansion|gbp|aud|usd|eur|xau|pair)",
+            r"\benable\b.*(strat|expansion|gbp|aud|usd|eur|xau|pair)",
+            r"\bsuspend\b.*(strat|expansion|gbp|aud|usd|eur|xau|pair)",
+            r"\bhalt\b.*(strat|expansion|gbp|aud|usd|eur|xau|pair)",
+        ]
+        for pat in control_patterns:
+            if re.search(pat, q):
+                return "STRATEGY_CONTROL", 0.98
+
         # 1. Technical Analysis queries
         analysis_patterns = [
             r"analyze",
@@ -524,6 +690,9 @@ Falcon is an autonomous institutional trading system operating under Session Mom
             r"what.*about.*eur",
             r"what.*about.*gbp",
             r"what.*about.*xau",
+            r"what.*about.*jpy",
+            r"what.*about.*aud",
+            r"what.*about.*dragon",
         ]
         for pat in analysis_patterns:
             if re.search(pat, q):
@@ -597,6 +766,7 @@ Falcon is an autonomous institutional trading system operating under Session Mom
             r"what are we trading",
             r"system health",
             r"capital status",
+            r"paused.*strategies",
         ]
         for pat in system_patterns:
             if re.search(pat, q):
@@ -605,27 +775,35 @@ Falcon is an autonomous institutional trading system operating under Session Mom
         return "GENERAL_INQUIRY", 0.80
 
     def _extract_symbol(self, explicit_symbol: Optional[str], q: str) -> str:
-        """Extracts symbol from explicit argument or natural query text."""
+        """Extracts symbol from explicit argument or natural query text across all 6 core assets."""
         if explicit_symbol:
-            sym_clean = explicit_symbol.strip().upper()
+            sym_clean = explicit_symbol.strip().upper().replace("_", "").replace("/", "")
             if "XAU" in sym_clean or "GOLD" in sym_clean:
                 return "XAU/USD"
+            if "GBPJPY" in sym_clean or ("GBP" in sym_clean and "JPY" in sym_clean):
+                return "GBP/JPY"
+            if "AUDUSD" in sym_clean or "AUD" in sym_clean:
+                return "AUD/USD"
+            if "USDJPY" in sym_clean or "JPY" in sym_clean:
+                return "USD/JPY"
             if "EUR" in sym_clean:
                 return "EUR/USD"
             if "GBP" in sym_clean:
                 return "GBP/USD"
-            if "JPY" in sym_clean:
-                return "USD/JPY"
-            return sym_clean
+            return explicit_symbol.strip().upper()
 
+        if "gbpjpy" in q or "gbp/jpy" in q or "dragon" in q or ("gbp" in q and "jpy" in q):
+            return "GBP/JPY"
+        if "audusd" in q or "aud/usd" in q or "aussie" in q or re.search(r"\baud\b", q):
+            return "AUD/USD"
+        if "usdjpy" in q or "usd/jpy" in q or "jpy" in q or "yen" in q:
+            return "USD/JPY"
         if "gold" in q or "xau" in q:
             return "XAU/USD"
         if "gbp" in q or "cable" in q or "pound" in q:
             return "GBP/USD"
         if "eur" in q or "euro" in q:
             return "EUR/USD"
-        if "jpy" in q or "yen" in q:
-            return "USD/JPY"
         if "btc" in q or "bitcoin" in q:
             return "BTC/USD"
         if "nasdaq" in q or "ndx" in q or "us100" in q:
@@ -682,6 +860,60 @@ Falcon is an autonomous institutional trading system operating under Session Mom
                 rr = round((entry - tp) / max(sl - entry, 0.01), 1)
                 pattern = "Asian High Liquidity Sweep + M15 Bearish OB Retest"
                 analysis = f"Buy-Side Liquidity (BSL) swept above ${sl:.2f} into institutional supply."
+            return entry, sl, tp, rr, pattern, "M15", analysis
+
+        elif "GBP/JPY" in symbol or "GBPJPY" in symbol:
+            entry = round(live_quote, 3) if live_quote else 198.500
+            if direction == "BUY":
+                sl = round(entry - 0.350, 3)
+                base_reward = 0.980
+                tp = round(entry + (base_reward * multiplier), 3)
+                rr = round((tp - entry) / max(entry - sl, 0.001), 1)
+                pattern = "Dragon London Open Volatility Breakout + FVG Retest"
+                analysis = "Tokyo session high broken at London Open with RVol >= 1.8x surge and Yen-cross alignment."
+            else:
+                sl = round(entry + 0.350, 3)
+                base_reward = 0.980
+                tp = round(entry - (base_reward * multiplier), 3)
+                rr = round((entry - tp) / max(sl - entry, 0.001), 1)
+                pattern = "Dragon Institutional FVG & Bearish Sweep"
+                analysis = "Buy-side liquidity swept above Tokyo high with 3-candle bearish FVG displacement."
+            return entry, sl, tp, rr, pattern, "M15", analysis
+
+        elif "JPY" in symbol:
+            entry = round(live_quote, 3) if live_quote else 150.250
+            if direction == "BUY":
+                sl = round(entry - 0.250, 3)
+                base_reward = 0.700
+                tp = round(entry + (base_reward * multiplier), 3)
+                rr = round((tp - entry) / max(entry - sl, 0.001), 1)
+                pattern = "Tokyo Fix & Asian Low Liquidity Sweep + FVG"
+                analysis = "Asian session low swept with immediate rejection close and rising US Yield / DXY confluence."
+            else:
+                sl = round(entry + 0.250, 3)
+                base_reward = 0.700
+                tp = round(entry - (base_reward * multiplier), 3)
+                rr = round((entry - tp) / max(sl - entry, 0.001), 1)
+                pattern = "Asian High Sweep + Bollinger Upper Band Exhaustion"
+                analysis = "Asian range top pierced into overbought RSI (>70) with 3-candle FVG reversal toward 20-SMA."
+            return entry, sl, tp, rr, pattern, "M15", analysis
+
+        elif "AUD" in symbol:
+            entry = round(live_quote, 4) if live_quote else 0.6580
+            if direction == "BUY":
+                sl = round(entry - 0.0020, 4)
+                base_reward = 0.0056
+                tp = round(entry + (base_reward * multiplier), 4)
+                rr = round((tp - entry) / max(entry - sl, 0.0001), 1)
+                pattern = "Pacific Liquidity Sweep + Gold-Macro Confluence"
+                analysis = "Sydney/Tokyo low swept with bullish FVG displacement supported by XAU/USD strength and softening DXY."
+            else:
+                sl = round(entry + 0.0020, 4)
+                base_reward = 0.0056
+                tp = round(entry - (base_reward * multiplier), 4)
+                rr = round((entry - tp) / max(sl - entry, 0.0001), 1)
+                pattern = "AUD/USD Structural EMA 20/50 Bearish Pullback"
+                analysis = "Price rejected H1 EMA 20/50 dynamic supply aligned with firming DXY macro gate."
             return entry, sl, tp, rr, pattern, "M15", analysis
 
         elif "GBP" in symbol:

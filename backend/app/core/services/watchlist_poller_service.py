@@ -118,6 +118,23 @@ class WatchlistPollerService:
             logger.debug("Session budget standby: skipping watchlist poller price check.")
             return result
 
+        # Step 0: Autonomous 5-Minute Mission Refresh (ensures 24/5 signal generation across all 6 pairs even when mobile app is closed)
+        if getattr(self, "autonomous_mission_refresh_enabled", True):
+            try:
+                from app.core.repository.mission_repository import mission_repository
+                latest_missions = mission_repository.list_missions(limit=1)
+                needs_mission_refresh = True
+                if latest_missions and latest_missions[0].completedAt:
+                    m_age = (now - latest_missions[0].completedAt).total_seconds()
+                    if m_age < 300.0:
+                        needs_mission_refresh = False
+                if needs_mission_refresh:
+                    from app.core.services.live_intelligence_service import LiveIntelligenceService
+                    LiveIntelligenceService().generate_dashboard_intelligence()
+                    logger.info("Autonomous background mission refresh completed across all active strategies.")
+            except Exception as ex:
+                logger.debug(f"Autonomous background mission refresh skipped: {ex}")
+
         try:
             # Force rebuild of signals to get fresh quote evaluation
             signals_response = signal_service.build_signals(mission_limit=5, force_refresh=True)
@@ -171,8 +188,9 @@ class WatchlistPollerService:
                 sl = trade.stopLoss
                 tp = trade.takeProfit
 
-                is_gold = "XAU" in raw_sym or "GOLD" in raw_sym or trade.entryPrice > 100
-                spread_buffer = 0.10 if is_gold else 0.00010  # 1 pip spread buffer
+                is_gold = "XAU" in raw_sym or "GOLD" in raw_sym or trade.entryPrice > 500
+                is_jpy = "JPY" in raw_sym
+                spread_buffer = 0.10 if is_gold else (0.015 if is_jpy else 0.00010)  # 1-1.5 pip spread buffer
 
                 risk_dist = abs(trade.entryPrice - sl)
                 tp1_dist = 1.5 * risk_dist
@@ -191,7 +209,7 @@ class WatchlistPollerService:
                         tp1_hit = True
 
                     if tp1_hit:
-                        new_sl = round(be_price, 2 if is_gold else 4)
+                        new_sl = round(be_price, 2 if is_gold else (3 if is_jpy else 4))
                         new_notes = f"{notes_str} [BE_PROTECTED: TP1 +1.5R reached at {cur_px:.4f}; SL moved to {new_sl:.4f}]".strip()
                         trade_update = TradeJournalUpdate(
                             stopLoss=new_sl,
