@@ -303,7 +303,11 @@ class SignalService:
         # Step 2: Ingest candidate setups from recent missions
         missions = None
         try:
-            all_m = mission_repository.get_all_missions()
+            all_m = None
+            if hasattr(mission_repository, "get_recent_missions"):
+                missions = mission_repository.get_recent_missions(limit=mission_limit)
+            if not missions:
+                all_m = mission_repository.get_all_missions()
             if all_m:
                 missions = all_m[-mission_limit:]
         except Exception:
@@ -451,8 +455,8 @@ class SignalService:
                 # Proximity band: 1.0 to 1.5 pips (0.00015 for 4-digit Forex, 0.50 for Gold)
                 is_gold_sym = "XAU" in symbol.upper() or "GOLD" in symbol.upper() or cand.entryPrice > 500
                 is_jpy_sym = "JPY" in symbol.upper()
-                pip_tolerance = 0.50 if is_gold_sym else (0.020 if is_jpy_sym else 0.00015)
-                slip_invalidation = 1.50 if is_gold_sym else (0.045 if is_jpy_sym else 0.00030)  # 3-4.5 pips
+                pip_tolerance = 1.20 if is_gold_sym else (0.035 if is_jpy_sym else 0.00030)
+                slip_invalidation = 3.50 if is_gold_sym else (0.100 if is_jpy_sym else 0.00080)  # 8-10 pips / $3.50 Gold
 
                 # Check if this setup is ALREADY recorded as ACTIVE in repository or open trades
                 is_already_active = signal_signature_repository.is_active(

@@ -168,6 +168,10 @@ class MarketScheduler:
                             results["duplicates_prevented"] += signal_result["duplicates"]
                             
                         except Exception as e:
+                            try:
+                                db.rollback()
+                            except Exception:
+                                pass
                             error_msg = f"Error scanning {symbol} {timeframe}: {e}"
                             logger.error(error_msg)
                 # Track and resolve signal outcomes against live prices

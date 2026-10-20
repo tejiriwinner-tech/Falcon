@@ -858,7 +858,9 @@ class LiveIntelligenceService:
         latest_mission = mission_repository.get_latest_mission()
         
         # Check if this intelligence is materially different
-        if latest_mission and self._is_duplicate_intelligence(latest_mission, decisions, market_state):
+        if latest_mission and self._is_duplicate_intelligence(
+            latest_mission, decisions, market_state, current_candidates=candidates
+        ):
             logger.info("Duplicate intelligence detected, skipping mission persistence")
             return
         
@@ -950,7 +952,7 @@ class LiveIntelligenceService:
         self,
         latest_mission: MissionReport,
         current_decisions: List[DecisionArtifact],
-        current_market_state: MarketState
+        current_market_state: MarketState, current_candidates: Optional[List[SignalCandidate]] = None
     ) -> bool:
         """
         Check if current intelligence is materially the same as the previous mission.
@@ -968,6 +970,34 @@ class LiveIntelligenceService:
         latest_artifacts = mission_repository.get_mission_artifacts(latest_mission.id)
         latest_decisions = latest_artifacts.get("decisions", [])
         latest_market_state = latest_artifacts.get("marketState")
+        latest_candidates = latest_artifacts.get("candidates", [])
+        now_utc = datetime.now(timezone.utc)
+        mission_ts = getattr(latest_mission, "completedAt", None) or getattr(latest_mission, "startedAt", None)
+        if mission_ts is not None:
+            try:
+                if (now_utc - mission_ts).total_seconds() >= 900.0:
+                    return False
+            except Exception:
+                return False
+        latest_approved = sum(1 for d in latest_decisions if (d.status.value if hasattr(d.status, "value") else str(d.status)) == "APPROVED")
+        current_approved = sum(1 for d in current_decisions if (d.status.value if hasattr(d.status, "value") else str(d.status)) == "APPROVED")
+        if latest_approved != current_approved:
+            return False
+        if current_candidates and latest_candidates:
+            prev_by_strat = {c.strategyId: c for c in latest_candidates}
+            for cand in current_candidates:
+                prev_c = prev_by_strat.get(cand.strategyId)
+                if prev_c is None:
+                    return False
+                c_dir = cand.direction.value if hasattr(cand.direction, "value") else str(cand.direction)
+                p_dir = prev_c.direction.value if hasattr(prev_c.direction, "value") else str(prev_c.direction)
+                if c_dir != p_dir:
+                    return False
+                if c_dir in ("BUY", "SELL") and prev_c.entryPrice > 0 and cand.entryPrice > 0:
+                    sym_u = (cand.symbol or "").upper()
+                    shift_thresh = 0.80 if ("XAU" in sym_u or "GOLD" in sym_u) else (0.025 if "JPY" in sym_u else 0.00020)
+                    if abs(cand.entryPrice - prev_c.entryPrice) >= shift_thresh:
+                        return False
         
         # Check decision count
         if len(latest_decisions) != len(current_decisions):

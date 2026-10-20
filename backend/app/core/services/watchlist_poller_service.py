@@ -122,10 +122,16 @@ class WatchlistPollerService:
         if getattr(self, "autonomous_mission_refresh_enabled", True):
             try:
                 from app.core.repository.mission_repository import mission_repository
-                latest_missions = mission_repository.list_missions(limit=1)
+                latest_mission = None
+                if hasattr(mission_repository, "get_latest_mission"):
+                    latest_mission = mission_repository.get_latest_mission()
+                elif hasattr(mission_repository, "get_recent_missions"):
+                    recent = mission_repository.get_recent_missions(limit=1)
+                    latest_mission = recent[-1] if recent else None
+
                 needs_mission_refresh = True
-                if latest_missions and latest_missions[0].completedAt:
-                    m_age = (now - latest_missions[0].completedAt).total_seconds()
+                if latest_mission and getattr(latest_mission, "completedAt", None):
+                    m_age = (now - latest_mission.completedAt).total_seconds()
                     if m_age < 300.0:
                         needs_mission_refresh = False
                 if needs_mission_refresh:
@@ -133,7 +139,7 @@ class WatchlistPollerService:
                     LiveIntelligenceService().generate_dashboard_intelligence()
                     logger.info("Autonomous background mission refresh completed across all active strategies.")
             except Exception as ex:
-                logger.debug(f"Autonomous background mission refresh skipped: {ex}")
+                logger.warning(f"Autonomous background mission refresh skipped: {ex}")
 
         try:
             # Force rebuild of signals to get fresh quote evaluation

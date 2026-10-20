@@ -72,7 +72,14 @@ class ValidationEngine:
             rsi_raw = getattr(candidate.marketSnapshot, "rsi", None) if candidate.marketSnapshot else None
             if rsi_raw is not None:
                 rsi_val = float(rsi_raw)
-                rsi_passed = 30.0 <= rsi_val <= 70.0
+                cand_dir = getattr(candidate, "direction", None)
+                dir_str = cand_dir.value if hasattr(cand_dir, "value") else str(cand_dir or "")
+                if dir_str == "BUY":
+                    rsi_passed = 18.0 <= rsi_val <= 75.0
+                elif dir_str == "SELL":
+                    rsi_passed = 25.0 <= rsi_val <= 82.0
+                else:
+                    rsi_passed = 30.0 <= rsi_val <= 70.0
                 rsi_desc = f"Ensures RSI ({rsi_val:.1f}) is within normal operating range (30-70)."
                 rsi_score = 15 if rsi_passed else 0
             else:

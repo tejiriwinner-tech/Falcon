@@ -217,18 +217,26 @@ class SignalGenerationEngine:
             for s in active_strategies
         } | {"XAUUSD", "GBPUSD", "EURUSD", "GBPJPY", "USDJPY", "AUDUSD"}
         cached_bars_1h = {}
+        cached_bars_15m = {}
 
         def _load_bars(sym):
             try:
                 b1h = market_history_service.get_bars(sym, timeframe="1h", limit=120)
-                return sym, b1h
+                b1h = market_history_service.get_bars(sym, timeframe="1h", limit=120)
+                try:
+                    b15m = market_history_service.get_bars(sym, timeframe="15m", limit=120)
+                except Exception:
+                    b15m = []
+                return sym, b1h, (b15m if b15m and len(b15m) >= 5 else b1h)
             except Exception:
-                return sym, []
+                return sym, [], []
 
         if unique_symbols:
             with ThreadPoolExecutor(max_workers=min(len(unique_symbols), 6)) as executor:
-                for sym, b1h in executor.map(_load_bars, unique_symbols):
+
+                for sym, b1h, b15m in executor.map(_load_bars, unique_symbols):
                     cached_bars_1h[sym] = b1h
+                    cached_bars_15m[sym] = b15m
 
         for i, strategy in enumerate(active_strategies, 1):
             started_at = datetime.now(timezone.utc)
@@ -336,7 +344,19 @@ class SignalGenerationEngine:
                 asset_trend = "Neutral"
 
             # ── 2. Candlestick Pattern & Sniper Analysis ──────────────────────
-            bars_1h = cached_bars_1h.get(canonical_symbol, [])
+            strat_tf = (getattr(strategy, "bestTimeframe", "") or "1H").upper()
+            if strat_tf in ("M15", "M5", "15M", "5M"):
+                bars_1h = cached_bars_15m.get(canonical_symbol) or cached_bars_1h.get(canonical_symbol, [])
+            else:
+                bars_1h = cached_bars_1h.get(canonical_symbol, [])
+            if rsi_val is None and bars_1h and len(bars_1h) >= 15:
+                from app.core.services.market_history_service import compute_rsi
+                rsi_val = compute_rsi([b.close for b in bars_1h])
+                if asset_trend == "Neutral" and rsi_val is not None:
+                    if rsi_val >= 52.0:
+                        asset_trend = "Bullish"
+                    elif rsi_val <= 48.0:
+                        asset_trend = "Bearish"
 
             candles_1h = [
                 CandleBar(
@@ -354,12 +374,12 @@ class SignalGenerationEngine:
             # Append live bar if available
             if candles_1h and entry_price > 0:
                 last_c = candles_1h[-1]
-                candles_1h.append(CandleBar(
-                    open=last_c.close,
-                    high=max(last_c.close, entry_price),
-                    low=min(last_c.close, entry_price),
+                candles_1h.__setitem__(-1, CandleBar(
+                    open=last_c.open,
+                    high=max(last_c.high, entry_price),
+                    low=min(last_c.low, entry_price),
                     close=entry_price,
-                    volume=100.0,
+                    volume=last_c.volume if (last_c.volume and last_c.volume > 0) else 100.0,
                     timestamp=int(started_at.timestamp()),
                     time=started_at,
                 ))

@@ -258,3 +258,84 @@ def test_briefings_include_all_6_pairs_and_pause_governance():
         assert daily.risk_state["paused_strategies_count"] == 1
 
     _reset_pause_state()
+
+
+
+def test_bottleneck_remediation_rsi_and_mission_persistence():
+    """Verify directional RSI validation (oversold BUY / overbought SELL pass) and 15-min mission freshness."""
+    from datetime import timedelta
+    from app.core.engines.validation_engine import ValidationEngine
+    from app.schemas.signal_candidate import (
+        SignalCandidate,
+        CandidateDirection,
+        CandidateStatus,
+        CandidateMarketSnapshot,
+        ConfidenceBreakdown,
+        CandidateCondition,
+    )
+    from app.schemas.market_state import MarketState
+
+    now = datetime.now(timezone.utc)
+    v_engine = ValidationEngine()
+    market_state = MarketState(
+        timestamp=now,
+        provider="OANDA",
+        environment="PRODUCTION",
+        prices={},
+        session="London",
+        dataAgeSeconds=0,
+    )
+
+    # Oversold BUY setup (RSI = 24.5) should PASS RSI Validation (mean-reversion / liquidity sweep)
+    buy_cand = SignalCandidate(
+        id="cand-buy-oversold",
+        symbol="USD/JPY",
+        strategyId="strat-009",
+        strategyName="Asian Mean Reversion Range",
+        strategyVersion="1.0.0",
+        strategyGrade="B",
+        strategyScore=82,
+        direction=CandidateDirection.BUY,
+        confidence=78,
+        readinessScore=85,
+        entryPrice=150.100,
+        stopLoss=149.850,
+        takeProfit=150.650,
+        riskReward=2.2,
+        status=CandidateStatus.GENERATED,
+        generatedAt=now,
+        reasons=[],
+        conditions=[
+            CandidateCondition(title="Technical Alignment", description="Mean reversion", passed=True),
+            CandidateCondition(title="Session Match", description="Tokyo", passed=True),
+        ],
+        marketSnapshot=CandidateMarketSnapshot(
+            trend="Bullish",
+            volatility="Moderate",
+            session="London",
+            spread=0.8,
+            newsImpact="Low",
+            marketSentiment="Bullish",
+            marketConfidence=85,
+            atr=0.15,
+            rsi=24.5,
+        ),
+        confidenceBreakdown=ConfidenceBreakdown(
+            trendScore=20, strategyScore=25, sessionScore=15, sentimentScore=10, newsScore=8
+        ),
+        evaluationDurationMs=5,
+        marketDataAgeSeconds=0,
+        evaluationStartedAt=now,
+        evaluationCompletedAt=now,
+    )
+    res_buy = v_engine.validate_candidates([buy_cand], strategies=[], market_state=market_state)[0]
+    rsi_check_buy = next(c for c in res_buy.checks if c.title == "RSI Validation")
+    assert rsi_check_buy.passed is True
+
+    # Overbought SELL setup (RSI = 74.0) should PASS RSI Validation
+    sell_cand = buy_cand.model_copy(deep=True)
+    sell_cand.direction = CandidateDirection.SELL
+    sell_cand.marketSnapshot.rsi = 74.0
+    res_sell = v_engine.validate_candidates([sell_cand], strategies=[], market_state=market_state)[0]
+    rsi_check_sell = next(c for c in res_sell.checks if c.title == "RSI Validation")
+    assert rsi_check_sell.passed is True
