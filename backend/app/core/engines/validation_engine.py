@@ -122,7 +122,7 @@ class ValidationEngine:
             # Dynamic asset-aware spread limit (Gold up to 3.5 pips, GBP pairs 2.5, Majors 1.8)
             symbol = getattr(candidate, "symbol", "") or ""
             if "XAU" in symbol or "GOLD" in symbol:
-                max_spread = 3.5
+                max_spread = 8.0
             elif "GBP" in symbol:
                 max_spread = 2.5
             else:

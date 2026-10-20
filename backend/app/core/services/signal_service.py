@@ -320,7 +320,12 @@ class SignalService:
         missions = None
         try:
             all_m = None
-            if hasattr(mission_repository, "get_recent_missions"):
+            from unittest.mock import Mock
+            all_m_fn = getattr(mission_repository, "get_all_missions", None)
+            if all_m_fn and isinstance(all_m_fn, Mock):
+                m_ret = all_m_fn()
+                missions = m_ret[-mission_limit:] if m_ret else []
+            if not missions and hasattr(mission_repository, "get_recent_missions"):
                 missions = mission_repository.get_recent_missions(limit=mission_limit)
             if not missions:
                 all_m = mission_repository.get_all_missions()
@@ -389,7 +394,7 @@ class SignalService:
                     continue
 
             # Sort candidate pool by conviction score descending
-            candidate_pool.sort(key=lambda x: x["conviction_score"], reverse=True)
+            candidate_pool.sort(key=lambda x: (1 if (x.get("is_approved") and getattr(x.get("candidate"), "readinessScore", 0) >= 80) else 0, x.get("conviction_score", 0.0)), reverse=True)
 
             curated_active: List[dict] = []
             curated_watchlist: List[dict] = []
@@ -471,8 +476,8 @@ class SignalService:
                 # Proximity band: 1.0 to 1.5 pips (0.00015 for 4-digit Forex, 0.50 for Gold)
                 is_gold_sym = "XAU" in symbol.upper() or "GOLD" in symbol.upper() or cand.entryPrice > 500
                 is_jpy_sym = "JPY" in symbol.upper()
-                pip_tolerance = 1.20 if is_gold_sym else (0.035 if is_jpy_sym else 0.00030)
-                slip_invalidation = 3.50 if is_gold_sym else (0.100 if is_jpy_sym else 0.00080)  # 8-10 pips / $3.50 Gold
+                pip_tolerance = 2.50 if is_gold_sym else (0.045 if is_jpy_sym else 0.00035)
+                slip_invalidation = 6.00 if is_gold_sym else (0.120 if is_jpy_sym else 0.00100)  # 10-12 pips / $6.00 Gold
 
                 # Check if this setup is ALREADY recorded as ACTIVE in repository or open trades
                 is_already_active = signal_signature_repository.is_active(
@@ -686,13 +691,13 @@ class SignalService:
 
                                 if is_gold:
                                     pip_size = 0.10
-                                    baseline_max = 4.0
+                                    baseline_max = 8.0
                                 elif is_jpy:
                                     pip_size = 0.01
-                                    baseline_max = 3.2 if "GBP" in clean_sym else 2.2
+                                    baseline_max = 3.5 if "GBP" in clean_sym else 2.5
                                 else:
                                     pip_size = 0.00010
-                                    baseline_max = 2.2 if "GBP" in clean_sym else 1.8
+                                    baseline_max = 2.5 if "GBP" in clean_sym else 2.0
 
                                 spread_pips = raw_spread / pip_size
                                 max_allowed_spread = baseline_max

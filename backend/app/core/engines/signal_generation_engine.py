@@ -97,7 +97,7 @@ class SignalGenerationEngine:
             else:
                 stop_loss = round(sniper_stop, dec_places)
             
-            eff_rr = max(rr, 1.5)
+            eff_rr = max(rr, 2.0)
             eff_risk = abs(current_price - stop_loss)
             target_dist = max(eff_risk * eff_rr, abs((sniper_target or current_price) - current_price))
             if recovery_mult > 1.0:
@@ -108,7 +108,7 @@ class SignalGenerationEngine:
             else:
                 take_profit = round(current_price - target_dist, dec_places)
         else:
-            eff_rr = max(rr, 1.5)
+            eff_rr = max(rr, 2.0)
             target_dist = base_stop_dist * eff_rr * recovery_mult
             if direction == CandidateDirection.BUY:
                 stop_loss = round(current_price - base_stop_dist, dec_places)
@@ -564,6 +564,51 @@ class SignalGenerationEngine:
                     except Exception as ex:
                         logger.warning(f"Bollinger Band mean-reversion evaluation error for {canonical_symbol}: {ex}")
 
+                # 2D. Trend Continuation, Pullback & Momentum Flow Integration (strat-002, strat-004, strat-005, strat-007, strat-010, strat-018)
+                if not has_sniper_setup and (
+                    strat_type_val in ["TREND_CONTINUATION", "PULLBACK", "MOMENTUM", "SWING_STRUCTURE"]
+                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-018")
+                ):
+                    try:
+                        pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
+                        dec_p = 2 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (3 if "JPY" in canonical_symbol else 5)
+                        is_bullish = asset_trend == "Bullish"
+                        is_bearish = asset_trend == "Bearish"
+                        if not is_bullish and not is_bearish and len(candles_1h) >= 10:
+                            is_bullish = candles_1h[-1].close > candles_1h[-10].close
+                            is_bearish = candles_1h[-1].close < candles_1h[-10].close
+
+                        if is_bullish and (rsi_val is None or (35.0 <= rsi_val <= 75.0)):
+                            has_sniper_setup = True
+                            direction = CandidateDirection.BUY
+                            pattern_conviction = 0.85
+                            swing_l = min(c.low for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price - 20 * pip_u)
+                            sniper_stop = round(swing_l - 2.0 * pip_u, dec_p)
+                            min_d = 5.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.20 if "JPY" in canonical_symbol else 0.0015)
+                            if abs(entry_price - sniper_stop) < min_d:
+                                sniper_stop = round(entry_price - min_d, dec_p)
+                            rr_target = getattr(strategy, "minimumRiskReward", 2.2) or 2.2
+                            sniper_target = round(entry_price + abs(entry_price - sniper_stop) * max(rr_target, 2.0), dec_p)
+                            sniper_trigger_rule = f"Structural {strategy.name} flow confirmed on H1 trend structure (RSI: {rsi_val if rsi_val is not None else 50.0:.1f})"
+                            sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bullish structure confirmed with R:R >= {max(rr_target, 2.0):.1f}."
+                            pattern_name = f"{strategy.name} Structure Flow"
+                        elif is_bearish and (rsi_val is None or (25.0 <= rsi_val <= 65.0)):
+                            has_sniper_setup = True
+                            direction = CandidateDirection.SELL
+                            pattern_conviction = 0.85
+                            swing_h = max(c.high for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price + 20 * pip_u)
+                            sniper_stop = round(swing_h + 2.0 * pip_u, dec_p)
+                            min_d = 5.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.20 if "JPY" in canonical_symbol else 0.0015)
+                            if abs(entry_price - sniper_stop) < min_d:
+                                sniper_stop = round(entry_price + min_d, dec_p)
+                            rr_target = getattr(strategy, "minimumRiskReward", 2.2) or 2.2
+                            sniper_target = round(entry_price - abs(entry_price - sniper_stop) * max(rr_target, 2.0), dec_p)
+                            sniper_trigger_rule = f"Structural {strategy.name} flow confirmed on H1 trend structure (RSI: {rsi_val if rsi_val is not None else 50.0:.1f})"
+                            sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bearish structure confirmed with R:R >= {max(rr_target, 2.0):.1f}."
+                            pattern_name = f"{strategy.name} Structure Flow"
+                    except Exception as ex:
+                        logger.warning(f"Trend continuation evaluation error for {canonical_symbol}: {ex}")
+
                 # 3. Unconfirmed / Generic Fallback: strict discipline, no phantom directions
                 if not has_sniper_setup:
                     if strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
@@ -612,15 +657,17 @@ class SignalGenerationEngine:
 
             # Condition 2: Spread Limit (asset-specific)
             if "XAU" in strategy.symbol or "GOLD" in strategy.symbol:
-                spread_limit = 2.5
+                spread_limit = 8.0
             elif "GBP" in strategy.symbol and "JPY" in strategy.symbol:
-                spread_limit = 3.2
+                spread_limit = 3.5
             elif "JPY" in strategy.symbol:
-                spread_limit = 1.5
+                spread_limit = 2.2
             elif "AUD" in strategy.symbol:
-                spread_limit = 1.2
+                spread_limit = 1.8
+            elif "GBP" in strategy.symbol:
+                spread_limit = 2.2
             else:
-                spread_limit = 0.8
+                spread_limit = 1.8
             spread_passed = spread <= spread_limit
             spread_cond = CandidateCondition(
                 title="Spread Limit",

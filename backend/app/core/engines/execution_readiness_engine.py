@@ -83,11 +83,12 @@ class ExecutionReadinessEngine:
                 s_score = 15
                 s_desc = f"Active session '{session}' matches optimal trading sessions."
             elif "asian" in session_lower or "asia" in session_lower or "tokyo" in session_lower or "sydney" in session_lower:
-                s_score = 10
-                s_desc = f"Active session '{session}' has reduced liquidity."
+                is_asian_pref = (any(p.lower() in ("asian", "tokyo", "sydney", "asia") for p in getattr(strategy, "preferredSessions", [])) if strategy else False) or getattr(strategy, "id", "") in ("strat-003", "strat-009", "strat-013", "strat-014", "strat-017", "strat-018")
+                s_score = 15 if is_asian_pref else 10
+                s_desc = f"Active session '{session}' matches preferred Asian session." if is_asian_pref else f"Active session '{session}' has reduced liquidity."
                 reasons.append(ReadinessReason(
                     title="Suboptimal Trading Session",
-                    description=f"The current session '{session}' is active, but offers lower volume and liquidity.",
+                    description=f"The current session '{session}' is active, and is optimal for Asian-session strategies." if is_asian_pref else f"The current session '{session}' is active, but offers lower volume and liquidity.",
                     severity=ReadinessSeverity.WARNING,
                     isBlocking=False
                 ))
@@ -114,7 +115,7 @@ class ExecutionReadinessEngine:
             
             # Asset-aware institutional spread thresholds
             if "XAU" in sym or "GOLD" in sym:
-                ideal_spread, acceptable_spread, max_spread = 2.5, 4.0, 5.0
+                ideal_spread, acceptable_spread, max_spread = 4.0, 6.5, 8.5
             elif "GBPJPY" in sym:
                 ideal_spread, acceptable_spread, max_spread = 2.0, 3.2, 4.0
             elif "GBP" in sym:
