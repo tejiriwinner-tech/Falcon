@@ -413,7 +413,7 @@ class SessionBreakoutEngine:
         dec = 2 if ("XAU" in sym_upper or "GOLD" in sym_upper or entry_price > 100) else 5
 
         atr = self.compute_atr(symbol, candles)
-        atr_buffer = 1.5 * atr
+        atr_buffer = 1.0 * atr
 
         if dir_upper == "BUY":
             if structure_sl is not None and structure_sl < entry_price:
@@ -423,12 +423,12 @@ class SessionBreakoutEngine:
                 effective_risk = atr_buffer
 
             sl = round(entry_price - effective_risk, dec)
-            tp1 = round(entry_price + (1.5 * effective_risk), dec)
-            tp2 = round(entry_price + (3.0 * effective_risk), dec)
+            tp1 = round(entry_price + (1.0 * effective_risk), dec)
+            tp2 = round(entry_price + (1.5 * effective_risk), dec)
 
             # Institutional bounds: TP1 must never overshoot primary Take Profit
             if take_profit is not None and take_profit > entry_price:
-                tp1 = min(tp1, round(entry_price + (take_profit - entry_price) * 0.5, dec))
+                tp1 = min(round(entry_price + (1.0 * effective_risk), dec), round(entry_price + (take_profit - entry_price) * 0.5, dec))
                 tp2 = take_profit
         else:
             if structure_sl is not None and structure_sl > entry_price:
@@ -438,12 +438,12 @@ class SessionBreakoutEngine:
                 effective_risk = atr_buffer
 
             sl = round(entry_price + effective_risk, dec)
-            tp1 = round(entry_price - (1.5 * effective_risk), dec)
-            tp2 = round(entry_price - (3.0 * effective_risk), dec)
+            tp1 = round(entry_price - (1.0 * effective_risk), dec)
+            tp2 = round(entry_price - (1.5 * effective_risk), dec)
 
             # Institutional bounds: TP1 must never overshoot primary Take Profit
             if take_profit is not None and take_profit < entry_price:
-                tp1 = max(tp1, round(entry_price - (entry_price - take_profit) * 0.5, dec))
+                tp1 = max(round(entry_price - (1.0 * effective_risk), dec), round(entry_price - (entry_price - take_profit) * 0.5, dec))
                 tp2 = take_profit
 
         trailing_buffer = round(1.0 * atr, dec)

@@ -478,7 +478,7 @@ class SignalOutcomeResolver:
 
             is_buy = direction == "BUY"
             be_threshold = entry + risk_d if is_buy else entry - risk_d
-            tp1_threshold = entry + (1.5 * risk_d) if is_buy else entry - (1.5 * risk_d)
+            tp1_threshold = entry + (1.0 * risk_d) if is_buy else entry - (1.0 * risk_d)
 
             # Max excursion reached across lifetime of this trade
             max_reach = trade.peakPrice if (is_buy and trade.peakPrice) else (trade.troughPrice if (not is_buy and trade.troughPrice) else current_price)
@@ -491,7 +491,7 @@ class SignalOutcomeResolver:
             )
 
             tp1_hit = (
-                (trade.mfeR is not None and trade.mfeR >= 1.5)
+                (trade.mfeR is not None and trade.mfeR >= 1.0)
                 or "TP1_REACHED" in (trade.notes or "")
                 or "TP1_SCALED_OUT_50" in (trade.notes or "")
                 or (is_buy and (current_price >= tp1_threshold or (bid > 0 and bid >= tp1_threshold) or max_reach >= tp1_threshold))
@@ -501,7 +501,7 @@ class SignalOutcomeResolver:
             if be_reached and "BE_PROTECTED" not in (trade.notes or ""):
                 notes_append = " | [BE_PROTECTED: Locked at entry at +1.0R]"
                 if tp1_hit and "TP1" not in (trade.notes or ""):
-                    notes_append += " | [TP1_SCALED_OUT_50: 50% profit banked at +1.5R]"
+                    notes_append += " | [TP1_SCALED_OUT_50: 50% profit banked at +1.0R]"
                 new_notes = f"{trade.notes or 'Falcon'}{notes_append}"
                 trade.stopLoss = entry
                 trade.notes = new_notes
@@ -645,7 +645,7 @@ class SignalOutcomeResolver:
                 elif result in ("LOSS", "LOST"):
                     realized_r = -round(abs(float(monetary_pnl)) / float(initial_risk), 2)
                 elif result in ("BREAKEVEN", "BE"):
-                    realized_r = 0.75 if ("TP1" in (trade.notes or "") or "SCALED_OUT" in (trade.notes or "")) else 0.0
+                    realized_r = 0.50 if ("TP1" in (trade.notes or "") or "SCALED_OUT" in (trade.notes or "") or "BE_PROTECTED" in (trade.notes or "")) else 0.0
 
             if realized_r is None:
                 if result in ("WIN", "WON"):
@@ -653,7 +653,7 @@ class SignalOutcomeResolver:
                 elif result in ("LOSS", "LOST"):
                     realized_r = -1.0
                 elif result in ("BREAKEVEN", "BE"):
-                    realized_r = 0.75 if ("TP1" in (trade.notes or "") or "SCALED_OUT" in (trade.notes or "")) else 0.0
+                    realized_r = 0.50 if ("TP1" in (trade.notes or "") or "SCALED_OUT" in (trade.notes or "") or "BE_PROTECTED" in (trade.notes or "")) else 0.0
 
             # Phase 5C: Excursion peak / trough & R finalization on close
             from app.core.analytics.execution_quality_service import execution_quality_service

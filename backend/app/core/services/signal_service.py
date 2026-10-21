@@ -614,7 +614,7 @@ class SignalService:
                                                 ot.id,
                                                 TradeJournalUpdate(
                                                     stopLoss=cand.entryPrice,
-                                                    notes=f"{ot.notes or 'Falcon'} | [BE_PROTECTED: +1.0R reached]",
+                                                    notes=f"{ot.notes or 'Falcon'} | [BE_PROTECTED: +1.0R reached | 50% TP1 secured]",
                                                 )
                                             )
                                         except Exception:
@@ -656,8 +656,8 @@ class SignalService:
                             pnl_amount = _pnl_usd(symbol, direction_str, cand.entryPrice, actual_exit, float(lot_size or 0.01))
                             r_multiple = _realized_r(direction_str, cand.entryPrice, cand.stopLoss, actual_exit)
                             if outcome == "BREAKEVEN":
-                                pnl_amount = 0.0
-                                r_multiple = 0.0
+                                pnl_amount = _pnl_usd(symbol, direction_str, cand.entryPrice, cand.entryPrice + (risk_d if is_buy else -risk_d), float(lot_size or 0.01)) * 0.5
+                                r_multiple = 0.50
 
                             matching_trade = None
                             for ot in open_trades:
@@ -673,7 +673,7 @@ class SignalService:
                             exit_label = "Target (TP)" if hit_tp else ("Breakeven" if outcome == "BREAKEVEN" else "Stop Loss (SL)")
                             exit_reason_str = f"Signal hit {exit_label} at {actual_exit:.4f}"
                             lesson_str = "Predefined target achieved; institutional take profit executed." if hit_tp else (
-                                "Capital preserved at breakeven stop." if outcome == "BREAKEVEN" else "Risk contained by stop loss invalidation boundary."
+                                "Capital preserved at breakeven stop after securing 50% partial at +1.0R." if outcome == "BREAKEVEN" else "Risk contained by stop loss invalidation boundary."
                             )
 
                             if matching_trade:
@@ -732,6 +732,30 @@ class SignalService:
                 # Capital Defense Shield Checks (apply only to pending setups):
                 shield_reason = None
                 if not is_already_active:
+                    # 0. Daily Rollover Blackout (20:50 - 21:30 UTC): Interbank liquidity freeze & spread blowout
+                    now_utc_time = now.time()
+                    from datetime import time as dt_time
+                    if dt_time(20, 50) <= now_utc_time <= dt_time(21, 30):
+                        shield_reason = "DAILY ROLLOVER BLACKOUT: 20:50-21:30 UTC interbank liquidity freeze. Entries blocked."
+
+                    # 0b. Post-Stop Cooldown (45m per strategy & symbol): Prevents rapid-fire whipsaw re-entries
+                    if not shield_reason and cand.strategyId:
+                        try:
+                            cooldown_cutoff = now - timedelta(minutes=45)
+                            all_closed = trade_journal_repository.list_trades() or []
+                            has_recent_stop = any(
+                                t.strategyId == cand.strategyId
+                                and (t.symbol.replace("/", "").replace("-", "").upper() == norm_sym)
+                                and (t.status or "").upper() == "CLOSED"
+                                and (t.result or "").upper() in ("LOST", "LOSS", "BREAKEVEN", "BE")
+                                and (t.closeDate is not None and t.closeDate >= cooldown_cutoff)
+                                for t in all_closed
+                            )
+                            if has_recent_stop:
+                                shield_reason = f"POST-STOP COOLDOWN: Strategy {cand.strategyId} on {symbol} in 45m cooldown following recent stop-out."
+                        except Exception as ex:
+                            logger.debug(f"Post-stop cooldown check error: {ex}")
+
                     # 1. Economic Calendar News Blackout Check
                     if getattr(settings, "NEWS_BLACKOUT_ENABLED", False):
                         try:
@@ -1090,7 +1114,7 @@ class SignalService:
         else:
             status = "HOLD"
 
-        targets_str = f"TP1: {tp1:.4f} (50% Bank @ 1.5R) | TP2: {tp2:.4f} (Runner) | Macro Bias: {htf_bias}"
+        targets_str = f"TP1: {tp1:.4f} (50% Bank @ 1.0R) | TP2: {tp2:.4f} (Runner @ 1.5R) | Macro Bias: {htf_bias}"
 
         if status == "ACTIVE":
             trigger_rule = f"[MARKET EXECUTION - ENTER NOW] [ACTIVE IN POSITION] Price touched entry at {entry_price:.4f}. {targets_str}."

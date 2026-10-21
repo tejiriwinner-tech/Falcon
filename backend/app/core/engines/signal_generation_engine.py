@@ -34,11 +34,11 @@ class SignalGenerationEngine:
         symbol: str = "EURUSD",
         adaptive_mult: float = 1.0,
         pattern_details: Optional[Dict[str, Any]] = None,
-        rr: float = 2.0,
+        rr: float = 1.5,
         recovery_mult: float = 1.0,
     ) -> Tuple[float, float, float]:
         """
-        Calculates entry, stopLoss, and takeProfit using dynamic 1.5 * ATR fallback or pattern swing stops.
+        Calculates entry, stopLoss, and takeProfit using calibrated 1.0 * ATR fallback or pattern swing stops.
         `recovery_mult` is accepted for backward compatibility but IGNORED: take-profit
         distance is never stretched after losses (removed martingale-style 2x/4x targets).
         Returns: (entry_price, stop_loss, take_profit)
@@ -47,18 +47,18 @@ class SignalGenerationEngine:
         raw_symbol = (symbol or "").upper()
         dec_places = 2 if ("XAU" in raw_symbol or "GOLD" in raw_symbol or current_price > 500) else (3 if "JPY" in raw_symbol else 5)
 
-        # Dynamic ATR-derived fallback stop distance: 1.5 * ATR (Phase 5B)
+        # Dynamic ATR-derived fallback stop distance: 1.0 * ATR (calibrated from 1.5 * ATR)
         if atr is not None and atr > 0:
-            base_stop_dist = round(1.5 * atr * adaptive_mult, dec_places)
+            base_stop_dist = round(1.0 * atr * adaptive_mult, dec_places)
         elif current_price > 0:
-            base_stop_dist = round(1.5 * (current_price * 0.002) * adaptive_mult, dec_places)
+            base_stop_dist = round(1.0 * (current_price * 0.002) * adaptive_mult, dec_places)
         else:
             base_stop_dist = 0.0020
 
         # Minimum institutional distance safety bound:
-        # Forex: 15-20 pips minimum (0.0015 for standard majors, 0.20 for JPY)
-        # Gold: $5.00 minimum
-        min_dist = 5.00 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.20 if "JPY" in raw_symbol else 0.0015)
+        # Forex: 10-15 pips minimum (0.0010 for standard majors, 0.15 for JPY)
+        # Gold: $3.00 minimum
+        min_dist = 3.00 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.15 if "JPY" in raw_symbol else 0.0010)
         if base_stop_dist < min_dist:
             base_stop_dist = min_dist
 
@@ -97,7 +97,7 @@ class SignalGenerationEngine:
             else:
                 stop_loss = round(sniper_stop, dec_places)
             
-            eff_rr = max(rr, 2.0)
+            eff_rr = max(rr, 1.5)
             eff_risk = abs(current_price - stop_loss)
             target_dist = max(eff_risk * eff_rr, abs((sniper_target or current_price) - current_price))
             if recovery_mult > 1.0:
@@ -108,7 +108,7 @@ class SignalGenerationEngine:
             else:
                 take_profit = round(current_price - target_dist, dec_places)
         else:
-            eff_rr = max(rr, 2.0)
+            eff_rr = max(rr, 1.5)
             target_dist = base_stop_dist * eff_rr * recovery_mult
             if direction == CandidateDirection.BUY:
                 stop_loss = round(current_price - base_stop_dist, dec_places)
@@ -818,11 +818,11 @@ class SignalGenerationEngine:
                 ))
 
             # ── 6. Precise Invalidation and Target Calculation with Adaptive Tuning & Asymmetric R:R ──
-            base_rr = strategy.minimumRiskReward or 2.0
+            base_rr = strategy.minimumRiskReward or 1.5
             if getattr(strategy, "id", "") == "strat-012":
-                rr = max(base_rr, 3.0)
+                rr = max(base_rr, 1.8)
             elif has_sniper_setup:
-                rr = max(base_rr, 2.5)
+                rr = max(base_rr, 1.8)
             else:
                 rr = base_rr
             vol_mult = 1.4 if volatility == "High" else (1.0 if volatility == "Moderate" else 0.8)

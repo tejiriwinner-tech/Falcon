@@ -30,6 +30,7 @@ class StrategyStatus(str, Enum):
     TESTING = "TESTING"
     PAUSED = "PAUSED"
     DEPRECATED = "DEPRECATED"
+    INCUBATION = "INCUBATION"
 
 class StrategyHealth(str, Enum):
     EXCELLENT = "EXCELLENT"

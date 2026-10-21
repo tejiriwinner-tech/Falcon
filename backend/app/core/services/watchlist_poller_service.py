@@ -199,7 +199,7 @@ class WatchlistPollerService:
                 spread_buffer = 0.10 if is_gold else (0.015 if is_jpy else 0.00010)  # 1-1.5 pip spread buffer
 
                 risk_dist = abs(trade.entryPrice - sl)
-                tp1_dist = 1.5 * risk_dist
+                tp1_dist = 1.0 * risk_dist
                 tp1_price = (trade.entryPrice + tp1_dist) if direction == "BUY" else (trade.entryPrice - tp1_dist)
                 be_price = (trade.entryPrice + spread_buffer) if direction == "BUY" else (trade.entryPrice - spread_buffer)
 
@@ -216,7 +216,7 @@ class WatchlistPollerService:
 
                     if tp1_hit:
                         new_sl = round(be_price, 2 if is_gold else (3 if is_jpy else 4))
-                        new_notes = f"{notes_str} [BE_PROTECTED: TP1 +1.5R reached at {cur_px:.4f}; SL moved to {new_sl:.4f}]".strip()
+                        new_notes = f"{notes_str} [BE_PROTECTED: TP1 +1.0R reached at {cur_px:.4f}; SL moved to {new_sl:.4f}; 50% banked]".strip()
                         trade_update = TradeJournalUpdate(
                             stopLoss=new_sl,
                             notes=new_notes,
@@ -224,7 +224,7 @@ class WatchlistPollerService:
                         updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
                         logger.info(
                             f"🛡️ TP1 HIT & SL MOVED TO BREAKEVEN for {trade.symbol} #{trade.id} at {cur_px:.4f}. "
-                            f"Stop loss adjusted to {new_sl:.4f} (BE + spread). 50% partial profit secured."
+                            f"Stop loss adjusted to {new_sl:.4f} (BE + spread). 50% partial profit secured (+0.50R)."
                         )
                         try:
                             telegram_alert_service.dispatch_breakeven_alert(trade, new_sl, cur_px)
@@ -253,7 +253,7 @@ class WatchlistPollerService:
 
                 if hit_sl:
                     if is_be_protected:
-                        # Trade stopped out at Breakeven after reaching TP1 (+1.5R partials banked)
+                        # Trade stopped out at Breakeven after reaching TP1 (+1.0R partials banked)
                         be_pts = round(abs(trade.entryPrice - sl), 4)
                         trade_update = TradeJournalUpdate(
                             status="CLOSED",
@@ -261,9 +261,9 @@ class WatchlistPollerService:
                             exitPrice=sl,
                             closeDate=now,
                             profitLoss=be_pts,
-                            realizedRMultiple=0.75,
-                            reasonForExit="Break-Even Stop Hit (Capital Defended after TP1)",
-                            lessonLearned="Capital defended by automated BE trailing rule; full 1R loss averted after +1.5R target run.",
+                            realizedRMultiple=0.50,
+                            reasonForExit="Break-Even Stop Hit (Capital Defended after TP1 +1.0R)",
+                            lessonLearned="Capital defended by automated BE trailing rule; +0.50R banked at TP1.",
                         )
                         updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
                         try:
@@ -282,14 +282,14 @@ class WatchlistPollerService:
                                 updated_trade or trade,
                                 exit_reason="Break-Even Stop Hit (Capital Defended after TP1 run)",
                                 result="BREAKEVEN",
-                                realized_r=0.75,
+                                realized_r=0.50,
                                 lesson="Capital preserved by automated BE trailing rule; full 1R loss avoided.",
                             )
                         except Exception as ex:
                             logger.debug(f"Telegram trade closed alert error: {ex}")
                         logger.info(
                             f"🛡️ BREAKEVEN HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (Exit: {sl:.4f}). "
-                            f"Trade closed as BREAKEVEN (+0.75R banked). Capital 100% defended."
+                            f"Trade closed as BREAKEVEN (+0.50R banked). Capital 100% defended."
                         )
                     else:
                         # Full stop-loss hit before reaching TP1
