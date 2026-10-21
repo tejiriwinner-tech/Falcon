@@ -219,7 +219,7 @@ class MacroCrossAssetEngine:
                         pass
 
             if dir_upper == "BUY":
-                if snap.dxy_bias == "STRONG_BULLISH":
+                if snap.dxy_bias in ("STRONG_BULLISH", "BULLISH"):
                     return MacroGateAssessment(
                         symbol=norm_sym,
                         direction=dir_upper,
@@ -265,7 +265,7 @@ class MacroCrossAssetEngine:
                         ),
                     )
             elif dir_upper == "SELL":
-                if snap.dxy_bias == "STRONG_BEARISH":
+                if snap.dxy_bias in ("STRONG_BEARISH", "BEARISH"):
                     return MacroGateAssessment(
                         symbol=norm_sym,
                         direction=dir_upper,
@@ -314,7 +314,7 @@ class MacroCrossAssetEngine:
         # Case 2: Direct USD assets (USDJPY, USDCAD, USDCHF)
         elif norm_sym in DIRECT_USD_ASSETS:
             if dir_upper == "BUY":
-                if snap.dxy_bias == "STRONG_BEARISH":
+                if snap.dxy_bias in ("STRONG_BEARISH", "BEARISH"):
                     return MacroGateAssessment(
                         symbol=norm_sym,
                         direction=dir_upper,
@@ -345,7 +345,7 @@ class MacroCrossAssetEngine:
                         ),
                     )
             elif dir_upper == "SELL":
-                if snap.dxy_bias == "STRONG_BULLISH":
+                if snap.dxy_bias in ("STRONG_BULLISH", "BULLISH"):
                     return MacroGateAssessment(
                         symbol=norm_sym,
                         direction=dir_upper,

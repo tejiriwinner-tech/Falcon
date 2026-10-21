@@ -30,6 +30,30 @@ class PositionSizingService:
         self.max_risk_pct = max_risk_pct
         self.account_currency = account_currency.upper()
 
+    @classmethod
+    def calculate_portfolio_heat_multiplier(cls, active_trade_count: int) -> float:
+        """
+        Dynamically scale per-trade risk based on number of active concurrent positions:
+        - 0 or 1 active trade: 1.0x (1.0% risk)
+        - 2 active trades: 0.75x (0.75% risk each -> 1.5% total portfolio heat)
+        - 3 active trades: 0.50x (0.50% risk each -> 1.5% total portfolio heat)
+        - >= 4 active trades: 0.35x (0.35% risk each)
+        """
+        if active_trade_count <= 1:
+            return 1.0
+        elif active_trade_count == 2:
+            return 0.75
+        elif active_trade_count == 3:
+            return 0.50
+        else:
+            return 0.35
+
+    @classmethod
+    def calculate_portfolio_heat_lot_size(cls, active_trade_count: int, base_lot_size: float = 0.01) -> float:
+        mult = cls.calculate_portfolio_heat_multiplier(active_trade_count)
+        scaled = round(base_lot_size * mult, 2)
+        return max(0.01, scaled)
+
     def calculate_units(
         self,
         symbol: str,

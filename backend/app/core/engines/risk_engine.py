@@ -44,7 +44,25 @@ class RiskEngine:
         )
 
         # EXPOSURE: Evaluate correlation risk or asset exposure
-        exposure_score = 10
+        exposure_score = 8
+        try:
+            from app.core.repository.trade_journal_repository import trade_journal_repository
+            open_t = trade_journal_repository.list_trades() or []
+            cand_sym = (candidate.symbol or "").replace("/", "").replace("_", "").upper()
+            cand_dir = (getattr(candidate.direction, "value", str(candidate.direction)) or "").upper()
+            from app.core.services.signal_service import extract_directional_currency_exposures
+            c_exps = extract_directional_currency_exposures(cand_sym, cand_dir)
+            has_corr = False
+            for ot in open_t:
+                if (ot.status or "").upper() in ("OPEN", "FILLED") and ot.closeDate is None:
+                    ot_exps = extract_directional_currency_exposures(ot.symbol, ot.direction)
+                    if any(e in ot_exps for e in c_exps if any(m in e for m in ("USD", "JPY", "EUR", "GBP", "AUD"))):
+                        has_corr = True
+                        break
+            if has_corr:
+                exposure_score = 15
+        except Exception:
+            exposure_score = 10
         cat_exposure = RiskCategoryScore(
             category=RiskCategory.EXPOSURE,
             score=exposure_score,

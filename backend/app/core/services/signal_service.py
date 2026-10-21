@@ -46,6 +46,37 @@ def canonical_signal_signature(
     )
 
 
+def extract_directional_currency_exposures(symbol: str, direction: str) -> List[str]:
+    """
+    Extracts underlying currency basket directional exposures to prevent correlated cluster drawdowns.
+    Examples:
+    - EUR/USD BUY  -> ["+EUR", "-USD"]
+    - EUR/USD SELL -> ["-EUR", "+USD"]
+    - XAU/USD BUY  -> ["+XAU", "-USD"]
+    - XAU/USD SELL -> ["-XAU", "+USD"]
+    - GBP/USD BUY  -> ["+GBP", "-USD"]
+    - AUD/USD BUY  -> ["+AUD", "-USD"]
+    - USD/JPY BUY  -> ["+USD", "-JPY"]
+    - USD/JPY SELL -> ["-USD", "+JPY"]
+    - GBP/JPY BUY  -> ["+GBP", "-JPY"]
+    - GBP/JPY SELL -> ["-GBP", "+JPY"]
+    """
+    clean = (symbol or "").replace("/", "").replace("_", "").replace("-", "").upper()
+    dir_str = (direction or "").upper()
+    if "XAU" in clean or "GOLD" in clean:
+        base, quote = "XAU", "USD"
+    elif len(clean) == 6:
+        base, quote = clean[:3], clean[3:]
+    else:
+        return []
+
+    if dir_str == "BUY":
+        return [f"+{base}", f"-{quote}"]
+    elif dir_str == "SELL":
+        return [f"-{base}", f"+{quote}"]
+    return []
+
+
 class SignalService:
     """
     Curates, ranks, and serves high-conviction sniper trading signals.
@@ -401,6 +432,16 @@ class SignalService:
             additional_resolved: List[SignalItem] = []
             active_symbols: set = {ot.symbol.replace("/", "").replace("-", "").upper() for ot in open_trades}
             watchlist_symbols: set = set()
+            active_currency_baskets: Dict[str, str] = {}
+            for ot in open_trades:
+                ot_status = (ot.status or "").upper()
+                if ot_status in ("OPEN", "FILLED") and ot.closeDate is None:
+                    is_be = getattr(ot, "isBreakevenProtected", False) or "BE_PROTECTED" in (ot.notes or "")
+                    if not is_be:
+                        ot_exps = extract_directional_currency_exposures(ot.symbol, ot.direction)
+                        for exp in ot_exps:
+                            if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")):
+                                active_currency_baskets[exp] = ot.symbol
 
             lot_size = ExecutionSettings().default_lot_size
             pm = getattr(providers, "provider_manager", None)
@@ -556,6 +597,28 @@ class SignalService:
 
                 # If position is already active, monitor live SL / TP boundary hit:
                 if is_already_active and cur_px is not None and cur_px > 0:
+                    # Institutional Real-Time Stop-Loss Ratcheting (+1.0R Breakeven)
+                    risk_d = abs(cand.entryPrice - cand.stopLoss)
+                    is_buy = cand.direction.value.upper() == "BUY"
+                    be_threshold = cand.entryPrice + risk_d if is_buy else cand.entryPrice - risk_d
+                    if (is_buy and cur_px >= be_threshold) or (not is_buy and cur_px <= be_threshold):
+                        if (is_buy and cand.stopLoss < cand.entryPrice) or (not is_buy and cand.stopLoss > cand.entryPrice):
+                            cand.stopLoss = cand.entryPrice
+                            item["is_be_protected"] = True
+                            for ot in open_trades:
+                                ot_sym = ot.symbol.replace("/", "").replace("-", "").upper()
+                                if ot_sym == norm_sym and (ot.status or "").upper() in ("OPEN", "FILLED"):
+                                    if ot.stopLoss != cand.entryPrice:
+                                        try:
+                                            trade_journal_repository.update_trade(
+                                                ot.id,
+                                                TradeJournalUpdate(
+                                                    stopLoss=cand.entryPrice,
+                                                    notes=f"{ot.notes or 'Falcon'} | [BE_PROTECTED: +1.0R reached]",
+                                                )
+                                            )
+                                        except Exception:
+                                            pass
                     hit_tp = False
                     hit_sl = False
                     if cand.direction.value.upper() == "BUY":
@@ -719,6 +782,24 @@ class SignalService:
                         except Exception as ex:
                             logger.debug(f"MTF filter check error: {ex}")
 
+                cand_exps = extract_directional_currency_exposures(symbol, direction_str)
+                if not is_already_active and not shield_reason:
+                    # A. Anti-Cluster Currency Basket Check (prevent correlated USD/JPY cluster drawdown)
+                    cluster_conflict = None
+                    for exp in cand_exps:
+                        if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")) and exp in active_currency_baskets:
+                            cluster_conflict = (exp, active_currency_baskets[exp])
+                            break
+                    if cluster_conflict:
+                        conf_exp, existing_sym = cluster_conflict
+                        shield_reason = f"ANTI-CLUSTER SHIELD: {conf_exp} exposure already held by active {existing_sym}. Held on Watchlist to prevent correlated drawdown."
+                        entry_hit = False
+
+                    # B. Portfolio Heat Cap (Max 3 simultaneous active trades)
+                    if not shield_reason and len(curated_active) >= 3:
+                        shield_reason = "PORTFOLIO HEAT CAP: Maximum 3 simultaneous active trades reached. Held on Watchlist."
+                        entry_hit = False
+
                 # If shield intervened on a pending setup, suppress entry promotion
                 if shield_reason and not is_already_active:
                     entry_hit = False
@@ -728,7 +809,16 @@ class SignalService:
                 # 2. Otherwise -> Watchlist in HOLD / WAITING status
                 if is_already_active or (entry_hit and is_approved and is_ready and not shield_reason):
                     item["is_guardian_authorized"] = True
-                    item["lot_size"] = lot_size
+                    for exp in cand_exps:
+                        if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")):
+                            active_currency_baskets[exp] = symbol
+
+                    from app.core.services.position_sizing_service import position_sizing_service
+                    scaled_lot = position_sizing_service.calculate_portfolio_heat_lot_size(
+                        active_trade_count=len(curated_active) + 1,
+                        base_lot_size=lot_size,
+                    )
+                    item["lot_size"] = scaled_lot
                     item["current_market_px"] = cur_px
                     item["entry_hit"] = True
                     try:
