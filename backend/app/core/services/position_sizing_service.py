@@ -124,3 +124,8 @@ class PositionSizingService:
 
 
 position_sizing_service = PositionSizingService()
+
+# Module-level aliases for direct functional access
+calculate_portfolio_heat_multiplier = PositionSizingService.calculate_portfolio_heat_multiplier
+calculate_portfolio_heat_lot_size = PositionSizingService.calculate_portfolio_heat_lot_size
+

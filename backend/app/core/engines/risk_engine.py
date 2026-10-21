@@ -22,6 +22,55 @@ class RiskEngine:
             extremeMax=100
         )
 
+    def _evaluate_currency_basket_correlation(self, candidate, open_trades=None) -> float:
+        """
+        Evaluate whether the candidate creates correlated currency basket risk with open trades.
+        Docks exposure score if an active trade shares an active currency side (e.g. -USD).
+        """
+        try:
+            if open_trades is None:
+                from app.core.repository.trade_journal_repository import trade_journal_repository
+                open_trades = trade_journal_repository.list_trades() or []
+
+            def _extract_sym(obj) -> str:
+                s = getattr(obj, "symbol", None)
+                if isinstance(s, str):
+                    return s.replace("/", "").replace("_", "").upper()
+                p = getattr(obj, "pair", None)
+                if isinstance(p, str):
+                    return p.replace("/", "").replace("_", "").upper()
+                return str(s or p or "").replace("/", "").replace("_", "").upper()
+
+            def _extract_dir(obj) -> str:
+                d = getattr(obj, "direction", None)
+                if d is None or not isinstance(d, (str, bytes)):
+                    val = getattr(d, "value", None)
+                    if isinstance(val, str):
+                        return val.upper()
+                    act = getattr(obj, "action", None)
+                    if isinstance(act, str):
+                        return act.upper()
+                if isinstance(d, str):
+                    return d.upper()
+                return str(d or "").upper()
+
+            cand_sym = _extract_sym(candidate)
+            cand_dir = _extract_dir(candidate)
+            from app.core.services.signal_service import extract_directional_currency_exposures
+            c_exps = extract_directional_currency_exposures(cand_sym, cand_dir)
+            for ot in open_trades:
+                ot_status = (getattr(ot, "status", "") or "").upper()
+                ot_close = getattr(ot, "closeDate", None)
+                if (ot_status in ("OPEN", "FILLED", "") and ot_close is None):
+                    ot_sym = _extract_sym(ot)
+                    ot_dir = _extract_dir(ot)
+                    ot_exps = extract_directional_currency_exposures(ot_sym, ot_dir)
+                    if any(e in ot_exps for e in c_exps if any(m in e for m in ("USD", "JPY", "EUR", "GBP", "AUD"))):
+                        return 15.0
+            return 8.0
+        except Exception:
+            return 10.0
+
     def assess_risk(
         self,
         assessment_id: str,
@@ -44,25 +93,7 @@ class RiskEngine:
         )
 
         # EXPOSURE: Evaluate correlation risk or asset exposure
-        exposure_score = 8
-        try:
-            from app.core.repository.trade_journal_repository import trade_journal_repository
-            open_t = trade_journal_repository.list_trades() or []
-            cand_sym = (candidate.symbol or "").replace("/", "").replace("_", "").upper()
-            cand_dir = (getattr(candidate.direction, "value", str(candidate.direction)) or "").upper()
-            from app.core.services.signal_service import extract_directional_currency_exposures
-            c_exps = extract_directional_currency_exposures(cand_sym, cand_dir)
-            has_corr = False
-            for ot in open_t:
-                if (ot.status or "").upper() in ("OPEN", "FILLED") and ot.closeDate is None:
-                    ot_exps = extract_directional_currency_exposures(ot.symbol, ot.direction)
-                    if any(e in ot_exps for e in c_exps if any(m in e for m in ("USD", "JPY", "EUR", "GBP", "AUD"))):
-                        has_corr = True
-                        break
-            if has_corr:
-                exposure_score = 15
-        except Exception:
-            exposure_score = 10
+        exposure_score = int(self._evaluate_currency_basket_correlation(candidate))
         cat_exposure = RiskCategoryScore(
             category=RiskCategory.EXPOSURE,
             score=exposure_score,
