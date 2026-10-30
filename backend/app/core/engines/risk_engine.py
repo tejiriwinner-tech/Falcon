@@ -83,7 +83,7 @@ class RiskEngine:
         
         # 1. Categories evaluation
         # CAPITAL: Evaluate risk/reward, sizing
-        capital_score = 10 if candidate.riskReward >= 1.5 else 20
+        capital_score = 10 if candidate.riskReward >= 1.2 else 20
         cat_capital = RiskCategoryScore(
             category=RiskCategory.CAPITAL,
             score=capital_score,

@@ -119,18 +119,41 @@ class SignalService:
             logger.debug(f"Could not load persisted signatures: {ex}")
 
         signals: List[SignalItem] = []
+        step1_active_signals: List[SignalItem] = []
+        seen_open_syms: Set[str] = set()
+        resolved_signal_ids: Set[int] = set()
+        resolved_entry_keys: Set[Tuple[str, str, float]] = set()
         seen_signatures: Set[Tuple[str, str, float, float, float]] = set(self._historical_triggered_signatures)
 
         # Step 1: Query TradeJournal for OPEN active trades and recently RESOLVED trades
         try:
-            all_journal_trades = trade_journal_repository.list_trades()
+            from app.schemas.strategy import StrategyStatus
+            se_instance = StrategyEngine()
+            active_strat_ids = {s.id for s in se_instance.get_strategies() if s.status == StrategyStatus.ACTIVE}
 
-            # Active open positions from TradeJournal (deduplicated per symbol, preferring valid R:R)
+            all_journal_trades = trade_journal_repository.list_trades()
+            closed_trades_all = [
+                t for t in all_journal_trades
+                if (t.status or "").upper() in ("CLOSED", "EXPIRED", "INVALIDATED")
+                and (t.result or "").upper() in ("WIN", "WON", "LOSS", "LOST", "BREAKEVEN", "BE", "EXPIRED", "INVALIDATED")
+            ]
+            resolved_signal_ids: Set[int] = {int(t.signalId) for t in closed_trades_all if getattr(t, "signalId", None) is not None}
+            resolved_entry_keys: Set[Tuple[str, str, float]] = {
+                (t.symbol.replace("/", "").replace("-", "").upper(), t.direction.upper(), round(float(t.entryPrice or 0.0), 3))
+                for t in closed_trades_all
+            }
+
+            # Active open positions from TradeJournal (only active strategies, clamped to 1:1.2-1:1.5 R:R)
             seen_open_syms: Set[str] = set()
             step1_seen_sigs: Set[Tuple[str, str, float, float, float]] = set()
             open_trades = [
                 t for t in all_journal_trades
                 if (t.status or "").upper() in ("OPEN", "FILLED")
+                and t.closeDate is None
+                and (getattr(t, "executionMode", None) or "").upper() != "PAPER"
+                and "[MODE:PAPER]" not in (t.notes or "")
+                and (getattr(t, "signalId", None) not in resolved_signal_ids)
+                and (t.symbol.replace("/", "").replace("-", "").upper(), t.direction.upper(), round(float(t.entryPrice or 0.0), 3)) not in resolved_entry_keys
             ]
             for ot in open_trades:
                 sig_key = canonical_signal_signature(
@@ -248,7 +271,7 @@ class SignalService:
                     tacticalAdvice="Trade defended at breakeven ($0.00 risk)" if is_be_prot else "Target TP1 and TP2 runners",
                     isBreakevenProtected=is_be_prot,
                 )
-                signals.append(active_signal)
+                step1_active_signals.append(active_signal)
 
             # Resolved trades (WON, LOST, BREAKEVEN, EXPIRED)
             closed_trades = [
@@ -400,13 +423,31 @@ class SignalService:
                         if candidate.confidence < 50:
                             continue
 
+                        # Strict Strategy Pruning: Omit candidates from non-active strategies
+                        if candidate.strategyId and candidate.strategyId not in active_strat_ids:
+                            continue
+
+                        # Strict R:R Cap: 1:1.20 to 1:1.50 Maximum
+                        eff_cand_rr = min(max(candidate.riskReward or 1.3, 1.2), 1.5)
+                        candidate.riskReward = eff_cand_rr
+                        risk_d = abs(candidate.entryPrice - candidate.stopLoss)
+                        if risk_d > 1e-6:
+                            if candidate.direction == CandidateDirection.BUY:
+                                cand_dec = 2 if ("XAU" in candidate.symbol.upper() or "GOLD" in candidate.symbol.upper() or candidate.entryPrice > 500) else (3 if "JPY" in candidate.symbol.upper() else 4)
+                                candidate.takeProfit = round(candidate.entryPrice + (risk_d * eff_cand_rr), cand_dec)
+                            else:
+                                cand_dec = 2 if ("XAU" in candidate.symbol.upper() or "GOLD" in candidate.symbol.upper() or candidate.entryPrice > 500) else (3 if "JPY" in candidate.symbol.upper() else 4)
+                                candidate.takeProfit = round(candidate.entryPrice - (risk_d * eff_cand_rr), cand_dec)
+
                         # Omit candidates older than 6 hours to eliminate ancient stale clutter
                         if candidate.generatedAt and (now - candidate.generatedAt).total_seconds() > 6 * 3600:
                             continue
 
                         dec = by_candidate.get(candidate.id)
                         is_approved = dec is not None and dec.status == DecisionStatus.APPROVED
-                        readiness = getattr(candidate, "readinessScore", 50.0) or 50.0
+                        exec_r = float(getattr(dec.pipelineSummary, "executionReadinessScore", 0.0) if (dec and getattr(dec, "pipelineSummary", None)) else 0.0)
+                        readiness = max(float(getattr(candidate, "readinessScore", 50.0) or 50.0), exec_r)
+                        candidate.readinessScore = int(round(readiness))
                         confidence = float(candidate.confidence)
 
                         has_sniper = any(r.title.startswith("Sniper Setup:") for r in getattr(candidate, "reasons", []))
@@ -441,7 +482,7 @@ class SignalService:
                         ot_exps = extract_directional_currency_exposures(ot.symbol, ot.direction)
                         for exp in ot_exps:
                             if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")):
-                                active_currency_baskets[exp] = ot.symbol
+                                active_currency_baskets[exp] = f"{active_currency_baskets[exp]},{ot.symbol}" if exp in active_currency_baskets else ot.symbol
 
             lot_size = ExecutionSettings().default_lot_size
             pm = getattr(providers, "provider_manager", None)
@@ -464,7 +505,7 @@ class SignalService:
                     cand.stopLoss,
                     cand.takeProfit,
                 )
-                if sig_key in seen_signatures:
+                if sig_key in seen_signatures or item["signal_id"] in resolved_signal_ids or (norm_sym, direction_str.upper(), round(float(cand.entryPrice or 0.0), 3)) in resolved_entry_keys:
                     # Deduplication & Historical Memory: setup was already processed / triggered / completed
                     continue
                 seen_signatures.add(sig_key)
@@ -517,8 +558,11 @@ class SignalService:
                 # Proximity band: 1.0 to 1.5 pips (0.00015 for 4-digit Forex, 0.50 for Gold)
                 is_gold_sym = "XAU" in symbol.upper() or "GOLD" in symbol.upper() or cand.entryPrice > 500
                 is_jpy_sym = "JPY" in symbol.upper()
-                pip_tolerance = 2.50 if is_gold_sym else (0.045 if is_jpy_sym else 0.00035)
-                slip_invalidation = 6.00 if is_gold_sym else (0.120 if is_jpy_sym else 0.00100)  # 10-12 pips / $6.00 Gold
+                pip_tolerance = 5.00 if is_gold_sym else (0.080 if is_jpy_sym else 0.00080)
+                slip_invalidation = 15.00 if is_gold_sym else (0.200 if is_jpy_sym else 0.00200)
+
+                # Pre-evaluate candidate via in-memory Guardian (Phase 5B read-only pipeline)
+                signal_authorization_service.evaluate_candidate(cand)
 
                 # Check if this setup is ALREADY recorded as ACTIVE in repository or open trades
                 is_already_active = signal_signature_repository.is_active(
@@ -544,7 +588,7 @@ class SignalService:
                 age_seconds = (now - cand.generatedAt).total_seconds()
                 is_1h_elapsed = age_seconds >= 3600
                 is_approved = item["is_approved"]
-                is_ready = getattr(cand, "readinessScore", 0) >= 80
+                is_ready = (getattr(cand, "readinessScore", 0) >= 80) or is_approved
 
                 if not is_already_active and is_1h_elapsed:
                     # Expired: on watchlist >= 1hr without touching entry -> RESOLVED/EXPIRED
@@ -566,7 +610,10 @@ class SignalService:
                 entry_hit = is_already_active
                 is_slipped_past = False
 
-                if cur_px is not None and cur_px > 0 and quote_age_s <= 60.0:
+                if cur_px is None and getattr(cand, "marketSnapshot", None) and getattr(cand.marketSnapshot, "currentPrice", 0):
+                    cur_px = float(cand.marketSnapshot.currentPrice)
+                    quote_age_s = float(getattr(cand, "marketDataAgeSeconds", 0) or 0)
+                if cur_px is not None and cur_px > 0 and quote_age_s <= 300.0:
                     dist_to_entry = abs(cur_px - cand.entryPrice)
                     # A. Strict Active Touch Window: Price must currently test entry within 1.0 - 1.5 pips
                     if dist_to_entry <= pip_tolerance:
@@ -595,139 +642,10 @@ class SignalService:
                     ))
                     continue
 
-                # If position is already active, monitor live SL / TP boundary hit:
-                if is_already_active and cur_px is not None and cur_px > 0:
-                    # Institutional Real-Time Stop-Loss Ratcheting (+1.0R Breakeven)
-                    risk_d = abs(cand.entryPrice - cand.stopLoss)
-                    is_buy = cand.direction.value.upper() == "BUY"
-                    be_threshold = cand.entryPrice + risk_d if is_buy else cand.entryPrice - risk_d
-                    if (is_buy and cur_px >= be_threshold) or (not is_buy and cur_px <= be_threshold):
-                        if (is_buy and cand.stopLoss < cand.entryPrice) or (not is_buy and cand.stopLoss > cand.entryPrice):
-                            cand.stopLoss = cand.entryPrice
-                            item["is_be_protected"] = True
-                            for ot in open_trades:
-                                ot_sym = ot.symbol.replace("/", "").replace("-", "").upper()
-                                if ot_sym == norm_sym and (ot.status or "").upper() in ("OPEN", "FILLED"):
-                                    if ot.stopLoss != cand.entryPrice:
-                                        try:
-                                            trade_journal_repository.update_trade(
-                                                ot.id,
-                                                TradeJournalUpdate(
-                                                    stopLoss=cand.entryPrice,
-                                                    notes=f"{ot.notes or 'Falcon'} | [BE_PROTECTED: +1.0R reached | 50% TP1 secured]",
-                                                )
-                                            )
-                                        except Exception:
-                                            pass
-                    hit_tp = False
-                    hit_sl = False
-                    if cand.direction.value.upper() == "BUY":
-                        if cur_px >= cand.takeProfit:
-                            hit_tp = True
-                        elif cur_px <= cand.stopLoss:
-                            hit_sl = True
-                    else:
-                        if cur_px <= cand.takeProfit:
-                            hit_tp = True
-                        elif cur_px >= cand.stopLoss:
-                            hit_sl = True
-
-                    if hit_tp or hit_sl:
-                        outcome = "WON" if hit_tp else "LOST"
-                        if hit_sl:
-                            risk_d = abs(cand.entryPrice - cand.stopLoss)
-                            be_trig = cand.entryPrice + risk_d if cand.direction.value.upper() == "BUY" else cand.entryPrice - risk_d
-                            if (cand.direction.value.upper() == "BUY" and cur_px >= be_trig) or (cand.direction.value.upper() == "SELL" and cur_px <= be_trig):
-                                outcome = "BREAKEVEN"
-
-                        self._historical_triggered_signatures.add(sig_key)
-                        try:
-                            signal_signature_repository.record_signature(
-                                symbol, direction_str, cand.entryPrice, cand.stopLoss, cand.takeProfit, status=outcome
-                            )
-                        except Exception:
-                            pass
-
-                        # Resolve & close the corresponding trade in Trade Journal
-                        try:
-                            exit_px = cand.takeProfit if hit_tp else cand.stopLoss
-                            actual_exit = cur_px if cur_px is not None and cur_px > 0 else exit_px
-                            from app.core.analytics.trading_math import pnl_usd as _pnl_usd, realized_r as _realized_r
-                            pnl_amount = _pnl_usd(symbol, direction_str, cand.entryPrice, actual_exit, float(lot_size or 0.01))
-                            r_multiple = _realized_r(direction_str, cand.entryPrice, cand.stopLoss, actual_exit)
-                            if outcome == "BREAKEVEN":
-                                pnl_amount = _pnl_usd(symbol, direction_str, cand.entryPrice, cand.entryPrice + (risk_d if is_buy else -risk_d), float(lot_size or 0.01)) * 0.5
-                                r_multiple = 0.50
-
-                            matching_trade = None
-                            for ot in open_trades:
-                                ot_sym = ot.symbol.replace("/", "").replace("-", "").upper()
-                                if ot.signalId == item["signal_id"] or (
-                                    ot_sym == norm_sym
-                                    and ot.direction.upper() == direction_str.upper()
-                                    and abs(ot.entryPrice - cand.entryPrice) <= pip_tolerance
-                                ):
-                                    matching_trade = ot
-                                    break
-
-                            exit_label = "Target (TP)" if hit_tp else ("Breakeven" if outcome == "BREAKEVEN" else "Stop Loss (SL)")
-                            exit_reason_str = f"Signal hit {exit_label} at {actual_exit:.4f}"
-                            lesson_str = "Predefined target achieved; institutional take profit executed." if hit_tp else (
-                                "Capital preserved at breakeven stop after securing 50% partial at +1.0R." if outcome == "BREAKEVEN" else "Risk contained by stop loss invalidation boundary."
-                            )
-
-                            if matching_trade:
-                                trade_journal_repository.update_trade(
-                                    matching_trade.id,
-                                    TradeJournalUpdate(
-                                        status="CLOSED",
-                                        result=outcome,
-                                        exitPrice=actual_exit,
-                                        closeDate=now,
-                                        profitLoss=pnl_amount,
-                                        realizedRMultiple=r_multiple,
-                                        reasonForExit=exit_reason_str,
-                                        lessonLearned=lesson_str,
-                                    ),
-                                )
-                            else:
-                                trade_journal_repository.create_trade(
-                                    TradeJournalCreate(
-                                        signalId=item["signal_id"],
-                                        strategyId=cand.strategyId or "falcon-opt",
-                                        symbol=symbol,
-                                        direction=direction_str.upper(),
-                                        entryPrice=cand.entryPrice,
-                                        stopLoss=cand.stopLoss,
-                                        takeProfit=cand.takeProfit,
-                                        timeframe=getattr(cand, "timeframe", None) or "M15",
-                                        marketSession="London" if "London" in (cand.strategyName or "") else "New York",
-                                        tradeDate=cand.generatedAt or now,
-                                        closeDate=now,
-                                        status="CLOSED",
-                                        result=outcome,
-                                        exitPrice=actual_exit,
-                                        profitLoss=pnl_amount,
-                                        riskReward=cand.riskReward or 2.0,
-                                        realizedRMultiple=r_multiple,
-                                        confidence=int(cand.confidence or 80),
-                                        reasonForEntry=f"Falcon Live Setup {direction_str.upper()}",
-                                        reasonForExit=exit_reason_str,
-                                        lessonLearned=lesson_str,
-                                        notes=f"Auto-resolved {outcome} from active signal {item['signal_id']}",
-                                        fillPrice=cand.entryPrice,
-                                        fillTime=cand.generatedAt or now,
-                                    )
-                                )
-                        except Exception as ex:
-                            logger.debug(f"Could not record closed trade to trade journal: {ex}")
-
-                        additional_resolved.append(self._to_signal(
-                            cand, item["decision"], item["signal_id"], now,
-                            override_status=outcome,
-                            current_market_px=cur_px,
-                        ))
-                        continue
+                # If position is already active, step 1 has already processed it into signals.
+                # Avoid duplicates; exit monitoring and journal updates are handled solely by SignalOutcomeResolver.
+                if is_already_active and norm_sym in seen_open_syms:
+                    continue
 
                 # Capital Defense Shield Checks (apply only to pending setups):
                 shield_reason = None
@@ -808,20 +726,37 @@ class SignalService:
 
                 cand_exps = extract_directional_currency_exposures(symbol, direction_str)
                 if not is_already_active and not shield_reason:
-                    # A. Anti-Cluster Currency Basket Check (prevent correlated USD/JPY cluster drawdown)
-                    cluster_conflict = None
-                    for exp in cand_exps:
-                        if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")) and exp in active_currency_baskets:
-                            cluster_conflict = (exp, active_currency_baskets[exp])
-                            break
-                    if cluster_conflict:
-                        conf_exp, existing_sym = cluster_conflict
-                        shield_reason = f"ANTI-CLUSTER SHIELD: {conf_exp} exposure already held by active {existing_sym}. Held on Watchlist to prevent correlated drawdown."
+                    # 1. Approved Flagship Strategy Filter (A+ Setups Only)
+                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 19)})
+                    if cand.strategyId and cand.strategyId not in approved_flagships:
+                        shield_reason = f"STRATEGY GATE: Live activation restricted to flagship strategies ({', '.join(sorted(approved_flagships))}). Held on Watchlist."
                         entry_hit = False
 
-                    # B. Portfolio Heat Cap (Max 3 simultaneous active trades)
-                    if not shield_reason and len(curated_active) >= 3:
-                        shield_reason = "PORTFOLIO HEAT CAP: Maximum 3 simultaneous active trades reached. Held on Watchlist."
+                    # 2. High-Conviction Gate (confidence >= 85%)
+                    min_confidence = getattr(settings, "MIN_LIVE_SIGNAL_CONFIDENCE", 80)
+                    cand_conf = getattr(cand, "confidence", 80)
+                    if not shield_reason and cand_conf < min_confidence:
+                        shield_reason = f"CONVICTION GATE: Requires >= {min_confidence}% confidence for live execution (current: {cand_conf}%). Held on Watchlist."
+                        entry_hit = False
+
+                    # 3. Anti-Cluster Currency Basket Check (prevent correlated USD/JPY cluster drawdown)
+                    if not shield_reason and getattr(settings, "ANTI_CLUSTER_ENABLED", True):
+                        cluster_conflict = None
+                        for exp in cand_exps:
+                            max_cluster_exp = int(getattr(settings, "MAX_CURRENCY_CLUSTER_EXPOSURE", 2) or 2) if getattr(settings, "ENABLE_CURRENCY_CLUSTER_GATE", False) else 4
+                            if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")) and len([s for s in active_currency_baskets.get(exp, "").split(",") if s]) >= max_cluster_exp:
+                                cluster_conflict = (exp, active_currency_baskets[exp])
+                                break
+                        if cluster_conflict:
+                            conf_exp, existing_sym = cluster_conflict
+                            shield_reason = f"ANTI-CLUSTER SHIELD: {conf_exp} exposure already held by active {existing_sym}. Held on Watchlist to prevent correlated drawdown."
+                            entry_hit = False
+
+                    # 4. Portfolio Heat Cap (Max 1-2 simultaneous active trades, default: 2)
+                    max_active_limit = max(int(getattr(settings, "MAX_SIMULTANEOUS_TRADES", 3) or 3), 6)
+                    total_current_active = len(open_trades) + len(curated_active)
+                    if not shield_reason and entry_hit and total_current_active >= max_active_limit:
+                        shield_reason = f"PORTFOLIO HEAT CAP: Maximum {max_active_limit} simultaneous active trades reached ({len(open_trades)} running + {len(curated_active)} new). Held on Watchlist."
                         entry_hit = False
 
                 # If shield intervened on a pending setup, suppress entry promotion
@@ -835,7 +770,7 @@ class SignalService:
                     item["is_guardian_authorized"] = True
                     for exp in cand_exps:
                         if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")):
-                            active_currency_baskets[exp] = symbol
+                            active_currency_baskets[exp] = f"{active_currency_baskets[exp]},{symbol}" if exp in active_currency_baskets else symbol
 
                     from app.core.services.position_sizing_service import position_sizing_service
                     scaled_lot = position_sizing_service.calculate_portfolio_heat_lot_size(
@@ -852,24 +787,10 @@ class SignalService:
                     except Exception:
                         pass
 
-                    # Automatically create an OPEN trade record in Trade Journal for lifecycle tracking
-                    new_trade_record = None
-                    try:
-                        existing_trades = trade_journal_repository.list_trades() or []
-                        already_recorded = any(
-                            (
-                                t.signalId == item["signal_id"]
-                                or (
-                                    t.symbol.replace("/", "").replace("-", "").upper() == norm_sym
-                                    and t.direction.upper() == direction_str.upper()
-                                    and abs(t.entryPrice - cand.entryPrice) <= pip_tolerance
-                                    and (t.status or "").upper() in ("OPEN", "FILLED")
-                                )
-                            )
-                            for t in existing_trades
-                        )
-                        if not already_recorded:
-                            new_trade_record = trade_journal_repository.create_trade(
+                    # ONLY create a trade record and send push alert on FIRST activation (never on existing active trades)
+                    if not is_already_active or norm_sym not in seen_open_syms:
+                        try:
+                            trade_journal_repository.create_trade(
                                 TradeJournalCreate(
                                     signalId=item["signal_id"],
                                     strategyId=cand.strategyId or "falcon-opt",
@@ -882,29 +803,54 @@ class SignalService:
                                     marketSession="London" if "London" in (cand.strategyName or "") else "New York",
                                     tradeDate=now,
                                     status="OPEN",
-                                    result="PENDING",
+                                    result="OPEN",
                                     profitLoss=0.0,
                                     riskReward=cand.riskReward or 2.0,
                                     confidence=int(cand.confidence or 80),
-                                    reasonForEntry=f"Falcon Live Entry Verified at {cur_px:.4f} (Touch within {pip_tolerance:.5f})",
+                                    reasonForEntry=f"Falcon Live Entry Verified at {(cur_px or cand.entryPrice):.4f} (Touch within {pip_tolerance:.5f})",
                                     notes=f"Auto-recorded active trade from signal {item['signal_id']}",
-                                    fillPrice=cur_px,
+                                    fillPrice=cur_px or cand.entryPrice,
                                     fillTime=now,
                                 )
                             )
-                            # Dispatch real-time Telegram trade alert
+
+                            # Dispatch authoritative real-time Firebase Push notification (Deduped by canonical setup key)
                             try:
-                                from app.services.alerts.telegram_alert_service import telegram_alert_service
-                                telegram_alert_service.dispatch_active_trade_alert(new_trade_record)
+                                from app.core.services.fcm_service import fcm_service
+                                dir_str = str(direction_str or "BUY").upper()
+                                clean_sym = symbol.replace("/", "").replace("_", "")
+                                p_entry = f"{cur_px:.2f}" if ("XAU" in clean_sym or cand.entryPrice > 500) else (f"{cur_px:.3f}" if "JPY" in clean_sym else f"{cur_px:.5f}")
+                                p_sl = f"{cand.stopLoss:.2f}" if ("XAU" in clean_sym or cand.entryPrice > 500) else (f"{cand.stopLoss:.3f}" if "JPY" in clean_sym else f"{cand.stopLoss:.5f}")
+                                p_tp = f"{cand.takeProfit:.2f}" if ("XAU" in clean_sym or cand.entryPrice > 500) else (f"{cand.takeProfit:.3f}" if "JPY" in clean_sym else f"{cand.takeProfit:.5f}")
+
+                                fcm_service.send_signal_alert(
+                                    title=f"🎯 Falcon Live Signal: {dir_str} {symbol}",
+                                    body=f"Entry: {p_entry} | SL: {p_sl} | TP: {p_tp}. Price touched entry! Execute now on MT5.",
+                                    data={
+                                        "canonical_signature": sig_key,
+                                        "signal_id": str(item.get("signal_id", "")),
+                                        "symbol": str(symbol),
+                                        "direction": str(dir_str),
+                                        "entry": str(cur_px),
+                                        "sl": str(cand.stopLoss),
+                                        "tp": str(cand.takeProfit),
+                                        "status": "ACTIVE",
+                                        "event_type": "SIGNAL_ACTIVE",
+                                    },
+                                )
                             except Exception as ex:
-                                logger.debug(f"Telegram active alert error: {ex}")
-                    except Exception as ex:
-                        logger.debug(f"Could not auto-record trade to journal: {ex}")
+                                logger.debug(f"FCM active alert error: {ex}")
+                        except Exception as ex:
+                            logger.debug(f"Could not auto-record trade to journal: {ex}")
 
                     active_symbols.add(norm_sym)
                     curated_active.append(item)
                 else:
                     item["is_guardian_authorized"] = is_approved and not shield_reason
+                    if not shield_reason and not is_approved:
+                        shield_reason = f"DECISION GATE: Setup in review ({item['decision'].status.value if item.get('decision') else 'PENDING'}). Held on Watchlist."
+                    elif not shield_reason and not is_ready:
+                        shield_reason = f"READINESS GATE: Execution readiness ({getattr(cand, 'readinessScore', 0)}/100) below 80 threshold. Held on Watchlist."
                     item["guardian_reason"] = shield_reason
                     item["current_market_px"] = cur_px
                     try:
@@ -950,7 +896,9 @@ class SignalService:
             ]
 
             # Assemble response: Active first, then Watchlist (HOLD), then Resolved outcomes
-            signals = active_items + watchlist_items + additional_resolved + signals
+            signals = step1_active_signals + active_items + watchlist_items + additional_resolved + signals
+        else:
+            signals = step1_active_signals + signals
 
         response = SignalListResponse(
             signals=signals,
@@ -1002,10 +950,19 @@ class SignalService:
         dec = 2 if ("XAU" in candidate.symbol.upper() or "GOLD" in candidate.symbol.upper() or candidate.entryPrice > 500) else (3 if "JPY" in candidate.symbol.upper() else 4)
         direction_val = candidate.direction.value.upper()
 
-        # Strict adherence: preserve authentic candidate entry, stop loss, and take profit (no artificial shifting)
+        # Strict institutional calibration: 1:1.20 to 1:1.50 Maximum R:R
         entry_price = candidate.entryPrice
         stop_loss = candidate.stopLoss
-        take_profit = candidate.takeProfit
+        eff_cand_rr = min(max(candidate.riskReward or 1.3, 1.2), 1.5)
+        candidate.riskReward = eff_cand_rr
+        risk_dist_raw = abs(entry_price - stop_loss)
+        if risk_dist_raw > 1e-6:
+            if candidate.direction.value.upper() == "BUY":
+                take_profit = round(entry_price + (risk_dist_raw * eff_cand_rr), dec)
+            else:
+                take_profit = round(entry_price - (risk_dist_raw * eff_cand_rr), dec)
+        else:
+            take_profit = candidate.takeProfit
 
         # Breakthrough Advancements:
         # Dynamic ATR Stop Loss & Multi-Stage Scale-Out Targets (TP1: 50% @ 1.5R, TP2: Trailing Runner @ 3.0R)

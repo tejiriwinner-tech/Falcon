@@ -47,11 +47,11 @@ class SignalGenerationEngine:
         raw_symbol = (symbol or "").upper()
         dec_places = 2 if ("XAU" in raw_symbol or "GOLD" in raw_symbol or current_price > 500) else (3 if "JPY" in raw_symbol else 5)
 
-        # Dynamic ATR-derived fallback stop distance: 1.0 * ATR (calibrated from 1.5 * ATR)
+        # Dynamic ATR-derived fallback stop distance: 1.5 * ATR (calibrated to preserve structural breathing room)
         if atr is not None and atr > 0:
-            base_stop_dist = round(1.0 * atr * adaptive_mult, dec_places)
+            base_stop_dist = round(1.5 * atr * adaptive_mult, dec_places)
         elif current_price > 0:
-            base_stop_dist = round(1.0 * (current_price * 0.002) * adaptive_mult, dec_places)
+            base_stop_dist = round(1.5 * (current_price * 0.002) * adaptive_mult, dec_places)
         else:
             base_stop_dist = 0.0020
 
@@ -97,19 +97,20 @@ class SignalGenerationEngine:
             else:
                 stop_loss = round(sniper_stop, dec_places)
             
-            eff_rr = max(rr, 1.5)
+            # Strict Falcon Risk-to-Reward: 1:1.2 to 1:1.5 Maximum (Quant-Calibrated Sweet Spot)
+            eff_rr = min(max(rr, 1.2), 1.5)
             eff_risk = abs(current_price - stop_loss)
-            target_dist = max(eff_risk * eff_rr, abs((sniper_target or current_price) - current_price))
-            if recovery_mult > 1.0:
-                target_dist = target_dist * recovery_mult
+            raw_target_dist = abs((sniper_target or current_price) - current_price)
+            target_dist = min(max(raw_target_dist, eff_risk * eff_rr), eff_risk * 1.5)
 
             if direction == CandidateDirection.BUY:
                 take_profit = round(current_price + target_dist, dec_places)
             else:
                 take_profit = round(current_price - target_dist, dec_places)
         else:
-            eff_rr = max(rr, 1.5)
-            target_dist = base_stop_dist * eff_rr * recovery_mult
+            # Strict Falcon Risk-to-Reward: 1:1.2 to 1:1.5 Maximum (Quant-Calibrated Sweet Spot)
+            eff_rr = min(max(rr, 1.2), 1.5)
+            target_dist = base_stop_dist * eff_rr
             if direction == CandidateDirection.BUY:
                 stop_loss = round(current_price - base_stop_dist, dec_places)
                 take_profit = round(current_price + target_dist, dec_places)
@@ -473,7 +474,7 @@ class SignalGenerationEngine:
                 if not has_sniper_setup and (strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"] or getattr(strategy, "id", "") in ("strat-008", "strat-014", "strat-015", "session_momentum_liquidity_breakout")):
                     try:
                         from app.core.engines.session_breakout_engine import session_breakout_engine
-                        from app.schemas.session_breakout import SessionStatus
+                        from app.schemas.session_breakout import SessionName, SessionStatus
                         corridors = session_breakout_engine.compute_session_corridors(canonical_symbol, candles_1h, allow_benchmark=False)
                         broken_up = any(c.status == SessionStatus.BROKEN_UP for c in corridors)
                         broken_down = any(c.status == SessionStatus.BROKEN_DOWN for c in corridors)
@@ -503,7 +504,7 @@ class SignalGenerationEngine:
                                         entry_price = sweep_eval.retest_price
 
                                     # True Structural Stop anchored 2 pips beyond corridor
-                                    target_corr = next((c for c in corridors if getattr(c, "session_name", None) in (SessionStatus.ASIAN, "Asian")), corridors[0]) if corridors else None
+                                    target_corr = next((c for c in corridors if getattr(c, "session_name", None) in (SessionName.ASIAN, "Asian", "ASIAN")), corridors[0]) if corridors else None
                                     struct_sl = None
                                     if target_corr:
                                         pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
@@ -517,7 +518,7 @@ class SignalGenerationEngine:
                                         structure_sl=struct_sl,
                                     )
                                     has_sniper_setup = True
-                                    pattern_conviction = conv_obj.composite_score / 100.0
+                                    pattern_conviction = (getattr(conv_obj, "total_score", None) or getattr(conv_obj, "composite_score", 60.0)) / 100.0
                                     sniper_trigger_rule = f"Session Corridor ({session}) {sweep_eval.tactical_note} with {recent_exp.rvol:.1f}x RVol surge"
                                     sniper_stop = sl_b
                                     sniper_target = tp1_b
@@ -566,8 +567,8 @@ class SignalGenerationEngine:
 
                 # 2D. Trend Continuation, Pullback & Momentum Flow Integration (strat-002, strat-004, strat-005, strat-007, strat-010, strat-018)
                 if not has_sniper_setup and (
-                    strat_type_val in ["TREND_CONTINUATION", "PULLBACK", "MOMENTUM", "SWING_STRUCTURE"]
-                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-018")
+                    strat_type_val in ["TREND_CONTINUATION", "PULLBACK", "MOMENTUM", "SWING_STRUCTURE", "PRICE_ACTION"]
+                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-011", "strat-012", "strat-013", "strat-016", "strat-017", "strat-018")
                 ):
                     try:
                         pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
@@ -588,7 +589,7 @@ class SignalGenerationEngine:
                             if abs(entry_price - sniper_stop) < min_d:
                                 sniper_stop = round(entry_price - min_d, dec_p)
                             rr_target = getattr(strategy, "minimumRiskReward", 2.2) or 2.2
-                            sniper_target = round(entry_price + abs(entry_price - sniper_stop) * max(rr_target, 2.0), dec_p)
+                            sniper_target = round(entry_price + abs(entry_price - sniper_stop) * min(max(rr_target, 1.2), 1.5), dec_p)
                             sniper_trigger_rule = f"Structural {strategy.name} flow confirmed on H1 trend structure (RSI: {rsi_val if rsi_val is not None else 50.0:.1f})"
                             sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bullish structure confirmed with R:R >= {max(rr_target, 2.0):.1f}."
                             pattern_name = f"{strategy.name} Structure Flow"
@@ -602,7 +603,7 @@ class SignalGenerationEngine:
                             if abs(entry_price - sniper_stop) < min_d:
                                 sniper_stop = round(entry_price + min_d, dec_p)
                             rr_target = getattr(strategy, "minimumRiskReward", 2.2) or 2.2
-                            sniper_target = round(entry_price - abs(entry_price - sniper_stop) * max(rr_target, 2.0), dec_p)
+                            sniper_target = round(entry_price - abs(entry_price - sniper_stop) * min(max(rr_target, 1.2), 1.5), dec_p)
                             sniper_trigger_rule = f"Structural {strategy.name} flow confirmed on H1 trend structure (RSI: {rsi_val if rsi_val is not None else 50.0:.1f})"
                             sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bearish structure confirmed with R:R >= {max(rr_target, 2.0):.1f}."
                             pattern_name = f"{strategy.name} Structure Flow"
@@ -655,23 +656,29 @@ class SignalGenerationEngine:
                 passed=trend_passed
             )
 
-            # Condition 2: Spread Limit (asset-specific)
-            if "XAU" in strategy.symbol or "GOLD" in strategy.symbol:
-                spread_limit = 8.0
+            # Condition 2: Spread Limit (asset-specific with strict unit accounting)
+            is_gold_asset = "XAU" in strategy.symbol or "GOLD" in strategy.symbol
+            if is_gold_asset:
+                spread_limit = 1.50  # $1.50 USD cash (~0.04% on $4,000 Gold)
             elif "GBP" in strategy.symbol and "JPY" in strategy.symbol:
                 spread_limit = 3.5
             elif "JPY" in strategy.symbol:
-                spread_limit = 2.2
+                spread_limit = 2.0
             elif "AUD" in strategy.symbol:
-                spread_limit = 1.8
+                spread_limit = 2.0
             elif "GBP" in strategy.symbol:
-                spread_limit = 2.2
+                spread_limit = 2.0
             else:
-                spread_limit = 1.8
+                spread_limit = 2.0
             spread_passed = spread <= spread_limit
+            spread_desc = (
+                f"Current live spread is ${spread:.2f} USD (strategy limit <= ${spread_limit:.2f} USD)."
+                if is_gold_asset else
+                f"Current live spread is {spread:.2f} pips (strategy limit <= {spread_limit:.1f} pips)."
+            )
             spread_cond = CandidateCondition(
                 title="Spread Limit",
-                description=f"Current live spread is {spread:.2f} pips (strategy limit <= {spread_limit:.1f}).",
+                description=spread_desc,
                 passed=spread_passed
             )
 
@@ -764,16 +771,16 @@ class SignalGenerationEngine:
 
             if macro_eval.is_macro_trap:
                 readiness_score = min(readiness_score, 40)
-            elif has_sniper_setup and spread_passed and news_passed and session_passed:
+            elif (has_sniper_setup or trend_passed) and spread_passed and news_passed and session_passed and direction != CandidateDirection.WAIT:
                 readiness_score = max(readiness_score, 88)
-            elif not has_sniper_setup:
+            elif not has_sniper_setup and not trend_passed:
                 # Without an authentic confirmed technical setup, cap readiness so it cannot prematurely trigger a live position
                 readiness_score = min(readiness_score, 78)
 
             # Determine Candidate Status
             if macro_eval.is_macro_trap:
                 status = CandidateStatus.REJECTED
-            elif readiness_score >= 85 and direction != CandidateDirection.WAIT and has_sniper_setup:
+            elif readiness_score >= 85 and direction != CandidateDirection.WAIT and (has_sniper_setup or trend_passed):
                 status = CandidateStatus.GENERATED
             elif readiness_score >= 45 and direction != CandidateDirection.WAIT:
                 status = CandidateStatus.WAITING_CONFIRMATION
@@ -818,11 +825,12 @@ class SignalGenerationEngine:
                 ))
 
             # ── 6. Precise Invalidation and Target Calculation with Adaptive Tuning & Asymmetric R:R ──
-            base_rr = strategy.minimumRiskReward or 1.5
+            # Strict Risk-to-Reward Cap: 1:1.2 to 1:1.5 Maximum (Quant-Calibrated Sweet Spot)
+            base_rr = min(max(strategy.minimumRiskReward or 1.3, 1.2), 1.5)
             if getattr(strategy, "id", "") == "strat-012":
-                rr = max(base_rr, 1.8)
+                rr = min(max(base_rr, 1.35), 1.5)
             elif has_sniper_setup:
-                rr = max(base_rr, 1.8)
+                rr = min(max(base_rr, 1.35), 1.5)
             else:
                 rr = base_rr
             vol_mult = 1.4 if volatility == "High" else (1.0 if volatility == "Moderate" else 0.8)
@@ -970,3 +978,32 @@ class SignalGenerationEngine:
             print(f"[EVENT BUS] {json.dumps(event_payload)}")
 
         return candidates
+
+    def generate_shadow_candidates(
+        self,
+        market_state: MarketState,
+        strategies: List[StrategyItem],
+        as_of: Optional[datetime] = None,
+        research_contexts: Optional[dict] = None,
+    ) -> List[SignalCandidate]:
+        """
+        Stage 3 Isolated Shadow Pipeline:
+        Evaluates all 18 registered strategies (flagship active + incubation candidates)
+        strictly for forward simulated paper tracking.
+        Does NOT alter production candidate generation (generate_candidates remains active-only).
+        """
+        shadow_eval_strategies = [
+            s.model_copy(update={"status": StrategyStatus.ACTIVE})
+            for s in strategies
+            if s.status != StrategyStatus.PAUSED
+        ]
+        candidates = self.generate_candidates(
+            market_state=market_state,
+            strategies=shadow_eval_strategies,
+            as_of=as_of,
+            research_contexts=research_contexts,
+        )
+        for c in candidates:
+            c.pipelineStage = "SHADOW_FORWARD_TRIAL"
+        return candidates
+

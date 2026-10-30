@@ -264,7 +264,17 @@ class SignalSignatureRepository:
         # Fuzzy check in-memory signatures in case float rounding slightly differed
         sym_clean = (symbol or "").replace("/", "").upper()
         dir_clean = (direction or "").upper()
-        tol = 0.50 if ("XAU" in sym_clean or entry_price > 100) else 0.00025
+        tol = 2.50 if ("XAU" in sym_clean or "GOLD" in sym_clean or entry_price > 500) else (0.045 if "JPY" in sym_clean else 0.00035)
+        terminal_st = {"WON", "LOST", "BREAKEVEN", "EXPIRED", "CLOSED", "INVALIDATED"}
+        with self._in_memory._lock:
+            for v in self._in_memory._signatures.values():
+                if (
+                    v.get("symbol") == sym_clean
+                    and v.get("direction") == dir_clean
+                    and (v.get("status") or "").upper() in terminal_st
+                    and abs(float(v.get("entry_price", 0.0)) - float(entry_price)) <= tol
+                ):
+                    return False
         with self._in_memory._lock:
             for v in self._in_memory._signatures.values():
                 if (
@@ -274,6 +284,30 @@ class SignalSignatureRepository:
                     and abs(float(v.get("entry_price", 0.0)) - float(entry_price)) <= tol
                 ):
                     return True
+        if database_enabled():
+            self._ensure_schema()
+            try:
+                session = get_session()
+                try:
+                    stmt = select(SignalSignatureRecord).where(
+                        SignalSignatureRecord.symbol == sym_clean,
+                        SignalSignatureRecord.direction == dir_clean,
+                        SignalSignatureRecord.status == "ACTIVE",
+                    )
+                    for rec in session.execute(stmt).scalars().all():
+                        if abs(float(rec.entry_price or 0.0) - float(entry_price)) <= tol:
+                            term_stmt = select(SignalSignatureRecord).where(
+                                SignalSignatureRecord.symbol == sym_clean,
+                                SignalSignatureRecord.direction == dir_clean,
+                                SignalSignatureRecord.status.in_(list(terminal_st)),
+                            )
+                            if any(abs(float(tr.entry_price or 0.0) - float(entry_price)) <= tol for tr in session.execute(term_stmt).scalars().all()):
+                                return False
+                            return True
+                finally:
+                    session.close()
+            except Exception as ex:
+                logger.debug(f"Error fuzzy-checking active signature in DB: {ex}")
         return False
 
     def has_signature(

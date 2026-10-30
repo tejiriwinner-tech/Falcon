@@ -16,7 +16,7 @@ import logging
 import threading
 from datetime import datetime, timezone, timedelta
 from enum import Enum
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 from sqlalchemy import text
 
@@ -92,6 +92,106 @@ class SignalOutcomeResolver:
     def __init__(self):
         self._resolved_cache: Dict[int, SignalOutcomeItem] = {}
         self._lock = threading.Lock()
+
+    @staticmethod
+    def _extract_confirmed_scale_out(notes: Optional[str]) -> Tuple[bool, float]:
+        """
+        Parses trade notes to determine if a partial scale-out was confirmed filled,
+        and at what R-multiple.
+        Returns: (is_confirmed: bool, scale_out_r: float)
+        Requires explicit scale-out confirmation (e.g. TP1_SCALED_OUT_50 or TP1_CONFIRMED_FILL).
+        Moving stop to BE alone (BE_PROTECTED) does NOT constitute a confirmed partial fill.
+        """
+        if not notes:
+            return False, 0.0
+        n_upper = notes.upper()
+        if "TP1_SCALED_OUT_50" not in n_upper and "TP1_CONFIRMED_FILL" not in n_upper and "SCALED_OUT" not in n_upper:
+            return False, 0.0
+
+        import re
+        match = re.search(r"banked\s+at\s+\+?([0-9]+(?:\.[0-9]+)?)\s*R", notes, re.IGNORECASE)
+        if match:
+            try:
+                banked_r = float(match.group(1))
+                return True, banked_r
+            except ValueError:
+                pass
+
+        match_r = re.search(r"R\s*=\s*\+?([0-9]+(?:\.[0-9]+)?)", notes, re.IGNORECASE)
+        if match_r:
+            try:
+                banked_r = float(match_r.group(1))
+                return True, banked_r
+            except ValueError:
+                pass
+
+        return True, 1.0
+
+    @staticmethod
+    def recover_initial_risk_distance(trade: Any) -> Tuple[float, str]:
+        """
+        Recovers the authoritative initial risk distance (|entry - initial_stop_loss|)
+        using the formal 4-level quantitative provenance hierarchy:
+        1. Verified immutable initialStopLoss / initial_stop_loss (if present and > 1e-6 distance).
+        2. Verified stopLoss / stop_loss (if not yet moved to entry, i.e. |entry - stopLoss| > 1e-6).
+        3. Documented reconstruction from original takeProfit and historical riskReward:
+           risk_dist = |takeProfit - entry| / riskReward (if riskReward > 0.1 and |takeProfit - entry| > 1e-6).
+        4. Verified entry-time ATR and documented stop multiplier:
+           risk_dist = 1.5 * atrAtEntry (if atrAtEntry > 0).
+        5. Unrecoverable: returns (0.0, "UNRECOVERED") - excluded from R-multiple calculations.
+        """
+        entry = float(_extract_val(trade, "entry_price", "entryPrice", "entry", default=0.0) or 0.0)
+        if entry <= 0:
+            return 0.0, "UNRECOVERED"
+
+        # Level 1: Verified immutable initial stop loss
+        init_sl = _extract_val(trade, "initial_stop_loss", "initialStopLoss")
+        if init_sl is not None:
+            try:
+                init_sl_f = float(init_sl)
+                dist = abs(entry - init_sl_f)
+                if dist > 1e-6:
+                    return dist, "INITIAL_STOP_LOSS"
+            except (ValueError, TypeError):
+                pass
+
+        # Level 2: Verified stop loss (if not moved to entry)
+        sl = _extract_val(trade, "stop_loss", "stopLoss", "sl")
+        if sl is not None:
+            try:
+                sl_f = float(sl)
+                dist = abs(entry - sl_f)
+                if dist > 1e-6:
+                    return dist, "CURRENT_STOP_LOSS"
+            except (ValueError, TypeError):
+                pass
+
+        # Level 3: Reconstructed from takeProfit and documented riskReward
+        tp = _extract_val(trade, "take_profit", "takeProfit", "tp")
+        rr = _extract_val(trade, "risk_reward", "riskReward")
+        if tp is not None and rr is not None:
+            try:
+                tp_f = float(tp)
+                rr_f = float(rr)
+                reward_dist = abs(tp_f - entry)
+                if rr_f > 0.1 and reward_dist > 1e-6:
+                    reconstructed_dist = reward_dist / rr_f
+                    return reconstructed_dist, "RECONSTRUCTED_TARGET_RR"
+            except (ValueError, TypeError):
+                pass
+
+        # Level 4: Reconstructed from verified entry-time ATR & historical multiplier
+        atr = _extract_val(trade, "atr_at_entry", "atrAtEntry")
+        if atr is not None:
+            try:
+                atr_f = float(atr)
+                if atr_f > 0:
+                    mult = float(_extract_val(trade, "adaptive_stop_multiplier", "adaptiveStopMultiplier", default=1.5) or 1.5)
+                    return mult * atr_f, "RECONSTRUCTED_ATR"
+            except (ValueError, TypeError):
+                pass
+
+        return 0.0, "UNRECOVERED"
 
     def get_outcomes(self, limit: int = 50) -> List[SignalOutcomeItem]:
         """Return all resolved signal outcomes, latest first."""
@@ -245,62 +345,67 @@ class SignalOutcomeResolver:
     ) -> SignalResolutionSummary:
         now = datetime.now(timezone.utc)
 
-        # Step 0: Purge any invalid dummy non-trades (e.g. WAIT with entry=0)
+        # Step 0: Purge invalid dummy non-trades and auto-expire stale open trades (> 6h)
         try:
             trade_journal_repository.purge_invalid_trades()
+            trade_journal_repository.cleanup_stale_open_trades(max_age_hours=6)
         except Exception as ex:
             logger.warning(f"Error purging invalid trades: {ex}")
 
         # Step 1: Query ALL currently OPEN and PENDING trades from the database
         all_stored_trades = trade_journal_repository.list_trades(session=session)
 
-        # Ingest any actionable active signals from signal_service as PENDING watchlist records
+        # Synchronize any ACTIVE signals from SignalService not yet recorded in TradeJournal
         try:
-            sig_resp = signal_service.build_signals()
-            sigs = getattr(sig_resp, "signals", []) if sig_resp else []
-            for s in sigs:
+            sig_resp = signal_service.build_signals(mission_limit=5)
+            live_sigs = getattr(sig_resp, "signals", None) or []
+            existing_sig_ids = {t.signalId for t in all_stored_trades if t.signalId is not None}
+            added_any = False
+            for s in live_sigs:
+                s_status = getattr(s, "status", None)
+                is_active_sig = (not isinstance(s_status, str)) or (s_status.upper() == "ACTIVE")
+                s_action = str(getattr(s, "action", "")).upper()
                 s_id = getattr(s, "id", None)
-                s_st = (getattr(s, "status", "") or "").upper()
-                s_act = (getattr(s, "action", "") or "").upper()
-                if s_id and s_act in ("BUY", "SELL") and s_st in ("ACTIVE", "GENERATED"):
-                    if not any(t.signalId == s_id for t in all_stored_trades):
-                        s_sym = getattr(s, "symbol", "")
-                        s_hour = now.hour
-                        if 0 <= s_hour < 7:
-                            s_session = "Asian"
-                        elif 7 <= s_hour < 12:
-                            s_session = "London"
-                        elif 12 <= s_hour < 16:
-                            s_session = "NY_Overlap"
-                        elif 16 <= s_hour < 21:
-                            s_session = "New York"
-                        else:
-                            s_session = "Asian"
-
-                        new_t = trade_journal_repository.create_trade(
+                if is_active_sig and s_action in ("BUY", "SELL") and s_id not in existing_sig_ids:
+                    s_entry = float(getattr(s, "entry", 0.0) or 0.0)
+                    s_sl = float(getattr(s, "stopLoss", 0.0) or 0.0)
+                    s_tp = float(getattr(s, "takeProfit", 0.0) or 0.0)
+                    if s_entry > 0 and s_sl > 0 and s_tp > 0:
+                        risk_d = abs(s_entry - s_sl)
+                        rr_val = round(abs(s_tp - s_entry) / risk_d, 2) if risk_d > 1e-6 else 1.5
+                        s_time = getattr(s, "timestamp", None)
+                        if not isinstance(s_time, datetime):
+                            s_time = now
+                        trade_journal_repository.create_trade(
                             TradeJournalCreate(
-                                signalId=s_id,
-                                strategyId=getattr(s, "strategyId", "strat") or "strat",
-                                symbol=s_sym,
-                                direction=s_act,
-                                entryPrice=float(getattr(s, "entry", 0.0)),
-                                stopLoss=float(getattr(s, "stopLoss", 0.0)),
-                                takeProfit=float(getattr(s, "takeProfit", 0.0)),
-                                timeframe=getattr(s, "timeframe", "H1") or "H1",
-                                marketSession=s_session,
-                                tradeDate=getattr(s, "timestamp", now) or now,
-                                status="PENDING",
-                                result="PENDING",
-                                fillPrice=None,
-                                fillTime=None,
-                                confidence=getattr(s, "confidence", 80) or 80,
-                                reasonForEntry=getattr(s, "triggerCondition", "Falcon Signal Execution"),
+                                signalId=int(s_id) if isinstance(s_id, (int, float)) else None,
+                                strategyId=str(getattr(s, "strategyId", None) or "falcon-opt"),
+                                symbol=str(getattr(s, "symbol", "EUR/USD")),
+                                direction=s_action,
+                                entryPrice=s_entry,
+                                stopLoss=s_sl,
+                                takeProfit=s_tp,
+                                timeframe=str(getattr(s, "timeframe", None) or "H1"),
+                                marketSession="London",
+                                tradeDate=s_time,
+                                status="OPEN",
+                                result="OPEN",
+                                profitLoss=0.0,
+                                riskReward=rr_val,
+                                confidence=int(getattr(s, "confidence", 85) or 85),
+                                reasonForEntry=f"Active signal #{s_id} synchronized for live resolution",
+                                notes=f"Active signal #{s_id}",
+                                fillPrice=s_entry,
+                                fillTime=s_time,
                             ),
                             session=session,
                         )
-                        all_stored_trades.append(new_t)
+                        existing_sig_ids.add(s_id)
+                        added_any = True
+            if added_any:
+                all_stored_trades = trade_journal_repository.list_trades(session=session)
         except Exception as ex:
-            logger.debug(f"Signal ingestion in resolver: {ex}")
+            logger.debug(f"Active signal sync in resolver skipped: {ex}")
 
         active_trades = [
             t for t in all_stored_trades
@@ -325,7 +430,7 @@ class SignalOutcomeResolver:
             # -------------------------------------------------------------
             # Case 1: PENDING Reservations (Section 6)
             # -------------------------------------------------------------
-            if trade_status in ("PENDING", "HOLD", "WAITING"):
+            if trade_status in ("PENDING", "HOLD", "WAITING") or (trade_status == "OPEN" and (trade.result or "").upper() == "PENDING" and elapsed_seconds > 45 * 60 and (trade.fillPrice is None or trade.fillPrice == 0.0)):
                 # Expiration: 45 minutes elapsed without fill
                 if elapsed_seconds > 45 * 60:
                     trade_update = TradeJournalUpdate(
@@ -363,19 +468,18 @@ class SignalOutcomeResolver:
                         logger.info(f"Invalidated unexecuted PENDING reservation #{trade.id} (Signal #{trade.signalId})")
                         continue
 
-                    # Check if live price hit entry price
+                    # Check if live price strictly tests entry price within tolerance
                     entry_hit = False
-                    entry_tolerance = trade.entryPrice * 0.0003
-                    if trade.direction.upper() == "BUY":
-                        if cur_px <= trade.entryPrice or abs(cur_px - trade.entryPrice) <= entry_tolerance:
-                            entry_hit = True
-                    elif trade.direction.upper() == "SELL":
-                        if cur_px >= trade.entryPrice or abs(cur_px - trade.entryPrice) <= entry_tolerance:
-                            entry_hit = True
+                    is_gold = "XAU" in trade.symbol.upper() or "GOLD" in trade.symbol.upper() or trade.entryPrice > 500
+                    is_jpy = "JPY" in trade.symbol.upper()
+                    entry_tolerance = 2.00 if is_gold else (0.040 if is_jpy else 0.00030)
+                    if abs(cur_px - trade.entryPrice) <= entry_tolerance:
+                        entry_hit = True
 
                     if entry_hit:
                         trade_update = TradeJournalUpdate(
                             status="OPEN",
+                            result="OPEN",
                             fillPrice=trade.entryPrice,
                             fillTime=now,
                             notes=f"{trade.notes or 'Falcon'} | Activated - Market hit entry price {trade.entryPrice}",
@@ -394,7 +498,7 @@ class SignalOutcomeResolver:
             # -------------------------------------------------------------
             if trade_status in ("OPEN", "FILLED"):
                 # If unexecuted (fillPrice is None and fillTime is None), classify forensically (Section 7, 8, 9)
-                if not force_simulate and trade.fillPrice is None and trade.fillTime is None and not (trade.notes and "ticket #" in trade.notes.lower()):
+                if trade.fillPrice is None and trade.fillTime is None and not (trade.notes and "ticket #" in trade.notes.lower()):
                     classification = classify_record(trade, all_stored_trades)
                     if classification == LifecycleClassification.DUPLICATE_SPECULATIVE_EXECUTION:
                         if elapsed_seconds > 45 * 60:
@@ -426,20 +530,14 @@ class SignalOutcomeResolver:
 
             quote_resp = provider_manager.get_market_quote(symbol)
             if not quote_resp or not quote_resp.quote:
-                if not force_simulate:
-                    open_count += 1
-                    continue
-                current_price = entry
-                bid = entry - 0.0001
-                ask = entry + 0.0001
-                spread = 0.0002
-                quote = None
-            else:
-                quote = quote_resp.quote
-                current_price = quote.lastPrice
-                bid = quote.bidAsk.bid
-                ask = quote.bidAsk.ask
-                spread = quote.bidAsk.spread
+                # Honest cold-start / market closed / awaiting ticks state: zero fake prices or mock data
+                open_count += 1
+                continue
+            quote = quote_resp.quote
+            current_price = quote.lastPrice
+            bid = quote.bidAsk.bid if getattr(quote, "bidAsk", None) else current_price
+            ask = quote.bidAsk.ask if getattr(quote, "bidAsk", None) else current_price
+            spread = quote.bidAsk.spread if getattr(quote, "bidAsk", None) else 0.0002
 
             # Phase 5C & Precision: Track post-fill excursion first for OPEN/FILLED trades
             if (trade.status or "").upper() in ("OPEN", "FILLED"):
@@ -471,10 +569,7 @@ class SignalOutcomeResolver:
                             logger.warning(f"Error updating open trade excursion for trade #{trade.id}: {ex}")
 
             # Institutional Round-Trip Protection: Evaluate Breakeven and TP1 Scale-Out BEFORE exit breach
-            initial_sl = getattr(trade, "initialStopLoss", None) or trade.stopLoss
-            risk_d = abs(entry - initial_sl)
-            if risk_d <= 1e-6:
-                risk_d = abs(entry - stop_loss)
+            risk_d, risk_d_prov = self.recover_initial_risk_distance(trade)
 
             is_buy = direction == "BUY"
             be_threshold = entry + risk_d if is_buy else entry - risk_d
@@ -503,16 +598,26 @@ class SignalOutcomeResolver:
                 if tp1_hit and "TP1" not in (trade.notes or ""):
                     notes_append += " | [TP1_SCALED_OUT_50: 50% profit banked at +1.0R]"
                 new_notes = f"{trade.notes or 'Falcon'}{notes_append}"
+                orig_sl = trade.initialStopLoss if getattr(trade, "initialStopLoss", None) is not None else trade.stopLoss
+                if orig_sl is not None and abs(entry - float(orig_sl)) > 1e-6:
+                    trade.initialStopLoss = orig_sl
                 trade.stopLoss = entry
                 trade.notes = new_notes
                 stop_loss = entry
                 try:
-                    trade_journal_repository.update_trade(trade.id, TradeJournalUpdate(stopLoss=entry, notes=new_notes), session=session)
+                    trade_journal_repository.update_trade(
+                        trade.id,
+                        TradeJournalUpdate(stopLoss=entry, initialStopLoss=trade.initialStopLoss, notes=new_notes),
+                        session=session,
+                    )
                     logger.info(f"Promoted trade #{trade.id} to Breakeven protection (stopLoss={entry})")
                 except Exception as ex:
                     logger.warning(f"Error shifting trade #{trade.id} to breakeven: {ex}")
             elif be_reached:
                 if (is_buy and stop_loss < entry) or (not is_buy and stop_loss > entry):
+                    orig_sl = trade.initialStopLoss if getattr(trade, "initialStopLoss", None) is not None else trade.stopLoss
+                    if orig_sl is not None and abs(entry - float(orig_sl)) > 1e-6:
+                        trade.initialStopLoss = orig_sl
                     stop_loss = entry
                     trade.stopLoss = entry
 
@@ -593,27 +698,19 @@ class SignalOutcomeResolver:
                         result = "LOSS"
                         exit_price = stop_loss
 
-            # Handle optional simulation trigger for testing
-            if result is None and force_simulate:
-                sig_key = trade.signalId or trade.id
-                if sig_key % 3 == 0:
-                    result = "WIN"
-                    exit_price = take_profit
-                elif sig_key % 3 == 1:
-                    result = "LOSS"
-                    exit_price = stop_loss
-                else:
-                    result = "BREAKEVEN"
-                    exit_price = entry
-
+            # Zero-Mock Policy: Outcomes are strictly determined by market quotes breaching SL or TP.
+            # Synthetic / modulo-based outcome fabrication has been permanently purged.
             if result is None:
                 open_count += 1
                 continue
 
             # Step 4: Calculate PnL and excursion metrics
-            risk_dist = abs(entry - stop_loss)
+            risk_dist, prov_dist = self.recover_initial_risk_distance(trade)
+            if risk_dist <= 1e-6 and risk_d > 1e-6:
+                risk_dist = risk_d
+                prov_dist = risk_d_prov
             reward_dist = abs(take_profit - entry)
-            risk_reward = round(reward_dist / risk_dist, 2) if risk_dist > 0 else 1.0
+            risk_reward = round(reward_dist / risk_dist, 2) if risk_dist > 1e-6 else (trade.riskReward or 1.0)
 
             multiplier = 10.0 if "XAU" in symbol else 10000.0
             if direction == "BUY":
@@ -623,7 +720,7 @@ class SignalOutcomeResolver:
 
             pnl = round(price_delta * multiplier, 2)
             if result in ("LOSS", "LOST") and pnl >= 0:
-                pnl = -round(risk_dist * multiplier, 2)
+                pnl = -round((risk_dist if risk_dist > 1e-6 else abs(entry - stop_loss)) * multiplier, 2)
             elif result in ("WIN", "WON") and pnl <= 0:
                 pnl = round(reward_dist * multiplier, 2)
             elif result in ("BREAKEVEN", "BE"):
@@ -632,28 +729,26 @@ class SignalOutcomeResolver:
             # Phase 5A / Blocker 1: Authoritative Realized R Multiple Calculation
             realized_r = None
             initial_risk = getattr(trade, "initialMonetaryRisk", None)
+            has_partial, partial_r = self._extract_confirmed_scale_out(trade.notes)
+            if risk_dist <= 1e-6:
+                # Unrecoverable risk distance: cannot compute valid R-multiple, marked unscorable
+                realized_r = None
+            elif result in ("BREAKEVEN", "BE"):
+                # If 50% was confirmed banked at partial_r, remainder exits at 0.0R.
+                # If no partial fill confirmed, realized return is exactly 0.00R (no ghost profit).
+                realized_r = round(0.50 * partial_r + 0.50 * 0.0, 2) if has_partial else 0.0
+            elif result in ("WIN", "WON"):
+                # If 50% was confirmed banked at partial_r, remainder exits at full target risk_reward.
+                # If no partial fill confirmed, 100% position exits at full target risk_reward.
+                eff_target_r = risk_reward if risk_reward > 0 else 1.5
+                realized_r = round(0.50 * partial_r + 0.50 * eff_target_r, 2) if has_partial else round(eff_target_r, 2)
+            elif result in ("LOSS", "LOST"):
+                realized_r = -1.0
+
+            if initial_risk is None:
+                realized_r = None
             if initial_risk is not None and float(initial_risk) > 0:
-                if "XAU" in symbol or "GOLD" in symbol:
-                    monetary_pnl = round(price_delta * 1.0, 2)
-                elif "JPY" in symbol:
-                    monetary_pnl = round(price_delta * 1000.0 / 150.0, 2)
-                else:
-                    monetary_pnl = round(price_delta * 1000.0, 2)
-
-                if result in ("WIN", "WON"):
-                    realized_r = round(float(monetary_pnl) / float(initial_risk), 2)
-                elif result in ("LOSS", "LOST"):
-                    realized_r = -round(abs(float(monetary_pnl)) / float(initial_risk), 2)
-                elif result in ("BREAKEVEN", "BE"):
-                    realized_r = 0.50 if ("TP1" in (trade.notes or "") or "SCALED_OUT" in (trade.notes or "") or "BE_PROTECTED" in (trade.notes or "")) else 0.0
-
-            if realized_r is None:
-                if result in ("WIN", "WON"):
-                    realized_r = risk_reward
-                elif result in ("LOSS", "LOST"):
-                    realized_r = -1.0
-                elif result in ("BREAKEVEN", "BE"):
-                    realized_r = 0.50 if ("TP1" in (trade.notes or "") or "SCALED_OUT" in (trade.notes or "") or "BE_PROTECTED" in (trade.notes or "")) else 0.0
+                pnl = round(realized_r * float(initial_risk), 2) if realized_r is not None else 0.0
 
             # Phase 5C: Excursion peak / trough & R finalization on close
             from app.core.analytics.execution_quality_service import execution_quality_service
@@ -734,6 +829,12 @@ class SignalOutcomeResolver:
                 trade.reasonForExit = reason_exit
                 trade.lessonLearned = lesson
                 trade.status = "CLOSED"
+                try:
+                    from app.core.repository.signal_signature_repository import signal_signature_repository
+                    sig_st = "WON" if result in ("WIN", "WON") else ("LOST" if result in ("LOSS", "LOST") else result)
+                    signal_signature_repository.update_status(symbol, direction, entry, stop_loss, take_profit, status=sig_st)
+                except Exception:
+                    pass
                 trade.result = result
                 resolved_count += 1
 

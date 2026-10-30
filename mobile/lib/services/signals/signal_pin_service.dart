@@ -86,6 +86,11 @@ class SignalPinService extends ChangeNotifier {
       final key = live.uniqueKey;
       if (_pinnedSignals.containsKey(key)) {
         final existing = _pinnedSignals[key]!;
+        final exStatus = existing.status.toUpperCase();
+        final liveStatus = live.status.toUpperCase();
+        if (exStatus == 'ACTIVE' && (liveStatus == 'HOLD' || liveStatus == 'WAITING')) {
+          continue;
+        }
         if (existing.status != live.status ||
             existing.analysis != live.analysis ||
             existing.isBreakeven != live.isBreakeven) {

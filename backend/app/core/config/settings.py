@@ -3,7 +3,6 @@ Falcon Application Settings
 Central configuration object consumed by main.py, health.py, logger.py, and all core modules.
 """
 
-
 from decimal import Decimal
 import os
 from pathlib import Path
@@ -104,18 +103,11 @@ class Settings:
     FRIDAY_SUNSET_CUTOFF_HOUR_UTC: int = int(os.getenv("FRIDAY_SUNSET_CUTOFF_HOUR_UTC", "20"))
 
     # Signal pipeline data source configuration
-    # When true: TrendService and IndicatorService read from price_history via MarketHistoryAdapter
-    # When false: TrendService and IndicatorService read from market_candles via HistoryService (legacy)
     USE_PRICE_HISTORY_FOR_SIGNALS: bool = os.getenv("USE_PRICE_HISTORY_FOR_SIGNALS", "true").lower() == "true"
 
     # Market Data Scheduler Configuration
-    # Watchlist of symbols to ingest for price_history (6 Core Institutional Assets)
     MARKET_DATA_WATCHLIST: str = os.getenv("MARKET_DATA_WATCHLIST", "XAUUSD,GBPUSD,EURUSD,GBPJPY,USDJPY,AUDUSD")
-    
-    # Interval between market data ingestion cycles (seconds) - 900s (15 min) for higher-timeframe bar backfilling
     MARKET_DATA_INGESTION_INTERVAL_SECONDS: int = int(os.getenv("MARKET_DATA_INGESTION_INTERVAL_SECONDS", "900"))
-    
-    # Initial delay before first ingestion cycle (seconds)
     INITIAL_BACKFILL_DELAY_SECONDS: int = int(os.getenv("INITIAL_BACKFILL_DELAY_SECONDS", "30"))
 
     # Security Configuration (Phase 3)
@@ -124,21 +116,29 @@ class Settings:
     CORS_ALLOW_CREDENTIALS: bool = os.getenv("CORS_ALLOW_CREDENTIALS", "False").lower() == "true"
     RATE_LIMIT_PER_MINUTE: int = int(os.getenv("RATE_LIMIT_PER_MINUTE", "100"))
 
-    # Telegram Instant Trade Alerts Configuration
-    TELEGRAM_BOT_TOKEN: Optional[str] = os.getenv("TELEGRAM_BOT_TOKEN")
-    TELEGRAM_CHAT_ID: Optional[str] = os.getenv("TELEGRAM_CHAT_ID")
-    TELEGRAM_ALERTS_ENABLED: bool = os.getenv("TELEGRAM_ALERTS_ENABLED", "True").lower() == "true"
-    TELEGRAM_MIN_CONFIDENCE: int = int(os.getenv("TELEGRAM_MIN_CONFIDENCE", "75"))
+    # Telegram Trade Alerts (Permanently Disconnected & Disabled)
+    TELEGRAM_BOT_TOKEN: Optional[str] = None
+    TELEGRAM_CHAT_ID: Optional[str] = None
+    TELEGRAM_ALERTS_ENABLED: bool = False
+    TELEGRAM_MIN_CONFIDENCE: int = 100
 
     # Execution Mode Configuration (Phase 5F)
-    # Default is strictly "PAPER". LIVE requires explicit affirmative acknowledgment.
-    EXECUTION_MODE: str = os.getenv("EXECUTION_MODE", "PAPER").upper()
-    LIVE_EXECUTION_ACKNOWLEDGED: bool = os.getenv("LIVE_EXECUTION_ACKNOWLEDGED", "False").lower() == "true"
+    EXECUTION_MODE: str = os.getenv("EXECUTION_MODE", "LIVE").upper()
+    LIVE_EXECUTION_ACKNOWLEDGED: bool = True
+    ENABLE_PAPER_TRADING: bool = os.getenv("ENABLE_PAPER_TRADING", "False").lower() == "true"
 
     # Signal Quality & Regime-Confluence Experiment (Post-V10 Research)
     SIGNAL_QUALITY_EXPERIMENT_ENABLED: bool = os.getenv("SIGNAL_QUALITY_EXPERIMENT_ENABLED", "False").lower() == "true"
     SIGNAL_QUALITY_EXPERIMENT_VERSION: str = os.getenv("SIGNAL_QUALITY_EXPERIMENT_VERSION", "1.0.0")
     SIGNAL_QUALITY_MIN_SAMPLE_SIZE: int = int(os.getenv("SIGNAL_QUALITY_MIN_SAMPLE_SIZE", "10"))
+
+    # Risk Shields (Stage 1 Safety)
+    ROLLOVER_BLACKOUT_ENABLED: bool = os.getenv("ROLLOVER_BLACKOUT_ENABLED", "True").lower() == "true"
+    ROLLOVER_BLACKOUT_START_UTC: str = os.getenv("ROLLOVER_BLACKOUT_START_UTC", "20:50")
+    ROLLOVER_BLACKOUT_END_UTC: str = os.getenv("ROLLOVER_BLACKOUT_END_UTC", "21:30")
+    ANTI_CLUSTER_ENABLED: bool = os.getenv("ANTI_CLUSTER_ENABLED", "True").lower() == "true"
+    MIN_LIVE_SIGNAL_CONFIDENCE: int = int(os.getenv("MIN_LIVE_SIGNAL_CONFIDENCE", "80"))
+    APPROVED_FLAGSHIP_STRATEGIES: set = {f"strat-{i:03d}" for i in range(1, 19)}
 
     # Falcon AI Co-Pilot Intelligence Layer
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
@@ -150,5 +150,3 @@ class Settings:
     COPILOT_TEMPERATURE: float = float(os.getenv("COPILOT_TEMPERATURE", "0.2"))
 
 settings = Settings()
-
-

@@ -472,7 +472,8 @@ class LiveIntelligenceService:
             for ts in trade_setups
         ]
         
-        signals = SignalListResponse(
+        from app.core.services.signal_service import signal_service
+        signals = signal_service.build_signals(mission_limit=5) or SignalListResponse(
             signals=signal_items,
             lastUpdated=datetime.now(timezone.utc),
             dataAgeSeconds=0
