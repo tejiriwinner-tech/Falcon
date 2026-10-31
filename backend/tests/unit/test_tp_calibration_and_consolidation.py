@@ -67,7 +67,7 @@ def test_session_breakout_engine_tp1_and_tp2_levels():
 def test_strategy_consolidation_active_vs_incubation():
     """Verify exactly 6 flagships are ACTIVE and the 12 other strategies are in INCUBATION."""
     engine = StrategyEngine()
-    flagship_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017"}
+    flagship_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020"}
 
     active_count = 0
     incubation_count = 0
@@ -83,16 +83,16 @@ def test_strategy_consolidation_active_vs_incubation():
             assert s.readyForExecution is False, f"{s.id} should not be readyForExecution"
             incubation_count += 1
 
-    assert active_count == 6
+    assert active_count == 8
     assert incubation_count == 12
-    assert len(engine._strategies) == 18
+    assert len(engine._strategies) == 20
 
 
 def test_all_18_strategies_can_toggle_on_and_off_for_live_signals():
     """Verify all 18 strategies are approved in settings and respect user ON/OFF toggles."""
     from app.core.config.settings import settings
 
-    all_18 = {f"strat-{i:03d}" for i in range(1, 19)}
+    all_18 = {f"strat-{i:03d}" for i in range(1, 21)}
     assert all_18.issubset(settings.APPROVED_FLAGSHIP_STRATEGIES)
 
     engine = StrategyEngine()
@@ -162,3 +162,38 @@ def test_cleanup_stale_open_trades_protects_filled_active_positions():
     assert expired_count == 1
     assert storage.get_trade(filled_trade.id).status == "OPEN"
     assert storage.get_trade(pending_trade.id).status == "EXPIRED"
+
+
+def test_london_momentum_strategies_for_gbpusd_xauusd_and_eurusd():
+    """Verify GBP/USD strat-004 is untouched and XAU/USD (strat-019) + EUR/USD (strat-020) London Momentum are ACTIVE."""
+    engine = StrategyEngine()
+    s4 = engine.get_strategy_by_id("strat-004")
+    s19 = engine.get_strategy_by_id("strat-019")
+    s20 = engine.get_strategy_by_id("strat-020")
+
+    # GBP/USD London Momentum (strat-004) completely untouched
+    assert s4 is not None
+    assert s4.name == "London Momentum"
+    assert s4.symbol == "GBP/USD"
+    assert s4.type.value == "MOMENTUM"
+    assert s4.bestTimeframe == "M5"
+    assert s4.status == StrategyStatus.ACTIVE
+    assert s4.readyForExecution is True
+
+    # XAU/USD London Momentum (strat-019)
+    assert s19 is not None
+    assert s19.name == "London Momentum (XAU/USD)"
+    assert s19.symbol == "XAU/USD"
+    assert s19.type.value == "MOMENTUM"
+    assert s19.bestTimeframe == "M5"
+    assert s19.status == StrategyStatus.ACTIVE
+    assert s19.readyForExecution is True
+
+    # EUR/USD London Momentum (strat-020)
+    assert s20 is not None
+    assert s20.name == "London Momentum (EUR/USD)"
+    assert s20.symbol == "EUR/USD"
+    assert s20.type.value == "MOMENTUM"
+    assert s20.bestTimeframe == "M5"
+    assert s20.status == StrategyStatus.ACTIVE
+    assert s20.readyForExecution is True

@@ -163,7 +163,7 @@ class SignalService:
                     ot.stopLoss,
                     ot.takeProfit,
                 )
-                ot_norm_sym = ot.symbol.replace("/", "").replace("-", "").upper()
+                ot_norm_sym = f"{ot.symbol.replace('/', '').replace('-', '').upper()}:{ot.strategyId or ''}"
                 if sig_key in step1_seen_sigs or ot_norm_sym in seen_open_syms:
                     continue
                 seen_open_syms.add(ot_norm_sym)
@@ -471,7 +471,7 @@ class SignalService:
             curated_active: List[dict] = []
             curated_watchlist: List[dict] = []
             additional_resolved: List[SignalItem] = []
-            active_symbols: set = {ot.symbol.replace("/", "").replace("-", "").upper() for ot in open_trades}
+            active_symbols: set = {f"{ot.symbol.replace('/', '').replace('-', '').upper()}:{ot.strategyId or ''}" for ot in open_trades}
             watchlist_symbols: set = set()
             active_currency_baskets: Dict[str, str] = {}
             for ot in open_trades:
@@ -513,7 +513,8 @@ class SignalService:
                 # Institutional Anti-Hedging & Unique Asset Resolve:
                 # If this asset already has an authoritative active or pending setup,
                 # skip weaker or conflicting setups so Falcon strictly focuses on 1 unique trade per symbol.
-                if norm_sym in active_symbols or norm_sym in watchlist_symbols:
+                strat_sym_key = f"{norm_sym}:{cand.strategyId or ''}"
+                if strat_sym_key in active_symbols or strat_sym_key in watchlist_symbols:
                     continue
 
                 # Real-Time Live Market Quote Evaluation (Layer 2: Strict Freshness <= 60s)
@@ -644,7 +645,7 @@ class SignalService:
 
                 # If position is already active, step 1 has already processed it into signals.
                 # Avoid duplicates; exit monitoring and journal updates are handled solely by SignalOutcomeResolver.
-                if is_already_active and norm_sym in seen_open_syms:
+                if is_already_active and strat_sym_key in seen_open_syms:
                     continue
 
                 # Capital Defense Shield Checks (apply only to pending setups):
@@ -727,7 +728,7 @@ class SignalService:
                 cand_exps = extract_directional_currency_exposures(symbol, direction_str)
                 if not is_already_active and not shield_reason:
                     # 1. Approved Flagship Strategy Filter (A+ Setups Only)
-                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 19)})
+                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 21)})
                     if cand.strategyId and cand.strategyId not in approved_flagships:
                         shield_reason = f"STRATEGY GATE: Live activation restricted to flagship strategies ({', '.join(sorted(approved_flagships))}). Held on Watchlist."
                         entry_hit = False
@@ -753,7 +754,7 @@ class SignalService:
                             entry_hit = False
 
                     # 4. Portfolio Heat Cap (Max 1-2 simultaneous active trades, default: 2)
-                    max_active_limit = max(int(getattr(settings, "MAX_SIMULTANEOUS_TRADES", 3) or 3), 6)
+                    max_active_limit = max(int(getattr(settings, "MAX_SIMULTANEOUS_TRADES", 3) or 3), 8)
                     total_current_active = len(open_trades) + len(curated_active)
                     if not shield_reason and entry_hit and total_current_active >= max_active_limit:
                         shield_reason = f"PORTFOLIO HEAT CAP: Maximum {max_active_limit} simultaneous active trades reached ({len(open_trades)} running + {len(curated_active)} new). Held on Watchlist."
@@ -788,7 +789,7 @@ class SignalService:
                         pass
 
                     # ONLY create a trade record and send push alert on FIRST activation (never on existing active trades)
-                    if not is_already_active or norm_sym not in seen_open_syms:
+                    if not is_already_active or strat_sym_key not in seen_open_syms:
                         try:
                             trade_journal_repository.create_trade(
                                 TradeJournalCreate(
@@ -843,7 +844,7 @@ class SignalService:
                         except Exception as ex:
                             logger.debug(f"Could not auto-record trade to journal: {ex}")
 
-                    active_symbols.add(norm_sym)
+                    active_symbols.add(strat_sym_key)
                     curated_active.append(item)
                 else:
                     item["is_guardian_authorized"] = is_approved and not shield_reason
@@ -859,7 +860,7 @@ class SignalService:
                         )
                     except Exception:
                         pass
-                    watchlist_symbols.add(norm_sym)
+                    watchlist_symbols.add(strat_sym_key)
                     curated_watchlist.append(item)
 
             # Compute autonomous loss recovery metrics (in-memory, no DB)

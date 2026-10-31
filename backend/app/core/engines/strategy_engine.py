@@ -1,3 +1,6 @@
+import json
+import logging
+import os
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Set
 from app.schemas.strategy import (
@@ -48,6 +51,12 @@ def _empty_validation() -> StrategyValidation:
     )
 
 
+logger = logging.getLogger("falcon.strategy_engine")
+
+STRATEGY_STATUS_FILE = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "..", "..", "data", "strategy_status.json")
+)
+
 EXPANSION_STRATEGY_IDS: Set[str] = {
     "strat-013",
     "strat-014",
@@ -63,9 +72,96 @@ class StrategyEngine:
     _paused_strategy_ids: Set[str] = set()
     _paused_symbols: Set[str] = set()
     _expansion_paused: bool = False
+    _status_overrides: Dict[str, StrategyStatus] = {}
+    _loaded_persisted: bool = False
+    _cached_strategies: Optional[List[StrategyItem]] = None
+    _cached_strategies_at: float = 0.0
+
+    @classmethod
+    def invalidate_cache(cls) -> None:
+        cls._cached_strategies = None
+        cls._cached_strategies_at = 0.0
+        try:
+            from app.core.services.signal_service import signal_service
+            signal_service._cache_response = None
+            signal_service._cache_time = None
+        except Exception:
+            pass
+
+    @classmethod
+    def _load_persisted_status(cls):
+        if cls._loaded_persisted:
+            return
+        cls._loaded_persisted = True
+        try:
+            if os.path.exists(STRATEGY_STATUS_FILE):
+                with open(STRATEGY_STATUS_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    if isinstance(data, dict):
+                        for sid, stat_str in data.items():
+                            try:
+                                cls._status_overrides[sid.lower()] = StrategyStatus(stat_str)
+                            except ValueError:
+                                pass
+        except Exception as ex:
+            logger.debug(f"Failed to load persisted strategy status: {ex}")
+        try:
+            from app.core.database.session import database_enabled, get_engine, get_session
+            from app.core.database.models import Base, StrategyStatusRecord
+            from sqlalchemy import select
+            if database_enabled():
+                engine = get_engine()
+                Base.metadata.create_all(bind=engine, tables=[StrategyStatusRecord.__table__], checkfirst=True)
+                session = get_session()
+                try:
+                    rows = session.execute(select(StrategyStatusRecord)).scalars().all()
+                    for row in rows:
+                        try:
+                            cls._status_overrides[row.strategy_id.lower()] = StrategyStatus(row.status)
+                        except ValueError:
+                            pass
+                finally:
+                    session.close()
+        except Exception as ex:
+            logger.debug(f"Failed to load persisted strategy status from DB: {ex}")
+
+    @classmethod
+    def _save_persisted_status(cls):
+        try:
+            os.makedirs(os.path.dirname(STRATEGY_STATUS_FILE), exist_ok=True)
+            data = {sid: stat.value for sid, stat in cls._status_overrides.items()}
+            with open(STRATEGY_STATUS_FILE, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2)
+        except Exception as ex:
+            logger.debug(f"Failed to save persisted strategy status: {ex}")
+        try:
+            from app.core.database.session import database_enabled, get_engine, get_session
+            from app.core.database.models import Base, StrategyStatusRecord
+            if database_enabled():
+                engine = get_engine()
+                Base.metadata.create_all(bind=engine, tables=[StrategyStatusRecord.__table__], checkfirst=True)
+                now = datetime.now(timezone.utc)
+                session = get_session()
+                try:
+                    for sid, stat in cls._status_overrides.items():
+                        rec = session.get(StrategyStatusRecord, sid.lower())
+                        if rec is None:
+                            session.add(StrategyStatusRecord(strategy_id=sid.lower(), status=stat.value, updated_at=now))
+                        else:
+                            rec.status = stat.value
+                            rec.updated_at = now
+                    session.commit()
+                except Exception as ex:
+                    session.rollback()
+                    logger.debug(f"Failed to persist strategy status to DB: {ex}")
+                finally:
+                    session.close()
+        except Exception as ex:
+            logger.debug(f"Failed to save persisted strategy status to DB: {ex}")
 
     def __init__(self):
         self.version = "2.1.0"
+        self._load_persisted_status()
         self._strategies = self._init_strategies()
 
     @classmethod
@@ -85,6 +181,9 @@ class StrategyEngine:
         for s in self._strategies:
             if s.id.lower() == sid or s.name.lower() == sid:
                 self.__class__._paused_strategy_ids.add(s.id)
+                self.__class__._status_overrides[s.id.lower()] = StrategyStatus.INCUBATION
+                self._save_persisted_status()
+                self.invalidate_cache()
                 out = s.model_copy(deep=True)
                 out.status = StrategyStatus.PAUSED
                 out.readyForExecution = False
@@ -97,6 +196,9 @@ class StrategyEngine:
         for s in self._strategies:
             if s.id.lower() == sid or s.name.lower() == sid:
                 self.__class__._paused_strategy_ids.discard(s.id)
+                self.__class__._status_overrides[s.id.lower()] = StrategyStatus.ACTIVE
+                self._save_persisted_status()
+                self.invalidate_cache()
                 norm_sym = (s.symbol or "").replace("/", "").replace("_", "").upper()
                 self.__class__._paused_symbols.discard(norm_sym)
                 if s.id in EXPANSION_STRATEGY_IDS and self.__class__._expansion_paused:
@@ -155,6 +257,49 @@ class StrategyEngine:
             self.__class__._paused_symbols.discard(sym)
         return sorted(EXPANSION_STRATEGY_IDS)
 
+    def toggle_strategy_status(self, strategy_id: str) -> Optional[StrategyItem]:
+        """Toggle strategy between ACTIVE and INCUBATION."""
+        sid = (strategy_id or "").strip().lower()
+        strategies = self.get_strategies()
+        target = None
+        for s in strategies:
+            if s.id.lower() == sid or s.name.lower() == sid:
+                target = s
+                break
+        if not target:
+            return None
+
+        new_status = StrategyStatus.INCUBATION if target.status == StrategyStatus.ACTIVE else StrategyStatus.ACTIVE
+        self.__class__._status_overrides[target.id.lower()] = new_status
+        if new_status == StrategyStatus.ACTIVE:
+            self.__class__._paused_strategy_ids.discard(target.id)
+            norm_sym = (target.symbol or "").replace("/", "").replace("_", "").upper()
+            self.__class__._paused_symbols.discard(norm_sym)
+        self._save_persisted_status()
+        self.invalidate_cache()
+        return self.get_enriched_strategy(target.id)
+
+    def set_strategy_status(self, strategy_id: str, new_status: StrategyStatus) -> Optional[StrategyItem]:
+        """Explicitly set strategy status to ACTIVE or INCUBATION."""
+        sid = (strategy_id or "").strip().lower()
+        strategies = self.get_strategies()
+        target = None
+        for s in strategies:
+            if s.id.lower() == sid or s.name.lower() == sid:
+                target = s
+                break
+        if not target:
+            return None
+
+        self.__class__._status_overrides[target.id.lower()] = new_status
+        if new_status == StrategyStatus.ACTIVE:
+            self.__class__._paused_strategy_ids.discard(target.id)
+            norm_sym = (target.symbol or "").replace("/", "").replace("_", "").upper()
+            self.__class__._paused_symbols.discard(norm_sym)
+        self._save_persisted_status()
+        self.invalidate_cache()
+        return self.get_enriched_strategy(target.id)
+
     def get_pause_state(self) -> Dict[str, Any]:
         """Return structured telemetry on active vs paused strategies and symbols (zero DB I/O)."""
         active_list: List[str] = []
@@ -176,6 +321,11 @@ class StrategyEngine:
 
     def get_strategies(self) -> List[StrategyItem]:
         """Strategy definitions with performance and validation from stored data."""
+        import time as _t
+        now_mono = _t.monotonic()
+        if self.__class__._cached_strategies is not None and (now_mono - self.__class__._cached_strategies_at) < 60.0:
+            return [s.model_copy(deep=True) for s in self.__class__._cached_strategies]
+
         performance = performance_by_strategy()
         validations = latest_validation_by_strategy()
         last_used = last_used_by_strategy()
@@ -183,6 +333,13 @@ class StrategyEngine:
         strategies: List[StrategyItem] = []
         for definition in self._strategies:
             strategy = definition.model_copy(deep=True)
+            sid_lower = strategy.id.lower()
+            if sid_lower in self._status_overrides:
+                strategy.status = self._status_overrides[sid_lower]
+                strategy.readyForExecution = (strategy.status == StrategyStatus.ACTIVE)
+            if strategy.minimumRiskReward and strategy.minimumRiskReward > 1.5:
+                strategy.minimumRiskReward = 1.5
+
             if self._is_strategy_paused(strategy):
                 strategy.status = StrategyStatus.PAUSED
                 strategy.readyForExecution = False
@@ -195,7 +352,9 @@ class StrategyEngine:
             strategy.lastUsed = last_used.get(strategy.id, strategy.lastUsed)
             strategy.strategyScore = self._score(strategy)
             strategies.append(strategy)
-        return strategies
+        self.__class__._cached_strategies = strategies
+        self.__class__._cached_strategies_at = _t.monotonic()
+        return [s.model_copy(deep=True) for s in strategies]
 
     def _score(self, strategy: StrategyItem) -> StrategyScore:
         historical = round(strategy.performance.winRate)
@@ -219,8 +378,9 @@ class StrategyEngine:
         return None
 
     def get_enriched_strategy(self, strategy_id: str) -> Optional[StrategyItem]:
+        sid = (strategy_id or "").strip().lower()
         for s in self.get_strategies():
-            if s.id == strategy_id:
+            if s.id.lower() == sid or s.name.lower() == sid:
                 return s
         return None
 
@@ -389,7 +549,7 @@ class StrategyEngine:
             confirmationIndicators=["MACD", "Volume"],
             successConditions=["High Volume", "Trend Confirmed"],
             minimumConfidence=85,
-            minimumRiskReward=1.5,
+            minimumRiskReward=1.3,
             preferredSessions=["London", "New York", "Asian"],
             avoidConditions=["Low Volume", "Spread Widening"],
             requiredConfirmations=["MACD crossover", "Volume spikes"],
@@ -515,7 +675,7 @@ class StrategyEngine:
             bestSession="London",
             bestTimeframe="H4",
             riskLevel=RiskLevel.LOW,
-            status=StrategyStatus.ACTIVE,
+            status=StrategyStatus.INCUBATION,
             health=StrategyHealth.GOOD,
             performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=["Highly profitable", "Low screen time required"],
@@ -527,7 +687,7 @@ class StrategyEngine:
             confirmationIndicators=["EMA 20"],
             successConditions=["Daily Trends"],
             minimumConfidence=80,
-            minimumRiskReward=1.5,
+            minimumRiskReward=1.3,
             preferredSessions=["London", "New York"],
             avoidConditions=["Ranging Markets"],
             requiredConfirmations=["20 EMA support", "Daily trend confirm"],
@@ -740,7 +900,7 @@ class StrategyEngine:
             type=StrategyType.PRICE_ACTION,
             category=StrategyCategory.INTRADAY,
             symbol="XAU/USD",
-            description="Hunts institutional stop-loss sweeps above Previous Day/Session Highs (PDH/ASH) or below Lows (PDL/ASL) paired with a 3-candle Fair Value Gap (FVG) displacement. Enters on rejection with tight wick-anchored stops for asymmetric 1:3.0 to 1:4.5 R:R.",
+            description="Hunts institutional stop-loss sweeps above Previous Day/Session Highs (PDH/ASH) or below Lows (PDL/ASL) paired with Fair Value Gap (FVG) / Inversion FVG (IFVG). Enters on rejection with tight wick-anchored stops for disciplined 1:1.2 to 1:1.5 R:R.",
             marketCondition="Liquidity Sweeps & Displacement Reversals",
             bestSession="London / New York",
             bestTimeframe="H1",
@@ -751,26 +911,26 @@ class StrategyEngine:
             strengths=[
                 "Exploits retail stop hunts before institutional reversal",
                 "Ultra-tight stop loss anchored beyond sweep wick (10-18 pips)",
-                "Asymmetric 1:3.0 to 1:4.5 risk-to-reward profile"
+                "Disciplined 1:1.5 to 1:2.0 risk-to-reward profile"
             ],
             weaknesses=["Selective sniper frequency (waits for key pool sweep)"],
             entryChecklist=[
                 "Wick sweep of PDH/PDL or Asian High/Low with body close back inside range",
-                "3-candle Fair Value Gap (FVG) displacement confirmed",
+                "3-candle Fair Value Gap (FVG) or Inversion FVG (IFVG) confirmed",
                 "Cross-Asset DXY Macro Gate aligned",
-                "Risk/Reward >= 3.0"
+                "Risk/Reward between 1.5 and 2.0"
             ],
             exitChecklist=[
-                "Opposite liquidity pool target reached (1:3.0+ R:R)",
-                "Breakeven + 2 pips locked at +1.5R",
+                "Disciplined target reached (1:1.2 to 1:1.5 R:R)",
+                "Breakeven + 2 pips locked at +1.0R",
                 "Structural Higher-Low / Lower-High trailing stop"
             ],
             idealVolatility="Medium to High",
             avoidDuring=["Unscheduled Flash Crashes", "DXY Macro Bull/Bear Trap"],
-            confirmationIndicators=["Smart Money Sweep Engine", "3-Candle FVG Imbalance", "Synthetic DXY Macro Gate"],
-            successConditions=["Liquidity Pool Pierced & Rejected", "FVG Imbalance Created", "Macro DXY Aligned"],
+            confirmationIndicators=["Smart Money Sweep Engine", "Inversion FVG (IFVG)", "Synthetic DXY Macro Gate"],
+            successConditions=["Liquidity Pool Pierced & Rejected", "FVG / IFVG Created", "Macro DXY Aligned"],
             minimumConfidence=85,
-            minimumRiskReward=1.8,
+            minimumRiskReward=1.35,
             preferredSessions=["London", "New York", "London-NY Overlap", "NY Overlap"],
             avoidConditions=["Macro DXY Contradiction", "Wide Rollover Spreads"],
             requiredConfirmations=["Liquidity Sweep Rejection Close", "Fair Value Gap Displacement"],
@@ -804,7 +964,7 @@ class StrategyEngine:
             bestSession="Asian / London",
             bestTimeframe="M15",
             riskLevel=RiskLevel.LOW,
-            status=StrategyStatus.ACTIVE,
+            status=StrategyStatus.INCUBATION,
             health=StrategyHealth.EXCELLENT,
             performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=[
@@ -828,7 +988,7 @@ class StrategyEngine:
             confirmationIndicators=["Smart Money Sweep Engine", "3-Candle FVG Imbalance", "RSI 14"],
             successConditions=["Asian Boundary Swept & Rejected", "FVG Imbalance Confirmed", "Spread <= 1.5 pips"],
             minimumConfidence=82,
-            minimumRiskReward=1.5,
+            minimumRiskReward=1.3,
             preferredSessions=["Asian", "Tokyo", "London", "London-NY Overlap"],
             avoidConditions=["BOJ Emergency Press Conference", "Wide Rollover Spreads"],
             requiredConfirmations=["Liquidity Sweep Rejection Close", "FVG or Reversal Candle"],
@@ -976,7 +1136,7 @@ class StrategyEngine:
             bestSession="London / New York",
             bestTimeframe="H1",
             riskLevel=RiskLevel.LOW,
-            status=StrategyStatus.ACTIVE,
+            status=StrategyStatus.INCUBATION,
             health=StrategyHealth.EXCELLENT,
             performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=[
@@ -999,7 +1159,7 @@ class StrategyEngine:
             confirmationIndicators=["Smart Money Sweep & FVG Engine", "Candlestick Pattern Engine", "EMA 20 / 50"],
             successConditions=["SMC Sweep or FVG Retest", "HTF Structure Aligned", "Risk/Reward >= 3.0"],
             minimumConfidence=85,
-            minimumRiskReward=1.5,
+            minimumRiskReward=1.3,
             preferredSessions=["London", "New York", "Asian", "London-NY Overlap"],
             avoidConditions=["Middle-of-Range Chop", "Wide Spreads"],
             requiredConfirmations=["Liquidity Sweep or FVG Fill", "Candlestick Confirmation Close"],
@@ -1033,7 +1193,7 @@ class StrategyEngine:
             bestSession="Asian / London",
             bestTimeframe="M15",
             riskLevel=RiskLevel.LOW,
-            status=StrategyStatus.ACTIVE,
+            status=StrategyStatus.INCUBATION,
             health=StrategyHealth.EXCELLENT,
             performance=EMPTY_PERFORMANCE.model_copy(),
             strengths=[
@@ -1056,7 +1216,7 @@ class StrategyEngine:
             confirmationIndicators=["Smart Money Sweep Engine", "Synthetic DXY & Gold Confluence", "3-Candle FVG"],
             successConditions=["Liquidity Sweep Confirmed", "Macro DXY & Gold Aligned", "Spread <= 1.2 pips"],
             minimumConfidence=83,
-            minimumRiskReward=1.8,
+            minimumRiskReward=1.35,
             preferredSessions=["Asian", "Sydney", "Tokyo", "London", "New York", "London-NY Overlap"],
             avoidConditions=["Macro DXY Bull/Bear Trap", "Gold Divergence"],
             requiredConfirmations=["Sweep Rejection Close", "FVG or Candlestick Confirmation", "Macro Gate Pass"],
@@ -1136,11 +1296,108 @@ class StrategyEngine:
             latestValidation=_empty_validation()
         )
 
+        # 19. London Momentum (XAU/USD)
+        s19 = StrategyItem(
+            id="strat-019",
+            name="London Momentum (XAU/USD)",
+            type=StrategyType.MOMENTUM,
+            category=StrategyCategory.INTRADAY,
+            symbol="XAU/USD",
+            description="Scalps quick high-momentum runs in Gold (XAU/USD) during active session flow.",
+            marketCondition="High Volatility Trend",
+            bestSession="London",
+            bestTimeframe="M5",
+            riskLevel=RiskLevel.HIGH,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=["Quick returns", "High volume", "Strong Gold impulse capture"],
+            weaknesses=["High commission costs", "Slippage risks"],
+            entryChecklist=["High volume candle", "MACD bullish/bearish crossover"],
+            exitChecklist=["Opposite signal crossover"],
+            idealVolatility="High",
+            avoidDuring=["FOMC", "NFP", "CPI"],
+            confirmationIndicators=["MACD", "Volume"],
+            successConditions=["High Volume", "Trend Confirmed"],
+            minimumConfidence=85,
+            minimumRiskReward=1.3,
+            preferredSessions=["London", "New York", "Asian"],
+            avoidConditions=["Low Volume", "Spread Widening"],
+            requiredConfirmations=["MACD crossover", "Volume spikes"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Volatile", "High Liquidity"],
+            estimatedHoldingTime="10-30 minutes",
+            maxConsecutiveLosses=5,
+            createdAt=datetime(2026, 4, 1, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 10, 31, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="2.0",
+            parentStrategyId="strat-004",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="London Momentum engine replicated for XAU/USD without modifying GBP/USD strat-004.",
+            dependencies=["Market Session Engine", "Volatility Filter"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 20. London Momentum (EUR/USD)
+        s20 = StrategyItem(
+            id="strat-020",
+            name="London Momentum (EUR/USD)",
+            type=StrategyType.MOMENTUM,
+            category=StrategyCategory.INTRADAY,
+            symbol="EUR/USD",
+            description="Scalps quick high-momentum runs in EUR/USD pairs during active session flow.",
+            marketCondition="High Volatility Trend",
+            bestSession="London",
+            bestTimeframe="M5",
+            riskLevel=RiskLevel.HIGH,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=["Quick returns", "High volume", "Tight Euro spread execution"],
+            weaknesses=["High commission costs", "Slippage risks"],
+            entryChecklist=["High volume candle", "MACD bullish/bearish crossover"],
+            exitChecklist=["Opposite signal crossover"],
+            idealVolatility="High",
+            avoidDuring=["ECB Rate Decision", "NFP"],
+            confirmationIndicators=["MACD", "Volume"],
+            successConditions=["High Volume", "Trend Confirmed"],
+            minimumConfidence=85,
+            minimumRiskReward=1.3,
+            preferredSessions=["London", "New York", "Asian"],
+            avoidConditions=["Low Volume", "Spread Widening"],
+            requiredConfirmations=["MACD crossover", "Volume spikes"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Volatile", "High Liquidity"],
+            estimatedHoldingTime="10-30 minutes",
+            maxConsecutiveLosses=5,
+            createdAt=datetime(2026, 4, 1, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 10, 31, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="2.0",
+            parentStrategyId="strat-004",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="London Momentum engine replicated for EUR/USD without modifying GBP/USD strat-004.",
+            dependencies=["Market Session Engine", "Volatility Filter"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
         strategies = [
             s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12,
-            s13, s14, s15, s16, s17, s18,
+            s13, s14, s15, s16, s17, s18, s19, s20,
         ]
         for strategy in strategies:
+            default_active_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020"}
+            strategy.status = StrategyStatus.ACTIVE if strategy.id in default_active_ids else StrategyStatus.INCUBATION
+            strategy.readyForExecution = (strategy.status == StrategyStatus.ACTIVE)
+            if strategy.minimumRiskReward and strategy.minimumRiskReward > 1.5:
+                strategy.minimumRiskReward = 1.5
             strategy.strategyScore.riskRating = strategy.riskLevel
         return strategies
 

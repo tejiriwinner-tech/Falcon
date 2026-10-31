@@ -568,7 +568,7 @@ class SignalGenerationEngine:
                 # 2D. Trend Continuation, Pullback & Momentum Flow Integration (strat-002, strat-004, strat-005, strat-007, strat-010, strat-018)
                 if not has_sniper_setup and (
                     strat_type_val in ["TREND_CONTINUATION", "PULLBACK", "MOMENTUM", "SWING_STRUCTURE", "PRICE_ACTION"]
-                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-011", "strat-012", "strat-013", "strat-016", "strat-017", "strat-018")
+                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-011", "strat-012", "strat-013", "strat-016", "strat-017", "strat-018", "strat-019", "strat-020")
                 ):
                     try:
                         pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
