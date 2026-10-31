@@ -32,7 +32,7 @@ def test_18_strategies_registered_across_all_6_pairs():
     """Verify all 6 core pairs have dedicated institutional strategies (18 total)."""
     _reset_pause_state()
     strats = strategy_engine.get_strategies()
-    assert len(strats) == 20
+    assert len(strats) == 21
 
     by_symbol = {}
     for s in strats:
@@ -42,7 +42,7 @@ def test_18_strategies_registered_across_all_6_pairs():
     assert "GBP/USD" in by_symbol and len(by_symbol["GBP/USD"]) == 2
     assert "EUR/USD" in by_symbol and len(by_symbol["EUR/USD"]) == 3
     assert set(by_symbol["USD/JPY"]) == {"strat-009", "strat-013", "strat-014"}
-    assert set(by_symbol["GBP/JPY"]) == {"strat-015", "strat-016"}
+    assert set(by_symbol["GBP/JPY"]) == {"strat-015", "strat-016", "strat-021"}
     assert set(by_symbol["AUD/USD"]) == {"strat-017", "strat-018"}
 
 
@@ -173,7 +173,7 @@ def test_copilot_pause_and_resume_controls():
         state = strategy_engine.get_pause_state()
         assert state["expansion_paused"] is True
         assert state["paused_count"] == 6
-        assert state["active_count"] == 14
+        assert state["active_count"] == 15
         assert "strat-013" in state["paused_strategy_ids"]
         assert "strat-018" in state["paused_strategy_ids"]
 
@@ -183,13 +183,13 @@ def test_copilot_pause_and_resume_controls():
         state = strategy_engine.get_pause_state()
         assert state["expansion_paused"] is False
         assert state["paused_count"] == 0
-        assert state["active_count"] == 20
+        assert state["active_count"] == 21
 
         # 3. Pause a specific currency pair (GBP/JPY) via Co-Pilot
         resp_pause_gj = copilot_service.handle_query(CopilotQueryRequest(query="Pause GBP/JPY"))
         assert resp_pause_gj.intent == "STRATEGY_CONTROL"
         state = strategy_engine.get_pause_state()
-        assert set(state["paused_strategy_ids"]) == {"strat-015", "strat-016"}
+        assert set(state["paused_strategy_ids"]) == {"strat-015", "strat-016", "strat-021"}
         assert "GBPJPY" in state["paused_symbols"]
 
         # 4. Resume GBP/JPY via Co-Pilot
@@ -247,7 +247,7 @@ def test_briefings_include_all_6_pairs_and_pause_governance():
         london = briefing_service.generate_london_open_briefing(market_quotes=sample_quotes, force_refresh=True)
         for pair in ["EUR/USD", "GBP/USD", "XAU/USD", "USD/JPY", "GBP/JPY", "AUD/USD"]:
             assert pair in london.market_levels
-        assert london.risk_state["active_strategies_count"] == 19
+        assert london.risk_state["active_strategies_count"] == 20
         assert london.risk_state["paused_strategies_count"] == 1
         assert "strat-015" in london.risk_state["paused_strategy_ids"]
         assert "GBP/JPY" in london.formatted_text
@@ -255,7 +255,7 @@ def test_briefings_include_all_6_pairs_and_pause_governance():
         assert "USD/JPY" in london.formatted_text
 
         daily = briefing_service.generate_daily_review_briefing(trade_journal_data=[], force_refresh=True)
-        assert daily.risk_state["active_strategies_count"] == 19
+        assert daily.risk_state["active_strategies_count"] == 20
         assert daily.risk_state["paused_strategies_count"] == 1
 
     _reset_pause_state()

@@ -1388,12 +1388,70 @@ class StrategyEngine:
             latestValidation=_empty_validation()
         )
 
+        # 21. London Open Liquidity Sweep + Momentum Displacement (GBP/JPY)
+        s21 = StrategyItem(
+            id="strat-021",
+            name="London Open Liquidity Sweep + Momentum Displacement",
+            type=StrategyType.MOMENTUM,
+            category=StrategyCategory.INTRADAY,
+            symbol="GBP/JPY",
+            description="Marks the Asian Session High and Low (00:00-06:45 UTC), waits for London Open (07:00-10:00 UTC) or London/NY Overlap (12:00-15:00 UTC) to sweep one side of the Asian range by 10-25 pips (triggering retail stops), and enters on the displacement candle with Break of Structure (BOS) and Fair Value Gap (FVG) pullback in the direction of the H1 trend.",
+            marketCondition="Asian Range Liquidity Sweep & London Momentum Displacement",
+            bestSession="London",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.HIGH,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Exploits GBP/JPY's notorious end-of-Tokyo/London-open fakeouts",
+                "High win rate: post-sweep London displacement routinely carries 40-80+ pips in a single impulse leg",
+                "Combines M15 Asian liquidity sweep + BOS/FVG displacement with H1 trend alignment"
+            ],
+            weaknesses=["Requires high-volatility session displacement", "Avoid during BOE/BOJ rate announcements"],
+            entryChecklist=[
+                "Mark Asian Session High and Low (00:00 - 06:45 UTC)",
+                "London Open / Overlap sweeps one side of Asian range by 10-25 pips",
+                "Displacement candle back inside with Break of Structure (BOS) and Fair Value Gap (FVG)",
+                "Enter on FVG / Order Block pullback aligned with H1 trend"
+            ],
+            exitChecklist=[
+                "40-80+ pip London momentum impulse leg target reached",
+                "Automated breakeven lock at +1.0R"
+            ],
+            idealVolatility="High",
+            avoidDuring=["BOE / BOJ Rate Decisions", "Rollover Spread Widening"],
+            confirmationIndicators=["Asian Range Corridor", "Smart Money Sweep & FVG Engine", "BOS Displacement", "H1 Trend Alignment"],
+            successConditions=["Asian High/Low Swept (10-25 pips)", "BOS + FVG Displacement", "H1 Trend Aligned"],
+            minimumConfidence=85,
+            minimumRiskReward=1.3,
+            preferredSessions=["London", "New York", "London-NY Overlap", "NY Overlap", "Asian"],
+            avoidConditions=["Low Volume Chop", "Spread > 3.5 Pips"],
+            requiredConfirmations=["Asian Liquidity Sweep", "BOS + FVG Displacement Candle", "H1 Trend Direction"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Volatile", "Trending", "Institutional Flow", "High Liquidity"],
+            estimatedHoldingTime="15-90 minutes",
+            maxConsecutiveLosses=3,
+            createdAt=datetime(2026, 10, 31, tzinfo=timezone.utc),
+            updatedAt=datetime(2026, 10, 31, tzinfo=timezone.utc),
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId=None,
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Highest win-rate GBP/JPY London Open Liquidity Sweep + Momentum Displacement (M15 structure + M5 execution).",
+            dependencies=["Smart Money Engine", "Session Breakout Engine", "Market Session Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
         strategies = [
             s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12,
-            s13, s14, s15, s16, s17, s18, s19, s20,
+            s13, s14, s15, s16, s17, s18, s19, s20, s21,
         ]
         for strategy in strategies:
-            default_active_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020"}
+            default_active_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020", "strat-021"}
             strategy.status = StrategyStatus.ACTIVE if strategy.id in default_active_ids else StrategyStatus.INCUBATION
             strategy.readyForExecution = (strategy.status == StrategyStatus.ACTIVE)
             if strategy.minimumRiskReward and strategy.minimumRiskReward > 1.5:

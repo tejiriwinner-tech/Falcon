@@ -67,7 +67,7 @@ def test_session_breakout_engine_tp1_and_tp2_levels():
 def test_strategy_consolidation_active_vs_incubation():
     """Verify exactly 6 flagships are ACTIVE and the 12 other strategies are in INCUBATION."""
     engine = StrategyEngine()
-    flagship_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020"}
+    flagship_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020", "strat-021"}
 
     active_count = 0
     incubation_count = 0
@@ -83,16 +83,16 @@ def test_strategy_consolidation_active_vs_incubation():
             assert s.readyForExecution is False, f"{s.id} should not be readyForExecution"
             incubation_count += 1
 
-    assert active_count == 8
+    assert active_count == 9
     assert incubation_count == 12
-    assert len(engine._strategies) == 20
+    assert len(engine._strategies) == 21
 
 
 def test_all_18_strategies_can_toggle_on_and_off_for_live_signals():
     """Verify all 18 strategies are approved in settings and respect user ON/OFF toggles."""
     from app.core.config.settings import settings
 
-    all_18 = {f"strat-{i:03d}" for i in range(1, 21)}
+    all_18 = {f"strat-{i:03d}" for i in range(1, 22)}
     assert all_18.issubset(settings.APPROVED_FLAGSHIP_STRATEGIES)
 
     engine = StrategyEngine()
@@ -197,3 +197,14 @@ def test_london_momentum_strategies_for_gbpusd_xauusd_and_eurusd():
     assert s20.bestTimeframe == "M5"
     assert s20.status == StrategyStatus.ACTIVE
     assert s20.readyForExecution is True
+
+    # GBP/JPY London Open Liquidity Sweep + Momentum Displacement (strat-021)
+    s21 = engine.get_strategy_by_id("strat-021")
+    assert s21 is not None
+    assert s21.name == "London Open Liquidity Sweep + Momentum Displacement"
+    assert s21.symbol == "GBP/JPY"
+    assert s21.type.value == "MOMENTUM"
+    assert s21.bestTimeframe == "M15"
+    assert s21.riskLevel.value == "HIGH"
+    assert s21.status == StrategyStatus.ACTIVE
+    assert s21.readyForExecution is True
