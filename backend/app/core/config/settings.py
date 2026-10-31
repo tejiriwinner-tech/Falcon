@@ -138,7 +138,7 @@ class Settings:
     ROLLOVER_BLACKOUT_END_UTC: str = os.getenv("ROLLOVER_BLACKOUT_END_UTC", "21:30")
     ANTI_CLUSTER_ENABLED: bool = os.getenv("ANTI_CLUSTER_ENABLED", "True").lower() == "true"
     MIN_LIVE_SIGNAL_CONFIDENCE: int = int(os.getenv("MIN_LIVE_SIGNAL_CONFIDENCE", "80"))
-    APPROVED_FLAGSHIP_STRATEGIES: set = {f"strat-{i:03d}" for i in range(1, 22)}
+    APPROVED_FLAGSHIP_STRATEGIES: set = {f"strat-{i:03d}" for i in range(1, 24)}
 
     # Falcon AI Co-Pilot Intelligence Layer
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")

@@ -728,7 +728,7 @@ class SignalService:
                 cand_exps = extract_directional_currency_exposures(symbol, direction_str)
                 if not is_already_active and not shield_reason:
                     # 1. Approved Flagship Strategy Filter (A+ Setups Only)
-                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 22)})
+                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 24)})
                     if cand.strategyId and cand.strategyId not in approved_flagships:
                         shield_reason = f"STRATEGY GATE: Live activation restricted to flagship strategies ({', '.join(sorted(approved_flagships))}). Held on Watchlist."
                         entry_hit = False
@@ -754,7 +754,7 @@ class SignalService:
                             entry_hit = False
 
                     # 4. Portfolio Heat Cap (Max 1-2 simultaneous active trades, default: 2)
-                    max_active_limit = max(int(getattr(settings, "MAX_SIMULTANEOUS_TRADES", 3) or 3), 9)
+                    max_active_limit = max(int(getattr(settings, "MAX_SIMULTANEOUS_TRADES", 3) or 3), 11)
                     total_current_active = len(open_trades) + len(curated_active)
                     if not shield_reason and entry_hit and total_current_active >= max_active_limit:
                         shield_reason = f"PORTFOLIO HEAT CAP: Maximum {max_active_limit} simultaneous active trades reached ({len(open_trades)} running + {len(curated_active)} new). Held on Watchlist."

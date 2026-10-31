@@ -67,7 +67,7 @@ def test_session_breakout_engine_tp1_and_tp2_levels():
 def test_strategy_consolidation_active_vs_incubation():
     """Verify exactly 6 flagships are ACTIVE and the 12 other strategies are in INCUBATION."""
     engine = StrategyEngine()
-    flagship_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020", "strat-021"}
+    flagship_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023"}
 
     active_count = 0
     incubation_count = 0
@@ -83,16 +83,16 @@ def test_strategy_consolidation_active_vs_incubation():
             assert s.readyForExecution is False, f"{s.id} should not be readyForExecution"
             incubation_count += 1
 
-    assert active_count == 9
+    assert active_count == 11
     assert incubation_count == 12
-    assert len(engine._strategies) == 21
+    assert len(engine._strategies) == 23
 
 
 def test_all_18_strategies_can_toggle_on_and_off_for_live_signals():
     """Verify all 18 strategies are approved in settings and respect user ON/OFF toggles."""
     from app.core.config.settings import settings
 
-    all_18 = {f"strat-{i:03d}" for i in range(1, 22)}
+    all_18 = {f"strat-{i:03d}" for i in range(1, 24)}
     assert all_18.issubset(settings.APPROVED_FLAGSHIP_STRATEGIES)
 
     engine = StrategyEngine()
@@ -208,3 +208,25 @@ def test_london_momentum_strategies_for_gbpusd_xauusd_and_eurusd():
     assert s21.riskLevel.value == "HIGH"
     assert s21.status == StrategyStatus.ACTIVE
     assert s21.readyForExecution is True
+
+    # USD/JPY NY Open Yield-Driven Liquidity Sweep + Momentum Displacement (strat-022)
+    s22 = engine.get_strategy_by_id("strat-022")
+    assert s22 is not None
+    assert s22.name == "NY Open Yield-Driven Liquidity Sweep + Momentum Displacement"
+    assert s22.symbol == "USD/JPY"
+    assert s22.type.value == "MOMENTUM"
+    assert s22.bestTimeframe == "M15"
+    assert s22.riskLevel.value == "HIGH"
+    assert s22.status == StrategyStatus.ACTIVE
+    assert s22.readyForExecution is True
+
+    # AUD/USD Liquidity Sweep + Gold & DXY Macro Displacement (strat-023)
+    s23 = engine.get_strategy_by_id("strat-023")
+    assert s23 is not None
+    assert s23.name == "Liquidity Sweep + Gold & DXY Macro Displacement"
+    assert s23.symbol == "AUD/USD"
+    assert s23.type.value == "MOMENTUM"
+    assert s23.bestTimeframe == "M15"
+    assert s23.riskLevel.value == "HIGH"
+    assert s23.status == StrategyStatus.ACTIVE
+    assert s23.readyForExecution is True

@@ -449,7 +449,7 @@ class SignalGenerationEngine:
                 pattern_name = None
 
                 # 2. Institutional Smart Money Liquidity Sweep & FVG Integration (Pillar 2 / strat-012, strat-013, strat-016, strat-017)
-                if getattr(strategy, "id", "") in ("strat-012", "strat-013", "strat-016", "strat-017", "strat-021") or (
+                if getattr(strategy, "id", "") in ("strat-012", "strat-013", "strat-016", "strat-017", "strat-021", "strat-022", "strat-023") or (
                     not has_sniper_setup and strat_type_val in ["PRICE_ACTION", "SWING_STRUCTURE", "SUPPORT_RESISTANCE"]
                 ):
                     try:
@@ -471,7 +471,7 @@ class SignalGenerationEngine:
                         logger.warning(f"Smart Money sweep evaluation error for {canonical_symbol}: {ex}")
 
                 # 2A. GBP/JPY London Open Liquidity Sweep (10-25 pips) + BOS/FVG Momentum Displacement (strat-021)
-                if not has_sniper_setup and getattr(strategy, "id", "") == "strat-021" and len(candles_1h) >= 6:
+                if not has_sniper_setup and getattr(strategy, "id", "") in ("strat-021", "strat-022", "strat-023") and len(candles_1h) >= 6:
                     try:
                         pip_u = 0.01 if "JPY" in canonical_symbol else 0.0001
                         dec_p = 3 if "JPY" in canonical_symbol else 5
@@ -493,47 +493,51 @@ class SignalGenerationEngine:
                             swept_down_pips = (asian_low - sweep_low) / pip_u
                             swept_up_pips = (sweep_high - asian_high) / pip_u
 
-                            if swept_down_pips >= 8.0 and last_bar.close > asian_low and asset_trend != "Bearish":
+                            min_sweep_pips = 6.0 if getattr(strategy, "id", "") == "strat-023" else 8.0
+                            min_risk_u = 0.0015 if getattr(strategy, "id", "") == "strat-023" else 0.20
+                            min_impulse_u = 0.0022 if getattr(strategy, "id", "") == "strat-023" else (0.28 if getattr(strategy, "id", "") == "strat-022" else 0.40)
+
+                            if swept_down_pips >= min_sweep_pips and last_bar.close > asian_low and asset_trend != "Bearish":
                                 has_sniper_setup = True
                                 direction = CandidateDirection.BUY
                                 pattern_conviction = 0.89
                                 sniper_stop = round(sweep_low - 3.0 * pip_u, dec_p)
-                                risk_dist = max(abs(entry_price - sniper_stop), 0.20)
+                                risk_dist = max(abs(entry_price - sniper_stop), min_risk_u)
                                 sniper_stop = round(entry_price - risk_dist, dec_p)
-                                impulse_dist = max(risk_dist * 1.45, 0.40)
+                                impulse_dist = max(risk_dist * 1.40, min_impulse_u)
                                 sniper_target = round(entry_price + impulse_dist, dec_p)
                                 sniper_trigger_rule = (
-                                    f"Asian Low ({asian_low:.{dec_p}f}) swept by {swept_down_pips:.1f} pips "
-                                    f"+ BOS/FVG displacement close ({last_bar.close:.{dec_p}f}) aligned with H1 trend"
+                                    f"Session Low ({asian_low:.{dec_p}f}) swept by {swept_down_pips:.1f} pips "
+                                    f"+ BOS/FVG displacement close ({last_bar.close:.{dec_p}f}) aligned with H1 & Macro"
                                 )
                                 sniper_rationale = (
-                                    f"GBP/JPY London Open Liquidity Sweep + Momentum Displacement: Asian Low swept by "
+                                    f"{strategy.name} ({canonical_symbol}): Session Low swept by "
                                     f"{swept_down_pips:.1f} pips with bullish BOS/FVG reclaim targeting {sniper_target:.{dec_p}f}."
                                 )
-                                pattern_name = "London Open Asian Sweep + BOS/FVG Displacement"
-                            elif swept_up_pips >= 8.0 and last_bar.close < asian_high and asset_trend != "Bullish":
+                                pattern_name = f"{strategy.name} (Sweep + BOS/FVG)"
+                            elif swept_up_pips >= min_sweep_pips and last_bar.close < asian_high and asset_trend != "Bullish":
                                 has_sniper_setup = True
                                 direction = CandidateDirection.SELL
                                 pattern_conviction = 0.89
                                 sniper_stop = round(sweep_high + 3.0 * pip_u, dec_p)
-                                risk_dist = max(abs(entry_price - sniper_stop), 0.20)
+                                risk_dist = max(abs(entry_price - sniper_stop), min_risk_u)
                                 sniper_stop = round(entry_price + risk_dist, dec_p)
-                                impulse_dist = max(risk_dist * 1.45, 0.40)
+                                impulse_dist = max(risk_dist * 1.40, min_impulse_u)
                                 sniper_target = round(entry_price - impulse_dist, dec_p)
                                 sniper_trigger_rule = (
-                                    f"Asian High ({asian_high:.{dec_p}f}) swept by {swept_up_pips:.1f} pips "
-                                    f"+ BOS/FVG displacement close ({last_bar.close:.{dec_p}f}) aligned with H1 trend"
+                                    f"Session High ({asian_high:.{dec_p}f}) swept by {swept_up_pips:.1f} pips "
+                                    f"+ BOS/FVG displacement close ({last_bar.close:.{dec_p}f}) aligned with H1 & Macro"
                                 )
                                 sniper_rationale = (
-                                    f"GBP/JPY London Open Liquidity Sweep + Momentum Displacement: Asian High swept by "
+                                    f"{strategy.name} ({canonical_symbol}): Session High swept by "
                                     f"{swept_up_pips:.1f} pips with bearish BOS/FVG reclaim targeting {sniper_target:.{dec_p}f}."
                                 )
-                                pattern_name = "London Open Asian Sweep + BOS/FVG Displacement"
+                                pattern_name = f"{strategy.name} (Sweep + BOS/FVG)"
                     except Exception as ex:
                         logger.warning(f"GBP/JPY Asian sweep + displacement evaluation error: {ex}")
 
                 # 2B. Institutional Session Breakout Integration (strat-008, strat-014, strat-015, etc.)
-                if not has_sniper_setup and (strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"] or getattr(strategy, "id", "") in ("strat-008", "strat-014", "strat-015", "session_momentum_liquidity_breakout")):
+                if not has_sniper_setup and (strat_type_val in ["BREAKOUT", "SESSION_BREAKOUT"] or getattr(strategy, "id", "") in ("strat-008", "strat-014", "strat-015", "strat-022", "session_momentum_liquidity_breakout")):
                     try:
                         from app.core.engines.session_breakout_engine import session_breakout_engine
                         from app.schemas.session_breakout import SessionName, SessionStatus
@@ -630,7 +634,7 @@ class SignalGenerationEngine:
                 # 2D. Trend Continuation, Pullback & Momentum Flow Integration (strat-002, strat-004, strat-005, strat-007, strat-010, strat-018)
                 if not has_sniper_setup and (
                     strat_type_val in ["TREND_CONTINUATION", "PULLBACK", "MOMENTUM", "SWING_STRUCTURE", "PRICE_ACTION"]
-                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-011", "strat-012", "strat-013", "strat-016", "strat-017", "strat-018", "strat-019", "strat-020", "strat-021")
+                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-011", "strat-012", "strat-013", "strat-016", "strat-017", "strat-018", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023")
                 ):
                     try:
                         pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
