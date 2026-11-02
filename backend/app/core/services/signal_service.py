@@ -17,6 +17,7 @@ from app.core.engines.strategy_engine import StrategyEngine
 from app.core.config import settings
 from app.schemas.decision_artifact import DecisionArtifact, DecisionStatus
 from app.schemas.execution_order import ExecutionSettings
+from app.schemas.market_quote import MarketQuote, MarketQuoteResponse
 from app.schemas.signal_candidate import SignalCandidate, CandidateStatus, CandidateDirection
 from app.schemas.signal import SignalItem, SignalListResponse
 from app.schemas.trade_journal import TradeJournalCreate
@@ -189,8 +190,14 @@ class SignalService:
                 try:
                     raw_ot_sym = ot.symbol.replace("/", "").upper()
                     pm = getattr(providers, "provider_manager", None)
+                except Exception:
+                    pass
+            batch_quotes = {}
+            if True:
+                try:
+                    pass
                     if pm is not None:
-                        cached_e = pm._cache.get(raw_ot_sym, allow_stale=True) if hasattr(pm, "_cache") else None
+                        cached_e = pm._cache.get(raw_ot_sym, allow_stale=False) if hasattr(pm, "_cache") else None
                         if cached_e and getattr(cached_e.data, "lastPrice", None):
                             cur_live_px = cached_e.data.lastPrice
                         else:
@@ -486,10 +493,26 @@ class SignalService:
 
             lot_size = ExecutionSettings().default_lot_size
             pm = getattr(providers, "provider_manager", None)
+            batch_quotes = {}
+            if True:
+                try:
+                    pass
+                except Exception:
+                    pass
             if pm is not None and hasattr(pm, "get_batch_quotes") and candidate_pool:
                 try:
                     unique_syms = list({item["candidate"].symbol.replace("/", "").upper() for item in candidate_pool})
-                    pm.get_batch_quotes(unique_syms)
+                    pass
+                except Exception:
+                    pass
+            if pm is not None and hasattr(pm, "get_batch_quotes") and candidate_pool:
+                try:
+                    unique_syms = list({item["candidate"].symbol.replace("/", "").upper() for item in candidate_pool})
+                    batch_quotes = pm.get_batch_quotes(unique_syms) or {}
+                except Exception:
+                    batch_quotes = {}
+                try:
+                    pass
                 except Exception:
                     pass
 
@@ -523,7 +546,16 @@ class SignalService:
                 quote_resp = None
                 try:
                     raw_sym = symbol.replace("/", "").upper()
-                    if pm is not None and hasattr(pm, "_cache"):
+                    b_resp = batch_quotes.get(raw_sym) if isinstance(batch_quotes, dict) else None
+                    if b_resp and getattr(b_resp, "quote", None) and getattr(b_resp.quote, "lastPrice", None):
+                        cur_px = b_resp.quote.lastPrice
+                        raw_freshness = getattr(b_resp.quote, "freshnessSeconds", 0.0)
+                        try:
+                            quote_age_s = float(raw_freshness) if raw_freshness is not None else 0.0
+                        except (TypeError, ValueError):
+                            quote_age_s = 0.0
+                        quote_resp = b_resp
+                    if (cur_px is None or quote_age_s > 60.0) and pm is not None and hasattr(pm, "_cache"):
                         cached_entry = pm._cache.get(raw_sym, allow_stale=True)
                         if cached_entry and hasattr(cached_entry, "data"):
                             q_data = cached_entry.data
@@ -700,7 +732,7 @@ class SignalService:
                                     baseline_max = 8.0
                                 elif is_jpy:
                                     pip_size = 0.01
-                                    baseline_max = 3.5 if "GBP" in clean_sym else 2.5
+                                    baseline_max = 4.5 if "GBP" in clean_sym else 3.0
                                 else:
                                     pip_size = 0.00010
                                     baseline_max = 2.5 if "GBP" in clean_sym else 2.0

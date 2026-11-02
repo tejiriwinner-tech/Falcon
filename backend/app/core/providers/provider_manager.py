@@ -122,6 +122,7 @@ class ProviderManager:
                         marketStatus=MarketStatus.OPEN,
                         freshnessSeconds=round(age, 4),
                     )
+                    self._cache.set(symbol=canonical, data=quote, provider_id="oanda", provider_name="OANDA Stream", ttl=30)
                     self._successful_requests += 1
                     elapsed_ms = (time.time() - t_start) * 1000
                     self._warm_request_count += 1
@@ -137,6 +138,7 @@ class ProviderManager:
                 quote = cached_entry.data
                 if isinstance(quote, MarketQuote):
                     quote.freshnessSeconds = cached_entry.age_seconds
+                    self._cache.set(symbol=canonical, data=quote, provider_id="oanda", provider_name="OANDA Stream", ttl=30)
                     self._successful_requests += 1
                     elapsed_ms = (time.time() - t_start) * 1000
                     self._warm_request_count += 1
@@ -210,6 +212,7 @@ class ProviderManager:
                             marketStatus=MarketStatus.OPEN,
                             freshnessSeconds=round(age, 4),
                         )
+                        self._cache.set(symbol=canonical, data=quote, provider_id="oanda", provider_name="OANDA Stream", ttl=30)
                         results[canonical] = MarketQuoteResponse(quote=quote)
         except Exception:
             pass
