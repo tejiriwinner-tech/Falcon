@@ -190,12 +190,6 @@ class SignalService:
                 try:
                     raw_ot_sym = ot.symbol.replace("/", "").upper()
                     pm = getattr(providers, "provider_manager", None)
-                except Exception:
-                    pass
-            batch_quotes = {}
-            if True:
-                try:
-                    pass
                     if pm is not None:
                         cached_e = pm._cache.get(raw_ot_sym, allow_stale=False) if hasattr(pm, "_cache") else None
                         if cached_e and getattr(cached_e.data, "lastPrice", None):
@@ -776,7 +770,7 @@ class SignalService:
                     if not shield_reason and getattr(settings, "ANTI_CLUSTER_ENABLED", True):
                         cluster_conflict = None
                         for exp in cand_exps:
-                            max_cluster_exp = int(getattr(settings, "MAX_CURRENCY_CLUSTER_EXPOSURE", 2) or 2) if getattr(settings, "ENABLE_CURRENCY_CLUSTER_GATE", False) else 4
+                            max_cluster_exp = int(getattr(settings, "MAX_CURRENCY_CLUSTER_EXPOSURE", 2) or 2) if getattr(settings, "ENABLE_CURRENCY_CLUSTER_GATE", False) else 8
                             if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")) and len([s for s in active_currency_baskets.get(exp, "").split(",") if s]) >= max_cluster_exp:
                                 cluster_conflict = (exp, active_currency_baskets[exp])
                                 break
