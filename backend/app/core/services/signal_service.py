@@ -146,6 +146,7 @@ class SignalService:
 
             # Active open positions from TradeJournal (only active strategies, clamped to 1:1.2-1:1.5 R:R)
             seen_open_syms: Set[str] = set()
+            open_symbol_dirs: Dict[str, str] = {}
             step1_seen_sigs: Set[Tuple[str, str, float, float, float]] = set()
             open_trades = [
                 t for t in all_journal_trades
@@ -156,6 +157,7 @@ class SignalService:
                 and (getattr(t, "signalId", None) not in resolved_signal_ids)
                 and (t.symbol.replace("/", "").replace("-", "").upper(), t.direction.upper(), round(float(t.entryPrice or 0.0), 3)) not in resolved_entry_keys
             ]
+            open_trades.sort(key=lambda t: t.tradeDate, reverse=True)
             for ot in open_trades:
                 sig_key = canonical_signal_signature(
                     ot.symbol,
@@ -164,7 +166,11 @@ class SignalService:
                     ot.stopLoss,
                     ot.takeProfit,
                 )
-                ot_norm_sym = f"{ot.symbol.replace('/', '').replace('-', '').upper()}:{ot.strategyId or ''}"
+                ot_base_sym = ot.symbol.replace("/", "").replace("-", "").upper()
+                ot_norm_sym = f"{ot_base_sym}:{ot.strategyId or ''}"
+                if ot_base_sym in open_symbol_dirs and open_symbol_dirs[ot_base_sym] != ot.direction.upper():
+                    continue
+                open_symbol_dirs[ot_base_sym] = ot.direction.upper()
                 if sig_key in step1_seen_sigs or ot_norm_sym in seen_open_syms:
                     continue
                 seen_open_syms.add(ot_norm_sym)
@@ -475,6 +481,7 @@ class SignalService:
             active_symbols: set = {f"{ot.symbol.replace('/', '').replace('-', '').upper()}:{ot.strategyId or ''}" for ot in open_trades}
             watchlist_symbols: set = set()
             active_currency_baskets: Dict[str, str] = {}
+            open_trades.sort(key=lambda t: t.tradeDate, reverse=True)
             for ot in open_trades:
                 ot_status = (ot.status or "").upper()
                 if ot_status in ("OPEN", "FILLED") and ot.closeDate is None:
@@ -698,6 +705,21 @@ class SignalService:
                             )
                             if has_recent_stop:
                                 shield_reason = f"POST-STOP COOLDOWN: Strategy {cand.strategyId} on {symbol} in 45m cooldown following recent stop-out."
+                            else:
+                                chop_cutoff_3h = now - timedelta(hours=3)
+                                recent_sym_losses = [
+                                    t for t in all_closed
+                                    if (t.symbol.replace("/", "").replace("-", "").upper() == norm_sym)
+                                    and (t.status or "").upper() == "CLOSED"
+                                    and (t.result or "").upper() in ("LOST", "LOSS")
+                                    and (t.closeDate is not None and t.closeDate >= chop_cutoff_3h)
+                                ]
+                                if len(recent_sym_losses) >= 2:
+                                    latest_loss_dt = max(t.closeDate for t in recent_sym_losses if t.closeDate is not None)
+                                    if latest_loss_dt >= (now - timedelta(minutes=90)):
+                                        shield_reason = f"ANTI-WHIPSAW CHOP SHIELD: {symbol} recorded {len(recent_sym_losses)} stop-outs in 3h window. 90m volatility cooldown active."
+                            if not shield_reason and norm_sym in open_symbol_dirs and open_symbol_dirs[norm_sym] != direction_str.upper():
+                                shield_reason = f"OPPOSING POSITION SHIELD: Active {open_symbol_dirs[norm_sym]} position already open on {symbol}. Opposing {direction_str.upper()} entry blocked."
                         except Exception as ex:
                             logger.debug(f"Post-stop cooldown check error: {ex}")
 
@@ -708,7 +730,11 @@ class SignalService:
                             is_blk, n_title, n_curr, n_delta, n_phase = economic_calendar_service.check_blackout_status(symbol)
                             if is_blk:
                                 phase_str = f"in {n_delta}m" if n_phase == "UPCOMING" else f"{n_delta}m ago"
-                                shield_reason = f"NEWS BLACKOUT: {n_curr} High-Impact event '{n_title}' {phase_str}. Capital shield active."
+                                shield_reason = f"NEWS BLACKOUT: {n_curr} High/Medium-Impact event '{n_title}' {phase_str}. Capital shield active."
+                            else:
+                                news_cat_eval = economic_calendar_service.evaluate_news_catalyst(symbol, proposed_direction=direction_str)
+                                if news_cat_eval.get("is_counter_news_fade"):
+                                    shield_reason = f"POST-NEWS FADE VETO: {news_cat_eval.get('rationale')}"
                         except Exception as ex:
                             logger.debug(f"News blackout shield check error: {ex}")
 
@@ -793,7 +819,10 @@ class SignalService:
                 # Lifecycle Routing:
                 # 1. Price actively touches entry (or was previously activated) & setup approved + ready & no shields -> ACTIVE
                 # 2. Otherwise -> Watchlist in HOLD / WAITING status
+                if is_already_active and norm_sym in open_symbol_dirs and open_symbol_dirs[norm_sym] != direction_str.upper():
+                    continue
                 if is_already_active or (entry_hit and is_approved and is_ready and not shield_reason):
+                    open_symbol_dirs[norm_sym] = direction_str.upper()
                     item["is_guardian_authorized"] = True
                     for exp in cand_exps:
                         if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")):

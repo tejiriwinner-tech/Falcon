@@ -58,7 +58,7 @@ class SignalGenerationEngine:
         # Minimum institutional distance safety bound:
         # Forex: 10-15 pips minimum (0.0010 for standard majors, 0.15 for JPY)
         # Gold: $3.00 minimum
-        min_dist = 3.00 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.15 if "JPY" in raw_symbol else 0.0010)
+        min_dist = 14.00 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.32 if ("GBP" in raw_symbol and "JPY" in raw_symbol) else (0.25 if "JPY" in raw_symbol else (0.0015 if "AUD" in raw_symbol else 0.0018)))
         if base_stop_dist < min_dist:
             base_stop_dist = min_dist
 
@@ -651,7 +651,7 @@ class SignalGenerationEngine:
                             pattern_conviction = 0.85
                             swing_l = min(c.low for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price - 20 * pip_u)
                             sniper_stop = round(swing_l - 2.0 * pip_u, dec_p)
-                            min_d = 5.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.20 if "JPY" in canonical_symbol else 0.0015)
+                            min_d = 14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018))
                             if abs(entry_price - sniper_stop) < min_d:
                                 sniper_stop = round(entry_price - min_d, dec_p)
                             rr_target = getattr(strategy, "minimumRiskReward", 2.2) or 2.2
@@ -665,7 +665,7 @@ class SignalGenerationEngine:
                             pattern_conviction = 0.85
                             swing_h = max(c.high for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price + 20 * pip_u)
                             sniper_stop = round(swing_h + 2.0 * pip_u, dec_p)
-                            min_d = 5.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.20 if "JPY" in canonical_symbol else 0.0015)
+                            min_d = 14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018))
                             if abs(entry_price - sniper_stop) < min_d:
                                 sniper_stop = round(entry_price + min_d, dec_p)
                             rr_target = getattr(strategy, "minimumRiskReward", 2.2) or 2.2
@@ -762,7 +762,27 @@ class SignalGenerationEngine:
             )
 
             # Condition 4: News Safety
-            news_passed = news_impact != "High"
+            # Condition 4: High & Medium-Impact News Safety + Post-News Catalyst Displacement
+            from app.core.services.economic_calendar_service import economic_calendar_service
+            is_n_blk, n_blk_title, n_blk_ccy, n_blk_mins, n_blk_phase = economic_calendar_service.check_blackout_status(canonical_symbol)
+            news_cat = economic_calendar_service.evaluate_news_catalyst(
+                symbol=canonical_symbol,
+                proposed_direction=direction.value,
+                candles=candles_1h,
+            )
+            is_counter_news_fade = bool(news_cat.get("is_counter_news_fade", False))
+            news_passed = (not is_n_blk) and (not is_counter_news_fade)
+            if is_n_blk:
+                news_desc = f"Pre/Release News Shield: {n_blk_ccy} event '{n_blk_title}' ({n_blk_phase} {n_blk_mins}m). Holding entry."
+            elif news_cat.get("in_post_news_window"):
+                news_desc = news_cat.get("rationale", f"Current news impact level is {news_impact}.")
+            else:
+                news_desc = f"Current news impact level is {news_impact} (No conflicting High/Medium-impact catalyst)."
+            news_cond = CandidateCondition(
+                title="News Safety & Catalyst Alignment",
+                description=news_desc,
+                passed=news_passed
+            )
             news_cond = CandidateCondition(
                 title="News Safety",
                 description=f"Current news impact level is {news_impact}.",
@@ -804,7 +824,7 @@ class SignalGenerationEngine:
                 pattern_score = int(round(pattern_conviction * 100))
                 confidence = int(round(0.60 * pattern_score + 0.40 * base_confidence))
                 # Apply Macro Cross-Asset modifier
-                confidence = int(round(confidence + macro_eval.confidence_modifier))
+                confidence = int(round(confidence + macro_eval.confidence_modifier + int(news_cat.get("confidence_modifier", 0) or 0)))
                 # Institutional hard bounds: high-grade setups calibrated between 40% and 88%
                 confidence = max(40, min(88, confidence))
             else:
@@ -837,6 +857,8 @@ class SignalGenerationEngine:
 
             if macro_eval.is_macro_trap:
                 readiness_score = min(readiness_score, 40)
+            elif is_n_blk or is_counter_news_fade:
+                readiness_score = min(readiness_score, 58)
             elif (has_sniper_setup or trend_passed) and spread_passed and news_passed and session_passed and direction != CandidateDirection.WAIT:
                 readiness_score = max(readiness_score, 88)
             elif not has_sniper_setup and not trend_passed:
@@ -909,7 +931,7 @@ class SignalGenerationEngine:
                 strategy_type=strat_type_val,
                 session_name=session,
             )
-            adaptive_mult = tuning_profile.adaptive_stop_multiplier
+            adaptive_mult = round(tuning_profile.adaptive_stop_multiplier * float(news_cat.get("stop_multiplier", 1.0) or 1.0), 2)
             recovery_mult = getattr(tuning_profile, "profit_recovery_multiplier", 1.0) or 1.0
             recovery_status = getattr(tuning_profile, "recovery_status", "BASELINE") or "BASELINE"
 
