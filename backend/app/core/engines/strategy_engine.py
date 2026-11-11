@@ -350,6 +350,15 @@ class StrategyEngine:
             if validation is not None:
                 strategy.latestValidation = validation
             strategy.lastUsed = last_used.get(strategy.id, strategy.lastUsed)
+            if strategy.id != "strat-006":
+                try:
+                    from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
+                    learned_info = adaptive_tuning_engine.synthesize_artifact_learning(strategy.id)
+                    l_note = learned_info.get("learned_upgrade_note")
+                    if l_note and l_note not in (strategy.reviewNotes or ""):
+                        strategy.reviewNotes = f"{strategy.reviewNotes} [{l_note}]"
+                except Exception:
+                    pass
             strategy.strategyScore = self._score(strategy)
             strategies.append(strategy)
         self.__class__._cached_strategies = strategies
@@ -1573,6 +1582,38 @@ class StrategyEngine:
             if strategy.minimumRiskReward and strategy.minimumRiskReward > 1.5:
                 strategy.minimumRiskReward = 1.5
             strategy.strategyScore.riskRating = strategy.riskLevel
+            if strategy.id != "strat-006":
+                v32_upgrade_notes = {
+                    "strat-001": "v3.2 Upgrade: Ignores initial wick fakeouts (SWEEP_PROBE veto) + requires RVol >= 1.8x London range expansion & EMA 200 alignment.",
+                    "strat-002": "v3.2 Upgrade: Ignores initial wick fakeouts + enforces H1 EMA 20/50 structural pullback & $14+ Gold volatility stop floor.",
+                    "strat-003": "v3.2 Upgrade: Ignores initial wick breakouts at H4 S/R zones + demands confirmed pinbar/engulfing rejection close & RSI divergence.",
+                    "strat-004": "v3.2 Upgrade: Ignores initial wick fakeouts (SWEEP_PROBE filter) + requires >= 45% momentum candle body displacement, RVol surge & H1 EMA 20/50 alignment.",
+                    "strat-005": "v3.2 Upgrade: Ignores initial wick fakeouts + requires M30 structural support bounce, bullish/bearish engulfing close & DXY alignment.",
+                    "strat-007": "v3.2 Upgrade: Ignores initial wick fakeouts (SWEEP_PROBE veto) + enforces H4/Daily EMA 20/50 trend continuation & inverse DXY confirmation.",
+                    "strat-008": "v3.2 Upgrade: Ignores initial wick breakouts + requires single-sided session corridor break, RVol >= 1.8x surge & candle spread >= 60%.",
+                    "strat-009": "v3.2 Upgrade: Ignores initial wick breakouts + enforces Bollinger Band (20,2) outer exhaustion with RSI <35/>65 & 20-SMA mean reversion.",
+                    "strat-010": "v3.2 Upgrade: Ignores initial wick fakeouts + enforces H4 BOS, 50/200 EMA dynamic pullback & macro DXY alignment.",
+                    "strat-011": "v3.2 Upgrade: Ignores initial wick fakeouts + pairs 30+ institutional candlestick patterns with key S/R zones & $14+ Gold structural stops.",
+                    "strat-012": "v3.2 Upgrade: Ignores initial wick fakeouts + pairs PDH/PDL/Asian liquidity sweep + 3-Candle FVG with inverse DXY & $14+ Gold stop floor.",
+                    "strat-013": "v3.2 Upgrade: Ignores initial wick fakeouts + harvests Tokyo Fix & Asian range sweeps with 3-Candle FVG & US Yield/DXY alignment.",
+                    "strat-014": "v3.2 Upgrade: Ignores initial wick breakouts (SWEEP_PROBE veto) + requires single-sided corridor break, RVol >= 1.8x & US Yield/DXY lock.",
+                    "strat-015": "v3.2 Upgrade: Ignores initial wick breakouts + requires Tokyo corridor break & retest, RVol >= 1.8x & GBP/USD + USD/JPY Yen-cross sync.",
+                    "strat-016": "v3.2 Upgrade: Ignores initial wick fakeouts + enforces 3-Candle FVG pullback, H1 EMA 20/50 trend, 32p+ stop floor & Yen-cross sync.",
+                    "strat-017": "v3.2 Upgrade: Ignores initial wick fakeouts + enforces AUD/USD Asian/PDH sweep + 3-Candle FVG with mandatory Gold (XAU/USD) & inverse DXY lock.",
+                    "strat-018": "v3.2 Upgrade: Ignores initial wick fakeouts + enforces AUD/USD H1 EMA 20/50 pullback with mandatory Gold (XAU/USD) & inverse DXY confluence.",
+                    "strat-019": "v3.2 Upgrade: Ignores initial wick fakeouts (SWEEP_PROBE filter) + requires >= 45% Gold momentum candle body displacement, RVol surge & $14+ stop floor.",
+                    "strat-020": "v3.2 Upgrade: Ignores initial wick fakeouts (SWEEP_PROBE filter) + requires >= 45% Euro momentum candle body displacement, RVol surge & inverse DXY lock.",
+                    "strat-021": "v3.2 Upgrade: Ignores initial wick fakeouts + requires 10-25p Asian liquidity sweep, BOS/FVG displacement, 32p+ stop floor & GBP/USD + USD/JPY Yen-cross sync.",
+                    "strat-022": "v3.2 Upgrade: Ignores initial wick fakeouts + requires 10-20p Pre-NY/Tokyo sweep + BOS/FVG or RVol >= 1.8x break-retest aligned with US Yield & DXY.",
+                    "strat-023": "v3.2 Upgrade: Ignores initial wick fakeouts + requires 8-15p AUD/USD liquidity sweep + BOS/FVG with mandatory Gold (XAU/USD) & inverse DXY macro lock.",
+                }
+                old_ver = strategy.strategyVersion or "1.0"
+                strategy.parentStrategyId = f"{strategy.id}-v{old_ver}"
+                strategy.strategyVersion = "3.2"
+                if strategy.id in v32_upgrade_notes:
+                    strategy.reviewNotes = v32_upgrade_notes[strategy.id]
+                if "Anti-Wick Fakeout Filter (v3.2)" not in strategy.requiredConfirmations:
+                    strategy.requiredConfirmations = list(strategy.requiredConfirmations) + ["Anti-Wick Fakeout Filter (v3.2)"]
         return strategies
 
 

@@ -802,7 +802,48 @@ class SignalGenerationEngine:
                 passed=not macro_eval.is_macro_trap,
             )
 
-            conditions = [trend_cond, session_cond, spread_cond, news_cond, macro_cond]
+            # Condition 6: Falcon v3.2 Anti-Wick Fakeout & Unique Strategy Specialization Gate (strat-006 untouched)
+            v32_spec_passed = True
+            v32_spec_desc = "v3.2 Anti-Wick Fakeout & Strategy Specialization confirmed."
+            sid_val = getattr(strategy, "id", "") or ""
+            if sid_val != "strat-006" and direction != CandidateDirection.WAIT and candles_1h and len(candles_1h) >= 4:
+                try:
+                    from app.core.engines.session_breakout_engine import session_breakout_engine
+                    sw_check = session_breakout_engine.evaluate_sweep_retest(canonical_symbol, direction.value, candles_1h)
+                    # 1. Anti-Wick Fakeout Filter (borrowed from European Breakout v3.1) for Breakout/Momentum/Trend strategies
+                    if sid_val in ("strat-001", "strat-002", "strat-004", "strat-007", "strat-008", "strat-010", "strat-014", "strat-015", "strat-018", "strat-019", "strat-020") and sw_check.phase == "SWEEP_PROBE":
+                        v32_spec_passed = False
+                        v32_spec_desc = f"v3.2 Anti-Wick Fakeout Veto: {sw_check.tactical_note}"
+                    # 2. AUD/USD Secret Weapon: Gold (XAU/USD) Confluence Gate (strat-017, strat-018, strat-023)
+                    if v32_spec_passed and sid_val in ("strat-017", "strat-018", "strat-023"):
+                        xau_bars = cached_bars_1h.get("XAUUSD") or []
+                        if len(xau_bars) >= 4 and xau_bars[-4].close > 0:
+                            xau_chg_pct = ((xau_bars[-1].close - xau_bars[-4].close) / xau_bars[-4].close) * 100.0
+                            if (direction == CandidateDirection.BUY and xau_chg_pct < -0.15) or (direction == CandidateDirection.SELL and xau_chg_pct > 0.15):
+                                v32_spec_passed = False
+                                v32_spec_desc = f"v3.2 Gold-Macro Divergence Veto: XAU/USD ({xau_chg_pct:+.2f}%) diverging against {direction.value} AUD/USD."
+                            else:
+                                v32_spec_desc = f"v3.2 Secret Weapon Confirmed: Gold (XAU/USD {xau_chg_pct:+.2f}%) & Inverse DXY aligned with {direction.value} AUD/USD."
+                    # 3. GBP/JPY Yen-Cross Synchronization Gate (strat-015, strat-016, strat-021)
+                    if v32_spec_passed and sid_val in ("strat-015", "strat-016", "strat-021"):
+                        gu_bars = cached_bars_1h.get("GBPUSD") or []
+                        uj_bars = cached_bars_1h.get("USDJPY") or []
+                        if len(gu_bars) >= 4 and len(uj_bars) >= 4 and gu_bars[-4].close > 0 and uj_bars[-4].close > 0:
+                            gu_chg = ((gu_bars[-1].close - gu_bars[-4].close) / gu_bars[-4].close) * 100.0
+                            uj_chg = ((uj_bars[-1].close - uj_bars[-4].close) / uj_bars[-4].close) * 100.0
+                            if (gu_chg > 0.15 and uj_chg < -0.15) or (gu_chg < -0.15 and uj_chg > 0.15):
+                                v32_spec_passed = False
+                                v32_spec_desc = f"v3.2 Yen-Cross Whipsaw Veto: GBP/USD ({gu_chg:+.2f}%) and USD/JPY ({uj_chg:+.2f}%) diverging."
+                            else:
+                                v32_spec_desc = f"v3.2 Yen-Cross Sync Confirmed: GBP/USD ({gu_chg:+.2f}%) & USD/JPY ({uj_chg:+.2f}%) aligned."
+                except Exception:
+                    pass
+            v32_spec_cond = CandidateCondition(
+                title="v3.2 Anti-Fakeout & Specialization Gate",
+                description=v32_spec_desc,
+                passed=v32_spec_passed,
+            )
+            conditions = [trend_cond, session_cond, spread_cond, news_cond, macro_cond] if sid_val == "strat-006" else [trend_cond, session_cond, spread_cond, news_cond, macro_cond, v32_spec_cond]
 
             # ── 4. Calculate Confidence Breakdown & Final Conviction ──────────
             # Realistic institutional scoring: max confidence bounded at 88% to avoid artificial certainty
@@ -857,8 +898,8 @@ class SignalGenerationEngine:
 
             if macro_eval.is_macro_trap:
                 readiness_score = min(readiness_score, 40)
-            elif is_n_blk or is_counter_news_fade:
-                readiness_score = min(readiness_score, 58)
+            elif is_n_blk or is_counter_news_fade or not v32_spec_passed:
+                readiness_score = min(readiness_score, 62)
             elif (has_sniper_setup or trend_passed) and spread_passed and news_passed and session_passed and direction != CandidateDirection.WAIT:
                 readiness_score = max(readiness_score, 88)
             elif not has_sniper_setup and not trend_passed:
