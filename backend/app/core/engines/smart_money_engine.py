@@ -29,6 +29,17 @@ class FairValueGap:
 
 
 @dataclass
+class InversionFairValueGap:
+    original_direction: str      # "BULLISH" or "BEARISH"
+    inversion_direction: str     # "BEARISH" (broken bullish FVG) or "BULLISH" (broken bearish FVG)
+    top: float
+    bottom: float
+    midpoint: float
+    inversion_candle_index: int
+    broken_by_price: float
+
+
+@dataclass
 class LiquiditySweepSignal:
     symbol: str
     detected: bool
@@ -45,6 +56,9 @@ class LiquiditySweepSignal:
     confidence_bonus: int = 0
     rationale: str = ""
     tags: List[str] = field(default_factory=list)
+    order_book_cluster_swept: bool = False
+    retail_contrarian_aligned: bool = False
+    dom_imbalance: float = 0.0
 
 
 class SmartMoneyEngine:
@@ -115,6 +129,44 @@ class SmartMoneyEngine:
 
         return fvgs
 
+    def detect_inversion_fair_value_gaps(self, candles: List[Any], lookback: int = 16) -> List[InversionFairValueGap]:
+        """
+        Detect Inversion Fair Value Gaps (IFVGs) — The Anti-Retail Trap Engine.
+        When retail traders buy/sell into an FVG and institutional volume blows straight through it,
+        the imbalance flips polarity:
+        - Broken Bullish FVG (close < bottom) -> Bearish Inversion FVG (institutional resistance where retail buyers are trapped).
+        - Broken Bearish FVG (close > top) -> Bullish Inversion FVG (institutional support where retail sellers are squeezed).
+        """
+        ifvgs: List[InversionFairValueGap] = []
+        fvgs = self.detect_fair_value_gaps(candles, lookback=lookback)
+        n = len(candles)
+        for fvg in fvgs:
+            for j in range(fvg.candle_index + 1, n):
+                _, _, _, c, _ = self._extract_ohlc(candles[j])
+                if fvg.direction == "BULLISH" and c < fvg.bottom:
+                    ifvgs.append(InversionFairValueGap(
+                        original_direction="BULLISH",
+                        inversion_direction="BEARISH",
+                        top=fvg.top,
+                        bottom=fvg.bottom,
+                        midpoint=fvg.midpoint,
+                        inversion_candle_index=j,
+                        broken_by_price=round(c, 5),
+                    ))
+                    break
+                elif fvg.direction == "BEARISH" and c > fvg.top:
+                    ifvgs.append(InversionFairValueGap(
+                        original_direction="BEARISH",
+                        inversion_direction="BULLISH",
+                        top=fvg.top,
+                        bottom=fvg.bottom,
+                        midpoint=fvg.midpoint,
+                        inversion_candle_index=j,
+                        broken_by_price=round(c, 5),
+                    ))
+                    break
+        return ifvgs
+
     def analyze_liquidity_sweep(
         self, symbol: str, candles: List[Any]
     ) -> LiquiditySweepSignal:
@@ -180,10 +232,9 @@ class SmartMoneyEngine:
                 stop_loss = round(entry_price - min_risk, decimals)
                 risk = min_risk
 
-            # Target opposite liquidity pool or minimum 3.2R asymmetric target
-            structural_target = max(pdh, entry_price + (risk * 3.2))
-            take_profit = round(min(structural_target, entry_price + (risk * 4.5)), decimals)
-            rr = round(abs(take_profit - entry_price) / risk, 2) if risk > 0 else 3.2
+            # Disciplined target: 1:1.2 to 1:1.5 maximum (quant-calibrated at 1.4R)
+            take_profit = round(entry_price + (risk * 1.4), decimals)
+            rr = 1.4
 
             has_fvg = bullish_fvg is not None
             bonus = 18 if has_fvg else 12
@@ -236,9 +287,9 @@ class SmartMoneyEngine:
                 stop_loss = round(entry_price + min_risk, decimals)
                 risk = min_risk
 
-            structural_target = min(pdl, entry_price - (risk * 3.2))
-            take_profit = round(max(structural_target, entry_price - (risk * 4.5)), decimals)
-            rr = round(abs(entry_price - take_profit) / risk, 2) if risk > 0 else 3.2
+            # Disciplined target: 1:1.2 to 1:1.5 maximum (quant-calibrated at 1.4R)
+            take_profit = round(entry_price - (risk * 1.4), decimals)
+            rr = 1.4
 
             has_fvg = bearish_fvg is not None
             bonus = 18 if has_fvg else 12
@@ -272,13 +323,85 @@ class SmartMoneyEngine:
                 tags=tags,
             )
 
-        # 3. Pure Displacement Fair Value Gap Continuation (if no sweep on exact last bar, check fresh FVG near key pool)
+        # 3. Institutional Anti-Trap: Inversion Fair Value Gap (IFVG) Reversal
+        # Exploits when retail traders get trapped in an FVG and institutions violate it
+        ifvgs = self.detect_inversion_fair_value_gaps(candles, lookback=12)
+        for ifvg in reversed(ifvgs):
+            # Bearish Inversion (Retail buyers trapped): price rallies up into [bottom, top] but fails to close above top
+            if ifvg.inversion_direction == "BEARISH" and ifvg.inversion_candle_index < len(candles) - 1:
+                if recent_high_wick >= ifvg.bottom and close_last <= ifvg.top and close_last < o_last:
+                    stop_loss = round(ifvg.top + pip_buffer, decimals)
+                    entry_price = round(close_last, decimals)
+                    risk = abs(stop_loss - entry_price)
+                    min_risk = 2.50 if is_gold else (0.08 if is_jpy else 0.0008)
+                    if risk < min_risk:
+                        stop_loss = round(entry_price + min_risk, decimals)
+                        risk = min_risk
+                    # Disciplined target: 1:1.2 to 1:1.5 maximum (quant-calibrated at 1.35R)
+                    take_profit = round(entry_price - (risk * 1.35), decimals)
+                    rr = 1.35
+                    return LiquiditySweepSignal(
+                        symbol=symbol,
+                        detected=True,
+                        direction="SELL",
+                        swept_pool_type="INVERSION_FVG_RESISTANCE",
+                        swept_level=ifvg.midpoint,
+                        sweep_wick_extreme=recent_high_wick,
+                        rejection_close=entry_price,
+                        fvg=None,
+                        entry_price=entry_price,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
+                        risk_reward=rr,
+                        confidence_bonus=16,
+                        rationale=(
+                            f"Institutional Anti-Trap (Bearish IFVG): Retail buyers trapped at [{ifvg.bottom:.{decimals}f}-{ifvg.top:.{decimals}f}]. "
+                            f"Inversion retest rejected at {entry_price:.{decimals}f} (R:R 1:{rr:.1f})."
+                        ),
+                        tags=["SMC_INVERSION_FVG", "ANTI_RETAIL_TRAP", "TRAPPED_BUYERS_LIQUIDATED"],
+                    )
+
+            # Bullish Inversion (Retail sellers trapped): price drops down into [bottom, top] but fails to close below bottom
+            elif ifvg.inversion_direction == "BULLISH" and ifvg.inversion_candle_index < len(candles) - 1:
+                if recent_low_wick <= ifvg.top and close_last >= ifvg.bottom and close_last > o_last:
+                    stop_loss = round(ifvg.bottom - pip_buffer, decimals)
+                    entry_price = round(close_last, decimals)
+                    risk = abs(entry_price - stop_loss)
+                    min_risk = 2.50 if is_gold else (0.08 if is_jpy else 0.0008)
+                    if risk < min_risk:
+                        stop_loss = round(entry_price - min_risk, decimals)
+                        risk = min_risk
+                    # Disciplined target: 1:1.2 to 1:1.5 maximum (quant-calibrated at 1.35R)
+                    take_profit = round(entry_price + (risk * 1.35), decimals)
+                    rr = 1.35
+                    return LiquiditySweepSignal(
+                        symbol=symbol,
+                        detected=True,
+                        direction="BUY",
+                        swept_pool_type="INVERSION_FVG_SUPPORT",
+                        swept_level=ifvg.midpoint,
+                        sweep_wick_extreme=recent_low_wick,
+                        rejection_close=entry_price,
+                        fvg=None,
+                        entry_price=entry_price,
+                        stop_loss=stop_loss,
+                        take_profit=take_profit,
+                        risk_reward=rr,
+                        confidence_bonus=16,
+                        rationale=(
+                            f"Institutional Anti-Trap (Bullish IFVG): Retail sellers trapped at [{ifvg.bottom:.{decimals}f}-{ifvg.top:.{decimals}f}]. "
+                            f"Inversion retest bounced at {entry_price:.{decimals}f} (R:R 1:{rr:.1f})."
+                        ),
+                        tags=["SMC_INVERSION_FVG", "ANTI_RETAIL_TRAP", "TRAPPED_SELLERS_SQUEEZED"],
+                    )
+
+        # 4. Pure Displacement Fair Value Gap Continuation (if no sweep or inversion on exact last bar, check fresh FVG near key pool)
         if bullish_fvg and bullish_fvg.candle_index >= len(candles) - 2 and close_last >= bullish_fvg.bottom:
             entry_price = round(close_last, decimals)
             stop_loss = round(min(l_last, bullish_fvg.bottom) - pip_buffer, decimals)
             risk = max(abs(entry_price - stop_loss), 2.50 if is_gold else (0.08 if is_jpy else 0.0008))
             stop_loss = round(entry_price - risk, decimals)
-            take_profit = round(entry_price + (risk * 3.0), decimals)
+            take_profit = round(entry_price + (risk * 1.3), decimals)
             return LiquiditySweepSignal(
                 symbol=symbol,
                 detected=True,
@@ -291,11 +414,11 @@ class SmartMoneyEngine:
                 entry_price=entry_price,
                 stop_loss=stop_loss,
                 take_profit=take_profit,
-                risk_reward=3.0,
+                risk_reward=1.3,
                 confidence_bonus=10,
                 rationale=(
                     f"Institutional Bullish Fair Value Gap displacement [{bullish_fvg.bottom:.{decimals}f}-"
-                    f"{bullish_fvg.top:.{decimals}f}] with 50% CE at {bullish_fvg.midpoint:.{decimals}f} (R:R 1:3.0)."
+                    f"{bullish_fvg.top:.{decimals}f}] with 50% CE at {bullish_fvg.midpoint:.{decimals}f} (R:R 1:1.3)."
                 ),
                 tags=["SMC_FVG_DISPLACEMENT", "BULLISH_FVG"],
             )
@@ -305,7 +428,7 @@ class SmartMoneyEngine:
             stop_loss = round(max(h_last, bearish_fvg.top) + pip_buffer, decimals)
             risk = max(abs(stop_loss - entry_price), 2.50 if is_gold else (0.08 if is_jpy else 0.0008))
             stop_loss = round(entry_price + risk, decimals)
-            take_profit = round(entry_price - (risk * 3.0), decimals)
+            take_profit = round(entry_price - (risk * 1.3), decimals)
             return LiquiditySweepSignal(
                 symbol=symbol,
                 detected=True,
@@ -318,11 +441,11 @@ class SmartMoneyEngine:
                 entry_price=entry_price,
                 stop_loss=stop_loss,
                 take_profit=take_profit,
-                risk_reward=3.0,
+                risk_reward=1.3,
                 confidence_bonus=10,
                 rationale=(
                     f"Institutional Bearish Fair Value Gap displacement [{bearish_fvg.bottom:.{decimals}f}-"
-                    f"{bearish_fvg.top:.{decimals}f}] with 50% CE at {bearish_fvg.midpoint:.{decimals}f} (R:R 1:3.0)."
+                    f"{bearish_fvg.top:.{decimals}f}] with 50% CE at {bearish_fvg.midpoint:.{decimals}f} (R:R 1:1.3)."
                 ),
                 tags=["SMC_FVG_DISPLACEMENT", "BEARISH_FVG"],
             )

@@ -111,6 +111,10 @@ class ProviderManager:
                             bid=tick["bid"],
                             ask=tick["ask"],
                             spread=tick["spread"],
+                            bidLiquidity=tick.get("bidLiquidity"),
+                            askLiquidity=tick.get("askLiquidity"),
+                            domImbalance=tick.get("domImbalance"),
+                            depthTiers=tick.get("depthTiers"),
                         ),
                         lastPrice=tick.get("last", tick["bid"]),
                         change=0.0,
@@ -121,6 +125,10 @@ class ProviderManager:
                         quoteStatus=QuoteStatus.LIVE,
                         marketStatus=MarketStatus.OPEN,
                         freshnessSeconds=round(age, 4),
+                        bidLiquidity=tick.get("bidLiquidity"),
+                        askLiquidity=tick.get("askLiquidity"),
+                        domImbalance=tick.get("domImbalance"),
+                        depthTiers=tick.get("depthTiers"),
                     )
                     self._cache.set(symbol=canonical, data=quote, provider_id="oanda", provider_name="OANDA Stream", ttl=30)
                     self._successful_requests += 1
@@ -201,6 +209,10 @@ class ProviderManager:
                                 bid=tick["bid"],
                                 ask=tick["ask"],
                                 spread=tick["spread"],
+                            bidLiquidity=tick.get("bidLiquidity"),
+                            askLiquidity=tick.get("askLiquidity"),
+                            domImbalance=tick.get("domImbalance"),
+                            depthTiers=tick.get("depthTiers"),
                             ),
                             lastPrice=tick.get("last", tick["bid"]),
                             change=0.0,
@@ -211,6 +223,10 @@ class ProviderManager:
                             quoteStatus=QuoteStatus.LIVE,
                             marketStatus=MarketStatus.OPEN,
                             freshnessSeconds=round(age, 4),
+                        bidLiquidity=tick.get("bidLiquidity"),
+                        askLiquidity=tick.get("askLiquidity"),
+                        domImbalance=tick.get("domImbalance"),
+                        depthTiers=tick.get("depthTiers"),
                         )
                         self._cache.set(symbol=canonical, data=quote, provider_id="oanda", provider_name="OANDA Stream", ttl=30)
                         results[canonical] = MarketQuoteResponse(quote=quote)
@@ -244,6 +260,10 @@ class ProviderManager:
                             bid=raw_data["bid"],
                             ask=raw_data["ask"],
                             spread=raw_data["spread"],
+                    bidLiquidity=raw_data.get("bidLiquidity"),
+                    askLiquidity=raw_data.get("askLiquidity"),
+                    domImbalance=raw_data.get("domImbalance"),
+                    depthTiers=raw_data.get("depthTiers"),
                         ),
                         lastPrice=raw_data.get("lastPrice", raw_data.get("mid", 0.0)),
                         change=raw_data.get("change", 0.0),
@@ -258,6 +278,10 @@ class ProviderManager:
                         quoteStatus=QuoteStatus.LIVE,
                         marketStatus=MarketStatus.OPEN,
                         freshnessSeconds=freshness,
+                bidLiquidity=raw_data.get("bidLiquidity"),
+                askLiquidity=raw_data.get("askLiquidity"),
+                domImbalance=raw_data.get("domImbalance"),
+                depthTiers=raw_data.get("depthTiers"),
                     )
                     self._cache.set(
                         symbol=c_sym,
@@ -283,6 +307,27 @@ class ProviderManager:
     # ──────────────────────────────────────────────────────────────────
     # Internal fetch with state-aware skip + adaptive TTL
     # ──────────────────────────────────────────────────────────────────
+
+    def get_order_book_snapshot(self, raw_symbol: str) -> Dict[str, Any]:
+        """Retrieve cached OANDA OrderBook & PositionBook stop-cluster snapshot (5-min TTL)."""
+        canonical = self._mapper.normalize(raw_symbol) or raw_symbol.replace("/", "").upper()
+        oanda = self._registry.get("oanda")
+        if oanda and getattr(oanda, "configured", False) and hasattr(oanda, "fetch_order_and_position_book"):
+            try:
+                return oanda.fetch_order_and_position_book(canonical)
+            except Exception as ex:
+                logger.debug("[ProviderManager] OrderBook snapshot error for %s: %s", canonical, ex)
+        return {
+            "symbol": canonical,
+            "available": False,
+            "spotPrice": 0.0,
+            "stopLossClusterAbove": None,
+            "stopLossClusterAbovePct": 0.0,
+            "stopLossClusterBelow": None,
+            "stopLossClusterBelowPct": 0.0,
+            "retailNetLongPct": 50.0,
+            "contrarianBias": "NEUTRAL",
+        }
 
     def _compute_quote_age_seconds(self, ts: Any) -> float:
         try:
@@ -396,6 +441,10 @@ class ProviderManager:
                     bid=raw_data["bid"],
                     ask=raw_data["ask"],
                     spread=raw_data["spread"],
+                    bidLiquidity=raw_data.get("bidLiquidity"),
+                    askLiquidity=raw_data.get("askLiquidity"),
+                    domImbalance=raw_data.get("domImbalance"),
+                    depthTiers=raw_data.get("depthTiers"),
                 ),
                 lastPrice=raw_data.get("lastPrice", raw_data.get("mid", 0.0)),
                 change=raw_data.get("change", 0.0),
@@ -410,6 +459,10 @@ class ProviderManager:
                 quoteStatus=QuoteStatus.LIVE,
                 marketStatus=MarketStatus.OPEN,
                 freshnessSeconds=freshness,
+                bidLiquidity=raw_data.get("bidLiquidity"),
+                askLiquidity=raw_data.get("askLiquidity"),
+                domImbalance=raw_data.get("domImbalance"),
+                depthTiers=raw_data.get("depthTiers"),
             )
 
             # ── Adaptive TTL ───────────────────────────────────────────

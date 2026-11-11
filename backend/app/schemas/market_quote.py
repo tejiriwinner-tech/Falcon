@@ -24,6 +24,10 @@ class BidAsk(BaseModel):
     bid: float
     ask: float
     spread: float
+    bidLiquidity: Optional[float] = None
+    askLiquidity: Optional[float] = None
+    domImbalance: Optional[float] = None
+    depthTiers: Optional[int] = None
 
 
 class MarketQuote(BaseModel):
@@ -38,6 +42,10 @@ class MarketQuote(BaseModel):
     quoteStatus: QuoteStatus = QuoteStatus.LIVE
     marketStatus: MarketStatus = MarketStatus.OPEN
     freshnessSeconds: float = 0.0
+    bidLiquidity: Optional[float] = None
+    askLiquidity: Optional[float] = None
+    domImbalance: Optional[float] = None
+    depthTiers: Optional[int] = None
 
 
 class MarketQuoteResponse(BaseModel):

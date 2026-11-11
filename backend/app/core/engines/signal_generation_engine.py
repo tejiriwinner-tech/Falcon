@@ -843,7 +843,45 @@ class SignalGenerationEngine:
                 description=v32_spec_desc,
                 passed=v32_spec_passed,
             )
-            conditions = [trend_cond, session_cond, spread_cond, news_cond, macro_cond] if sid_val == "strat-006" else [trend_cond, session_cond, spread_cond, news_cond, macro_cond, v32_spec_cond]
+            # Condition 7: Stage 2 Institutional Order Flow (L2 DOM Imbalance, OANDA OrderBook Stop-Clusters & CFTC COT)
+            s2_dom_passed = True
+            s2_conviction_delta = 0
+            s2_flow_desc = "Stage 2 Institutional Order Flow & COT neutral."
+            if sid_val != "strat-006" and direction != CandidateDirection.WAIT:
+                try:
+                    from app.core.engines.order_flow_engine import order_flow_engine
+                    from app.core.providers.oanda_streaming_service import oanda_streaming_service
+                    live_dom_imb = None
+                    if quote_entry and hasattr(quote_entry, "data") and isinstance(quote_entry.data, MarketQuote):
+                        live_dom_imb = getattr(quote_entry.data, "domImbalance", None)
+                    if live_dom_imb is None:
+                        tick_d = oanda_streaming_service.get_latest_tick(canonical_symbol)
+                        if tick_d:
+                            live_dom_imb = tick_d.get("domImbalance")
+                    ob_snap = None
+                    if hasattr(provider_manager, "get_order_book_snapshot"):
+                        ob_snap = provider_manager.get_order_book_snapshot(canonical_symbol)
+                    of_decomp = order_flow_engine.analyze_order_flow(candles=candles_1h, symbol=canonical_symbol)
+                    s2_eval = order_flow_engine.evaluate_dom_and_absorption(
+                        symbol=canonical_symbol,
+                        direction=direction.value,
+                        entry_price=entry_price,
+                        dom_imbalance=live_dom_imb,
+                        order_book_snapshot=ob_snap,
+                        decomp=of_decomp,
+                    )
+                    s2_conviction_delta = s2_eval.conviction_delta
+                    s2_flow_desc = s2_eval.telemetry_tag
+                    if s2_eval.opposing_liquidity_wall:
+                        s2_dom_passed = False
+                except Exception:
+                    pass
+            s2_flow_cond = CandidateCondition(
+                title="Stage 2 Institutional DOM & COT Flow",
+                description=s2_flow_desc,
+                passed=s2_dom_passed,
+            )
+            conditions = [trend_cond, session_cond, spread_cond, news_cond, macro_cond] if sid_val == "strat-006" else [trend_cond, session_cond, spread_cond, news_cond, macro_cond, v32_spec_cond, s2_flow_cond]
 
             # ── 4. Calculate Confidence Breakdown & Final Conviction ──────────
             # Realistic institutional scoring: max confidence bounded at 88% to avoid artificial certainty
@@ -865,7 +903,7 @@ class SignalGenerationEngine:
                 pattern_score = int(round(pattern_conviction * 100))
                 confidence = int(round(0.60 * pattern_score + 0.40 * base_confidence))
                 # Apply Macro Cross-Asset modifier
-                confidence = int(round(confidence + macro_eval.confidence_modifier + int(news_cat.get("confidence_modifier", 0) or 0)))
+                confidence = int(round(confidence + macro_eval.confidence_modifier + int(news_cat.get("confidence_modifier", 0) or 0) + s2_conviction_delta))
                 # Institutional hard bounds: high-grade setups calibrated between 40% and 88%
                 confidence = max(40, min(88, confidence))
             else:
@@ -898,7 +936,7 @@ class SignalGenerationEngine:
 
             if macro_eval.is_macro_trap:
                 readiness_score = min(readiness_score, 40)
-            elif is_n_blk or is_counter_news_fade or not v32_spec_passed:
+            elif is_n_blk or is_counter_news_fade or not v32_spec_passed or not s2_dom_passed:
                 readiness_score = min(readiness_score, 62)
             elif (has_sniper_setup or trend_passed) and spread_passed and news_passed and session_passed and direction != CandidateDirection.WAIT:
                 readiness_score = max(readiness_score, 88)

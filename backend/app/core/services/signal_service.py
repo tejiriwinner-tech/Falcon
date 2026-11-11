@@ -761,6 +761,13 @@ class SignalService:
                                 max_allowed_spread = baseline_max
                                 if spread_pips > max_allowed_spread:
                                     shield_reason = f"SPREAD SPIKE: Live spread {spread_pips:.1f} pips exceeds {max_allowed_spread:.1f} limit. Entry held."
+                                elif getattr(cand, "strategyId", "") != "strat-006":
+                                    live_dom = getattr(quote_resp.quote, "domImbalance", None)
+                                    if live_dom is None and getattr(quote_resp.quote, "bidAsk", None):
+                                        live_dom = getattr(quote_resp.quote.bidAsk, "domImbalance", None)
+                                    if live_dom is not None:
+                                        if (direction_str.upper() == "BUY" and live_dom <= -0.55) or (direction_str.upper() == "SELL" and live_dom >= 0.55):
+                                            shield_reason = f"L2 DOM LIQUIDITY WALL SHIELD: Opposing institutional order-book wall (DOM Imbalance {live_dom:+.2f}) at entry. Waiting for absorption."
                         except Exception as ex:
                             logger.debug(f"Spread spike shield check error: {ex}")
 
@@ -1214,7 +1221,11 @@ class SignalService:
             atr14=atr_val,
             quantGrade=audit_res.grade,
             estDeltaBadge=audit_res.est_delta_badge,
-            tacticalAdvice=audit_res.tactical_advice,
+            tacticalAdvice=(
+                audit_res.tactical_advice
+                if getattr(candidate, "strategyId", "") == "strat-006"
+                else f"{audit_res.tactical_advice} | {order_flow_engine.evaluate_dom_and_absorption(symbol=candidate.symbol, direction=cand_dir, entry_price=entry_price, decomp=of_res).telemetry_tag}"
+            ),
             isBreakevenProtected=is_breakeven,
         )
 

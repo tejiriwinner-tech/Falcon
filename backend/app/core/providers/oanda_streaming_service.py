@@ -5,6 +5,7 @@ Sub-second event-driven price tick ingestion directly from OANDA's Streaming API
 
 Features:
 - Sub-50ms price tick push into memory with zero REST polling overhead.
+- Stage 2 Institutional L2 Order Book Depth (DOM) Bid/Ask Liquidity Imbalance calculation.
 - Automatic heartbeat watchdog and reconnect with exponential backoff.
 - In-memory tick cache for instant zero-latency retrieval.
 - Thread-safe listener subscription model for LocalCandleAggregator and Watchlist.
@@ -41,6 +42,7 @@ class OandaStreamingService:
         self._running = False
         self._stream_thread: Optional[threading.Thread] = None
         self._latest_ticks: Dict[str, Dict[str, Any]] = {}
+        self._dom_ema: Dict[str, float] = {}
         self._lock = threading.Lock()
         self._listeners: List[Callable[[str, float, float, float, datetime], None]] = []
         self._last_heartbeat: float = 0.0
@@ -160,17 +162,29 @@ class OandaStreamingService:
         spread = round(best_ask - best_bid, 5)
         now = datetime.now(timezone.utc)
 
-        tick_data = {
-            "symbol": canonical,
-            "bid": best_bid,
-            "ask": best_ask,
-            "last": last_price,
-            "spread": spread,
-            "timestamp": now,
-        }
+        # Stage 2 Institutional L2 Order Book Depth (DOM) Imbalance
+        bid_liq = sum(float(b.get("liquidity", 0.0) or 0.0) for b in bids if isinstance(b, dict))
+        ask_liq = sum(float(a.get("liquidity", 0.0) or 0.0) for a in asks if isinstance(a, dict))
+        total_liq = bid_liq + ask_liq
+        raw_dom = (bid_liq - ask_liq) / total_liq if total_liq > 0 else 0.0
+        depth_tiers = max(len(bids), len(asks))
 
         with self._lock:
-            self._latest_ticks[canonical] = tick_data
+            prev_ema = self._dom_ema.get(canonical, raw_dom)
+            dom_imbalance = round(0.45 * raw_dom + 0.55 * prev_ema, 4)
+            self._dom_ema[canonical] = dom_imbalance
+            self._latest_ticks[canonical] = {
+                "symbol": canonical,
+                "bid": best_bid,
+                "ask": best_ask,
+                "last": last_price,
+                "spread": spread,
+                "bidLiquidity": round(bid_liq, 2),
+                "askLiquidity": round(ask_liq, 2),
+                "domImbalance": dom_imbalance,
+                "depthTiers": depth_tiers,
+                "timestamp": now,
+            }
 
         # Notify listeners
         for listener in self._listeners:

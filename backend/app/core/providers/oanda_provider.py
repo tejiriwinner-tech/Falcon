@@ -103,6 +103,7 @@ class OandaProvider(BaseProvider):
 
         # Quote cache (short TTL to deduplicate sub-second bursts)
         self._quote_cache: Dict[str, Dict[str, Any]] = {}
+        self._order_book_cache: Dict[str, Dict[str, Any]] = {}
         self._cache_lock = threading.Lock()
 
         # Rate limiter tracking (100 req/s safe limit)
@@ -359,6 +360,15 @@ class OandaProvider(BaseProvider):
             spread_pips = round(spread / pip_size, 2)
             quote_time = p.get("time") or datetime.now(timezone.utc).isoformat()
 
+            # Stage 2 Institutional L2 Order Book Depth (DOM) Imbalance
+            bids_list = p.get("bids", []) or []
+            asks_list = p.get("asks", []) or []
+            bid_liq = sum(float(b.get("liquidity", 0.0) or 0.0) for b in bids_list if isinstance(b, dict))
+            ask_liq = sum(float(a.get("liquidity", 0.0) or 0.0) for a in asks_list if isinstance(a, dict))
+            total_liq = bid_liq + ask_liq
+            dom_imbalance = round((bid_liq - ask_liq) / total_liq, 4) if total_liq > 0 else 0.0
+            depth_tiers = max(len(bids_list), len(asks_list))
+
             norm_data = {
                 "symbol": norm,
                 "price": mid,
@@ -368,6 +378,10 @@ class OandaProvider(BaseProvider):
                 "ask": ask,
                 "spread": spread,
                 "spread_pips": spread_pips,
+                "bidLiquidity": round(bid_liq, 2),
+                "askLiquidity": round(ask_liq, 2),
+                "domImbalance": dom_imbalance,
+                "depthTiers": depth_tiers,
                 "timestamp": quote_time,
                 "is_market_open": p.get("status") == "tradeable",
                 "provider": self.PROVIDER_ID,
@@ -376,6 +390,110 @@ class OandaProvider(BaseProvider):
             out[norm] = norm_data
 
         return out
+
+    # ──────────────────────────────────────────────────────────────────
+    # Stage 2 Institutional OrderBook & PositionBook X-Ray API
+    # ──────────────────────────────────────────────────────────────────
+
+    def fetch_order_and_position_book(self, symbol: str, ttl_seconds: float = 300.0) -> Dict[str, Any]:
+        """
+        Fetch OANDA OrderBook & PositionBook snapshots (/v3/instruments/{instrument}/orderBook
+        and positionBook) with a 5-minute TTL cache to identify retail stop-loss clusters
+        and trapped retail positioning without adding latency to signal loops.
+        """
+        canonical = symbol_mapper.normalize(symbol) or symbol.upper()
+        now_ts = time.time()
+
+        with self._cache_lock:
+            cached = self._order_book_cache.get(canonical)
+            if cached and (now_ts - cached.get("_cached_at", 0.0)) < ttl_seconds:
+                return cached
+
+        result: Dict[str, Any] = {
+            "symbol": canonical,
+            "available": False,
+            "spotPrice": 0.0,
+            "stopLossClusterAbove": None,
+            "stopLossClusterAbovePct": 0.0,
+            "stopLossClusterBelow": None,
+            "stopLossClusterBelowPct": 0.0,
+            "retailNetLongPct": 50.0,
+            "contrarianBias": "NEUTRAL",
+            "_cached_at": now_ts,
+        }
+
+        if not self.configured or self._cb_should_block():
+            return result
+
+        ticker = symbol_mapper.to_provider_symbol(canonical, self.PROVIDER_ID)
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Accept-Datetime-Format": "RFC3339",
+        }
+
+        try:
+            ob_url = f"{self._base_url}/v3/instruments/{ticker}/orderBook"
+            ob_resp = requests.get(ob_url, headers=headers, timeout=3.0)
+            if ob_resp.status_code == 200:
+                ob_data = ob_resp.json().get("orderBook", {})
+                spot = float(ob_data.get("price", 0.0) or 0.0)
+                buckets = ob_data.get("buckets", []) or []
+                if spot > 0 and buckets:
+                    result["available"] = True
+                    result["spotPrice"] = spot
+                    # Search within ±0.8% of spot for concentrated stop/limit clusters
+                    band = spot * 0.008
+                    best_above_price = None
+                    best_above_pct = 0.0
+                    best_below_price = None
+                    best_below_pct = 0.0
+                    for b in buckets:
+                        b_price = float(b.get("price", 0.0) or 0.0)
+                        long_pct = float(b.get("longCountPercent", 0.0) or 0.0)
+                        short_pct = float(b.get("shortCountPercent", 0.0) or 0.0)
+                        if spot < b_price <= (spot + band):
+                            # Above spot: buy orders (short stop-losses + breakout buy stops)
+                            cluster_score = long_pct + (short_pct * 0.5)
+                            if cluster_score > best_above_pct:
+                                best_above_pct = round(cluster_score, 3)
+                                best_above_price = b_price
+                        elif (spot - band) <= b_price < spot:
+                            # Below spot: sell orders (long stop-losses + breakdown sell stops)
+                            cluster_score = short_pct + (long_pct * 0.5)
+                            if cluster_score > best_below_pct:
+                                best_below_pct = round(cluster_score, 3)
+                                best_below_price = b_price
+                    result["stopLossClusterAbove"] = best_above_price
+                    result["stopLossClusterAbovePct"] = best_above_pct
+                    result["stopLossClusterBelow"] = best_below_price
+                    result["stopLossClusterBelowPct"] = best_below_pct
+        except Exception as exc:
+            logger.debug("[OANDA] OrderBook fetch skipped for %s: %s", canonical, exc)
+
+        try:
+            pb_url = f"{self._base_url}/v3/instruments/{ticker}/positionBook"
+            pb_resp = requests.get(pb_url, headers=headers, timeout=3.0)
+            if pb_resp.status_code == 200:
+                pb_data = pb_resp.json().get("positionBook", {})
+                buckets = pb_data.get("buckets", []) or []
+                if buckets:
+                    total_long = sum(float(b.get("longCountPercent", 0.0) or 0.0) for b in buckets)
+                    total_short = sum(float(b.get("shortCountPercent", 0.0) or 0.0) for b in buckets)
+                    total_pos = total_long + total_short
+                    if total_pos > 0:
+                        net_long_pct = round((total_long / total_pos) * 100.0, 2)
+                        result["retailNetLongPct"] = net_long_pct
+                        result["available"] = True
+                        if net_long_pct >= 60.0:
+                            result["contrarianBias"] = "BEARISH"
+                        elif net_long_pct <= 40.0:
+                            result["contrarianBias"] = "BULLISH"
+        except Exception as exc:
+            logger.debug("[OANDA] PositionBook fetch skipped for %s: %s", canonical, exc)
+
+        with self._cache_lock:
+            self._order_book_cache[canonical] = result
+        return result
 
     # ──────────────────────────────────────────────────────────────────
     # Historical Candles API
