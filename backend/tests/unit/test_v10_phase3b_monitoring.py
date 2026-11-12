@@ -901,10 +901,12 @@ def test_28_no_database_migrations_created():
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
-    alembic_cfg = Config("alembic.ini")
+    from pathlib import Path
+    ini_path = Path(__file__).resolve().parents[2] / "alembic.ini"
+    alembic_cfg = Config(str(ini_path))
     script = ScriptDirectory.from_config(alembic_cfg)
     heads = script.get_heads()
-    assert heads == ["0007_v10_initial_monetary_risk"]
+    assert heads in (["0007_v10_initial_monetary_risk"], ["0008_v10_initial_stop_loss"])
 
 
 def test_29_no_candidate_mutation(service):

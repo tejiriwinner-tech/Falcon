@@ -123,6 +123,7 @@ class MarketDataScheduler:
                 logger.error(error_msg)
                 cycle_result["errors"].append(error_msg)
                 # Continue processing other symbols even if one fails
+            await asyncio.sleep(0.5)
 
         cycle_duration = time.time() - cycle_start
         logger.info(

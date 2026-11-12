@@ -580,7 +580,14 @@ def test_13_concurrent_guardian_authorization_respects_3_trade_ceiling():
     assert rejected_count == 5
 
 
-def test_14_concurrent_guardian_authorization_respects_aggregate_loss_limit():
+def test_14_concurrent_guardian_authorization_respects_aggregate_loss_limit(monkeypatch):
+    from app.core.config.settings import settings
+    monkeypatch.setattr(settings, "NEWS_BLACKOUT_ENABLED", False)
+    monkeypatch.setattr(settings, "CAPITAL_CYCLE_STARTING_CAPITAL", Decimal("20.00"))
+    from app.core.services.capital_cycle_service import capital_cycle_service
+    cycle = capital_cycle_service.get_active_cycle()
+    if cycle:
+        cycle.activeTradingCapital = Decimal("20.00")
     """14. Concurrent Guardian authorization requests strictly respect aggregate loss limit."""
     # Active capital = $20.00. 4 threads attempt to authorize signals with $8.00 risk each.
     # 2 * $8 = $16 (< $20). 3 * $8 = $24 (> $20). Exactly 2 can succeed.
@@ -813,7 +820,14 @@ def test_25_guardian_strictly_enforces_3_trade_ceiling():
     assert res4 is None
 
 
-def test_26_guardian_boundary_rejection_at_exact_equality():
+def test_26_guardian_boundary_rejection_at_exact_equality(monkeypatch):
+    from app.core.config.settings import settings
+    monkeypatch.setattr(settings, "NEWS_BLACKOUT_ENABLED", False)
+    monkeypatch.setattr(settings, "CAPITAL_CYCLE_STARTING_CAPITAL", Decimal("20.00"))
+    from app.core.services.capital_cycle_service import capital_cycle_service
+    cycle = capital_cycle_service.get_active_cycle()
+    if cycle:
+        cycle.activeTradingCapital = Decimal("20.00")
     """26. Boundary condition: existing_loss + proposed_loss == active_capital MUST FAIL."""
     trade_journal_repository.create_trade(
         make_journal_create(
@@ -836,7 +850,14 @@ def test_26_guardian_boundary_rejection_at_exact_equality():
     assert res is None
 
 
-def test_27_guardian_boundary_rejection_when_exceeding_capital():
+def test_27_guardian_boundary_rejection_when_exceeding_capital(monkeypatch):
+    from app.core.config.settings import settings
+    monkeypatch.setattr(settings, "NEWS_BLACKOUT_ENABLED", False)
+    monkeypatch.setattr(settings, "CAPITAL_CYCLE_STARTING_CAPITAL", Decimal("20.00"))
+    from app.core.services.capital_cycle_service import capital_cycle_service
+    cycle = capital_cycle_service.get_active_cycle()
+    if cycle:
+        cycle.activeTradingCapital = Decimal("20.00")
     """27. Boundary condition: existing_loss + proposed_loss > active_capital MUST FAIL."""
     trade_journal_repository.create_trade(
         make_journal_create(
@@ -968,7 +989,9 @@ def test_32_direction_aware_sell_fill_on_bid():
     assert t_filled.status == "OPEN"
 
 
-def test_33_direction_aware_buy_sl_and_tp():
+def test_33_direction_aware_buy_sl_and_tp(monkeypatch):
+    from app.core.config.settings import settings
+    monkeypatch.setattr(settings, "NEWS_BLACKOUT_ENABLED", False)
     """33. BUY trade triggers SL when bid <= stopLoss and TP when bid >= takeProfit."""
     # Test SL
     cand_sl = make_test_candidate(signal_id=6003, direction=CandidateDirection.BUY, entry_price=1.1000, stop_loss=1.0950)
@@ -981,7 +1004,8 @@ def test_33_direction_aware_buy_sl_and_tp():
     assert t_sl.result == "LOSS"
 
     # Test TP
-    cand_tp = make_test_candidate(signal_id=6004, direction=CandidateDirection.BUY, entry_price=1.1000, take_profit=1.1150)
+    signal_authorization_service._post_stop_cooldowns.clear()
+    cand_tp = make_test_candidate(signal_id=6004, direction=CandidateDirection.BUY, entry_price=1.1000, stop_loss=1.0950, take_profit=1.1150)
     _, res_tp = signal_authorization_service.authorize_candidate(
         cand_tp, signal_id=6004, execution_mode=ExecutionMode.PAPER.value
     )
@@ -991,7 +1015,9 @@ def test_33_direction_aware_buy_sl_and_tp():
     assert t_tp.result == "WIN"
 
 
-def test_34_direction_aware_sell_sl_and_tp():
+def test_34_direction_aware_sell_sl_and_tp(monkeypatch):
+    from app.core.config.settings import settings
+    monkeypatch.setattr(settings, "NEWS_BLACKOUT_ENABLED", False)
     """34. SELL trade triggers SL when ask >= stopLoss and TP when ask <= takeProfit."""
     # Test SL
     cand_sl = make_test_candidate(signal_id=6005, direction=CandidateDirection.SELL, entry_price=1.1000, stop_loss=1.1050, take_profit=1.0850)
@@ -1004,6 +1030,7 @@ def test_34_direction_aware_sell_sl_and_tp():
     assert t_sl.result == "LOSS"
 
     # Test TP
+    signal_authorization_service._post_stop_cooldowns.clear()
     cand_tp = make_test_candidate(signal_id=6006, direction=CandidateDirection.SELL, entry_price=1.1000, stop_loss=1.1050, take_profit=1.0850)
     _, res_tp = signal_authorization_service.authorize_candidate(
         cand_tp, signal_id=6006, execution_mode=ExecutionMode.PAPER.value

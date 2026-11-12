@@ -13,9 +13,13 @@ DATABASE_URL = os.getenv(
     "DATABASE_URL", 
     "sqlite:///./falcon_market_data.db"
 )
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgres://"):]
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = "postgresql+psycopg://" + DATABASE_URL[len("postgresql://"):]
 
 # Create engine with connection pooling for PostgreSQL
-if "postgresql" in DATABASE_URL or "supabase" in DATABASE_URL:
+if "postgresql" in DATABASE_URL or "postgres" in DATABASE_URL or "supabase" in DATABASE_URL:
     # PostgreSQL/Supabase connection pool configuration
     # Keep pool minimal (2-3 connections) so Fly.io multi-worker machines do not exhaust Supabase pooler
     engine = create_engine(

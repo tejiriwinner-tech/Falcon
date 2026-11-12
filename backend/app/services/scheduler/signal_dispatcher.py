@@ -39,9 +39,10 @@ class SignalDispatcher:
                 f"(ID: {signal.signalId})"
             )
             
-            # Dispatch to Telegram if configured
+            # Telegram alerts are strictly dispatched when a trade turns ACTIVE via SignalService
+            # Suppressing premature candidate broadcasts from background scanner
             type_str = str(getattr(signal, "signalType", "")).upper()
-            if "BUY" in type_str or "SELL" in type_str:
+            if False and ("BUY" in type_str or "SELL" in type_str):
                 try:
                     from app.services.alerts.telegram_alert_service import telegram_alert_service
                     if telegram_alert_service.is_configured:

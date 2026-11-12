@@ -11,11 +11,14 @@ sys.path.insert(0, str(BACKEND_DIR))
 
 try:
     from dotenv import load_dotenv
-    load_dotenv(BACKEND_DIR / ".env")
+    # Only load .env if DATABASE_URL is not explicitly provided in the process environment
+    if "DATABASE_URL" not in os.environ:
+        load_dotenv(BACKEND_DIR / ".env")
 except ImportError:
     pass
 
 from app.core.database.models import Base  # noqa: E402
+from app.core.database.migration_guard import validate_migration_target, redact_url  # noqa: E402
 from app.core.database.session import normalize_database_url  # noqa: E402
 
 config = context.config
@@ -23,10 +26,16 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-database_url = os.getenv("DATABASE_URL")
-if not database_url:
-    raise RuntimeError("DATABASE_URL must be set to run Falcon migrations")
-config.set_main_option("sqlalchemy.url", normalize_database_url(database_url))
+# Require explicit environment and fail-closed validation against accidental production targets
+migration_env = os.getenv("MIGRATION_ENV")
+raw_database_url = os.getenv("DATABASE_URL")
+
+validated_url = validate_migration_target(
+    migration_env=migration_env,
+    database_url=raw_database_url,
+)
+
+config.set_main_option("sqlalchemy.url", normalize_database_url(validated_url))
 
 target_metadata = Base.metadata
 

@@ -32,6 +32,7 @@ from app.core.engines.paper_trading_engine import (
 from app.core.execution.execution_mode_guard import (
     ExecutionMode,
     assert_no_broker_automation,
+    is_paper_record,
     parse_execution_mode,
 )
 from app.core.providers import provider_manager
@@ -71,6 +72,10 @@ class PaperTradingRuntime:
         """
         Evaluate and idempotently reserve an eligible signal candidate in PAPER mode.
         """
+        from app.core.config.settings import settings
+        if not getattr(settings, "ENABLE_PAPER_TRADING", False):
+            return None
+
         with self._lock:
             decision, reserved_item = self._engine.authorize_paper_candidate(
                 candidate=candidate,
@@ -95,6 +100,10 @@ class PaperTradingRuntime:
         3. Evaluates SL/TP for OPEN trades.
         4. Finalizes post-fill excursions and realized R upon closure.
         """
+        from app.core.config.settings import settings
+        if not getattr(settings, "ENABLE_PAPER_TRADING", False):
+            return {"filled_count": 0, "closed_count": 0, "expired_count": 0}
+
         with self._lock:
             now = as_of or datetime.now(timezone.utc)
             all_trades = self._journal_repo.list_trades(session=session)
@@ -102,7 +111,7 @@ class PaperTradingRuntime:
             # Filter strictly for active PAPER trades
             active_paper_trades = [
                 t for t in all_trades
-                if (getattr(t, "executionMode", None) or parse_execution_mode(t.notes)) == ExecutionMode.PAPER.value
+                if is_paper_record(t)
                 and (t.status or "").upper() in ("PENDING", "OPEN")
                 and t.closeDate is None
             ]

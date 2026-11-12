@@ -448,7 +448,12 @@ class DashboardService:
         # Compute real analytics summary from trade journal
         from app.core.repository.trade_journal_repository import trade_journal_repository
         try:
-            trades = trade_journal_repository.list_trades()
+            from app.core.execution.execution_mode_guard import is_live_record
+            raw_trades = trade_journal_repository.list_trades()
+            trades = [
+                t for t in raw_trades
+                if is_live_record(t)
+            ]
             closed_trades = [t for t in trades if getattr(t, "status", "").upper() == "CLOSED"]
             win_trades = [t for t in closed_trades if (getattr(t, "profitLoss", 0) or 0) > 0]
             win_rate = round((len(win_trades) / len(closed_trades)) * 100.0, 1) if closed_trades else 0.0
@@ -558,7 +563,12 @@ class DashboardService:
         symbols = [s.strip().upper() for s in settings.MARKET_DATA_WATCHLIST.split(",") if s.strip()] or WATCHLIST
         quotes = provider_manager.get_batch_quotes(symbols)
 
-        trades = trade_journal_repository.list_trades() if hasattr(trade_journal_repository, "list_trades") else []
+        from app.core.execution.execution_mode_guard import is_live_record
+        raw_all_trades = trade_journal_repository.list_trades() if hasattr(trade_journal_repository, "list_trades") else []
+        trades = [
+            t for t in raw_all_trades
+            if is_live_record(t)
+        ]
         active_trades = [t for t in trades if getattr(t, "status", "").upper() in ("OPEN", "ACTIVE", "PENDING")]
         account_summary = None
         oanda_p = provider_registry.get("oanda")

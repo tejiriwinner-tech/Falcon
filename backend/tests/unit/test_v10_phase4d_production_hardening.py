@@ -937,11 +937,13 @@ def test_43_zero_database_commits(monkeypatch, engine, mock_market_state, mock_s
 
 
 def test_44_alembic_head_strictly_initial_monetary_risk():
-    """Alembic migration head is strictly 0007_v10_initial_monetary_risk."""
-    cfg = Config("alembic.ini")
+    """Alembic migration head is strictly 0008_v10_initial_stop_loss."""
+    from pathlib import Path
+    ini_path = Path(__file__).resolve().parents[2] / "alembic.ini"
+    cfg = Config(str(ini_path))
     script = ScriptDirectory.from_config(cfg)
     heads = script.get_heads()
-    assert heads == ["0007_v10_initial_monetary_risk"]
+    assert heads == ["0008_v10_initial_stop_loss"]
 
 
 def test_45_zero_broker_calls_in_research_and_signal_paths():

@@ -31,6 +31,7 @@ from app.api.v1 import intelligence
 from app.api.v1 import live_intelligence
 from app.api.v1 import runtime
 from app.api.v1 import telegram_alerts
+from app.api.v1 import notifications
 from app.api.v1 import orders
 from app.api.v1 import capital_cycles
 from app.api.v1 import execution
@@ -74,13 +75,7 @@ api_router.include_router(intelligence.router, tags=["intelligence"])
 api_router.include_router(live_intelligence.router, tags=["live_intelligence"])
 api_router.include_router(runtime.router)
 api_router.include_router(telegram_alerts.router)
+api_router.include_router(notifications.router, tags=["notifications"])
 api_router.include_router(orders.router)
 api_router.include_router(execution.router, tags=["execution"])
 api_router.include_router(paper.router, tags=["paper"])
-
-
-
-
-
-
-

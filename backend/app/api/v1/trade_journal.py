@@ -1,3 +1,5 @@
+import logging
+logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException, Response, status
@@ -19,9 +21,18 @@ router = APIRouter()
 
 @router.get("/trade-journal", response_model=TradeJournalListResponse)
 def get_trade_journal():
-    """Returns every stored journal entry, newest trade first."""
+    """Returns stored journal entries for live trading. Excludes paper/shadow trades."""
+    all_trades = trade_journal_repository.list_trades()
+    # Filter out paper trades so the user journal strictly reflects real executable live positions
+    live_trades = [
+        t for t in all_trades
+        if (getattr(t, "executionMode", None) or "").upper() != "PAPER"
+        and "[MODE:PAPER]" not in (t.notes or "")
+        and "paper" not in (t.notes or "").lower()
+        and "paper" not in (t.reasonForEntry or "").lower()
+    ]
     return TradeJournalListResponse(
-        trades=trade_journal_repository.list_trades(),
+        trades=live_trades,
         lastUpdated=datetime.now(timezone.utc),
     )
 
@@ -67,12 +78,40 @@ def create_trade_journal(trade: TradeJournalCreate):
                 # so the position is actively tracked and protected rather than rejected.
                 notes_advisory = f"{trade.notes or ''} | [MANUAL_OVERRIDE | GUARDIAN_ADVISORY: {decision.reason}]"
                 trade.notes = notes_advisory.strip(" | ")
-                return trade_journal_repository.create_trade(trade)
+                trade.notes = notes_advisory.strip(" | ")
+                if trade.fillPrice is None:
+                    trade.fillPrice = trade.entryPrice
+                if trade.fillTime is None:
+                    trade.fillTime = datetime.now(timezone.utc)
+                if not trade.result or trade.result.upper() == "PENDING":
+                    trade.result = "OPEN"
+                created_manual = trade_journal_repository.create_trade(trade)
+                try:
+                    from app.core.repository.signal_signature_repository import signal_signature_repository
+                    from app.core.services.signal_service import signal_service
+                    signal_signature_repository.record_signature(
+                        trade.symbol, trade.direction, trade.entryPrice, trade.stopLoss, trade.takeProfit, status="ACTIVE"
+                    )
+                    signal_service._cache_response = None
+                    signal_service._cache_time = None
+                except Exception:
+                    pass
+                return created_manual
 
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Capital Guardian rejected trade: {decision.reason}",
             )
+        try:
+            from app.core.repository.signal_signature_repository import signal_signature_repository
+            from app.core.services.signal_service import signal_service
+            signal_signature_repository.record_signature(
+                trade.symbol, trade.direction, trade.entryPrice, trade.stopLoss, trade.takeProfit, status="ACTIVE"
+            )
+            signal_service._cache_response = None
+            signal_service._cache_time = None
+        except Exception:
+            pass
         return res_item
 
     return trade_journal_repository.create_trade(trade)
@@ -159,11 +198,67 @@ def delete_trade_journal_entry(trade_id: int):
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
+@router.post("/trade-journal/close-all-paper-trades", status_code=200)
+def close_all_paper_trades():
+    """Immediately purge and close all paper / shadow trades from database and memory."""
+    all_trades = trade_journal_repository.list_trades()
+    paper_ids = [
+        t.id for t in all_trades
+        if (getattr(t, "executionMode", None) or "").upper() == "PAPER"
+        or "[MODE:PAPER]" in (t.notes or "")
+        or "paper" in (t.notes or "").lower()
+        or "paper" in (t.reasonForEntry or "").lower()
+    ]
+    for tid in paper_ids:
+        try:
+            trade_journal_repository.delete_trade(tid)
+        except Exception:
+            pass
+    return {"status": "success", "closed_paper_trades": len(paper_ids)}
+
+@router.post("/trade-journal/purge-clean-slate", status_code=200)
 @router.delete("/trade-journal", status_code=200)
-def clear_all_trade_journal():
-    """Purge all trade journal records and reset signal signature deduplication memory."""
+def purge_clean_slate():
+    """Authoritative clean-slate purge protocol:
+    1. Purges all rows in TradeJournalRecord (database).
+    2. Wipes in-memory trade storage and disk outbox files.
+    3. Clears signal signature deduplication memory.
+    4. Clears signal outcome resolver cache.
+    5. Clears mission repository historical candidate artifacts.
+    6. Flushes cached signal service response and historical triggered signatures.
+    """
     trade_journal_repository.clear()
-    from app.core.repository.signal_signature_repository import signal_signature_repository
-    signal_signature_repository.clear()
-    return {"status": "success", "message": "All trade journal and history records cleared successfully"}
+    
+    try:
+        from app.core.repository.signal_signature_repository import signal_signature_repository
+        signal_signature_repository.clear()
+    except Exception as ex:
+        logger.debug(f"Signature repository clear error: {ex}")
+
+    try:
+        from app.core.services.signal_outcome_resolver import signal_outcome_resolver
+        with signal_outcome_resolver._lock:
+            signal_outcome_resolver._resolved_cache.clear()
+    except Exception as ex:
+        logger.debug(f"Resolver cache clear error: {ex}")
+
+    try:
+        from app.core.repository.mission_repository import mission_repository
+        mission_repository.clear_repository()
+    except Exception as ex:
+        logger.debug(f"Mission repository clear error: {ex}")
+
+    try:
+        from app.core.services.signal_service import signal_service
+        signal_service._cache_response = None
+        signal_service._cache_time = None
+        signal_service._historical_triggered_signatures.clear()
+    except Exception as ex:
+        logger.debug(f"Signal service cache clear error: {ex}")
+
+    return {
+        "status": "success",
+        "message": "Clean-slate purge executed. All journal clutter, outbox files, signatures, missions, and resolver caches wiped successfully.",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
 

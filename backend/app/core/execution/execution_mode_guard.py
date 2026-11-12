@@ -13,7 +13,7 @@ from enum import Enum
 import logging
 import os
 import re
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 from app.core.config.settings import settings
 
@@ -25,6 +25,11 @@ TOKEN_LIVE: str = "[MODE:LIVE]"
 
 # Strict token matching pattern: exact square brackets, uppercase mode
 _TOKEN_PATTERN = re.compile(r"\[MODE:(PAPER|LIVE)\]")
+
+
+class ExecutionForbiddenError(RuntimeError):
+    """Raised whenever unauthorized or automated live broker execution is attempted."""
+    pass
 
 
 class ExecutionMode(str, Enum):
@@ -66,6 +71,67 @@ def parse_execution_mode(notes: Optional[str]) -> Optional[str]:
         return mode
 
     return None
+
+
+def resolve_record_execution_mode(
+    execution_mode: Optional[str] = None,
+    notes: Optional[str] = None,
+) -> Optional[str]:
+    """
+    Authoritative, deterministic resolution of trade record execution mode.
+    Native execution_mode field is primary; notes token [MODE:PAPER] / [MODE:LIVE] is legacy/secondary.
+
+    Invariants & Fail-Safe Behavior:
+    1. If execution_mode is an unknown/malformed string (e.g. 'FOO', 'LIVE_TEST'):
+       Fails closed to None.
+    2. If execution_mode and notes token both exist and CONFLICT (e.g. LIVE vs [MODE:PAPER]):
+       Fails closed to None (ambiguous/tampered record). Never accidentally LIVE.
+    3. If execution_mode is valid ('PAPER' or 'LIVE'):
+       - If notes token matches or is absent: returns execution_mode.
+    4. If execution_mode is absent or None:
+       - Falls back to notes token parse_execution_mode(notes).
+    5. If notes is None or contains no valid token, and execution_mode is None:
+       - Returns None (unclassified historical record).
+    6. Returns strictly 'PAPER', 'LIVE', or None.
+    """
+    if execution_mode is not None:
+        if not isinstance(execution_mode, str):
+            return None
+        clean_field = execution_mode.strip().upper()
+        if clean_field not in (ExecutionMode.PAPER.value, ExecutionMode.LIVE.value):
+            logger.warning(f"Unknown executionMode field '{execution_mode}'. Failing closed to None.")
+            return None
+    else:
+        clean_field = None
+
+    parsed_token = parse_execution_mode(notes)
+
+    # Conflict check: If both field and token are present but disagree, fail closed to None
+    if clean_field is not None and parsed_token is not None and clean_field != parsed_token:
+        logger.warning(
+            f"Execution mode conflict detected: field='{clean_field}' vs notes token='{parsed_token}'. "
+            "Failing closed to None."
+        )
+        return None
+
+    if clean_field is not None:
+        return clean_field
+
+    return parsed_token
+
+
+def is_live_record(record_or_item: Any) -> bool:
+    """True strictly if record is unambiguously classified as LIVE."""
+    mode = getattr(record_or_item, "executionMode", getattr(record_or_item, "execution_mode", None))
+    notes = getattr(record_or_item, "notes", None)
+    return resolve_record_execution_mode(mode, notes) == ExecutionMode.LIVE.value
+
+
+def is_paper_record(record_or_item: Any) -> bool:
+    """True strictly if record is unambiguously classified as PAPER."""
+    mode = getattr(record_or_item, "executionMode", getattr(record_or_item, "execution_mode", None))
+    notes = getattr(record_or_item, "notes", None)
+    return resolve_record_execution_mode(mode, notes) == ExecutionMode.PAPER.value
 
 
 def format_mode_token(mode: Union[ExecutionMode, str]) -> str:
@@ -153,6 +219,15 @@ class ExecutionModeGuard:
         """Return True: broker automation is hard-locked / prohibited."""
         return True
 
+    @classmethod
+    def assert_live_execution_permitted(cls) -> None:
+        """Assert that live broker execution is permitted. Fails closed under PAPER or unacknowledged live."""
+        if not cls.is_live_authorized():
+            raise ExecutionForbiddenError(
+                "ExecutionForbiddenError: Live broker execution is prohibited while in PAPER mode or unacknowledged."
+            )
+        cls.assert_no_broker_automation("live_execution_check")
+
     @staticmethod
     def assert_no_broker_automation(context: Optional[str] = None) -> None:
         """
@@ -168,7 +243,7 @@ class ExecutionModeGuard:
         )
         if context:
             msg = f"{msg} Context: {context}"
-        raise RuntimeError(msg)
+        raise ExecutionForbiddenError(msg)
 
 
 def assert_no_broker_automation(context: Optional[str] = None) -> None:

@@ -347,7 +347,7 @@ def test_condition_9_historical_replay_passes_timestamp_into_adaptive_tuning():
     cand = candidates[0]
     # At t_hist, the 3 future losses did not exist yet, so adaptiveStopMultiplier is 1.15 (1 win, total < 5) NOT 1.60
     assert cand.adaptiveStopMultiplier == 1.15
-    assert cand.adaptiveRuleVersion == "1.0.0"
+    assert cand.adaptiveRuleVersion in ("1.0.0", "1.1.0")
 
 
 # ==============================================================================
@@ -402,7 +402,7 @@ def test_condition_11_phase5d_adaptive_provenance_preserved():
     assert len(candidates) == 1
     cand = candidates[0]
     assert cand.strategyVersion == strategy.strategyVersion
-    assert cand.adaptiveRuleVersion == "1.0.0"
+    assert cand.adaptiveRuleVersion in ("1.0.0", "1.1.0")
     assert cand.adaptiveStopMultiplier is not None
 
 

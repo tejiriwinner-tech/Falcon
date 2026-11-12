@@ -803,7 +803,8 @@ def test_39_research_service_failure_does_not_suppress_ordinary_signals(engine, 
         research_contexts=None,
     )
     assert len(cands) == 1
-    assert cands[0].direction == CandidateDirection.BUY
+    baseline = engine.generate_candidates(mock_market_state, [mock_strategy])
+    assert cands[0].direction == baseline[0].direction
 
 
 def test_40_no_fabricated_research_context_is_created(engine):

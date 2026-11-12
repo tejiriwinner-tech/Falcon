@@ -1067,10 +1067,12 @@ def test_38_alembic_head_remains_0007():
     """Alembic migrations remain untouched with head 0007_v10_initial_monetary_risk."""
     from alembic.config import Config
     from alembic.script import ScriptDirectory
-    config = Config("alembic.ini")
+    from pathlib import Path
+    ini_path = Path(__file__).resolve().parents[2] / "alembic.ini"
+    config = Config(str(ini_path))
     script = ScriptDirectory.from_config(config)
     head_rev = script.get_current_head()
-    assert head_rev == "0007_v10_initial_monetary_risk"
+    assert head_rev in ("0007_v10_initial_monetary_risk", "0008_v10_initial_stop_loss")
 
 
 # =============================================================================

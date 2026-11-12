@@ -887,8 +887,24 @@ def test_signal_outcome_resolver_execute_resolve_signals_end_to_end(memory_engin
         reasonForEntry="Institutional order block tap",
     ))
 
-    # Run resolve_signals with force_simulate=True
-    summary = signal_outcome_resolver.resolve_signals(force_simulate=True)
+    # Resolve trade organically via quote price breach (takeProfit = 1.0950 hit at 1.0960)
+    from unittest.mock import patch
+    from app.schemas.market_quote import MarketQuote, MarketQuoteResponse, BidAsk
+    with patch("app.core.services.signal_outcome_resolver.provider_manager.get_market_quote") as mock_pm_quote:
+        mock_pm_quote.return_value = MarketQuoteResponse(
+            quote=MarketQuote(
+                symbol="EURUSD",
+                providerId="oanda",
+                providerName="OANDA",
+                lastPrice=1.0960,
+                bid=1.0959,
+                ask=1.0961,
+                spread=0.0002,
+                timestamp=now,
+                bidAsk=BidAsk(bid=1.0959, ask=1.0961, spread=0.0002),
+            )
+        )
+        summary = signal_outcome_resolver.resolve_signals()
     assert summary.resolvedCount >= 1
 
     # Fetch updated trade from repository

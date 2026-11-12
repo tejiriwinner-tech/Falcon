@@ -108,6 +108,7 @@ class TradeJournalRecord(Base):
     atr_at_entry: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     # Authoritative initial risk established at entry (V10 Phase 5A.1)
+    initial_stop_loss: Mapped[float | None] = mapped_column(Float, nullable=True)
     initial_monetary_risk: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
 
 
@@ -228,4 +229,12 @@ class SignalSignatureRecord(Base):
 
 Index("ix_signal_signatures_symbol", SignalSignatureRecord.symbol)
 Index("ix_signal_signatures_status", SignalSignatureRecord.status)
+
+
+class StrategyStatusRecord(Base):
+    __tablename__ = "strategy_status_overrides"
+
+    strategy_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 

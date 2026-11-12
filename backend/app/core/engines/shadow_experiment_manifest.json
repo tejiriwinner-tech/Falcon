@@ -1,0 +1,56 @@
+{
+  "dataIsolation": {
+    "ambiguousRecordHandling": "Excluded from live performance and live capital reservations fail-closed",
+    "authoritativeClassification": "Native execution_mode column primary with resolve_record_execution_mode fallback"
+  },
+  "executionSecurity": {
+    "brokerDispatchHardLocked": true,
+    "executionMode": "PAPER",
+    "liveExecutionAcknowledged": false,
+    "oandaAutoExecute": false,
+    "oandaEnvironment": "practice"
+  },
+  "experimentName": "Falcon Controlled Forward Shadow Collection & Evidence Integrity",
+  "fillSimulation": {
+    "buySide": "Ask (Price + half_spread + slippage)",
+    "initialRiskImmutable": true,
+    "sameCandleAmbiguity": "FAIL_CLOSED_LOSS",
+    "sellSide": "Bid (Price - half_spread - slippage)",
+    "slippagePipsDefault": 0.2
+  },
+  "gitBranch": "real-data-work",
+  "gitHeadCommit": "40a8eca",
+  "manifestId": "SHADOW_EXP_20261022_V1",
+  "manifestSha256": "d1cbe71381baf74d09d1932288edb3e9685d85ee433c108fd5be272c3cff7795",
+  "productionBaselineCommit": "1a7e57b (Fly.io Release v11)",
+  "safeguards": {
+    "cooldown": {
+      "durationMinutes": 45,
+      "persisted": true,
+      "scope": "strategy_id + symbol"
+    },
+    "quoteFreshness": {
+      "clockDesyncToleranceSeconds": 5.0,
+      "maxAgeSeconds": 45.0,
+      "rejectCrossedQuotes": true,
+      "rejectNegativeSpreads": true
+    },
+    "rolloverBlackout": {
+      "boundarySemantics": "Closed interval [20:50:00, 21:30:00] UTC rejected fail-closed",
+      "endUtc": "21:30:00",
+      "startUtc": "20:50:00"
+    },
+    "spreadLimits": {
+      "crossFxMaxPips": 3.5,
+      "goldMaxDollarSpread": 0.8,
+      "majorFxMaxPips": 2.0
+    }
+  },
+  "startTimeUtc": "2026-10-22T03:00:00Z",
+  "strategyRegistryCounts": {
+    "activeFlagships": 6,
+    "incubationShadow": 12,
+    "total": 18
+  },
+  "strategyRegistrySha256": "d3d390e1e9981aa0a19a0d51fa29c7bd2a3a1269a02944a15b4c5d0008d5e416"
+}

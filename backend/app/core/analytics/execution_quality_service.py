@@ -170,12 +170,13 @@ class ExecutionQualityService:
             return trade.peakPrice, trade.troughPrice, trade.mfeR, trade.maeR
 
         # Check post-fill timestamp boundary
-        if trade.fillTime is not None and observation_time < trade.fillTime:
-            return trade.peakPrice, trade.troughPrice, trade.mfeR, trade.maeR
+        if isinstance(observation_time, datetime):
+            if trade.fillTime is not None and observation_time < trade.fillTime:
+                return trade.peakPrice, trade.troughPrice, trade.mfeR, trade.maeR
 
-        # Check close-time boundary
-        if trade.closeDate is not None and observation_time > trade.closeDate:
-            return trade.peakPrice, trade.troughPrice, trade.mfeR, trade.maeR
+            # Check close-time boundary
+            if trade.closeDate is not None and observation_time > trade.closeDate:
+                return trade.peakPrice, trade.troughPrice, trade.mfeR, trade.maeR
 
         fill_price = float(trade.fillPrice)
         current_peak = float(trade.peakPrice) if trade.peakPrice is not None else fill_price

@@ -90,7 +90,7 @@ def test_pillar_2_smart_money_liquidity_sweep_and_fvg_detection():
     assert sig.swept_pool_type in ("PDL", "ASL")
     assert sig.fvg is not None
     assert sig.fvg.direction == "BULLISH"
-    assert sig.risk_reward >= 3.0
+    assert 1.2 <= sig.risk_reward <= 1.5
     assert sig.stop_loss < 2316.5
 
 
@@ -100,7 +100,7 @@ def test_pillar_2_strategy_12_registered_in_strategy_engine():
     strat_12 = se.get_strategy_by_id("strat-012")
     assert strat_12 is not None
     assert strat_12.name == "Institutional Liquidity Sweep & FVG"
-    assert strat_12.minimumRiskReward >= 3.0
+    assert 1.2 <= strat_12.minimumRiskReward <= 1.5
     assert strat_12.grade == "A+"
 
 
@@ -200,3 +200,39 @@ def test_pillar_4_structural_trailing_stop_locks_profit_above_2r(mock_pm, mock_r
     resolver.resolve_signals()
     assert trade.stopLoss == 2315.00
     assert "STRUCTURAL_TRAIL_LOCKED" in (trade.notes or "")
+
+
+def test_pillar_2_inversion_fvg_anti_retail_trap_detection():
+    """
+    Verify Falcon's Anti-Retail Trap Engine:
+    Detects when a retail Bullish FVG is violently violated downward by institutional flow,
+    inverting into resistance (IFVG), and triggers an asymmetric SHORT on the failed retest.
+    """
+    smc = SmartMoneyEngine()
+    candles = []
+    # 10 base candles
+    for _ in range(10):
+        candles.append({"open": 2320.0, "high": 2328.0, "low": 2315.0, "close": 2322.0})
+
+    # Candle 10 (idx 10): high at 2330.0
+    candles.append({"open": 2325.0, "high": 2330.0, "low": 2324.0, "close": 2329.0})
+    # Candle 11 (idx 11): big rally
+    candles.append({"open": 2329.0, "high": 2345.0, "low": 2328.0, "close": 2344.0})
+    # Candle 12 (idx 12): low at 2335.0 (> 2330.0 -> Bullish FVG [2330.0 - 2335.0] created)
+    candles.append({"open": 2344.0, "high": 2350.0, "low": 2335.0, "close": 2348.0})
+
+    # Candle 13 (idx 13): Institutional breakdown violating the Bullish FVG, closing at 2325.0 (< bottom 2330.0)
+    # Retail buyers are trapped!
+    candles.append({"open": 2347.0, "high": 2348.0, "low": 2324.0, "close": 2325.0})
+
+    # Candle 14 (idx 14): Retest of the inverted gap up to 2332.0 (inside [2330-2335]), rejecting to close red at 2328.0
+    candles.append({"open": 2330.0, "high": 2332.0, "low": 2324.5, "close": 2328.0})
+
+    sig = smc.analyze_liquidity_sweep("XAUUSD", candles)
+    assert sig.detected is True
+    assert sig.direction == "SELL"
+    assert sig.swept_pool_type == "INVERSION_FVG_RESISTANCE"
+    assert "SMC_INVERSION_FVG" in sig.tags
+    assert "ANTI_RETAIL_TRAP" in sig.tags
+    assert 1.2 <= sig.risk_reward <= 1.5
+    assert sig.stop_loss > 2335.0

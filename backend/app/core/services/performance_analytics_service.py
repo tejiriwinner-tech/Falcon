@@ -229,7 +229,13 @@ def build_performance_analytics() -> PerformanceAnalyticsResponse:
     now = datetime.now(timezone.utc)
     today = now.date()
 
-    trades = trade_journal_repository.list_trades()
+    from app.core.execution.execution_mode_guard import is_live_record
+
+    all_raw_trades = trade_journal_repository.list_trades()
+    trades = [
+        trade for trade in all_raw_trades
+        if is_live_record(trade)
+    ]
     closed = [trade for trade in trades if _is_closed(trade)]
     closed_ordered = sorted(closed, key=lambda trade: _as_utc(trade.closeDate or trade.tradeDate))
 

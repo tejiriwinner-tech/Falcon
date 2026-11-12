@@ -94,9 +94,17 @@ class OrderExecutionService:
         self._orders[order_id] = item
         logger.info(f"Order created and queued: {order_id} ({item.action.value} {item.lot_size} {item.symbol})")
 
-        # Phase 5F Safety Gate: Automatic broker execution toggle
+        # Phase 5F / Stage 3 Safety Gate: Authoritative Execution Mode Guard
         from app.core.config import settings
-        if getattr(settings, "OANDA_AUTO_EXECUTE", False):
+        from app.core.execution.execution_mode_guard import execution_mode_guard
+
+        # Hard fail-closed: If not affirmatively authorized as LIVE, broker dispatch is strictly blocked
+        if not execution_mode_guard.is_live_authorized():
+            logger.info(
+                f"Order {order_id} recorded for decision-support tracking. "
+                "Automated broker order placement is strictly disabled in PAPER/SHADOW mode."
+            )
+        elif getattr(settings, "OANDA_AUTO_EXECUTE", False):
             try:
                 from app.core.providers import _oanda_provider
                 if _oanda_provider and _oanda_provider.configured:

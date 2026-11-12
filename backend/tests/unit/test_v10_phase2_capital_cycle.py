@@ -51,6 +51,12 @@ def mem_repo() -> CapitalCycleRepository:
     return CapitalCycleRepository(storage=storage)
 
 
+@pytest.fixture(autouse=True)
+def configure_micro_cycle_settings(monkeypatch):
+    monkeypatch.setattr(settings, "CAPITAL_CYCLE_STARTING_CAPITAL", Decimal("20.00"))
+    monkeypatch.setattr(settings, "CAPITAL_CYCLE_TARGET", Decimal("500.00"))
+    monkeypatch.setattr(settings, "CAPITAL_CYCLE_NEXT_ALLOCATION", Decimal("20.00"))
+
 @pytest.fixture
 def cycle_service(mem_repo: CapitalCycleRepository) -> CapitalCycleService:
     """Fixture providing CapitalCycleService wired to isolated in-memory repo."""
@@ -406,6 +412,7 @@ def test_alembic_migration_0006_cycle_isolated_db():
     try:
         sqlite_url = f"sqlite:///{db_path}"
         os.environ["DATABASE_URL"] = sqlite_url
+        os.environ["MIGRATION_ENV"] = "TEST"
 
         backend_dir = Path(__file__).resolve().parents[2]
         alembic_ini_path = str(backend_dir / "alembic.ini")
@@ -499,6 +506,7 @@ def test_alembic_migration_0006_cycle_isolated_db():
             os.environ["DATABASE_URL"] = old_db_url
         else:
             os.environ.pop("DATABASE_URL", None)
+        os.environ.pop("MIGRATION_ENV", None)
         if os.path.exists(db_path):
             try:
                 os.remove(db_path)

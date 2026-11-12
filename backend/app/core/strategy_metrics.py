@@ -55,56 +55,96 @@ def _performance(trades: Sequence[TradeJournalItem]) -> StrategyPerformance:
     )
 
 
-def performance_by_strategy() -> Dict[str, StrategyPerformance]:
-    grouped: Dict[str, List[TradeJournalItem]] = {}
-    for trade in trade_journal_repository.list_trades():
-        if trade.strategyId:
-            grouped.setdefault(trade.strategyId, []).append(trade)
-    return {
-        strategy_id: _performance(trades) for strategy_id, trades in grouped.items()
-    }
+import time as _t
 
+_perf_cache: Optional[Dict[str, StrategyPerformance]] = None
+_perf_cache_at: float = 0.0
+
+def invalidate_strategy_metrics_cache() -> None:
+    global _perf_cache, _perf_cache_at, _validation_cache, _validation_cache_at, _last_used_cache, _last_used_at
+    _perf_cache = None
+    _perf_cache_at = 0.0
+    _validation_cache = None
+    _validation_cache_at = 0.0
+    _last_used_cache = None
+    _last_used_at = 0.0
+
+def performance_by_strategy() -> Dict[str, StrategyPerformance]:
+    global _perf_cache, _perf_cache_at
+    now = _t.monotonic()
+    if _perf_cache is not None and (now - _perf_cache_at) < 60.0:
+        return _perf_cache
+
+    grouped: Dict[str, List[TradeJournalItem]] = {}
+    try:
+        for trade in trade_journal_repository.list_trades():
+            if trade.strategyId:
+                grouped.setdefault(trade.strategyId, []).append(trade)
+        res = {
+            strategy_id: _performance(trades) for strategy_id, trades in grouped.items()
+        }
+    except Exception:
+        res = {}
+    _perf_cache = res
+    _perf_cache_at = now
+    return res
+
+
+_validation_cache: Optional[Dict[str, StrategyValidation]] = None
+_validation_cache_at: float = 0.0
 
 def latest_validation_by_strategy() -> Dict[str, StrategyValidation]:
-    mission = mission_repository.get_latest_mission()
-    if mission is None:
-        return {}
+    global _validation_cache, _validation_cache_at
+    now = _t.monotonic()
+    if _validation_cache is not None and (now - _validation_cache_at) < 60.0:
+        return _validation_cache
 
-    artifacts = mission_repository.get_mission_artifacts(mission.id)
-    market_state = artifacts.get("marketState")
-    validations: List[ValidationResult] = artifacts.get("validations", [])
+    try:
+        mission = mission_repository.get_latest_mission()
+        if mission is None:
+            return {}
 
-    snapshot = MarketSnapshot(
-        trend=market_state.trend if market_state else "unknown",
-        volatility=market_state.volatility if market_state else "unknown",
-        liquidity=market_state.liquidity if market_state else "unknown",
-        news=market_state.currentNewsImpact if market_state else "unknown",
-        session=market_state.session if market_state else "unknown",
-        spread=market_state.spread if market_state else 0.0,
-        atr=0.0,
-        rsi=0.0,
-        ema200="unknown",
-        adx=0.0,
-    )
+        artifacts = mission_repository.get_mission_artifacts(mission.id)
+        market_state = artifacts.get("marketState")
+        validations: List[ValidationResult] = artifacts.get("validations", [])
 
-    return {
-        validation.strategyId: StrategyValidation(
-            score=validation.validationScore,
-            aiConfidence=validation.validationScore,
-            validationDurationSeconds=round(validation.validationDurationMs / 1000.0, 3),
-            failedChecks=[check.title for check in validation.checks if not check.passed],
-            checks=[
-                StrategyValidationCheck(
-                    name=check.title,
-                    passed=check.passed,
-                    value=f"{check.scoreAwarded}/{check.weight}",
-                )
-                for check in validation.checks
-            ],
-            marketSnapshot=snapshot,
+        snapshot = MarketSnapshot(
+            trend=market_state.trend if market_state else "unknown",
+            volatility=market_state.volatility if market_state else "unknown",
+            liquidity=market_state.liquidity if market_state else "unknown",
+            news=market_state.currentNewsImpact if market_state else "unknown",
+            session=market_state.session if market_state else "unknown",
+            spread=market_state.spread if market_state else 0.0,
+            atr=0.0,
+            rsi=0.0,
+            ema200="unknown",
+            adx=0.0,
         )
-        for validation in validations
-    }
+
+        res = {
+            validation.strategyId: StrategyValidation(
+                score=validation.validationScore,
+                aiConfidence=validation.validationScore,
+                validationDurationSeconds=round(validation.validationDurationMs / 1000.0, 3),
+                failedChecks=[check.title for check in validation.checks if not check.passed],
+                checks=[
+                    StrategyValidationCheck(
+                        name=check.title,
+                        passed=check.passed,
+                        value=f"{check.scoreAwarded}/{check.weight}",
+                    )
+                    for check in validation.checks
+                ],
+                marketSnapshot=snapshot,
+            )
+            for validation in validations
+        }
+    except Exception:
+        res = {}
+
+    _validation_cache = res
+    _validation_cache_at = now
+    return res
 
 
 _last_used_cache: Optional[Dict[str, Optional[str]]] = None
@@ -114,9 +154,8 @@ _last_used_at: float = 0.0
 def last_used_by_strategy() -> Dict[str, Optional[str]]:
     """Most recent candidate generation time per strategy across recent stored missions."""
     global _last_used_cache, _last_used_at
-    import time as _t
     now = _t.monotonic()
-    if _last_used_cache is not None and (now - _last_used_at) < 30.0:
+    if _last_used_cache is not None and (now - _last_used_at) < 60.0:
         return dict(_last_used_cache)
 
     last_used: Dict[str, Optional[str]] = {}

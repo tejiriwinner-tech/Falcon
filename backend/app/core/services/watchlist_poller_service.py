@@ -22,7 +22,7 @@ from app.core.services.session_budget_manager import session_budget_manager
 from app.core.services.signal_service import signal_service
 from app.core.services.signal_outcome_resolver import signal_outcome_resolver
 from app.core.services.broker_reconciliation_service import broker_reconciliation_service
-from app.services.alerts.telegram_alert_service import telegram_alert_service
+
 from app.schemas.trade_journal import TradeJournalUpdate
 
 logger = logging.getLogger("falcon.watchlist_poller")
@@ -178,203 +178,57 @@ class WatchlistPollerService:
         except Exception as ex:
             logger.debug(f"Broker reconciliation pass error: {ex}")
 
-        # Step 3: Monitor and auto-resolve OPEN trades in Trade Journal against live market
+        # Step 3: Authoritative Exit Management delegated strictly to SignalOutcomeResolver
         try:
-            open_trades = [
-                t for t in (trade_journal_repository.list_trades() or [])
-                if (t.status or "").upper() in ("OPEN", "FILLED") and t.closeDate is None and t.entryPrice > 0
-            ]
-            for trade in open_trades:
-                raw_sym = trade.symbol.replace("/", "").upper()
-                quote_resp = provider_manager.get_market_quote(raw_sym)
-                if not quote_resp or not quote_resp.quote or not quote_resp.quote.lastPrice:
-                    continue
-                cur_px = quote_resp.quote.lastPrice
-                direction = (trade.direction or "").upper()
-                sl = trade.stopLoss
-                tp = trade.takeProfit
-
-                is_gold = "XAU" in raw_sym or "GOLD" in raw_sym or trade.entryPrice > 500
-                is_jpy = "JPY" in raw_sym
-                spread_buffer = 0.10 if is_gold else (0.015 if is_jpy else 0.00010)  # 1-1.5 pip spread buffer
-
-                risk_dist = abs(trade.entryPrice - sl)
-                tp1_dist = 1.0 * risk_dist
-                tp1_price = (trade.entryPrice + tp1_dist) if direction == "BUY" else (trade.entryPrice - tp1_dist)
-                be_price = (trade.entryPrice + spread_buffer) if direction == "BUY" else (trade.entryPrice - spread_buffer)
-
-                notes_str = trade.notes or ""
-                is_be_protected = "BE_PROTECTED" in notes_str
-
-                # Phase 1: Automated Move-to-Breakeven (BE) when Price reaches TP1 (+1.5R)
-                if not is_be_protected and risk_dist > 0:
-                    tp1_hit = False
-                    if direction == "BUY" and cur_px >= tp1_price:
-                        tp1_hit = True
-                    elif direction == "SELL" and cur_px <= tp1_price:
-                        tp1_hit = True
-
-                    if tp1_hit:
-                        new_sl = round(be_price, 2 if is_gold else (3 if is_jpy else 4))
-                        new_notes = f"{notes_str} [BE_PROTECTED: TP1 +1.0R reached at {cur_px:.4f}; SL moved to {new_sl:.4f}; 50% banked]".strip()
-                        trade_update = TradeJournalUpdate(
-                            stopLoss=new_sl,
-                            notes=new_notes,
-                        )
-                        updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
-                        logger.info(
-                            f"🛡️ TP1 HIT & SL MOVED TO BREAKEVEN for {trade.symbol} #{trade.id} at {cur_px:.4f}. "
-                            f"Stop loss adjusted to {new_sl:.4f} (BE + spread). 50% partial profit secured (+0.50R)."
-                        )
-                        try:
-                            telegram_alert_service.dispatch_breakeven_alert(trade, new_sl, cur_px)
-                        except Exception as ex:
-                            logger.debug(f"Telegram BE alert dispatch error: {ex}")
-
-                        trade.stopLoss = new_sl
-                        trade.notes = new_notes
-                        sl = new_sl
-                        is_be_protected = True
-
-                # Phase 2: Boundary Hit Testing against current Stop Loss & Final Target
-                hit_sl = False
-                hit_tp = False
-
-                if direction == "BUY":
-                    if cur_px <= sl:
-                        hit_sl = True
-                    elif cur_px >= tp:
-                        hit_tp = True
-                else:  # SELL
-                    if cur_px >= sl:
-                        hit_sl = True
-                    elif cur_px <= tp:
-                        hit_tp = True
-
-                if hit_sl:
-                    if is_be_protected:
-                        # Trade stopped out at Breakeven after reaching TP1 (+1.0R partials banked)
-                        be_pts = round(abs(trade.entryPrice - sl), 4)
-                        trade_update = TradeJournalUpdate(
-                            status="CLOSED",
-                            result="BREAKEVEN",
-                            exitPrice=sl,
-                            closeDate=now,
-                            profitLoss=be_pts,
-                            realizedRMultiple=0.50,
-                            reasonForExit="Break-Even Stop Hit (Capital Defended after TP1 +1.0R)",
-                            lessonLearned="Capital defended by automated BE trailing rule; +0.50R banked at TP1.",
-                        )
-                        updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
-                        try:
-                            signal_outcome_resolver._conduct_post_mortem_learning(
-                                trade=updated_trade or trade,
-                                market_context={
-                                    "exit_reason": "Break-Even Hit",
-                                    "market_price": cur_px,
-                                    "invalidation_boundary": sl,
-                                }
-                            )
-                        except Exception as ex:
-                            logger.warning(f"Error in BE post-mortem learning for #{trade.id}: {ex}")
-                        try:
-                            telegram_alert_service.dispatch_trade_closed_alert(
-                                updated_trade or trade,
-                                exit_reason="Break-Even Stop Hit (Capital Defended after TP1 run)",
-                                result="BREAKEVEN",
-                                realized_r=0.50,
-                                lesson="Capital preserved by automated BE trailing rule; full 1R loss avoided.",
-                            )
-                        except Exception as ex:
-                            logger.debug(f"Telegram trade closed alert error: {ex}")
-                        logger.info(
-                            f"🛡️ BREAKEVEN HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (Exit: {sl:.4f}). "
-                            f"Trade closed as BREAKEVEN (+0.50R banked). Capital 100% defended."
-                        )
-                    else:
-                        # Full stop-loss hit before reaching TP1
-                        loss_pts = -round(abs(trade.entryPrice - sl), 4)
-                        trade_update = TradeJournalUpdate(
-                            status="CLOSED",
-                            result="LOST",
-                            exitPrice=sl,
-                            closeDate=now,
-                            profitLoss=loss_pts,
-                            realizedRMultiple=-1.0,
-                            reasonForExit="Stop Loss Hit",
-                            lessonLearned="Initial stop-loss invalidation boundary breached before reaching TP1.",
-                        )
-                        updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
-                        try:
-                            signal_outcome_resolver._conduct_post_mortem_learning(
-                                trade=updated_trade or trade,
-                                market_context={
-                                    "exit_reason": "Stop Loss Hit",
-                                    "market_price": cur_px,
-                                    "invalidation_boundary": sl,
-                                }
-                            )
-                        except Exception as ex:
-                            logger.warning(f"Error in post-mortem learning for trade #{trade.id}: {ex}")
-                        try:
-                            telegram_alert_service.dispatch_trade_closed_alert(
-                                updated_trade or trade,
-                                exit_reason="Stop Loss Hit",
-                                result="LOST",
-                                realized_r=-1.0,
-                                lesson=getattr(updated_trade, "lessonLearned", None) or "Structural invalidation boundary breached.",
-                            )
-                        except Exception as ex:
-                            logger.debug(f"Telegram trade closed alert error: {ex}")
-                        logger.info(
-                            f"🛑 STOP LOSS HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (SL: {sl:.4f}). "
-                            f"Trade closed as LOST and post-mortem recorded in journal."
-                        )
-                    result["new_expirations"] += 1
-
-                elif hit_tp:
-                    win_pts = round(abs(tp - trade.entryPrice), 4)
-                    rr_val = trade.riskReward or 2.0
-                    trade_update = TradeJournalUpdate(
-                        status="CLOSED",
-                        result="WON",
-                        exitPrice=tp,
-                        closeDate=now,
-                        profitLoss=win_pts,
-                        realizedRMultiple=rr_val,
-                        reasonForExit="Take Profit Target Hit Cleanly",
-                        lessonLearned="Target liquidity reached cleanly. Strategy reinforced.",
-                    )
-                    updated_trade = trade_journal_repository.update_trade(trade.id, trade_update)
-                    try:
-                        signal_outcome_resolver._conduct_post_mortem_learning(
-                            trade=updated_trade or trade,
-                            market_context={
-                                "exit_reason": "Take Profit Hit",
-                                "market_price": cur_px,
-                                "target": tp,
-                            }
-                        )
-                    except Exception as ex:
-                        logger.warning(f"Error in win learning for trade #{trade.id}: {ex}")
-                    try:
-                        telegram_alert_service.dispatch_trade_closed_alert(
-                            updated_trade or trade,
-                            exit_reason="Take Profit Target Hit Cleanly",
-                            result="WON",
-                            realized_r=rr_val,
-                            lesson="Target liquidity reached cleanly.",
-                        )
-                    except Exception as ex:
-                        logger.debug(f"Telegram trade closed alert error: {ex}")
-                    logger.info(
-                        f"🏆 TAKE PROFIT HIT for {trade.symbol} #{trade.id} at {cur_px:.4f} (TP: {tp:.4f}). "
-                        f"Trade closed as WON in journal."
-                    )
-                    result["new_triggers"] += 1
-
+            resolver_summary = signal_outcome_resolver.resolve_signals()
+            if resolver_summary:
+                result["new_triggers"] += getattr(resolver_summary, "winsCount", 0)
+                result["new_expirations"] += getattr(resolver_summary, "lossesCount", 0)
+                logger.debug(
+                    f"Authoritative signal resolver cycle: {resolver_summary.resolvedCount} resolved, "
+                    f"{resolver_summary.winsCount} wins, {resolver_summary.lossesCount} losses, "
+                    f"{resolver_summary.openCount} remaining open."
+                )
         except Exception as ex:
-            logger.warning(f"Error monitoring open trades in watchlist poller: {ex}")
+            logger.warning(f"Error executing authoritative SignalOutcomeResolver: {ex}")
+
+        # Step 4: Advance isolated paper/shadow trading lifecycle (DISABLED for clean live trading)
+        if getattr(settings, "ENABLE_PAPER_TRADING", False):
+            try:
+                from app.core.engines.paper_runtime import paper_trading_runtime
+                from app.core.engines.signal_generation_engine import SignalGenerationEngine
+                from app.core.engines.strategy_engine import StrategyEngine
+                from app.core.engines.market_state_engine import MarketStateEngine
+                from app.schemas.strategy import StrategyStatus
+
+                # Advance exits, expirations, and fills on existing paper positions
+                paper_res = paper_trading_runtime.process_cycle()
+                if paper_res.get("filled_count", 0) > 0 or paper_res.get("closed_count", 0) > 0:
+                    logger.info(f"Paper trading cycle advanced: {paper_res}")
+
+                # Safe shadow candidate evaluation across incubation strategies
+                strat_engine = StrategyEngine()
+                all_strats = strat_engine.get_strategies()
+                incubation_strats = [s for s in all_strats if s.status == StrategyStatus.INCUBATION]
+                if incubation_strats:
+                    market_state = MarketStateEngine().get_market_state()
+                    if market_state and market_state.quoteStatus != "INSUFFICIENT_DATA":
+                        sig_gen = SignalGenerationEngine()
+                        shadow_cands = sig_gen.generate_shadow_candidates(
+                            market_state=market_state,
+                            strategies=incubation_strats,
+                            as_of=now,
+                        )
+                        for cand in shadow_cands:
+                            cand_dir = getattr(cand.direction, "value", str(cand.direction)).upper()
+                            if cand_dir in ("BUY", "SELL"):
+                                s_id_val = int(cand.id.split("-")[-1]) if ("-" in cand.id and cand.id.split("-")[-1].isdigit()) else abs(hash(cand.id)) % 1000000
+                                paper_trading_runtime.reserve_paper_candidate(
+                                    candidate=cand,
+                                    signal_id=s_id_val,
+                                )
+            except Exception as ex:
+                logger.debug(f"Paper trading cycle pass error: {ex}")
 
         return result
 

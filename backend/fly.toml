@@ -26,6 +26,7 @@ primary_region = "lhr"
     timeout = "15s"
 
 [[vm]]
+  size = "shared-cpu-2x"
   cpu_kind = "shared"
-  cpus = 1
+  cpus = 2
   memory_mb = 2048

@@ -1,0 +1,2933 @@
+[
+  {
+    "avoidConditions": [
+      "High Impact News",
+      "Low Liquidity",
+      "Friday Afternoon",
+      "Holiday Markets"
+    ],
+    "avoidDuring": [
+      "FOMC",
+      "NFP",
+      "CPI"
+    ],
+    "bestSession": "London",
+    "bestTimeframe": "M15",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "RSI",
+      "EMA 50",
+      "Volume"
+    ],
+    "createdAt": "2026-01-15T00:00:00+00:00",
+    "createdBy": "Captain",
+    "dependencies": [
+      "Trend Bias",
+      "Market Session Engine",
+      "News Filter",
+      "Volatility Filter"
+    ],
+    "description": "Captures large volatility expansions during the London market open.",
+    "entryChecklist": [
+      "Trend confirmed",
+      "Breakout candle closed",
+      "Volume increasing",
+      "News clear"
+    ],
+    "estimatedHoldingTime": "20-40 minutes",
+    "exitChecklist": [
+      "TP reached",
+      "Structure broken",
+      "Momentum fading"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-001",
+    "idealVolatility": "High",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:56.082525+00:00",
+    "latestValidation": {
+      "aiConfidence": 65,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": false,
+          "value": "0/5"
+        }
+      ],
+      "failedChecks": [
+        "Trend Alignment",
+        "EMA Confirmation",
+        "Strategy Confidence"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 65,
+      "validationDurationSeconds": 0.027
+    },
+    "marketCompatibility": [
+      "Trending",
+      "Volatile",
+      "High Liquidity"
+    ],
+    "marketCondition": "High Volatility Trending",
+    "maxConsecutiveLosses": 3,
+    "minimumConfidence": 85,
+    "minimumRiskReward": 2.0,
+    "name": "London Breakout",
+    "parentStrategyId": "strat-001-v2.1",
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York",
+      "Asian"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "EMA 200 Trend",
+      "RSI > 50",
+      "Volume Above Average"
+    ],
+    "reviewNotes": "Removed RSI filter. Added EMA 200 confirmation. Reduced SL from 25 to 18 pips.",
+    "riskLevel": "MEDIUM",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 65,
+      "currentMarketScore": 65,
+      "currentNewsScore": 65,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 32,
+      "riskRating": "MEDIUM",
+      "sessionMatch": 65
+    },
+    "strategyVersion": "2.3",
+    "strengths": [
+      "High momentum",
+      "Strong trend confirmation",
+      "High historical accuracy"
+    ],
+    "successConditions": [
+      "London Session",
+      "Trend Direction Confirmed",
+      "Above EMA 200",
+      "Volume Increasing"
+    ],
+    "symbol": "XAU/USD",
+    "type": "BREAKOUT",
+    "updatedAt": "2026-07-10T00:00:00+00:00",
+    "weaknesses": [
+      "Poor during ranging markets",
+      "Avoid before major news"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Ranging Markets",
+      "Extreme Volatility"
+    ],
+    "avoidDuring": [
+      "FOMC",
+      "NFP"
+    ],
+    "bestSession": "London",
+    "bestTimeframe": "H1",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "EMA 20",
+      "RSI"
+    ],
+    "createdAt": "2026-02-10T00:00:00+00:00",
+    "createdBy": "Captain",
+    "dependencies": [
+      "Trend Bias",
+      "Volatility Filter"
+    ],
+    "description": "Rides strong impulse waves in structural trends.",
+    "entryChecklist": [
+      "Structural pullbacks complete",
+      "Engulfing candle formed"
+    ],
+    "estimatedHoldingTime": "2-6 hours",
+    "exitChecklist": [
+      "Opposite structure breaks"
+    ],
+    "grade": "A",
+    "health": "GOOD",
+    "id": "strat-002",
+    "idealVolatility": "Medium",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:56.185550+00:00",
+    "latestValidation": {
+      "aiConfidence": 90,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": false,
+          "value": "0/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [
+        "Session Match"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 90,
+      "validationDurationSeconds": 0.034
+    },
+    "marketCompatibility": [
+      "Trending",
+      "High Liquidity"
+    ],
+    "marketCondition": "Bullish/Bearish Trending",
+    "maxConsecutiveLosses": 4,
+    "minimumConfidence": 80,
+    "minimumRiskReward": 2.0,
+    "name": "Gold Trend Continuation",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "RSI > 50",
+      "EMA 20 / 50 aligned"
+    ],
+    "reviewNotes": "Updated default stop-loss buffer.",
+    "riskLevel": "MEDIUM",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 90,
+      "currentMarketScore": 90,
+      "currentNewsScore": 90,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 45,
+      "riskRating": "MEDIUM",
+      "sessionMatch": 90
+    },
+    "strategyVersion": "1.1",
+    "strengths": [
+      "Rides major moves",
+      "Clear stop loss placement"
+    ],
+    "successConditions": [
+      "Trend Alignment",
+      "Above EMA 50"
+    ],
+    "symbol": "XAU/USD",
+    "type": "TREND_CONTINUATION",
+    "updatedAt": "2026-06-05T00:00:00+00:00",
+    "weaknesses": [
+      "Drawdown during consolidation"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Trend Breakouts",
+      "High Impact News"
+    ],
+    "avoidDuring": [
+      "US Open",
+      "CPI"
+    ],
+    "bestSession": "Asian",
+    "bestTimeframe": "H4",
+    "category": "SWING",
+    "confirmationIndicators": [
+      "Stochastic",
+      "RSI"
+    ],
+    "createdAt": "2026-03-01T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Market Session Engine",
+      "Volatility Filter"
+    ],
+    "description": "Traded off key horizontal levels.",
+    "entryChecklist": [
+      "Level rejection candle",
+      "Oversold/Overbought RSI"
+    ],
+    "estimatedHoldingTime": "1-3 days",
+    "exitChecklist": [
+      "Opposite key level"
+    ],
+    "grade": "B",
+    "health": "GOOD",
+    "id": "strat-003",
+    "idealVolatility": "Low",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:56.285815+00:00",
+    "latestValidation": {
+      "aiConfidence": 100,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 100,
+      "validationDurationSeconds": 0.041
+    },
+    "marketCompatibility": [
+      "Ranging",
+      "Low Volatility"
+    ],
+    "marketCondition": "Ranging",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 75,
+    "minimumRiskReward": 2.0,
+    "name": "Support & Resistance Bounce",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "Asian"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Rejection Pinbar",
+      "RSI Divergence"
+    ],
+    "reviewNotes": "Active S/R bounce framework for horizontal ranges.",
+    "riskLevel": "LOW",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 100,
+      "currentMarketScore": 100,
+      "currentNewsScore": 100,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 50,
+      "riskRating": "LOW",
+      "sessionMatch": 100
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "High reliability during slow markets"
+    ],
+    "successConditions": [
+      "Low Volatility",
+      "Ranging Structure"
+    ],
+    "symbol": "XAU/USD",
+    "type": "SUPPORT_RESISTANCE",
+    "updatedAt": "2026-05-20T00:00:00+00:00",
+    "weaknesses": [
+      "Fails during breakouts"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Low Volume",
+      "Spread Widening"
+    ],
+    "avoidDuring": [
+      "BOE Rate Decision"
+    ],
+    "bestSession": "London",
+    "bestTimeframe": "M5",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "MACD",
+      "Volume"
+    ],
+    "createdAt": "2026-04-01T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Market Session Engine",
+      "Volatility Filter"
+    ],
+    "description": "Scalps quick runs in GBP/USD pairs.",
+    "entryChecklist": [
+      "High volume candle",
+      "MACD bullish crossover"
+    ],
+    "estimatedHoldingTime": "10-30 minutes",
+    "exitChecklist": [
+      "Opposite signal crossover"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-004",
+    "idealVolatility": "High",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:56.388900+00:00",
+    "latestValidation": {
+      "aiConfidence": 100,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 100,
+      "validationDurationSeconds": 0.022
+    },
+    "marketCompatibility": [
+      "Volatile",
+      "High Liquidity"
+    ],
+    "marketCondition": "High Volatility Trend",
+    "maxConsecutiveLosses": 5,
+    "minimumConfidence": 85,
+    "minimumRiskReward": 1.5,
+    "name": "London Momentum",
+    "parentStrategyId": "strat-004-v1.0",
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York",
+      "Asian"
+    ],
+    "readyForExecution": true,
+    "requiredConfirmations": [
+      "MACD crossover",
+      "Volume spikes"
+    ],
+    "reviewNotes": "Slightly reduced leverage recommendations.",
+    "riskLevel": "HIGH",
+    "status": "ACTIVE",
+    "strategyScore": {
+      "currentMarketFit": 100,
+      "currentMarketScore": 100,
+      "currentNewsScore": 100,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 50,
+      "riskRating": "HIGH",
+      "sessionMatch": 100
+    },
+    "strategyVersion": "2.0",
+    "strengths": [
+      "Quick returns",
+      "High volume"
+    ],
+    "successConditions": [
+      "High Volume",
+      "Trend Confirmed"
+    ],
+    "symbol": "GBP/USD",
+    "type": "MOMENTUM",
+    "updatedAt": "2026-07-01T00:00:00+00:00",
+    "weaknesses": [
+      "High commission costs",
+      "Slippage risks"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "High News Impact"
+    ],
+    "avoidDuring": [
+      "BOE news"
+    ],
+    "bestSession": "London",
+    "bestTimeframe": "M30",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "Stochastic",
+      "EMA 20"
+    ],
+    "createdAt": "2026-04-15T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Trend Bias"
+    ],
+    "description": "Buy pullbacks on structural zones.",
+    "entryChecklist": [
+      "Price touches support level",
+      "Stochastic cross"
+    ],
+    "estimatedHoldingTime": "2-4 hours",
+    "exitChecklist": [
+      "TP hit"
+    ],
+    "grade": "B",
+    "health": "GOOD",
+    "id": "strat-005",
+    "idealVolatility": "Medium",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:56.505895+00:00",
+    "latestValidation": {
+      "aiConfidence": 90,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": false,
+          "value": "0/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [
+        "Session Match"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 90,
+      "validationDurationSeconds": 0.029
+    },
+    "marketCompatibility": [
+      "Trending"
+    ],
+    "marketCondition": "Medium Trend",
+    "maxConsecutiveLosses": 3,
+    "minimumConfidence": 78,
+    "minimumRiskReward": 2.0,
+    "name": "GBP/USD Pullback Entry",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Support bounce",
+      "Bullish engulfing"
+    ],
+    "reviewNotes": "Active GBP/USD structural pullback strategy.",
+    "riskLevel": "MEDIUM",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 90,
+      "currentMarketScore": 90,
+      "currentNewsScore": 90,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 45,
+      "riskRating": "MEDIUM",
+      "sessionMatch": 90
+    },
+    "strategyVersion": "1.2",
+    "strengths": [
+      "Low risk exposure",
+      "High precision pullback entries"
+    ],
+    "successConditions": [
+      "Bullish Structure"
+    ],
+    "symbol": "GBP/USD",
+    "type": "PULLBACK",
+    "updatedAt": "2026-06-20T00:00:00+00:00",
+    "weaknesses": [
+      "Requires clean trending market structure"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Ranging Markets"
+    ],
+    "avoidDuring": [
+      "ECB news"
+    ],
+    "bestSession": "London",
+    "bestTimeframe": "M15",
+    "category": "SCALPING",
+    "confirmationIndicators": [
+      "Volume"
+    ],
+    "createdAt": "2026-05-01T00:00:00+00:00",
+    "createdBy": "Imported",
+    "dependencies": [
+      "Market Session Engine",
+      "Volatility Filter"
+    ],
+    "description": "Breakouts of early Frankfurt ranges.",
+    "entryChecklist": [
+      "Frankfurt high/low breakout",
+      "Volume confirmation"
+    ],
+    "estimatedHoldingTime": "20-60 minutes",
+    "exitChecklist": [
+      "TP or Trailing SL hit"
+    ],
+    "grade": "A",
+    "health": "GOOD",
+    "id": "strat-006",
+    "idealVolatility": "High",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:56.609002+00:00",
+    "latestValidation": {
+      "aiConfidence": 65,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": false,
+          "value": "0/5"
+        }
+      ],
+      "failedChecks": [
+        "Trend Alignment",
+        "EMA Confirmation",
+        "Strategy Confidence"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 65,
+      "validationDurationSeconds": 0.036
+    },
+    "marketCompatibility": [
+      "Trending",
+      "Volatile"
+    ],
+    "marketCondition": "Trending",
+    "maxConsecutiveLosses": 3,
+    "minimumConfidence": 80,
+    "minimumRiskReward": 2.0,
+    "name": "European Breakout",
+    "parentStrategyId": "strat-006-v3.0",
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York",
+      "Asian"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Breakout candle close",
+      "High volume"
+    ],
+    "reviewNotes": "Upgraded logic to ignore initial wick breakouts.",
+    "riskLevel": "MEDIUM",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 65,
+      "currentMarketScore": 65,
+      "currentNewsScore": 65,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 32,
+      "riskRating": "MEDIUM",
+      "sessionMatch": 65
+    },
+    "strategyVersion": "3.1",
+    "strengths": [
+      "Definite zones",
+      "Objective entry rules"
+    ],
+    "successConditions": [
+      "Volatile Sessions"
+    ],
+    "symbol": "EUR/USD",
+    "type": "BREAKOUT",
+    "updatedAt": "2026-07-02T00:00:00+00:00",
+    "weaknesses": [
+      "False breakouts"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Ranging Markets"
+    ],
+    "avoidDuring": [
+      "NFP"
+    ],
+    "bestSession": "London",
+    "bestTimeframe": "H4",
+    "category": "POSITION",
+    "confirmationIndicators": [
+      "EMA 20"
+    ],
+    "createdAt": "2026-05-10T00:00:00+00:00",
+    "createdBy": "Captain",
+    "dependencies": [
+      "Trend Bias"
+    ],
+    "description": "Long-term trend following.",
+    "entryChecklist": [
+      "Higher Highs / Lower Lows on Daily",
+      "Pullback to 20 EMA"
+    ],
+    "estimatedHoldingTime": "1-3 days",
+    "exitChecklist": [
+      "EMA cross in opposite direction"
+    ],
+    "grade": "B",
+    "health": "GOOD",
+    "id": "strat-007",
+    "idealVolatility": "Low",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:56.712239+00:00",
+    "latestValidation": {
+      "aiConfidence": 90,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": false,
+          "value": "0/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [
+        "Session Match"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 90,
+      "validationDurationSeconds": 0.043
+    },
+    "marketCompatibility": [
+      "Trending"
+    ],
+    "marketCondition": "Strong Trend",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 80,
+    "minimumRiskReward": 1.5,
+    "name": "EUR/USD Trend Continuation",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "20 EMA support",
+      "Daily trend confirm"
+    ],
+    "reviewNotes": "Active long-term EUR/USD trend continuation model.",
+    "riskLevel": "LOW",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 90,
+      "currentMarketScore": 90,
+      "currentNewsScore": 90,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 45,
+      "riskRating": "LOW",
+      "sessionMatch": 90
+    },
+    "strategyVersion": "1.5",
+    "strengths": [
+      "Highly profitable",
+      "Low screen time required"
+    ],
+    "successConditions": [
+      "Daily Trends"
+    ],
+    "symbol": "EUR/USD",
+    "type": "TREND_CONTINUATION",
+    "updatedAt": "2026-06-15T00:00:00+00:00",
+    "weaknesses": [
+      "Requires patient holding"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "High Impact News Blackout",
+      "Low Volume Range"
+    ],
+    "avoidDuring": [
+      "FOMC",
+      "NFP",
+      "CPI"
+    ],
+    "bestSession": "London",
+    "bestTimeframe": "M15",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "Session Corridors",
+      "Relative Volume Surge (RVol >= 1.8x)",
+      "Candle Spread Expansion"
+    ],
+    "createdAt": "2026-08-01T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Market Session Engine",
+      "Volume Expansion Engine",
+      "Volatility Filter"
+    ],
+    "description": "Institutional session breakout execution. Identifies directional corridor breaks of Asian and London Open ranges confirmed by Relative Volume surges (RVol >= 1.8x) and candle spread expansion.",
+    "entryChecklist": [
+      "Session range boundary breached",
+      "Relative Volume (RVol) >= 1.8x confirmed",
+      "Candle body >= 60% of total range",
+      "News clean"
+    ],
+    "estimatedHoldingTime": "30-90 minutes",
+    "exitChecklist": [
+      "1.5x - 2.0x session range expansion reached",
+      "Opposing volume reversal detected"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-008",
+    "idealVolatility": "High",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:56.815673+00:00",
+    "latestValidation": {
+      "aiConfidence": 55,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": false,
+          "value": "0/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": false,
+          "value": "0/5"
+        }
+      ],
+      "failedChecks": [
+        "Trend Alignment",
+        "EMA Confirmation",
+        "Session Match",
+        "Strategy Confidence"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 55,
+      "validationDurationSeconds": 0.024
+    },
+    "marketCompatibility": [
+      "High Volatility",
+      "Trending",
+      "Institutional Flow"
+    ],
+    "marketCondition": "Session Open Expansion or High Volume Breakout",
+    "maxConsecutiveLosses": 3,
+    "minimumConfidence": 85,
+    "minimumRiskReward": 2.5,
+    "name": "Session Momentum & Volume Expansion Breakout",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Session Boundary Breakout",
+      "RVol >= 1.8x Spike",
+      "Clean Candle Spread"
+    ],
+    "reviewNotes": "Upgraded to Session Momentum & Multi-Timeframe Volume Expansion engine.",
+    "riskLevel": "MEDIUM",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 55,
+      "currentMarketScore": 55,
+      "currentNewsScore": 55,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 28,
+      "riskRating": "MEDIUM",
+      "sessionMatch": 55
+    },
+    "strategyVersion": "2.0",
+    "strengths": [
+      "Exploits institutional session liquidity influx",
+      "Tight invalidation against session boundary",
+      "High risk-to-reward ratio"
+    ],
+    "successConditions": [
+      "Session Breakout Close",
+      "Volume Spike Confirmation",
+      "Multi-Timeframe Trend Confluence"
+    ],
+    "symbol": "XAU/USD",
+    "type": "SESSION_BREAKOUT",
+    "updatedAt": "2026-10-07T00:00:00+00:00",
+    "weaknesses": [
+      "Avoid during low volume consolidation",
+      "Requires clean session range formation"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "London Open Impending",
+      "High Spread Spikes"
+    ],
+    "avoidDuring": [
+      "BOJ Rate Decision",
+      "Asian High Impact News"
+    ],
+    "bestSession": "Asian",
+    "bestTimeframe": "M15",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "RSI 14",
+      "Bollinger Bands (20, 2)",
+      "Horizontal Support/Resistance"
+    ],
+    "createdAt": "2026-08-15T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Market Session Engine",
+      "Volatility Filter"
+    ],
+    "description": "Exploits quiet overnight Asian ranges (Tokyo/Sydney). Enters when price touches outer Bollinger Bands with RSI extreme exhaustion (< 30 or > 70) for rapid snap-backs.",
+    "entryChecklist": [
+      "Price at Bollinger Band outer edge",
+      "RSI overbought (>70) or oversold (<30)",
+      "Key S/R boundary hold"
+    ],
+    "estimatedHoldingTime": "1-3 hours",
+    "exitChecklist": [
+      "Mean / 20 SMA reached",
+      "Opposite band touched"
+    ],
+    "grade": "A",
+    "health": "EXCELLENT",
+    "id": "strat-009",
+    "idealVolatility": "Low",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:56.915745+00:00",
+    "latestValidation": {
+      "aiConfidence": 65,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": false,
+          "value": "0/5"
+        }
+      ],
+      "failedChecks": [
+        "Trend Alignment",
+        "EMA Confirmation",
+        "Strategy Confidence"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 65,
+      "validationDurationSeconds": 0.031
+    },
+    "marketCompatibility": [
+      "Ranging",
+      "Low Volatility",
+      "Consolidation"
+    ],
+    "marketCondition": "Ranging Low Volatility",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 80,
+    "minimumRiskReward": 2.0,
+    "name": "Asian Mean Reversion Range",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "Asian",
+      "Sydney",
+      "Tokyo"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "RSI Divergence or Extreme",
+      "Reversal Candlestick at Band"
+    ],
+    "reviewNotes": "Optimized for overnight Asian session automated tracking.",
+    "riskLevel": "LOW",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 65,
+      "currentMarketScore": 65,
+      "currentNewsScore": 65,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 32,
+      "riskRating": "LOW",
+      "sessionMatch": 65
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "Consistent overnight win-rate",
+      "Low drawdown",
+      "Safe during quiet markets"
+    ],
+    "successConditions": [
+      "Asian Session Active",
+      "RSI Extreme Reached",
+      "Low Spread Environment"
+    ],
+    "symbol": "USD/JPY",
+    "type": "MEAN_REVERSION",
+    "updatedAt": "2026-09-02T00:00:00+00:00",
+    "weaknesses": [
+      "Must exit before London pre-market momentum"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Ranging Consolidation",
+      "Unresolved Major Geopolitics"
+    ],
+    "avoidDuring": [
+      "Emergency Central Bank Announcements"
+    ],
+    "bestSession": "London",
+    "bestTimeframe": "H4",
+    "category": "SWING",
+    "confirmationIndicators": [
+      "EMA 50 / 200",
+      "Market Structure BOS",
+      "Higher Timeframe ATR"
+    ],
+    "createdAt": "2026-08-20T00:00:00+00:00",
+    "createdBy": "Captain",
+    "dependencies": [
+      "Trend Bias",
+      "Market Session Engine"
+    ],
+    "description": "Multi-day institutional swing trading. Rides major directional waves (150-350 pips) across Gold and major currencies based on H4 Higher-High/Higher-Low market structure and EMA 50 pullbacks.",
+    "entryChecklist": [
+      "H4 structural break of structure (BOS)",
+      "Pullback to 50 EMA dynamic zone",
+      "Daily bias aligned"
+    ],
+    "estimatedHoldingTime": "2-5 days",
+    "exitChecklist": [
+      "Opposite H4 structure break",
+      "Trailing stop-loss triggered"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-010",
+    "idealVolatility": "Medium",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:57.016883+00:00",
+    "latestValidation": {
+      "aiConfidence": 100,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 100,
+      "validationDurationSeconds": 0.038
+    },
+    "marketCompatibility": [
+      "Trending",
+      "Macro Expansion",
+      "Institutional Flows"
+    ],
+    "marketCondition": "Strong Macro Trend",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 88,
+    "minimumRiskReward": 2.8,
+    "name": "Macro Trend Swing Wave",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York",
+      "Asian"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "H4 Market Structure Trend Alignment",
+      "Daily EMA Slope Direction"
+    ],
+    "reviewNotes": "Institutional swing framework for capturing macro moves.",
+    "riskLevel": "LOW",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 100,
+      "currentMarketScore": 100,
+      "currentNewsScore": 100,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 50,
+      "riskRating": "LOW",
+      "sessionMatch": 100
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "Captures massive profit runs",
+      "Low maintenance / zero screen stress",
+      "Immune to short-term intraday noise"
+    ],
+    "successConditions": [
+      "Daily Bullish/Bearish Bias",
+      "H4 Pullback Complete",
+      "Risk/Reward >= 2.5"
+    ],
+    "symbol": "XAU/USD",
+    "type": "SWING_STRUCTURE",
+    "updatedAt": "2026-09-02T00:00:00+00:00",
+    "weaknesses": [
+      "Wider stop loss required",
+      "Low trade frequency (1-3 setups per week)"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Choppy Middle-of-Range Noise"
+    ],
+    "avoidDuring": [
+      "Low Liquidity Holidays"
+    ],
+    "bestSession": "London / New York",
+    "bestTimeframe": "H1",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "Candlestick Pattern Engine",
+      "Support/Demand Zones",
+      "ATR Sizing"
+    ],
+    "createdAt": "2026-09-03T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Candlestick Pattern Engine",
+      "Structure Engine"
+    ],
+    "description": "Executes high-conviction trades when institutional candlestick triggers (Engulfing, Morning/Evening Star, Three White Soldiers, Hammers, Three Line Strike, Double Tops/Bottoms) align precisely with Key Support/Resistance and Supply/Demand zones.",
+    "entryChecklist": [
+      "Candlestick pattern confirmed at close",
+      "Occurs at Institutional Support/Demand or Resistance/Supply",
+      "Risk/Reward >= 2.0"
+    ],
+    "estimatedHoldingTime": "2-8 hours",
+    "exitChecklist": [
+      "Opposite structure target reached",
+      "Trailing stop-loss after 1.5R"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-011",
+    "idealVolatility": "Medium to High",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:57.118883+00:00",
+    "latestValidation": {
+      "aiConfidence": 100,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 100,
+      "validationDurationSeconds": 0.045
+    },
+    "marketCompatibility": [
+      "Trending",
+      "Reversals",
+      "Breakouts"
+    ],
+    "marketCondition": "Key S/R Reversals & Trend Continuations",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 85,
+    "minimumRiskReward": 2.0,
+    "name": "Institutional Candlestick & Price Action Confluence",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York",
+      "Asian"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Confirmed Candle Close",
+      "Structure Level Tap"
+    ],
+    "reviewNotes": "Integrated institutional candlestick engine covering 30+ classical & SMC patterns.",
+    "riskLevel": "LOW",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 100,
+      "currentMarketScore": 100,
+      "currentNewsScore": 100,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 50,
+      "riskRating": "LOW",
+      "sessionMatch": 100
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "Pinpoint low-drawdown entries",
+      "Clear structural invalidation stop loss",
+      "High win-rate across all asset classes"
+    ],
+    "successConditions": [
+      "Pattern Confirmation",
+      "Key Zone Confluence",
+      "SMC Order Flow Alignment"
+    ],
+    "symbol": "XAU/USD",
+    "type": "PRICE_ACTION",
+    "updatedAt": "2026-09-03T00:00:00+00:00",
+    "weaknesses": [
+      "Requires patience for pattern close at key levels"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Macro DXY Contradiction",
+      "Wide Rollover Spreads"
+    ],
+    "avoidDuring": [
+      "Unscheduled Flash Crashes",
+      "DXY Macro Bull/Bear Trap"
+    ],
+    "bestSession": "London / New York",
+    "bestTimeframe": "H1",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "Smart Money Sweep Engine",
+      "3-Candle FVG Imbalance",
+      "Synthetic DXY Macro Gate"
+    ],
+    "createdAt": "2026-09-10T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Smart Money Engine",
+      "Macro Cross-Asset Gate",
+      "Structure Engine"
+    ],
+    "description": "Hunts institutional stop-loss sweeps above Previous Day/Session Highs (PDH/ASH) or below Lows (PDL/ASL) paired with a 3-candle Fair Value Gap (FVG) displacement. Enters on rejection with tight wick-anchored stops for asymmetric 1:3.0 to 1:4.5 R:R.",
+    "entryChecklist": [
+      "Wick sweep of PDH/PDL or Asian High/Low with body close back inside range",
+      "3-candle Fair Value Gap (FVG) displacement confirmed",
+      "Cross-Asset DXY Macro Gate aligned",
+      "Risk/Reward >= 3.0"
+    ],
+    "estimatedHoldingTime": "1-6 hours",
+    "exitChecklist": [
+      "Opposite liquidity pool target reached (1:3.0+ R:R)",
+      "Breakeven + 2 pips locked at +1.5R",
+      "Structural Higher-Low / Lower-High trailing stop"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-012",
+    "idealVolatility": "Medium to High",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:57.218322+00:00",
+    "latestValidation": {
+      "aiConfidence": 90,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": false,
+          "value": "0/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [
+        "Session Match"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 90,
+      "validationDurationSeconds": 0.026
+    },
+    "marketCompatibility": [
+      "Reversals",
+      "Breakouts",
+      "Trending",
+      "Volatile"
+    ],
+    "marketCondition": "Liquidity Sweeps & Displacement Reversals",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 85,
+    "minimumRiskReward": 1.8,
+    "name": "Institutional Liquidity Sweep & FVG",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York",
+      "London-NY Overlap",
+      "NY Overlap"
+    ],
+    "readyForExecution": true,
+    "requiredConfirmations": [
+      "Liquidity Sweep Rejection Close",
+      "Fair Value Gap Displacement"
+    ],
+    "reviewNotes": "Institutional Smart Money Concepts (SMC) Liquidity Sweep & FVG sniper engine.",
+    "riskLevel": "LOW",
+    "status": "ACTIVE",
+    "strategyScore": {
+      "currentMarketFit": 90,
+      "currentMarketScore": 90,
+      "currentNewsScore": 90,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 45,
+      "riskRating": "LOW",
+      "sessionMatch": 90
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "Exploits retail stop hunts before institutional reversal",
+      "Ultra-tight stop loss anchored beyond sweep wick (10-18 pips)",
+      "Asymmetric 1:3.0 to 1:4.5 risk-to-reward profile"
+    ],
+    "successConditions": [
+      "Liquidity Pool Pierced & Rejected",
+      "FVG Imbalance Created",
+      "Macro DXY Aligned"
+    ],
+    "symbol": "XAU/USD",
+    "type": "PRICE_ACTION",
+    "updatedAt": "2026-09-10T00:00:00+00:00",
+    "weaknesses": [
+      "Selective sniper frequency (waits for key pool sweep)"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "BOJ Emergency Press Conference",
+      "Wide Rollover Spreads"
+    ],
+    "avoidDuring": [
+      "BOJ Unscheduled Intervention",
+      "US NFP / CPI Release Minute"
+    ],
+    "bestSession": "Asian / London",
+    "bestTimeframe": "M15",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "Smart Money Sweep Engine",
+      "3-Candle FVG Imbalance",
+      "RSI 14"
+    ],
+    "createdAt": "2026-09-15T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Smart Money Engine",
+      "Market Session Engine",
+      "Macro Cross-Asset Gate"
+    ],
+    "description": "Pairs with Asian Mean Reversion Range (strat-009) on USD/JPY. Captures the institutional stop hunt when Tokyo Fix or early London liquidity pierces the overnight Asian High/Low by 5-15 pips and snaps back with a 3-candle Fair Value Gap (FVG) displacement.",
+    "entryChecklist": [
+      "Wick sweep of Asian High/Low or Previous Day High/Low on USD/JPY",
+      "Immediate candle body rejection close back inside range",
+      "3-candle FVG displacement or reversal candlestick confirmed",
+      "DXY / US Yield Macro Gate aligned"
+    ],
+    "estimatedHoldingTime": "1-4 hours",
+    "exitChecklist": [
+      "Asian range opposite boundary or 1:2.8+ R:R reached",
+      "Breakeven + 1.5 pips locked at +1.5R"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-013",
+    "idealVolatility": "Low to Medium",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:57.321094+00:00",
+    "latestValidation": {
+      "aiConfidence": 100,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 100,
+      "validationDurationSeconds": 0.033
+    },
+    "marketCompatibility": [
+      "Reversals",
+      "Ranging",
+      "Liquidity Sweeps"
+    ],
+    "marketCondition": "Asian Boundary Liquidity Sweeps & Reversals",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 82,
+    "minimumRiskReward": 1.5,
+    "name": "Tokyo Fix & Asian Range Liquidity Sweep",
+    "parentStrategyId": "strat-009",
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "Asian",
+      "Tokyo",
+      "London",
+      "London-NY Overlap"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Liquidity Sweep Rejection Close",
+      "FVG or Reversal Candle"
+    ],
+    "reviewNotes": "Paired with strat-009 to harvest Tokyo Fix and London Open liquidity sweeps on USD/JPY.",
+    "riskLevel": "LOW",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 100,
+      "currentMarketScore": 100,
+      "currentNewsScore": 100,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 50,
+      "riskRating": "LOW",
+      "sessionMatch": 100
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "Directly turns strat-009 Asian range boundary stop-hunts into high-R:R entries",
+      "Tight stop loss anchored 2 pips beyond the sweep wick",
+      "High 1:2.8+ risk-to-reward profile"
+    ],
+    "successConditions": [
+      "Asian Boundary Swept & Rejected",
+      "FVG Imbalance Confirmed",
+      "Spread <= 1.5 pips"
+    ],
+    "symbol": "USD/JPY",
+    "type": "PRICE_ACTION",
+    "updatedAt": "2026-09-15T00:00:00+00:00",
+    "weaknesses": [
+      "Requires established Asian session high/low pool"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Asian Low-Volume Chop",
+      "Macro DXY Contradiction"
+    ],
+    "avoidDuring": [
+      "Low Volume Asian Range",
+      "Pre-FOMC Blackout"
+    ],
+    "bestSession": "New York",
+    "bestTimeframe": "M15",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "Session Breakout Corridors",
+      "RVol >= 1.8x",
+      "Synthetic DXY & Yield Proxy"
+    ],
+    "createdAt": "2026-09-15T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Session Breakout Engine",
+      "Macro Cross-Asset Gate",
+      "Volume Expansion Engine"
+    ],
+    "description": "Complements Asian Mean Reversion Range (strat-009) by switching USD/JPY from range-fading to directional momentum expansion during London and New York sessions when US 10Y Yields and Synthetic DXY break out with Relative Volume >= 1.8x.",
+    "entryChecklist": [
+      "Asian or London session corridor broken cleanly on USD/JPY",
+      "Relative Volume surge (RVol >= 1.8x) confirmed",
+      "Synthetic DXY & US Yield Proxy aligned with breakout direction"
+    ],
+    "estimatedHoldingTime": "45-180 minutes",
+    "exitChecklist": [
+      "TP1 partial scale-out at +1.5R, TP2 runner at +2.5R+",
+      "Structural swing trailing stop engaged at +2.0R"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-014",
+    "idealVolatility": "Medium to High",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:57.424526+00:00",
+    "latestValidation": {
+      "aiConfidence": 55,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": false,
+          "value": "0/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": false,
+          "value": "0/5"
+        }
+      ],
+      "failedChecks": [
+        "Trend Alignment",
+        "EMA Confirmation",
+        "Session Match",
+        "Strategy Confidence"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 55,
+      "validationDurationSeconds": 0.04
+    },
+    "marketCompatibility": [
+      "Trending",
+      "High Volatility",
+      "Macro Expansion"
+    ],
+    "marketCondition": "London / NY Yield-Driven Trend Expansion",
+    "maxConsecutiveLosses": 3,
+    "minimumConfidence": 84,
+    "minimumRiskReward": 2.5,
+    "name": "US Yield & NY Momentum Breakout",
+    "parentStrategyId": "strat-009",
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York",
+      "London-NY Overlap",
+      "NY Overlap"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Session Boundary Breakout",
+      "RVol >= 1.8x Surge",
+      "DXY/Yield Alignment"
+    ],
+    "reviewNotes": "Pairs with strat-009 so USD/JPY transitions seamlessly from Asian mean reversion to London/NY yield breakouts.",
+    "riskLevel": "MEDIUM",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 55,
+      "currentMarketScore": 55,
+      "currentNewsScore": 55,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 28,
+      "riskRating": "MEDIUM",
+      "sessionMatch": 55
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "Captures explosive 60-120 pip USD/JPY waves during US Treasury Yield moves",
+      "Eliminates Asian-only blindspot on USD/JPY during London & NY hours",
+      "Confirmed by Synthetic DXY + RISING/FALLING_YIELDS macro gate"
+    ],
+    "successConditions": [
+      "Corridor Breakout Close",
+      "Volume Expansion",
+      "Macro Yield Alignment"
+    ],
+    "symbol": "USD/JPY",
+    "type": "SESSION_BREAKOUT",
+    "updatedAt": "2026-09-15T00:00:00+00:00",
+    "weaknesses": [
+      "Avoid during dead Asian consolidation (handled by strat-009)"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Spread > 3.2 Pips",
+      "GBP/USD vs USD/JPY Opposing Whipsaw"
+    ],
+    "avoidDuring": [
+      "BOE / BOJ Rate Decisions",
+      "Rollover Spread Widening"
+    ],
+    "bestSession": "London",
+    "bestTimeframe": "M15",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "Session Breakout Corridors",
+      "RVol >= 1.8x",
+      "Yen-Cross Alignment Filter"
+    ],
+    "createdAt": "2026-09-15T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Session Breakout Engine",
+      "Smart Money Engine",
+      "Volatility Filter"
+    ],
+    "description": "Captures high-beta 'Dragon' (GBP/JPY) volatility expansions at the London Open and London-NY Overlap. Waits for the Tokyo consolidation box to break with RVol >= 1.8x and enters on the structural retest.",
+    "entryChecklist": [
+      "Tokyo session range high/low broken with candle body >= 60% of range",
+      "Relative Volume (RVol) >= 1.8x surge confirmed",
+      "GBP/USD and USD/JPY cross-pair flows aligned (no divergence)"
+    ],
+    "estimatedHoldingTime": "30-120 minutes",
+    "exitChecklist": [
+      "1.5R TP1 partial bank + breakeven lock",
+      "2.8R+ TP2 runner with structural swing trail"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-015",
+    "idealVolatility": "High",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:57.525409+00:00",
+    "latestValidation": {
+      "aiConfidence": 55,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": false,
+          "value": "0/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": false,
+          "value": "0/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": false,
+          "value": "0/5"
+        }
+      ],
+      "failedChecks": [
+        "Trend Alignment",
+        "EMA Confirmation",
+        "Session Match",
+        "Strategy Confidence"
+      ],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 55,
+      "validationDurationSeconds": 0.021
+    },
+    "marketCompatibility": [
+      "Volatile",
+      "Trending",
+      "Session Breakouts"
+    ],
+    "marketCondition": "High-Beta Session Volatility Expansion",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 85,
+    "minimumRiskReward": 2.8,
+    "name": "Dragon London Open Volatility Breakout",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York",
+      "London-NY Overlap",
+      "NY Overlap"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Tokyo Corridor Breakout",
+      "RVol >= 1.8x Confirmation",
+      "HTF EMA Bias Alignment"
+    ],
+    "reviewNotes": "Dedicated institutional session breakout strategy for GBP/JPY.",
+    "riskLevel": "MEDIUM",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 55,
+      "currentMarketScore": 55,
+      "currentNewsScore": 55,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 28,
+      "riskRating": "MEDIUM",
+      "sessionMatch": 55
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "Exploits the highest average daily range (120-180 pips) among FX crosses",
+      "Filters out London Open Judas fakeouts via sweep-retest validation",
+      "Asymmetric 1:2.8+ risk-to-reward profile"
+    ],
+    "successConditions": [
+      "London/Overlap Active",
+      "Corridor Breakout + Retest",
+      "Spread <= 3.2 pips"
+    ],
+    "symbol": "GBP/JPY",
+    "type": "SESSION_BREAKOUT",
+    "updatedAt": "2026-09-15T00:00:00+00:00",
+    "weaknesses": [
+      "Requires strict 3.2-pip spread shield protection"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Middle-of-Range Chop",
+      "Wide Spreads"
+    ],
+    "avoidDuring": [
+      "Low Liquidity Rollover",
+      "High Impact GBP/JPY News"
+    ],
+    "bestSession": "London / New York",
+    "bestTimeframe": "H1",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "Smart Money Sweep & FVG Engine",
+      "Candlestick Pattern Engine",
+      "EMA 20 / 50"
+    ],
+    "createdAt": "2026-09-15T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Smart Money Engine",
+      "Candlestick Pattern Engine",
+      "Structure Engine"
+    ],
+    "description": "Trades GBP/JPY institutional liquidity sweeps and 3-candle Fair Value Gap (FVG) pullbacks aligned with H1 EMA 20/50 trend structure. Avoids chasing extended breakouts by entering on discount/premium imbalance fills.",
+    "entryChecklist": [
+      "Liquidity sweep of session/previous-day high/low OR 3-candle FVG created",
+      "H1 EMA 20 / EMA 50 trend structure aligned",
+      "Confirmation candle close at key zone"
+    ],
+    "estimatedHoldingTime": "1-6 hours",
+    "exitChecklist": [
+      "Opposite structural liquidity pool reached (1:3.0 R:R)",
+      "Automated breakeven at +1.5R and structural trail at +2.0R"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-016",
+    "idealVolatility": "Medium to High",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:57.631266+00:00",
+    "latestValidation": {
+      "aiConfidence": 100,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 100,
+      "validationDurationSeconds": 0.028
+    },
+    "marketCompatibility": [
+      "Trending",
+      "Reversals",
+      "Institutional Flow"
+    ],
+    "marketCondition": "Trending Impulses & SMC Imbalance Pullbacks",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 85,
+    "minimumRiskReward": 1.5,
+    "name": "Dragon Institutional FVG & Trend Pullback",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "London",
+      "New York",
+      "Asian",
+      "London-NY Overlap"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Liquidity Sweep or FVG Fill",
+      "Candlestick Confirmation Close"
+    ],
+    "reviewNotes": "Institutional SMC & FVG pullback sniper for GBP/JPY.",
+    "riskLevel": "LOW",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 100,
+      "currentMarketScore": 100,
+      "currentNewsScore": 100,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 50,
+      "riskRating": "LOW",
+      "sessionMatch": 100
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "Eliminates FOMO chasing on GBP/JPY by demanding FVG/sweep pullback",
+      "High-precision invalidation anchored below structural swing low/high",
+      "Superior 1:3.0+ risk-to-reward ratio"
+    ],
+    "successConditions": [
+      "SMC Sweep or FVG Retest",
+      "HTF Structure Aligned",
+      "Risk/Reward >= 3.0"
+    ],
+    "symbol": "GBP/JPY",
+    "type": "PRICE_ACTION",
+    "updatedAt": "2026-09-15T00:00:00+00:00",
+    "weaknesses": [
+      "Selective entry frequency; waits for clean imbalance retest"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Macro DXY Bull/Bear Trap",
+      "Gold Divergence"
+    ],
+    "avoidDuring": [
+      "RBA Rate Decision",
+      "US CPI / NFP"
+    ],
+    "bestSession": "Asian / London",
+    "bestTimeframe": "M15",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "Smart Money Sweep Engine",
+      "Synthetic DXY & Gold Confluence",
+      "3-Candle FVG"
+    ],
+    "createdAt": "2026-09-15T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Smart Money Engine",
+      "Macro Cross-Asset Gate",
+      "Candlestick Pattern Engine"
+    ],
+    "description": "Exploits Sydney/Tokyo and London Open liquidity sweeps on AUD/USD confirmed by 3-candle Fair Value Gaps (FVG) and positive commodity correlation with Gold (XAU/USD) and inverse Synthetic DXY flows.",
+    "entryChecklist": [
+      "Wick sweep of Asian/Previous-Day High or Low on AUD/USD",
+      "3-candle FVG displacement or institutional reversal candle close",
+      "XAU/USD (Gold) and Synthetic DXY macro gate aligned"
+    ],
+    "estimatedHoldingTime": "1-5 hours",
+    "exitChecklist": [
+      "1:2.8+ R:R target pool reached",
+      "Breakeven stop locked at +1.5R"
+    ],
+    "grade": "A+",
+    "health": "EXCELLENT",
+    "id": "strat-017",
+    "idealVolatility": "Medium",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:57.735243+00:00",
+    "latestValidation": {
+      "aiConfidence": 100,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 100,
+      "validationDurationSeconds": 0.035
+    },
+    "marketCompatibility": [
+      "Reversals",
+      "Trending",
+      "Commodity-FX Flow"
+    ],
+    "marketCondition": "Session Liquidity Sweeps & Commodity-FX Alignment",
+    "maxConsecutiveLosses": 2,
+    "minimumConfidence": 83,
+    "minimumRiskReward": 1.8,
+    "name": "Pacific Liquidity Sweep & Gold-Macro Confluence",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "Asian",
+      "Sydney",
+      "Tokyo",
+      "London",
+      "New York",
+      "London-NY Overlap"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "Sweep Rejection Close",
+      "FVG or Candlestick Confirmation",
+      "Macro Gate Pass"
+    ],
+    "reviewNotes": "Pairs AUD/USD SMC liquidity sweeps with Gold and DXY cross-asset confirmation.",
+    "riskLevel": "LOW",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 100,
+      "currentMarketScore": 100,
+      "currentNewsScore": 100,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 50,
+      "riskRating": "LOW",
+      "sessionMatch": 100
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "Active during Sydney/Tokyo Asian hours as well as London/NY transitions",
+      "Cross-asset Gold (XAU/USD) + DXY confirmation filters out false AUD breakouts",
+      "Tight 12-18 pip structural stops with 1:2.8+ R:R"
+    ],
+    "successConditions": [
+      "Liquidity Sweep Confirmed",
+      "Macro DXY & Gold Aligned",
+      "Spread <= 1.2 pips"
+    ],
+    "symbol": "AUD/USD",
+    "type": "PRICE_ACTION",
+    "updatedAt": "2026-09-15T00:00:00+00:00",
+    "weaknesses": [
+      "Avoid during RBA rate statements"
+    ]
+  },
+  {
+    "avoidConditions": [
+      "Choppy Range Consolidation",
+      "Macro DXY Contradiction"
+    ],
+    "avoidDuring": [
+      "RBA Rate Statement",
+      "US FOMC"
+    ],
+    "bestSession": "London / New York",
+    "bestTimeframe": "H1",
+    "category": "INTRADAY",
+    "confirmationIndicators": [
+      "EMA 20 / 50",
+      "Candlestick Pattern Engine",
+      "Synthetic DXY Macro Gate"
+    ],
+    "createdAt": "2026-09-15T00:00:00+00:00",
+    "createdBy": "Falcon AI",
+    "dependencies": [
+      "Trend Bias",
+      "Candlestick Pattern Engine",
+      "Macro Cross-Asset Gate"
+    ],
+    "description": "Rides clean, low-whipsaw intraday and multi-session trends on AUD/USD. Enters on structural pullbacks to the H1 20/50 EMA dynamic zone confirmed by institutional candlestick patterns and DXY macro alignment.",
+    "entryChecklist": [
+      "H1 trend aligned with EMA 20 & EMA 50 slope",
+      "Pullback to dynamic EMA support/resistance completed",
+      "Bullish/Bearish Engulfing, Pinbar, or Morning/Evening Star confirmation",
+      "DXY Macro Gate aligned"
+    ],
+    "estimatedHoldingTime": "2-6 hours",
+    "exitChecklist": [
+      "1:2.5+ R:R structural target reached",
+      "Swing trailing stop ratcheted at +2.0R"
+    ],
+    "grade": "A",
+    "health": "EXCELLENT",
+    "id": "strat-018",
+    "idealVolatility": "Low to Medium",
+    "lastReviewedAt": "2026-10-22T02:22:17.193927+00:00",
+    "lastUsed": "2026-10-22T02:14:57.840600+00:00",
+    "latestValidation": {
+      "aiConfidence": 100,
+      "checks": [
+        {
+          "name": "Trend Alignment",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "EMA Confirmation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "RSI Validation",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Session Match",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Spread Threshold",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "News Window",
+          "passed": true,
+          "value": "15/15"
+        },
+        {
+          "name": "Market Sentiment",
+          "passed": true,
+          "value": "10/10"
+        },
+        {
+          "name": "Strategy Confidence",
+          "passed": true,
+          "value": "5/5"
+        }
+      ],
+      "failedChecks": [],
+      "marketSnapshot": {
+        "adx": 0.0,
+        "atr": 0.0,
+        "ema200": "unknown",
+        "liquidity": "Good",
+        "news": "Low",
+        "rsi": 0.0,
+        "session": "Tokyo / Asian",
+        "spread": 0.39,
+        "trend": "Neutral",
+        "volatility": "Low"
+      },
+      "score": 100,
+      "validationDurationSeconds": 0.042
+    },
+    "marketCompatibility": [
+      "Trending",
+      "Low Volatility",
+      "High Liquidity"
+    ],
+    "marketCondition": "Steady Directional Trend & Pullback Continuation",
+    "maxConsecutiveLosses": 3,
+    "minimumConfidence": 82,
+    "minimumRiskReward": 2.5,
+    "name": "AUD/USD Structural Trend & EMA Pullback",
+    "parentStrategyId": null,
+    "performance": {
+      "averageConfidence": 0.0,
+      "averageRiskReward": 0.0,
+      "breakeven": 0,
+      "losses": 0,
+      "totalProfitLoss": 0.0,
+      "totalTrades": 0,
+      "winRate": 0.0,
+      "wins": 0
+    },
+    "preferredSessions": [
+      "Asian",
+      "London",
+      "New York",
+      "London-NY Overlap"
+    ],
+    "readyForExecution": false,
+    "requiredConfirmations": [
+      "EMA 20/50 Trend Alignment",
+      "Candlestick Pattern Close",
+      "DXY Gate Pass"
+    ],
+    "reviewNotes": "Institutional trend-continuation and EMA pullback strategy for AUD/USD.",
+    "riskLevel": "LOW",
+    "status": "INCUBATION",
+    "strategyScore": {
+      "currentMarketFit": 100,
+      "currentMarketScore": 100,
+      "currentNewsScore": 100,
+      "historicalPerformance": 0,
+      "historicalScore": 0,
+      "overallScore": 50,
+      "riskRating": "LOW",
+      "sessionMatch": 100
+    },
+    "strategyVersion": "1.0",
+    "strengths": [
+      "AUD/USD respects EMA 20/50 trend structure with minimal retail stop-hunting noise",
+      "Low drawdown and high consistency across London and NY sessions",
+      "1:2.5+ asymmetric risk-to-reward with structural trailing stops"
+    ],
+    "successConditions": [
+      "Trend Alignment",
+      "Candlestick Pullback Trigger",
+      "Macro DXY Aligned"
+    ],
+    "symbol": "AUD/USD",
+    "type": "TREND_CONTINUATION",
+    "updatedAt": "2026-09-15T00:00:00+00:00",
+    "weaknesses": [
+      "Lower frequency during tight horizontal consolidation"
+    ]
+  }
+]

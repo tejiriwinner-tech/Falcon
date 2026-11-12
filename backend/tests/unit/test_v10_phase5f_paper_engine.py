@@ -499,7 +499,9 @@ def test_15_duplicate_active_signal_id_reservation_prevented():
 # 3. Risk & Capital Isolation Tests (Conditions 16 - 22)
 # ==============================================================================
 
-def test_16_paper_still_passes_capital_guardian():
+def test_16_paper_still_passes_capital_guardian(monkeypatch):
+    from app.core.config.settings import settings
+    monkeypatch.setattr(settings, "NEWS_BLACKOUT_ENABLED", False)
     """16. PAPER trade must pass Capital Guardian invariants before authorization."""
     # Proposal exceeding active trading capital ($25 risk vs $20 capital)
     huge_proposal = ProposedTradeInput(
@@ -545,7 +547,9 @@ def test_17_three_trade_ceiling_enforced_in_paper():
     assert "maximum simultaneous trade count" in dec4.reason.lower() or "3" in dec4.reason
 
 
-def test_18_strict_aggregate_worst_case_loss_enforced_in_paper():
+def test_18_strict_aggregate_worst_case_loss_enforced_in_paper(monkeypatch):
+    from app.core.config.settings import settings
+    monkeypatch.setattr(settings, "NEWS_BLACKOUT_ENABLED", False)
     """18. Aggregate worst-case loss in PAPER cannot exceed active trading capital ($20)."""
     # 2 trades with $9.50 risk each = $19.00 <= $20.00 active capital
     p1 = ProposedTradeInput(

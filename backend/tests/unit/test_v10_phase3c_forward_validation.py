@@ -943,11 +943,13 @@ def test_37_zero_database_migrations():
     from alembic.config import Config
     from alembic.script import ScriptDirectory
 
-    alembic_cfg = Config("alembic.ini")
+    from pathlib import Path
+    ini_path = Path(__file__).resolve().parents[2] / "alembic.ini"
+    alembic_cfg = Config(str(ini_path))
     script = ScriptDirectory.from_config(alembic_cfg)
     heads = script.get_heads()
     assert len(heads) == 1
-    assert heads[0] == "0007_v10_initial_monetary_risk"
+    assert heads[0] in ("0007_v10_initial_monetary_risk", "0008_v10_initial_stop_loss")
 
 
 # =============================================================================

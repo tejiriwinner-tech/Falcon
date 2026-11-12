@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
 from typing import Any, Dict
-from app.schemas.strategy import StrategyListResponse, StrategyItem
+from pydantic import BaseModel
+from app.schemas.strategy import StrategyListResponse, StrategyItem, StrategyStatus
 from app.core.engines.strategy_engine import StrategyEngine, strategy_engine
 
 router = APIRouter()
@@ -100,6 +101,32 @@ def get_strategy(strategy_id: str):
     Get a specific strategy by ID.
     """
     strategy = strategy_engine.get_enriched_strategy(strategy_id)
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    return strategy
+
+
+class StrategyStatusUpdateRequest(BaseModel):
+    status: StrategyStatus
+
+
+@router.post("/strategies/{strategy_id}/toggle", response_model=StrategyItem)
+def toggle_strategy(strategy_id: str):
+    """
+    Toggle a strategy between ACTIVE and INCUBATION status.
+    """
+    strategy = strategy_engine.toggle_strategy_status(strategy_id)
+    if not strategy:
+        raise HTTPException(status_code=404, detail="Strategy not found")
+    return strategy
+
+
+@router.post("/strategies/{strategy_id}/status", response_model=StrategyItem)
+def update_strategy_status(strategy_id: str, payload: StrategyStatusUpdateRequest):
+    """
+    Explicitly set a strategy's status (ACTIVE or INCUBATION).
+    """
+    strategy = strategy_engine.set_strategy_status(strategy_id, payload.status)
     if not strategy:
         raise HTTPException(status_code=404, detail="Strategy not found")
     return strategy

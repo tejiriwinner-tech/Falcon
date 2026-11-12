@@ -38,6 +38,7 @@ class TradeJournalBase(BaseModel):
     adaptiveStopMultiplier: Optional[float] = None
     spreadAtEntry: Optional[float] = None
     atrAtEntry: Optional[float] = None
+    initialStopLoss: Optional[float] = None
     initialMonetaryRisk: Optional[Decimal] = None
     executionMode: Optional[str] = None
 
@@ -71,6 +72,7 @@ class TradeJournalUpdate(BaseModel):
     adaptiveStopMultiplier: Optional[float] = None
     spreadAtEntry: Optional[float] = None
     atrAtEntry: Optional[float] = None
+    initialStopLoss: Optional[float] = None
     initialMonetaryRisk: Optional[Decimal] = None
     executionMode: Optional[str] = None
 

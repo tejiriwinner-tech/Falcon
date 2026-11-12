@@ -12,7 +12,7 @@ from typing import Callable, List, Optional, Set
 logger = logging.getLogger("falcon.capital_guardian")
 
 from app.core.config.settings import settings
-from app.core.execution.execution_mode_guard import parse_execution_mode
+from app.core.execution.execution_mode_guard import parse_execution_mode, resolve_record_execution_mode
 from app.core.instruments.instrument_registry import (
     CanonicalInstrumentRegistry,
     instrument_registry,
@@ -94,15 +94,17 @@ class CapitalGuardianService:
             status_clean = (trade.status or "").strip().upper()
             if status_clean in CAPITAL_RESERVING_STATUSES and trade.closeDate is None:
                 # Mode isolation filter
-                trade_mode = getattr(trade, "executionMode", None) or parse_execution_mode(trade.notes)
+                trade_mode = resolve_record_execution_mode(
+                    getattr(trade, "executionMode", None), getattr(trade, "notes", None)
+                )
                 if execution_mode is not None:
                     mode_req = execution_mode.strip().upper()
                     if mode_req == "LIVE":
-                        # LIVE capacity only includes LIVE trades (or unclassified legacy trades), NOT PAPER
-                        if trade_mode == "PAPER":
+                        # LIVE capacity strictly includes only unambiguously verified LIVE trades
+                        if trade_mode != "LIVE":
                             continue
                     elif mode_req == "PAPER":
-                        # PAPER capacity only includes PAPER trades
+                        # PAPER capacity strictly includes only unambiguously verified PAPER trades
                         if trade_mode != "PAPER":
                             continue
 

@@ -20,7 +20,7 @@ All operations fail closed.
 from decimal import Decimal
 import logging
 import threading
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta, time
 from typing import List, Optional, Tuple
 
 from sqlalchemy import text
@@ -61,6 +61,26 @@ logger = logging.getLogger("falcon.signal_authorization_service")
 FALCON_GUARDIAN_ADVISORY_LOCK_KEY: int = 8882026
 
 
+def get_rollover_window_utc(now_utc: datetime) -> Tuple[time, time]:
+    """
+    Computes the exact UTC rollover blackout window for a given date,
+    dynamically mapped from 16:50 to 17:30 US Eastern (New York) time.
+    During EDT (UTC-4, March-Nov), returns (20:50, 21:30) UTC.
+    During EST (UTC-5, Nov-March), returns (21:50, 22:30) UTC.
+    """
+    try:
+        import zoneinfo
+        tz_ny = zoneinfo.ZoneInfo("America/New_York")
+        dt_ny = now_utc.astimezone(tz_ny)
+        dt_ny_start = dt_ny.replace(hour=16, minute=50, second=0, microsecond=0)
+        dt_ny_end = dt_ny.replace(hour=17, minute=30, second=0, microsecond=0)
+        start_utc = dt_ny_start.astimezone(timezone.utc).time()
+        end_utc = dt_ny_end.astimezone(timezone.utc).time()
+        return start_utc, end_utc
+    except Exception:
+        return time(20, 50, 0), time(21, 30, 0)
+
+
 class SignalAuthorizationService:
     """
     Hard safety gate ensuring every live signal is evaluated and reserved
@@ -85,6 +105,10 @@ class SignalAuthorizationService:
     ) -> List[TradeJournalItem]:
         """Return all trades currently reserving capital in the active cycle for the execution mode."""
         cycle = self._cycle_service.get_active_cycle(session=session)
+        if cycle is None and (execution_mode or "").upper() == "PAPER":
+            return self._guardian_service.get_capital_reserving_trades(
+                active_cycle=None, filter_by_cycle=False, session=session, execution_mode=execution_mode
+            )
         return self._guardian_service.get_capital_reserving_trades(
             active_cycle=cycle, filter_by_cycle=True, session=session, execution_mode=execution_mode
         )
@@ -122,6 +146,24 @@ class SignalAuthorizationService:
             signal_id=signal_id,
             session=session,
             execution_mode=execution_mode,
+            strategy_id=getattr(candidate, "strategyId", None),
+        )
+
+    def get_paper_cycle(self) -> Optional[CapitalCycleItem]:
+        """Resolve the isolated forward paper capital cycle. Returns None if unconfigured/disabled."""
+        now_utc = datetime.now(timezone.utc)
+        return CapitalCycleItem(
+            id=999999,
+            cycleId="CYCLE-PAPER-001",
+            cycleNumber=1,
+            startingCapital=Decimal("10000.00"),
+            targetCapital=Decimal("50000.00"),
+            activeTradingCapital=Decimal("10000.00"),
+            protectedProfit=Decimal("0.00"),
+            status=CapitalCycleStatus.ACTIVE,
+            startedAt=now_utc,
+            createdAt=now_utc,
+            updatedAt=now_utc,
         )
 
     def evaluate_proposal(
@@ -130,14 +172,20 @@ class SignalAuthorizationService:
         signal_id: Optional[int] = None,
         session: Optional[object] = None,
         execution_mode: Optional[str] = "LIVE",
+        strategy_id: Optional[str] = None,
     ) -> CapitalGuardianDecision:
         """
         Pure read-only evaluation of a trade proposal against Capital Guardian invariants.
         Does NOT insert into trade_journal or mutate persistent database state.
         """
         try:
-            # 1. Fetch active capital cycle
-            cycle = self._cycle_service.get_active_cycle(session=session)
+            # 1. Fetch active capital cycle (PAPER mode strictly isolated to synthetic paper cycle)
+            now_utc = datetime.now(timezone.utc)
+            if (execution_mode or "").upper() == "PAPER":
+                cycle = self.get_paper_cycle()
+            else:
+                cycle = self._cycle_service.get_active_cycle(session=session)
+
             if cycle is None:
                 return CapitalGuardianDecision(
                     allowed=False,
@@ -184,6 +232,30 @@ class SignalAuthorizationService:
                     aggregateWorstCaseLossAfter=Decimal("0.00"),
                     remainingLossCapacity=Decimal("0.00"),
                     cycleId=cycle.cycleId,
+                )
+
+            # 1b. Post-Stop Cooldown Check (45-minute blackout per strategy & symbol)
+            is_cd_ok, cd_reason = self.check_post_stop_cooldown(
+                strategy_id=strategy_id,
+                symbol=proposal.symbol,
+                now_utc=datetime.now(timezone.utc),
+                session=session,
+            )
+            if not is_cd_ok:
+                logger.warning(f"Authorization rejected by cooldown: {cd_reason}")
+                return CapitalGuardianDecision(
+                    allowed=False,
+                    reason=cd_reason,
+                    state=GuardianState.NORMAL,
+                    activeTradingCapital=cycle.activeTradingCapital if cycle else Decimal("0.00"),
+                    protectedProfit=cycle.protectedProfit if cycle else Decimal("0.00"),
+                    currentLiveTradeCount=0,
+                    maxLiveTradeCount=settings.MAX_SIMULTANEOUS_TRADES,
+                    currentAggregateWorstCaseLoss=Decimal("0.00"),
+                    proposedWorstCaseLoss=Decimal("0.00"),
+                    aggregateWorstCaseLossAfter=Decimal("0.00"),
+                    remainingLossCapacity=Decimal("0.00"),
+                    cycleId=cycle.cycleId if cycle else None,
                 )
 
             # 2. Fetch current capital-reserving trades for this execution mode
@@ -400,6 +472,197 @@ class SignalAuthorizationService:
             )
 
 
+    def validate_market_and_spread_conditions(
+        self,
+        symbol: str,
+        quote_resp: Optional[object] = None,
+        now_utc: Optional[datetime] = None,
+        bypass_quote_check: bool = False,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Validate UTC Rollover Blackout (20:50 - 21:30 UTC), quote freshness (<= 30s),
+        and instrument-specific spread caps:
+          - Gold: $0.80 USD cash maximum (quoted in price difference)
+          - JPY Majors (USDJPY): 2.0 pips (0.020)
+          - JPY Crosses (GBPJPY, EURJPY): 3.5 pips (0.035)
+          - Forex Majors (EURUSD, GBPUSD, AUDUSD): 2.0 pips (0.00020)
+          - Forex Crosses (EURGBP, etc.): 3.5 pips (0.00035)
+        Fails closed on stale (>30s) or missing quote data when bypass_quote_check is False.
+        """
+        now = now_utc or datetime.now(timezone.utc)
+        if now.tzinfo is None:
+            now = now.replace(tzinfo=timezone.utc)
+        clean_sym = symbol.replace("/", "").replace("_", "").replace("-", "").upper()
+
+        # 1. UTC Rollover Blackout Check (Dynamic US Eastern 16:50 - 17:30 New York / UTC equivalent)
+        if getattr(settings, "ROLLOVER_BLACKOUT_ENABLED", True):
+            now_time = now.time()
+            start_str = getattr(settings, "ROLLOVER_BLACKOUT_START_UTC", "20:50")
+            end_str = getattr(settings, "ROLLOVER_BLACKOUT_END_UTC", "21:30")
+
+            # If default settings are used, calculate dynamically based on US Eastern DST
+            if start_str == "20:50" and end_str == "21:30":
+                start_t, end_t = get_rollover_window_utc(now)
+            else:
+                try:
+                    sh, sm = map(int, start_str.split(":"))
+                    eh, em = map(int, end_str.split(":"))
+                    start_t = time(sh, sm, 0)
+                    end_t = time(eh, em, 0)
+                except Exception:
+                    start_t = time(20, 50, 0)
+                    end_t = time(21, 30, 0)
+
+            if start_t <= end_t:
+                in_blackout = (start_t <= now_time <= end_t)
+            else:
+                in_blackout = (now_time >= start_t or now_time <= end_t)
+
+            if in_blackout:
+                return False, f"DAILY ROLLOVER BLACKOUT: {start_t.strftime('%H:%M')}-{end_t.strftime('%H:%M')} UTC interbank liquidity freeze. Entries blocked."
+
+        if bypass_quote_check:
+            return True, None
+
+        # 2. Quote Availability & Freshness Check
+        if not quote_resp or not getattr(quote_resp, "quote", None):
+            return False, "QUOTE UNAVAILABLE: Live quote from broker unavailable. Order entry blocked."
+
+        quote = quote_resp.quote
+        bid_ask = getattr(quote, "bidAsk", None)
+        if not bid_ask or bid_ask.bid <= 0 or bid_ask.ask <= 0 or bid_ask.ask < bid_ask.bid or getattr(bid_ask, "spread", 0) < 0:
+            return False, "INVALID OR CROSSED QUOTE: Broker bid/ask prices missing, non-positive, or crossed (ask < bid). Order entry blocked."
+
+        q_time = getattr(quote, "timestamp", None)
+        if q_time is not None:
+            if not q_time.tzinfo:
+                q_time = q_time.replace(tzinfo=timezone.utc)
+            quote_age = (now - q_time).total_seconds()
+            if quote_age > 30.0:
+                return False, f"STALE QUOTE: Live quote is {quote_age:.1f}s old (> 30.0s threshold). Order entry blocked."
+            if quote_age < -5.0:
+                return False, f"FUTURE QUOTE: Live quote is from the future ({abs(quote_age):.1f}s ahead). Order entry blocked."
+
+        # 3. Instrument-Specific Spread Cap with Explicit Unit Accounting
+        raw_spread = float(bid_ask.spread)
+        is_gold = "XAU" in clean_sym or "GOLD" in clean_sym
+        is_jpy = clean_sym.endswith("JPY")
+
+        if is_gold:
+            max_gold_spread = 0.80  # $0.80 USD
+            if raw_spread > max_gold_spread:
+                return False, f"SPREAD SPIKE: Gold spread ${raw_spread:.2f} USD exceeds maximum allowable $0.80 USD cap. Entry blocked."
+        elif is_jpy:
+            pip_size = 0.010
+            spread_pips = raw_spread / pip_size
+            max_pips = 3.5 if any(k in clean_sym for k in ("GBP", "EUR", "AUD", "CAD", "NZD")) else 2.0
+            if spread_pips > max_pips:
+                return False, f"SPREAD SPIKE: Live spread {spread_pips:.1f} pips exceeds maximum {max_pips:.1f} pips cap for {symbol}. Entry blocked."
+        else:
+            pip_size = 0.00010
+            spread_pips = raw_spread / pip_size
+            is_major = any(clean_sym == m for m in ("EURUSD", "GBPUSD", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD"))
+            max_pips = 2.0 if is_major else 3.5
+            if spread_pips > max_pips:
+                return False, f"SPREAD SPIKE: Live spread {spread_pips:.1f} pips exceeds maximum {max_pips:.1f} pips cap for {symbol}. Entry blocked."
+
+        return True, None
+
+    def check_post_stop_cooldown(
+        self,
+        strategy_id: Optional[str],
+        symbol: str,
+        now_utc: Optional[datetime] = None,
+        session: Optional[object] = None,
+    ) -> Tuple[bool, Optional[str]]:
+        """
+        Enforce 45-minute post-stop cooldown per (strategy_id, symbol).
+        Prevents rapid-fire whipsaw re-entries across multiple worker processes.
+        Protected by PostgreSQL transaction advisory lock in caller.
+        """
+        if not strategy_id or strategy_id.lower() in ("unknown", "default", "none"):
+            return True, None
+
+        now = now_utc or datetime.now(timezone.utc)
+        cooldown_cutoff = now - timedelta(minutes=45)
+        clean_sym = symbol.replace("/", "").replace("_", "").replace("-", "").upper()
+
+        # 1. PostgreSQL direct SQL execution if connected
+        if session is not None:
+            try:
+                bind = getattr(session, "get_bind", lambda: None)()
+                if bind is not None and bind.dialect.name == "postgresql":
+                    stmt = text(
+                        """
+                        SELECT id, close_date, result, reason_for_exit
+                        FROM trade_journal
+                        WHERE strategy_id = :strat_id
+                          AND REPLACE(REPLACE(REPLACE(UPPER(symbol), '/', ''), '_', ''), '-', '') = :clean_sym
+                          AND UPPER(status) = 'CLOSED'
+                          AND close_date >= :cutoff
+                          AND (
+                              UPPER(result) IN ('LOST', 'LOSS', 'BREAKEVEN', 'BE')
+                              OR reason_for_exit ILIKE '%Stop Loss%'
+                              OR reason_for_exit ILIKE '%STOP_LOSS%'
+                          )
+                        ORDER BY close_date DESC
+                        LIMIT 1
+                        """
+                    )
+                    res = session.execute(stmt, {
+                        "strat_id": strategy_id,
+                        "clean_sym": clean_sym,
+                        "cutoff": cooldown_cutoff,
+                    }).fetchone()
+                    if res is not None:
+                        c_date = res[1]
+                        if c_date:
+                            if not c_date.tzinfo:
+                                c_date = c_date.replace(tzinfo=timezone.utc)
+                            rem_m = max(1, int((c_date + timedelta(minutes=45) - now).total_seconds() / 60))
+                        else:
+                            rem_m = 45
+                        reason = (
+                            f"POST-STOP COOLDOWN: Strategy '{strategy_id}' on {clean_sym} is in 45m cooldown "
+                            f"({rem_m}m remaining) following stop-out on Trade #{res[0]}."
+                        )
+                        logger.warning(reason)
+                        return False, reason
+            except Exception as ex:
+                logger.debug(f"PostgreSQL post-stop cooldown check error: {ex}")
+
+        # 2. Repository check (applies to in-memory, SQLite, or fallback)
+        try:
+            trades = self._journal_repo.list_trades(session=session) or []
+            for t in trades:
+                if t.strategyId == strategy_id:
+                    t_sym = t.symbol.replace("/", "").replace("_", "").replace("-", "").upper()
+                    if t_sym == clean_sym and (t.status or "").upper() == "CLOSED":
+                        t_close = t.closeDate
+                        if t_close:
+                            if not t_close.tzinfo:
+                                t_close = t_close.replace(tzinfo=timezone.utc)
+                            if t_close >= cooldown_cutoff:
+                                res_str = (t.result or "").upper()
+                                reas_str = (t.reasonForExit or "").lower()
+                                is_stop = (
+                                    res_str in ("LOST", "LOSS", "BREAKEVEN", "BE")
+                                    or "stop loss" in reas_str
+                                    or "stop_loss" in reas_str
+                                )
+                                if is_stop:
+                                    rem_m = max(1, int((t_close + timedelta(minutes=45) - now).total_seconds() / 60))
+                                    reason = (
+                                        f"POST-STOP COOLDOWN: Strategy '{strategy_id}' on {clean_sym} is in 45m cooldown "
+                                        f"({rem_m}m remaining) following stop-out on Trade #{t.id}."
+                                    )
+                                    logger.warning(reason)
+                                    return False, reason
+        except Exception as ex:
+            logger.debug(f"Repository post-stop cooldown check error: {ex}")
+
+        return True, None
+
     def _acquire_advisory_lock_if_postgres(self, session: object) -> None:
         """Acquire PostgreSQL transaction advisory lock if connected to PostgreSQL."""
         try:
@@ -440,8 +703,13 @@ class SignalAuthorizationService:
         reserving_trades: List[TradeJournalItem] = []
 
         try:
-            # 1. Fetch active capital cycle
-            cycle = self._cycle_service.get_active_cycle(session=session)
+            # 1. Fetch active capital cycle (PAPER mode strictly isolated to synthetic paper cycle)
+            now_utc = datetime.now(timezone.utc)
+            if (execution_mode or "").upper() == "PAPER":
+                cycle = self.get_paper_cycle()
+            else:
+                cycle = self._cycle_service.get_active_cycle(session=session)
+
             if cycle is None:
                 return (
                     CapitalGuardianDecision(
@@ -498,6 +766,30 @@ class SignalAuthorizationService:
                     ),
                     None,
                 )
+
+            # 1b. Post-Stop Cooldown Check (45-minute blackout per strategy & symbol)
+            is_cd_ok, cd_reason = self.check_post_stop_cooldown(
+                strategy_id=strategy_id,
+                symbol=proposal.symbol,
+                now_utc=datetime.now(timezone.utc),
+                session=session,
+            )
+            if not is_cd_ok:
+                logger.warning(f"Authorization rejected by cooldown: {cd_reason}")
+                return CapitalGuardianDecision(
+                    allowed=False,
+                    reason=cd_reason,
+                    state=GuardianState.NORMAL,
+                    activeTradingCapital=cycle.activeTradingCapital if cycle else Decimal("0.00"),
+                    protectedProfit=cycle.protectedProfit if cycle else Decimal("0.00"),
+                    currentLiveTradeCount=0,
+                    maxLiveTradeCount=settings.MAX_SIMULTANEOUS_TRADES,
+                    currentAggregateWorstCaseLoss=Decimal("0.00"),
+                    proposedWorstCaseLoss=Decimal("0.00"),
+                    aggregateWorstCaseLossAfter=Decimal("0.00"),
+                    remainingLossCapacity=Decimal("0.00"),
+                    cycleId=cycle.cycleId if cycle else None,
+                ), None
 
             # 2. Fetch current capital-reserving trades for this execution mode
             reserving_trades = self._guardian_service.get_capital_reserving_trades(
@@ -572,7 +864,7 @@ class SignalAuthorizationService:
                 marketSession=market_session or "London / New York",
                 tradeDate=now,
                 closeDate=None,
-                status="PENDING",
+                status="OPEN" if (execution_mode or "").upper() == "LIVE" else "PENDING",
                 result="PENDING",
                 profitLoss=0.0,
                 riskReward=rr_val,
@@ -590,8 +882,8 @@ class SignalAuthorizationService:
                 # Preserved authoritative initial monetary risk from Capital Guardian
                 initialMonetaryRisk=decision.proposedWorstCaseLoss,
                 # Explicitly unpopulated until real lifecycle events occur
-                fillTime=None,
-                fillPrice=None,
+                fillTime=now if (execution_mode or "").upper() == "LIVE" else None,
+                fillPrice=float(proposal.entryPrice) if (execution_mode or "").upper() == "LIVE" else None,
                 realizedRMultiple=None,
                 peakPrice=None,
                 troughPrice=None,
@@ -609,6 +901,8 @@ class SignalAuthorizationService:
                 f"Slots: {decision.currentLiveTradeCount + 1}/{decision.maxLiveTradeCount}, "
                 f"Loss After: ${decision.aggregateWorstCaseLossAfter}/${decision.activeTradingCapital}"
             )
+
+            # FCM Push & Telegram alerts are dispatched strictly when signal turns ACTIVE (price touches entry in SignalService)
 
             return decision, created_trade
 

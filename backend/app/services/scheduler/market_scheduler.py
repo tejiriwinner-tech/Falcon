@@ -45,6 +45,11 @@ class MarketScheduler:
         self.statistics = SchedulerStatistics()
         self.signal_generator = SignalGenerator()
         self.risk_engine = RiskManagementEngine()
+        try:
+            from app.core.config.database_init import create_tables
+            create_tables()
+        except Exception as ex:
+            logger.debug(f"Could not auto-create legacy market_candles table: {ex}")
         
         self.is_running = False
         self._task: Optional[asyncio.Task] = None
