@@ -386,12 +386,18 @@ class SignalGenerationEngine:
                 ))
 
             ema_20 = None
+            ema_50 = None
+            ema_200 = None
             key_res = None
             key_sup = None
             if candles_1h and len(candles_1h) >= 5:
                 closes = [c.close for c in candles_1h]
                 from app.core.engines.session_breakout_engine import session_breakout_engine
                 ema_20 = session_breakout_engine.compute_ema(closes, 20)
+                if len(closes) >= 30:
+                    ema_50 = session_breakout_engine.compute_ema(closes, min(len(closes), 50))
+                if len(closes) >= 50:
+                    ema_200 = session_breakout_engine.compute_ema(closes, min(len(closes), 200))
                 lookback = min(len(candles_1h), 20)
                 key_res = max(c.high for c in candles_1h[-lookback:])
                 key_sup = min(c.low for c in candles_1h[-lookback:])
@@ -422,11 +428,32 @@ class SignalGenerationEngine:
 
             # 1. Candlestick Pattern / Price Action Sniper Confirmation
             # Breakout strategies require structural corridor/volume confirmation (Section 2), not isolated candle patterns
+            # Macro Trend Veto: Isolated counter-trend candle patterns (e.g. Bullish Hammer during a falling knife)
+            # are strictly vetoed against H1/H4 EMA 50/200 downtrends on volatile assets (Gold & commodities).
+            is_counter_trend_reversal = False
+            if sniper_pattern:
+                pat_dir = sniper_pattern.direction
+                if pat_dir == PatSignalDirection.BUY:
+                    if asset_trend == "Bearish":
+                        is_counter_trend_reversal = True
+                    elif ema_50 is not None and entry_price < ema_50:
+                        is_counter_trend_reversal = True
+                    elif ema_50 is not None and ema_200 is not None and ema_50 < ema_200:
+                        is_counter_trend_reversal = True
+                elif pat_dir == PatSignalDirection.SELL:
+                    if asset_trend == "Bullish":
+                        is_counter_trend_reversal = True
+                    elif ema_50 is not None and entry_price > ema_50:
+                        is_counter_trend_reversal = True
+                    elif ema_50 is not None and ema_200 is not None and ema_50 > ema_200:
+                        is_counter_trend_reversal = True
+
             if (
                 sniper_pattern
                 and getattr(sniper_pattern, "conviction_score", 0.0) >= 0.65
                 and sniper_pattern.pattern_type != PatternType.NO_PATTERN
                 and strat_type_val not in ["BREAKOUT", "SESSION_BREAKOUT", "MEAN_REVERSION"]
+                and not is_counter_trend_reversal
             ):
                 has_sniper_setup = True
                 direction = (

@@ -478,7 +478,7 @@ class SignalService:
             curated_active: List[dict] = []
             curated_watchlist: List[dict] = []
             additional_resolved: List[SignalItem] = []
-            active_symbols: set = {f"{ot.symbol.replace('/', '').replace('-', '').upper()}:{ot.strategyId or ''}" for ot in open_trades}
+            active_symbols: set = {ot.symbol.replace('/', '').replace('-', '').upper() for ot in open_trades}
             watchlist_symbols: set = set()
             active_currency_baskets: Dict[str, str] = {}
             open_trades.sort(key=lambda t: t.tradeDate, reverse=True)
@@ -537,8 +537,11 @@ class SignalService:
                 # Institutional Anti-Hedging & Unique Asset Resolve:
                 # If this asset already has an authoritative active or pending setup,
                 # skip weaker or conflicting setups so Falcon strictly focuses on 1 unique trade per symbol.
+                # Strict Symbol-Level Concurrency Cap: Max 1 active trade per asset across all strategies
+                if norm_sym in active_symbols:
+                    continue
                 strat_sym_key = f"{norm_sym}:{cand.strategyId or ''}"
-                if strat_sym_key in active_symbols or strat_sym_key in watchlist_symbols:
+                if strat_sym_key in watchlist_symbols:
                     continue
 
                 # Real-Time Live Market Quote Evaluation (Layer 2: Strict Freshness <= 60s)
@@ -592,8 +595,9 @@ class SignalService:
                 # Proximity band: 1.0 to 1.5 pips (0.00015 for 4-digit Forex, 0.50 for Gold)
                 is_gold_sym = "XAU" in symbol.upper() or "GOLD" in symbol.upper() or cand.entryPrice > 500
                 is_jpy_sym = "JPY" in symbol.upper()
-                pip_tolerance = 5.00 if is_gold_sym else (0.080 if is_jpy_sym else 0.00080)
-                slip_invalidation = 15.00 if is_gold_sym else (0.200 if is_jpy_sym else 0.00200)
+                # Strict Precision Entry Proximity: Gold max 1.20 USD tolerance, Forex 0.8 to 1.5 pips
+                pip_tolerance = 1.20 if is_gold_sym else (0.080 if is_jpy_sym else 0.00080)
+                slip_invalidation = 6.00 if is_gold_sym else (0.200 if is_jpy_sym else 0.00200)
 
                 # Pre-evaluate candidate via in-memory Guardian (Phase 5B read-only pipeline)
                 signal_authorization_service.evaluate_candidate(cand)
@@ -690,21 +694,21 @@ class SignalService:
                     if dt_time(20, 50) <= now_utc_time <= dt_time(21, 30):
                         shield_reason = "DAILY ROLLOVER BLACKOUT: 20:50-21:30 UTC interbank liquidity freeze. Entries blocked."
 
-                    # 0b. Post-Stop Cooldown (45m per strategy & symbol): Prevents rapid-fire whipsaw re-entries
-                    if not shield_reason and cand.strategyId:
+                    # 0b. Symbol-Wide Post-Stop Cooldown: Prevents rapid-fire whipsaw & multi-strategy cascades on same asset
+                    if not shield_reason:
                         try:
-                            cooldown_cutoff = now - timedelta(minutes=45)
+                            cooldown_mins = 60 if is_gold_sym else 45
+                            cooldown_cutoff = now - timedelta(minutes=cooldown_mins)
                             all_closed = trade_journal_repository.list_trades() or []
-                            has_recent_stop = any(
-                                t.strategyId == cand.strategyId
-                                and (t.symbol.replace("/", "").replace("-", "").upper() == norm_sym)
+                            recent_stop_trade = next((
+                                t for t in all_closed
+                                if (t.symbol.replace("/", "").replace("-", "").upper() == norm_sym)
                                 and (t.status or "").upper() == "CLOSED"
                                 and (t.result or "").upper() in ("LOST", "LOSS", "BREAKEVEN", "BE")
                                 and (t.closeDate is not None and t.closeDate >= cooldown_cutoff)
-                                for t in all_closed
-                            )
-                            if has_recent_stop:
-                                shield_reason = f"POST-STOP COOLDOWN: Strategy {cand.strategyId} on {symbol} in 45m cooldown following recent stop-out."
+                            ), None)
+                            if recent_stop_trade:
+                                shield_reason = f"POST-STOP COOLDOWN: {symbol} in {cooldown_mins}m symbol-wide cooldown following stop-out by {recent_stop_trade.strategyId}. Capital defended."
                             else:
                                 chop_cutoff_3h = now - timedelta(hours=3)
                                 recent_sym_losses = [
@@ -716,8 +720,9 @@ class SignalService:
                                 ]
                                 if len(recent_sym_losses) >= 2:
                                     latest_loss_dt = max(t.closeDate for t in recent_sym_losses if t.closeDate is not None)
-                                    if latest_loss_dt >= (now - timedelta(minutes=90)):
-                                        shield_reason = f"ANTI-WHIPSAW CHOP SHIELD: {symbol} recorded {len(recent_sym_losses)} stop-outs in 3h window. 90m volatility cooldown active."
+                                    chop_duration = 120 if is_gold_sym else 90
+                                    if latest_loss_dt >= (now - timedelta(minutes=chop_duration)):
+                                        shield_reason = f"ANTI-WHIPSAW CHOP SHIELD: {symbol} recorded {len(recent_sym_losses)} stop-outs in 3h window. {chop_duration}m market cooldown active."
                             if not shield_reason and norm_sym in open_symbol_dirs and open_symbol_dirs[norm_sym] != direction_str.upper():
                                 shield_reason = f"OPPOSING POSITION SHIELD: Active {open_symbol_dirs[norm_sym]} position already open on {symbol}. Opposing {direction_str.upper()} entry blocked."
                         except Exception as ex:
@@ -906,6 +911,7 @@ class SignalService:
                         except Exception as ex:
                             logger.debug(f"Could not auto-record trade to journal: {ex}")
 
+                    active_symbols.add(norm_sym)
                     active_symbols.add(strat_sym_key)
                     curated_active.append(item)
                 else:
