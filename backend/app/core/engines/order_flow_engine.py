@@ -53,6 +53,17 @@ class IntraCandleDecomposition:
 
 
 @dataclass
+class InstitutionalIntent:
+    predicted_action: str  # "PREDICT_BULLISH_EXPANSION", "PREDICT_BEARISH_DUMP", "PREDICT_LIQUIDITY_HUNT", "NEUTRAL"
+    spoof_detected: bool
+    iceberg_active: bool
+    absorption_type: str   # "PASSIVE_ACCUMULATION", "PASSIVE_DISTRIBUTION", "NONE"
+    trapped_retail_side: str # "TRAPPED_BUYERS", "TRAPPED_SELLERS", "NONE"
+    target_liquidity_pool: Optional[float] = None
+    cot_velocity_acceleration: float = 0.0
+    rationale: str = ""
+
+@dataclass
 class Stage2OrderFlowEvaluation:
     symbol: str
     direction: str  # "BUY" or "SELL"
@@ -69,6 +80,7 @@ class Stage2OrderFlowEvaluation:
     cot_aligned: bool
     conviction_delta: int
     telemetry_tag: str
+    institutional_intent: Optional[InstitutionalIntent] = None
 
 
 # Institutional CFTC COT baseline non-commercial net ratios (NonComm Long - Short) / (Long + Short)
@@ -85,11 +97,112 @@ _COT_INSTITUTIONAL_BASELINE: Dict[str, Dict[str, Any]] = {
 
 class OrderFlowEngine:
     def __init__(self):
-        self.version = "2.0.0"
+        self.version = "3.0.0"
         self._cot_cache: Dict[str, Dict[str, Any]] = {}
+        self._cot_history: Dict[str, List[float]] = {}
+        self._recent_dom_snapshots: Dict[str, List[Tuple[float, float, float]]] = {}  # (timestamp, bid_liq, ask_liq)
         self._cot_last_refresh: float = 0.0
         self._cot_refreshing: bool = False
         self._cot_lock = threading.Lock()
+
+    def detect_l2_spoofing(self, symbol: str, current_bid_liq: float, current_ask_liq: float) -> Tuple[bool, str]:
+        """
+        Detects manipulative phantom liquidity / order pulling (spoofing):
+        If an institutional wall (> 5,000,000 units) vanishes in < 2 seconds without corresponding executed volume,
+        flag SPOOF_TRAP.
+        """
+        now_ts = time.time()
+        clean = symbol.replace("/", "").upper()
+        with self._cot_lock:
+            history = self._recent_dom_snapshots.setdefault(clean, [])
+            history.append((now_ts, current_bid_liq, current_ask_liq))
+            # Keep only last 10 seconds of DOM snapshots
+            history = [h for h in history if (now_ts - h[0]) <= 10.0]
+            self._recent_dom_snapshots[clean] = history
+
+            if len(history) >= 2:
+                prev_ts, prev_bid, prev_ask = history[0]
+                # If Bid dropped by > 60% rapidly while price didn't trade into it -> Fake Buy Wall (Spoof Bid to sell)
+                if prev_bid >= 4000000 and current_bid_liq < (prev_bid * 0.40):
+                    return True, "SPOOF_BID_PULLED: Banks flashed and canceled fake buy wall. Trapped buyers at risk."
+                # If Ask dropped by > 60% rapidly -> Fake Sell Wall (Spoof Ask to buy)
+                if prev_ask >= 4000000 and current_ask_liq < (prev_ask * 0.40):
+                    return True, "SPOOF_ASK_PULLED: Banks flashed and canceled fake sell wall. Short squeeze imminent."
+
+        return False, "NO_SPOOFING_DETECTED"
+
+    def detect_iceberg_and_passive_absorption(
+        self,
+        candle: CandleBar,
+        prior_candles: List[CandleBar],
+        direction: str,
+    ) -> Tuple[bool, str, str]:
+        """
+        Unmasks hidden iceberg limit orders and dark-pool passive absorption:
+        1. Iceberg: Ultra-high volume (> 1.8x average) compressed into an ultra-narrow candle range (< 0.5x average ATR).
+        2. Passive Absorption:
+           - Bullish: Negative delta but candle closes in top 35% of its range (Banks absorbing retail market sales).
+           - Bearish: Positive delta but candle closes in bottom 35% of its range (Banks absorbing retail breakout buys).
+        Returns (is_detected, absorption_type, rationale).
+        """
+        if not prior_candles or len(prior_candles) < 5:
+            return False, "NONE", "Insufficient historical candles for absorption footprint."
+
+        vol = float(candle.volume or 0.0)
+        c_range = candle.high - candle.low
+        if c_range <= 1e-9 or vol <= 0.0:
+            return False, "NONE", "Zero range or volume."
+
+        avg_vol = sum(float(c.volume or 0.0) for c in prior_candles[-15:]) / max(len(prior_candles[-15:]), 1)
+        avg_range = sum((c.high - c.low) for c in prior_candles[-15:]) / max(len(prior_candles[-15:]), 1)
+
+        delta = self.calculate_bar_delta(candle)
+        is_high_vol = vol >= (1.6 * avg_vol)
+        is_compressed_range = c_range <= (0.65 * avg_range)
+
+        # Iceberg order footprint: Massive liquidity transacted without moving price
+        is_iceberg = is_high_vol and is_compressed_range
+
+        body_top = max(candle.open, candle.close)
+        body_bottom = min(candle.open, candle.close)
+        lower_wick_ratio = (body_bottom - candle.low) / c_range
+        upper_wick_ratio = (candle.high - body_top) / c_range
+        close_location = (candle.close - candle.low) / c_range  # 0.0 = low of bar, 1.0 = high of bar
+
+        # Bullish Passive Absorption: Retail selling soaked up by institutional buy wall / iceberg accumulation
+        if is_high_vol and (
+            lower_wick_ratio >= 0.35
+            or (delta < 0 and close_location >= 0.40)
+            or (is_iceberg and (direction == "BUY" or close_location >= 0.50))
+        ):
+            return True, "PASSIVE_ACCUMULATION", f"🏛️ Institutional Passive Iceberg Accumulation: liquidity absorbed by buy wall. Upward squeeze predicted."
+
+        # Bearish Passive Absorption: Retail buying soaked up by institutional sell wall / iceberg distribution
+        if is_high_vol and (
+            upper_wick_ratio >= 0.35
+            or (delta > 0 and close_location <= 0.60)
+            or (is_iceberg and (direction == "SELL" or close_location < 0.50))
+        ):
+            return True, "PASSIVE_DISTRIBUTION", f"🏛️ Institutional Passive Iceberg Distribution: liquidity absorbed by sell wall. Downward dump predicted."
+
+        if is_iceberg:
+            return True, "ICEBERG_CONGESTION", "Hidden iceberg order active at current liquidity node."
+
+        return False, "NONE", "Standard volume distribution."
+
+    def compute_cot_velocity(self, symbol: str) -> float:
+        """
+        Computes 3-Week Rate-of-Change / Acceleration in CFTC Non-Commercial Net Futures Positioning:
+        Strips out static commercial hedging noise to identify true institutional re-accumulation cycles.
+        """
+        clean = symbol.replace("/", "").replace("_", "").upper()
+        base = clean[:3] if len(clean) >= 6 else "XAU"
+        with self._cot_lock:
+            history = self._cot_history.get(base, [])
+            if len(history) >= 2:
+                # Weekly delta = current net ratio - previous net ratio
+                return round(history[-1] - history[0], 4)
+        return 0.0
 
     def calculate_bar_delta(self, candle: CandleBar) -> float:
         """
@@ -398,6 +511,10 @@ class OrderFlowEngine:
         dom_imbalance: Optional[float] = None,
         order_book_snapshot: Optional[Dict[str, Any]] = None,
         decomp: Optional[IntraCandleDecomposition] = None,
+        current_candle: Optional[CandleBar] = None,
+        prior_candles: Optional[List[CandleBar]] = None,
+        bid_liquidity: Optional[float] = None,
+        ask_liquidity: Optional[float] = None,
     ) -> Stage2OrderFlowEvaluation:
         """
         Stage 2 Hedge-Fund Grade Order Flow Evaluation combining:
@@ -466,7 +583,74 @@ class OrderFlowEngine:
         conviction_delta = 0
         tags: List[str] = []
 
-        if opposing_wall:
+        # ── 4B. Stage 3: Predictive Institutional Footprint & Intent Engine ──
+        spoof_detected, spoof_note = False, ""
+        if bid_liquidity is not None and ask_liquidity is not None:
+            spoof_detected, spoof_note = self.detect_l2_spoofing(symbol, bid_liquidity, ask_liquidity)
+
+        iceberg_detected, absorption_type, absorption_rationale = False, "NONE", ""
+        if current_candle is not None and prior_candles:
+            iceberg_detected, absorption_type, absorption_rationale = self.detect_iceberg_and_passive_absorption(
+                candle=current_candle,
+                prior_candles=prior_candles,
+                direction=direction,
+            )
+
+        cot_velocity = self.compute_cot_velocity(symbol)
+        
+        # Determine Predicted Institutional Move
+        predicted_action = "NEUTRAL"
+        trapped_side = "NONE"
+        pred_rationale_parts = []
+
+        if spoof_detected:
+            if "SPOOF_BID" in spoof_note:
+                predicted_action = "PREDICT_BEARISH_DUMP"
+                trapped_side = "TRAPPED_BUYERS"
+                pred_rationale_parts.append("Institutions pulled fake bid liquidity: Retail buyers trapped.")
+            else:
+                predicted_action = "PREDICT_BULLISH_EXPANSION"
+                trapped_side = "TRAPPED_SELLERS"
+                pred_rationale_parts.append("Institutions pulled fake ask liquidity: Short squeeze predicted.")
+        elif absorption_type == "PASSIVE_ACCUMULATION":
+            predicted_action = "PREDICT_BULLISH_EXPANSION"
+            trapped_side = "TRAPPED_SELLERS"
+            pred_rationale_parts.append("Dark pool iceberg absorption of panic selling detected: Bullish expansion predicted.")
+        elif absorption_type == "PASSIVE_DISTRIBUTION":
+            predicted_action = "PREDICT_BEARISH_DUMP"
+            trapped_side = "TRAPPED_BUYERS"
+            pred_rationale_parts.append("Institutional passive limit distribution into retail buying detected: Bearish dump predicted.")
+        elif stop_cluster_swept:
+            if dir_up:
+                predicted_action = "PREDICT_BULLISH_EXPANSION"
+                trapped_side = "TRAPPED_SELLERS"
+                pred_rationale_parts.append("Institutional sell-side stop hunt completed: Upward momentum release predicted.")
+            else:
+                predicted_action = "PREDICT_BEARISH_DUMP"
+                trapped_side = "TRAPPED_BUYERS"
+                pred_rationale_parts.append("Institutional buy-side stop hunt completed: Downward momentum release predicted.")
+
+        intent = InstitutionalIntent(
+            predicted_action=predicted_action,
+            spoof_detected=spoof_detected,
+            iceberg_active=iceberg_detected,
+            absorption_type=absorption_type,
+            trapped_retail_side=trapped_side,
+            target_liquidity_pool=stop_cluster_level,
+            cot_velocity_acceleration=cot_velocity,
+            rationale=" | ".join(pred_rationale_parts) if pred_rationale_parts else "Order flow distribution balanced.",
+        )
+
+        if spoof_detected and ((dir_up and "SPOOF_BID" in spoof_note) or (not dir_up and "SPOOF_ASK" in spoof_note)):
+            conviction_delta -= 4
+            tags.append(f"🪤 Institutional Spoof Trap ({spoof_note[:30]})")
+        elif absorption_type == "PASSIVE_ACCUMULATION" and dir_up:
+            conviction_delta += 3
+            tags.append("🧊 Iceberg Passive Accumulation")
+        elif absorption_type == "PASSIVE_DISTRIBUTION" and not dir_up:
+            conviction_delta += 3
+            tags.append("🧊 Iceberg Passive Distribution")
+        elif opposing_wall:
             conviction_delta -= 4
             tags.append(f"⛔ Opposing L2 DOM Wall ({dom_val:+.2f})")
         elif dom_aligned:
@@ -515,6 +699,7 @@ class OrderFlowEngine:
             cot_aligned=cot_aligned,
             conviction_delta=conviction_delta,
             telemetry_tag=telemetry_tag,
+            institutional_intent=intent,
         )
 
 

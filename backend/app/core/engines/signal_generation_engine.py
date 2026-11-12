@@ -890,6 +890,14 @@ class SignalGenerationEngine:
                     if hasattr(provider_manager, "get_order_book_snapshot"):
                         ob_snap = provider_manager.get_order_book_snapshot(canonical_symbol)
                     of_decomp = order_flow_engine.analyze_order_flow(candles=candles_1h, symbol=canonical_symbol)
+                    cur_c = candles_1h[-1] if candles_1h else None
+                    prior_c = candles_1h[:-1] if len(candles_1h) >= 2 else []
+                    live_bid_liq = getattr(quote_entry.data, "bidLiquidity", None) if (quote_entry and hasattr(quote_entry, "data")) else None
+                    live_ask_liq = getattr(quote_entry.data, "askLiquidity", None) if (quote_entry and hasattr(quote_entry, "data")) else None
+                    if live_bid_liq is None and tick_d:
+                        live_bid_liq = tick_d.get("bidLiquidity")
+                        live_ask_liq = tick_d.get("askLiquidity")
+
                     s2_eval = order_flow_engine.evaluate_dom_and_absorption(
                         symbol=canonical_symbol,
                         direction=direction.value,
@@ -897,9 +905,25 @@ class SignalGenerationEngine:
                         dom_imbalance=live_dom_imb,
                         order_book_snapshot=ob_snap,
                         decomp=of_decomp,
+                        current_candle=cur_c,
+                        prior_candles=prior_c,
+                        bid_liquidity=live_bid_liq,
+                        ask_liquidity=live_ask_liq,
                     )
                     s2_conviction_delta = s2_eval.conviction_delta
                     s2_flow_desc = s2_eval.telemetry_tag
+
+                    # Institutional Predictive Intent Integration:
+                    # If institutions are spoofing bids to dump or actively distributing via iceberg, veto BUY entries
+                    if s2_eval.institutional_intent:
+                        p_act = s2_eval.institutional_intent.predicted_action
+                        if direction == CandidateDirection.BUY and p_act == "PREDICT_BEARISH_DUMP":
+                            s2_dom_passed = False
+                            s2_flow_desc = f"INSTITUTIONAL INTENT VETO: {s2_eval.institutional_intent.rationale}"
+                        elif direction == CandidateDirection.SELL and p_act == "PREDICT_BULLISH_EXPANSION":
+                            s2_dom_passed = False
+                            s2_flow_desc = f"INSTITUTIONAL INTENT VETO: {s2_eval.institutional_intent.rationale}"
+
                     if s2_eval.opposing_liquidity_wall:
                         s2_dom_passed = False
                 except Exception:
