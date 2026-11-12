@@ -837,10 +837,11 @@ class SignalGenerationEngine:
                 try:
                     from app.core.engines.session_breakout_engine import session_breakout_engine
                     sw_check = session_breakout_engine.evaluate_sweep_retest(canonical_symbol, direction.value, candles_1h)
-                    # 1. Anti-Wick Fakeout Filter (borrowed from European Breakout v3.1) for Breakout/Momentum/Trend strategies
-                    if sid_val in ("strat-001", "strat-002", "strat-004", "strat-007", "strat-008", "strat-010", "strat-014", "strat-015", "strat-018", "strat-019", "strat-020") and sw_check.phase == "SWEEP_PROBE":
+                    # 1. Universal Anti-Wick Fakeout Filter (Transplanted from European Breakout strat-006 100% win rate standard):
+                    # NEVER enter on an unconfirmed wick probe. Demands full candle body close outside session corridor or structure.
+                    if sw_check.phase == "SWEEP_PROBE":
                         v32_spec_passed = False
-                        v32_spec_desc = f"v3.2 Anti-Wick Fakeout Veto: {sw_check.tactical_note}"
+                        v32_spec_desc = f"Universal Anti-Wick Veto (strat-006 DNA): {sw_check.tactical_note}. Price probing wick without candle body close."
                     # 2. AUD/USD Secret Weapon: Gold (XAU/USD) Confluence Gate (strat-017, strat-018, strat-023)
                     if v32_spec_passed and sid_val in ("strat-017", "strat-018", "strat-023"):
                         xau_bars = cached_bars_1h.get("XAUUSD") or []

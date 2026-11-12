@@ -42,6 +42,8 @@ class StrategyTuningProfile:
     health_status: str = "HEALTHY"           # "HEALTHY", "CAUTION", "QUARANTINED_PAPER", "BOOSTED"
     regime_allocation_multiplier: float = 1.0  # Pillar 3: Dynamic regime-gated capital multiplier (0.25x to 1.25x)
     consecutive_loss_throttle_active: bool = False  # Pillar 3: True when >= 2 consecutive losses trigger 0.25x throttle
+    is_quarantined_shadow: bool = False  # True when win rate < 45% or consecutive losses >= 3 (promotions held to paper/shadow)
+    tier_grade: str = "TIER_2_CONSISTENT"  # TIER_1_FLAGSHIP, TIER_2_CONSISTENT, TIER_3_PROBATION, TIER_4_QUARANTINED
     learned_min_rvol: float = 1.5
     learned_require_wick_rejection: bool = True
     learned_confidence_floor: int = 80
@@ -259,33 +261,46 @@ class AdaptiveRuleTuningEngine:
         status = "OPTIMAL"
         rationale_parts = []
 
-        if consecutive_losses >= 3:
-            stop_mult = 1.6
-            pullback_mult = 1.3
-            status = "VOLATILITY_DEFENSE"
-            rationale_parts.append(
-                f"{consecutive_losses} consecutive losses detected: Expanding stop buffer to 1.6x ATR and demanding deeper entry pullbacks to protect capital."
-            )
-        elif consecutive_losses >= 2 or (wick_stopouts >= 2 and win_rate < 0.60):
-            stop_mult = 1.35
-            pullback_mult = 1.15
-            status = "BUFFER_EXPANDED"
-            rationale_parts.append(
-                f"Premature stop-outs near structural wicks detected: Expanded stop buffer to 1.35x ATR to bypass liquidity sweeps."
-            )
-        elif win_rate >= 0.75 and total >= 5:
+        # ── 4-Tier Autonomous Closed-Loop Health Grading ──
+        is_quarantined = False
+        tier_grade = "TIER_2_CONSISTENT"
+
+        # Tier 1: Flagship (strat-006, strat-014 or Win Rate >= 70% with >= 3 trades)
+        if (strategy_id or "").lower() in ("strat-006", "strat-014") or (win_rate >= 0.70 and total >= 3 and consecutive_losses == 0):
+            tier_grade = "TIER_1_FLAGSHIP"
             stop_mult = 1.0
             pullback_mult = 1.0
             status = "OPTIMAL"
+            rec_weight = max(rec_weight, 1.25)
+            rationale_parts.append(f"Flagship Tier ({win_rate*100:.0f}% win rate): Priority capital allocation (1.25x) active.")
+        # Tier 4: Quarantined Shadow (Win rate < 45% with >= 4 trades OR consecutive losses >= 3)
+        elif (win_rate < 0.45 and total >= 4) or consecutive_losses >= 3:
+            tier_grade = "TIER_4_QUARANTINED"
+            is_quarantined = True
+            stop_mult = 1.6
+            pullback_mult = 1.35
+            status = "QUARANTINED_SHADOW"
+            rec_weight = 0.0
             rationale_parts.append(
-                f"High consistency ({win_rate*100:.1f}% win rate): Standard tight sniper parameters active."
+                f"Autonomous Quarantine: Win rate ({win_rate*100:.1f}%) below 45% benchmark or {consecutive_losses} losses. Quarantined to paper shadow tracking to protect live capital."
+            )
+        # Tier 3: Probation (Win rate 45% - 54% or consecutive losses == 2)
+        elif win_rate < 0.55 or consecutive_losses == 2:
+            tier_grade = "TIER_3_PROBATION"
+            stop_mult = 1.35
+            pullback_mult = 1.20
+            status = "BUFFER_EXPANDED"
+            rec_weight = min(rec_weight, 0.40)
+            rationale_parts.append(
+                f"Probation Tier ({win_rate*100:.1f}% win rate, {consecutive_losses} loss streak): Strict 88% confidence floor and dampening to protect capital."
             )
         else:
+            tier_grade = "TIER_2_CONSISTENT"
             stop_mult = 1.15
             pullback_mult = 1.05
-            status = "BUFFER_EXPANDED"
+            status = "OPTIMAL"
             rationale_parts.append(
-                f"Moderate market noise: Applying slight +15% ATR buffer padding."
+                f"Consistent Performance Tier ({win_rate*100:.1f}% win rate across {total} trades): Balanced execution."
             )
 
         reg_mult, is_throttled, reg_reason = self.get_regime_capital_multiplier(
@@ -316,6 +331,8 @@ class AdaptiveRuleTuningEngine:
             health_status=health_status,
             regime_allocation_multiplier=reg_mult,
             consecutive_loss_throttle_active=is_throttled,
+            is_quarantined_shadow=is_quarantined,
+            tier_grade=tier_grade,
         )
         self._profiles[f"{strategy_id}_{symbol or 'ALL'}"] = profile
         try:

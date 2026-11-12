@@ -791,9 +791,22 @@ class SignalService:
 
                 cand_exps = extract_directional_currency_exposures(symbol, direction_str)
                 if not is_already_active and not shield_reason:
-                    # 1. Approved Flagship Strategy Filter (A+ Setups Only)
+                    # 1. Autonomous Closed-Loop Strategy Health & Quarantine Filter
+                    # If adaptive tuning engine graded strategy as QUARANTINED_SHADOW (win rate < 45% or 3 consecutive losses),
+                    # hold it on Watchlist / Paper Mode so it does not risk live capital until recovery.
+                    strat_profile = adaptive_tuning_engine.get_strategy_tuning(cand.strategyId or "", symbol)
+                    if strat_profile.is_quarantined_shadow:
+                        shield_reason = f"AUTONOMOUS QUARANTINE SHIELD: {cand.strategyId} Win Rate ({strat_profile.recent_win_rate*100:.0f}%) under 45% or streak {strat_profile.consecutive_losses} losses. Quarantined to paper tracking."
+                        entry_hit = False
+
+                    # Tier 3 Probation Filter: Requires >= 88% confidence floor
+                    if not shield_reason and strat_profile.tier_grade == "TIER_3_PROBATION" and (cand.confidence or 80) < 88:
+                        shield_reason = f"PROBATION CONVICTION SHIELD: {cand.strategyId} in probation tier requires >= 88% conviction (current: {cand.confidence}%). Held on Watchlist."
+                        entry_hit = False
+
+                    # Approved Flagship Filter
                     approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 24)})
-                    if cand.strategyId and cand.strategyId not in approved_flagships:
+                    if not shield_reason and cand.strategyId and cand.strategyId not in approved_flagships:
                         shield_reason = f"STRATEGY GATE: Live activation restricted to flagship strategies ({', '.join(sorted(approved_flagships))}). Held on Watchlist."
                         entry_hit = False
 
