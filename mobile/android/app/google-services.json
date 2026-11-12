@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "977942111872",
+    "project_id": "falcon-ac4cd",
+    "storage_bucket": "falcon-ac4cd.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:977942111872:android:efbca24827761ba417a865",
+        "android_client_info": {
+          "package_name": "com.tejiri.falcon"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCkKU33uQ0cv_2y4jS7CBU9GMnz2IjkG1E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

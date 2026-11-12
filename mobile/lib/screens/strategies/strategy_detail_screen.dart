@@ -21,6 +21,8 @@ class StrategyDetailScreen extends StatefulWidget {
 class _StrategyDetailScreenState extends State<StrategyDetailScreen> {
   final ApiService _apiService = ApiService();
   late Future<StrategyItem> _strategyFuture;
+  StrategyItem? _strategy;
+  bool _isToggling = false;
 
   @override
   void initState() {
@@ -34,9 +36,78 @@ class _StrategyDetailScreenState extends State<StrategyDetailScreen> {
     });
   }
 
+  Future<void> _handleToggle() async {
+    final strat = _strategy;
+    if (strat == null || _isToggling) return;
+
+    final wasActive = strat.status.toUpperCase() == 'ACTIVE';
+    final nextStatus = wasActive ? 'INCUBATION' : 'ACTIVE';
+
+    setState(() {
+      _isToggling = true;
+      _strategy = strat.copyWith(
+        status: nextStatus,
+        readyForExecution: nextStatus == 'ACTIVE',
+      );
+    });
+
+    try {
+      final updated = await _apiService.toggleStrategyStatus(strat.id);
+      if (mounted) {
+        setState(() {
+          _isToggling = false;
+          _strategy = updated;
+        });
+
+        final isNowActive = updated.status.toUpperCase() == 'ACTIVE';
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  isNowActive ? Icons.check_circle : Icons.pause_circle_outline,
+                  color: isNowActive ? AppColors.success : const Color(0xFF64B5F6),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isNowActive
+                        ? '${updated.name} is now ACTIVE (trading ${updated.symbol})'
+                        : '${updated.name} in INCUBATION (${updated.symbol} shadow mode)',
+                    style: const TextStyle(fontSize: 13, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF1E232A),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isToggling = false;
+          _strategy = strat;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update strategy: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   Color _getStatusColor(String status) {
     switch (status.toUpperCase()) {
       case 'ACTIVE': return AppColors.success;
+      case 'INCUBATION': return const Color(0xFF64B5F6);
       case 'TESTING': return AppColors.warning;
       case 'PAUSED': return AppColors.textSecondary;
       case 'DEPRECATED': return AppColors.error;
@@ -119,8 +190,11 @@ class _StrategyDetailScreenState extends State<StrategyDetailScreen> {
                 ),
               ),
             );
-          } else if (snapshot.hasData) {
-            final strategy = snapshot.data!;
+          } else if (snapshot.hasData || _strategy != null) {
+            if (_strategy == null && snapshot.hasData) {
+              _strategy = snapshot.data!;
+            }
+            final strategy = _strategy ?? snapshot.data!;
             return _buildContent(strategy);
           }
           return const SizedBox.shrink();
@@ -133,6 +207,10 @@ class _StrategyDetailScreenState extends State<StrategyDetailScreen> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Live Strategy Status Control Card (Toggle switch)
+        _buildStatusControlCard(strategy),
+        const SizedBox(height: 16),
+
         // Execution Readiness banner if not ready
         if (!strategy.readyForExecution)
           _buildReadinessBanner(strategy),
@@ -179,37 +257,144 @@ class _StrategyDetailScreenState extends State<StrategyDetailScreen> {
     );
   }
 
+  Widget _buildStatusControlCard(StrategyItem strategy) {
+    final isActive = strategy.status.toUpperCase() == 'ACTIVE';
+    final accentColor = isActive ? AppColors.success : const Color(0xFF64B5F6);
+
+    return AppCard(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: accentColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isActive ? Icons.play_arrow_rounded : Icons.science_outlined,
+                    color: accentColor,
+                    size: 26,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            isActive ? 'ACTIVE' : 'INCUBATION',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: accentColor,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withValues(alpha: 0.05),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              strategy.symbol,
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isActive
+                            ? 'Live execution active for ${strategy.symbol}'
+                            : 'Forward paper testing only (0 risk) for ${strategy.symbol}',
+                        style: const TextStyle(fontSize: 11, color: AppColors.textTertiary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          _isToggling
+              ? const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: Center(
+                    child: SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+                    ),
+                  ),
+                )
+              : Transform.scale(
+                  scale: 0.9,
+                  child: Switch(
+                    value: isActive,
+                    activeColor: AppColors.success,
+                    activeTrackColor: AppColors.success.withValues(alpha: 0.35),
+                    inactiveThumbColor: AppColors.textSecondary,
+                    inactiveTrackColor: Colors.white12,
+                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    onChanged: (val) => _handleToggle(),
+                  ),
+                ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildReadinessBanner(StrategyItem strategy) {
+    final isIncubation = strategy.status.toUpperCase() == 'INCUBATION';
+    final isPaused = strategy.status.toUpperCase() == 'PAUSED';
+    final bannerColor = isIncubation ? const Color(0xFF64B5F6) : AppColors.error;
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.error.withValues(alpha: 0.15),
+        color: bannerColor.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
+        border: Border.all(color: bannerColor.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.error, size: 24),
+          Icon(
+            isIncubation ? Icons.science_outlined : Icons.warning_amber_rounded,
+            color: bannerColor,
+            size: 24,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  'NOT READY FOR LIVE EXECUTION',
+                Text(
+                  isIncubation ? 'INCUBATION SHADOW MODE' : 'NOT READY FOR LIVE EXECUTION',
                   style: TextStyle(
-                    color: AppColors.error,
+                    color: bannerColor,
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  strategy.status == 'PAUSED'
-                      ? 'This strategy is manually paused.'
-                      : 'This strategy is deprecated or in active testing.',
+                  isIncubation
+                      ? 'This strategy is safely paper tracking in shadow mode. Flip the switch above to activate live trading.'
+                      : (isPaused ? 'This strategy is manually paused.' : 'This strategy is deprecated or in active testing.'),
                   style: const TextStyle(color: Colors.white70, fontSize: 11),
                 ),
               ],

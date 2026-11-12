@@ -6,6 +6,7 @@ import 'services/theme/theme_service.dart';
 import 'services/image/image_cache_service.dart';
 import 'services/notification/notification_service.dart';
 import 'services/notification/signal_monitor_service.dart';
+import 'services/notification/firebase_notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -13,8 +14,9 @@ void main() async {
   await ThemeService().init();
   await ImageCacheService().init();
   
-  // Initialize native notifications & real-time signal monitor
+  // Initialize native notifications & Firebase Cloud Messaging
   await NotificationService().init();
+  await FirebaseNotificationService().init();
   await SignalMonitorService().init();
   SignalMonitorService().startMonitoring();
 

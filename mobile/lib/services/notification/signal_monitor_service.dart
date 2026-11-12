@@ -14,42 +14,33 @@ class SignalMonitorService {
   final ApiService _apiService = ApiService();
   final NotificationService _notificationService = NotificationService();
   Timer? _timer;
-  final Set<int> _notifiedSignalIds = {};
-  final Set<int> _breakevenNotifiedIds = {};
-  final Set<int> _targetHitNotifiedIds = {};
+  final Set<String> _notifiedSignatures = {};
+  final Set<String> _breakevenNotifiedSignatures = {};
+  final Set<String> _targetHitNotifiedSignatures = {};
   bool _initialized = false;
 
-  static const String _prefKey = 'falcon_notified_signal_ids';
-  static const String _prefBeKey = 'falcon_breakeven_notified_ids';
-  static const String _prefTpKey = 'falcon_target_hit_notified_ids';
+  static const String _prefKey = 'falcon_notified_signatures_v2';
+  static const String _prefBeKey = 'falcon_breakeven_signatures_v2';
+  static const String _prefTpKey = 'falcon_target_hit_signatures_v2';
 
   Future<void> init() async {
     if (_initialized) return;
 
     try {
       final prefs = await SharedPreferences.getInstance();
-      
-      final savedIds = prefs.getStringList(_prefKey) ?? [];
-      for (final idStr in savedIds) {
-        final parsed = int.tryParse(idStr);
-        if (parsed != null) _notifiedSignalIds.add(parsed);
-      }
 
-      final savedBeIds = prefs.getStringList(_prefBeKey) ?? [];
-      for (final idStr in savedBeIds) {
-        final parsed = int.tryParse(idStr);
-        if (parsed != null) _breakevenNotifiedIds.add(parsed);
-      }
+      final savedSigs = prefs.getStringList(_prefKey) ?? [];
+      _notifiedSignatures.addAll(savedSigs);
 
-      final savedTpIds = prefs.getStringList(_prefTpKey) ?? [];
-      for (final idStr in savedTpIds) {
-        final parsed = int.tryParse(idStr);
-        if (parsed != null) _targetHitNotifiedIds.add(parsed);
-      }
+      final savedBeSigs = prefs.getStringList(_prefBeKey) ?? [];
+      _breakevenNotifiedSignatures.addAll(savedBeSigs);
+
+      final savedTpSigs = prefs.getStringList(_prefTpKey) ?? [];
+      _targetHitNotifiedSignatures.addAll(savedTpSigs);
 
       _initialized = true;
       debugPrint(
-          '[SignalMonitorService] Initialized with ${_notifiedSignalIds.length} known signals');
+          '[SignalMonitorService] Initialized with ${_notifiedSignatures.length} known trade signatures');
     } catch (e) {
       debugPrint('[SignalMonitorService] Init error: $e');
     }
@@ -89,10 +80,13 @@ class SignalMonitorService {
       final status = signal.status.toUpperCase();
       final analysis = signal.analysis.toUpperCase();
 
-      // 1. Initial Entry Alert for Actionable Trades
+      // Canonical setup key: stable across all mission IDs
+      final entrySig = "${signal.symbol}_${action}_${signal.entry.toStringAsFixed(2)}";
+
+      // 1. Initial Entry Alert for Actionable Trades (fires strictly ONCE per unique setup)
       if ((action == 'BUY' || action == 'SELL') && (status == 'ACTIVE' || status == 'OPEN')) {
-        if (!_notifiedSignalIds.contains(signal.id)) {
-          _notifiedSignalIds.add(signal.id);
+        if (!_notifiedSignatures.contains(entrySig)) {
+          _notifiedSignatures.add(entrySig);
           hasNew = true;
           debugPrint(
               '[SignalMonitorService] NEW ACTIVE TRADE DETECTED: ${signal.symbol} $action @ ${signal.entry}');
@@ -107,8 +101,9 @@ class SignalMonitorService {
           analysis.contains('BE_PROTECTED') ||
           analysis.contains('BREAKEVEN');
 
-      if (isBreakevenStatus && !_breakevenNotifiedIds.contains(signal.id)) {
-        _breakevenNotifiedIds.add(signal.id);
+      final beSig = "${signal.symbol}_BE_${signal.entry.toStringAsFixed(2)}";
+      if (isBreakevenStatus && !_breakevenNotifiedSignatures.contains(beSig)) {
+        _breakevenNotifiedSignatures.add(beSig);
         hasNew = true;
         debugPrint(
             '[SignalMonitorService] BREAKEVEN TRIGGERED: ${signal.symbol} @ ${signal.entry}');
@@ -122,8 +117,9 @@ class SignalMonitorService {
           analysis.contains('TP1_SCALED_OUT') ||
           analysis.contains('TARGET HIT');
 
-      if (isTargetHit && !_targetHitNotifiedIds.contains(signal.id)) {
-        _targetHitNotifiedIds.add(signal.id);
+      final tpHitSig = "${signal.symbol}_TP_${signal.entry.toStringAsFixed(2)}";
+      if (isTargetHit && !_targetHitNotifiedSignatures.contains(tpHitSig)) {
+        _targetHitNotifiedSignatures.add(tpHitSig);
         hasNew = true;
         final targetDesc = analysis.contains('TP1') ? 'Target 1 (1.5R Scale-Out)' : 'Target Take-Profit';
         debugPrint(
@@ -135,32 +131,17 @@ class SignalMonitorService {
     if (hasNew) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        // Persist last 100 notified IDs to prevent SharedPreferences bloat
-        final listToSave = _notifiedSignalIds
-            .toList()
-            .reversed
-            .take(100)
-            .map((id) => id.toString())
-            .toList();
+        // Persist last 100 notified signatures to prevent SharedPreferences bloat
+        final listToSave = _notifiedSignatures.toList().reversed.take(100).toList();
         await prefs.setStringList(_prefKey, listToSave);
 
-        final beListToSave = _breakevenNotifiedIds
-            .toList()
-            .reversed
-            .take(100)
-            .map((id) => id.toString())
-            .toList();
+        final beListToSave = _breakevenNotifiedSignatures.toList().reversed.take(100).toList();
         await prefs.setStringList(_prefBeKey, beListToSave);
 
-        final tpListToSave = _targetHitNotifiedIds
-            .toList()
-            .reversed
-            .take(100)
-            .map((id) => id.toString())
-            .toList();
+        final tpListToSave = _targetHitNotifiedSignatures.toList().reversed.take(100).toList();
         await prefs.setStringList(_prefTpKey, tpListToSave);
       } catch (e) {
-        debugPrint('[SignalMonitorService] Failed to persist signal IDs: $e');
+        debugPrint('[SignalMonitorService] Failed to persist signal signatures: $e');
       }
     }
   }

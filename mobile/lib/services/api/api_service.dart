@@ -411,6 +411,30 @@ class ApiService {
   }
 
 
+  Future<StrategyItem> toggleStrategyStatus(String strategyId) async {
+    _cache.remove('/strategies');
+    _cache.remove('/strategies/$strategyId');
+    return _send<StrategyItem>(
+      'POST',
+      '/strategies/$strategyId/toggle',
+      StrategyItem.fromJson,
+      body: {},
+    );
+  }
+
+
+  Future<StrategyItem> setStrategyStatus(String strategyId, String status) async {
+    _cache.remove('/strategies');
+    _cache.remove('/strategies/$strategyId');
+    return _send<StrategyItem>(
+      'POST',
+      '/strategies/$strategyId/status',
+      StrategyItem.fromJson,
+      body: {'status': status},
+    );
+  }
+
+
   Future<SignalCandidateListResponse> getSignalCandidates() async {
     return _get<SignalCandidateListResponse>('/signal-candidates', SignalCandidateListResponse.fromJson);
   }

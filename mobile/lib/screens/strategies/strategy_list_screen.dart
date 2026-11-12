@@ -18,6 +18,8 @@ class StrategyListScreen extends StatefulWidget {
 class _StrategyListScreenState extends State<StrategyListScreen> {
   final ApiService _apiService = ApiService();
   late Future<StrategyListResponse> _strategiesFuture;
+  List<StrategyItem>? _strategies;
+  final Set<String> _togglingIds = {};
 
   @override
   void initState() {
@@ -34,8 +36,96 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
   Future<void> _handleRefresh() async {
     _fetchStrategies();
     try {
-      await _strategiesFuture;
+      final res = await _strategiesFuture;
+      if (mounted) {
+        setState(() {
+          _strategies = List.from(res.strategies);
+        });
+      }
     } catch (_) {}
+  }
+
+  Future<void> _toggleStrategy(StrategyItem strategy) async {
+    final sid = strategy.id;
+    if (_togglingIds.contains(sid)) return;
+
+    final wasActive = strategy.status.toUpperCase() == 'ACTIVE';
+    final nextStatus = wasActive ? 'INCUBATION' : 'ACTIVE';
+
+    setState(() {
+      _togglingIds.add(sid);
+      if (_strategies != null) {
+        final idx = _strategies!.indexWhere((s) => s.id == sid);
+        if (idx != -1) {
+          _strategies![idx] = _strategies![idx].copyWith(
+            status: nextStatus,
+            readyForExecution: nextStatus == 'ACTIVE',
+          );
+        }
+      }
+    });
+
+    try {
+      final updated = await _apiService.toggleStrategyStatus(sid);
+      if (mounted) {
+        setState(() {
+          _togglingIds.remove(sid);
+          if (_strategies != null) {
+            final idx = _strategies!.indexWhere((s) => s.id == sid);
+            if (idx != -1) {
+              _strategies![idx] = updated;
+            }
+          }
+        });
+
+        final isNowActive = updated.status.toUpperCase() == 'ACTIVE';
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                Icon(
+                  isNowActive ? Icons.check_circle : Icons.pause_circle_outline,
+                  color: isNowActive ? AppColors.success : const Color(0xFF64B5F6),
+                  size: 20,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    isNowActive
+                        ? '${updated.name} is now ACTIVE (trading ${updated.symbol})'
+                        : '${updated.name} in INCUBATION (${updated.symbol} shadow mode)',
+                    style: const TextStyle(fontSize: 13, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: const Color(0xFF1E232A),
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 3),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _togglingIds.remove(sid);
+          if (_strategies != null) {
+            final idx = _strategies!.indexWhere((s) => s.id == sid);
+            if (idx != -1) {
+              _strategies![idx] = strategy;
+            }
+          }
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to update strategy: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -61,7 +151,7 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
         child: FutureBuilder<StrategyListResponse>(
           future: _strategiesFuture,
           builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
+            if (snapshot.connectionState == ConnectionState.waiting && _strategies == null) {
               return ListView(
                 padding: const EdgeInsets.all(16),
                 children: List.generate(
@@ -72,7 +162,7 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
                   ),
                 ),
               );
-            } else if (snapshot.hasError) {
+            } else if (snapshot.hasError && _strategies == null) {
               return Center(
                 child: Padding(
                   padding: const EdgeInsets.all(24.0),
@@ -114,13 +204,15 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
                   ),
                 ),
               );
-            } else if (snapshot.hasData) {
-              final response = snapshot.data!;
-              final strategies = response.strategies;
+            } else if (snapshot.hasData || _strategies != null) {
+              if (_strategies == null && snapshot.hasData) {
+                _strategies = List.from(snapshot.data!.strategies);
+              }
+              final strategies = _strategies ?? [];
 
               // Calculate Overview stats
               final total = strategies.length;
-              final active = strategies.where((s) => s.status == 'ACTIVE').length;
+              final active = strategies.where((s) => s.status.toUpperCase() == 'ACTIVE').length;
               final avgWinRate = strategies.isNotEmpty
                   ? (strategies.map((s) => s.performance.winRate).reduce((a, b) => a + b) / total)
                   : 0.0;
@@ -203,8 +295,9 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12.0),
       child: AppCard(
-        onTap: () {
-          context.push('/strategies/${strategy.id}');
+        onTap: () async {
+          await context.push('/strategies/${strategy.id}');
+          _fetchStrategies();
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,18 +379,59 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
                     _buildMiniChip(strategy.status, _getStatusColor(strategy.status)),
                   ],
                 ),
-                Text(
-                  'Score: ${strategy.strategyScore.overallScore}%',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primary,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      'Score: ${strategy.strategyScore.overallScore}%',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _buildSwitch(strategy),
+                  ],
                 ),
               ],
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildSwitch(StrategyItem strategy) {
+    final isToggling = _togglingIds.contains(strategy.id);
+    final isActive = strategy.status.toUpperCase() == 'ACTIVE';
+
+    if (isToggling) {
+      return const SizedBox(
+        width: 38,
+        height: 24,
+        child: Center(
+          child: SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.primary,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Transform.scale(
+      scale: 0.8,
+      child: Switch(
+        value: isActive,
+        activeColor: AppColors.success,
+        activeTrackColor: AppColors.success.withValues(alpha: 0.35),
+        inactiveThumbColor: AppColors.textSecondary,
+        inactiveTrackColor: Colors.white12,
+        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        onChanged: (_) => _toggleStrategy(strategy),
       ),
     );
   }
@@ -325,6 +459,8 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
     switch (status.toUpperCase()) {
       case 'ACTIVE':
         return AppColors.success;
+      case 'INCUBATION':
+        return const Color(0xFF64B5F6);
       case 'TESTING':
         return AppColors.warning;
       case 'PAUSED':

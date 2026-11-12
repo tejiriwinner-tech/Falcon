@@ -444,7 +444,6 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
     }
   }
 
-
   Future<void> _dispatchToTelegram() async {
     setState(() => _isDispatchingTelegram = true);
     try {
@@ -866,28 +865,7 @@ class _CopilotScreenState extends State<CopilotScreen> with SingleTickerProvider
             ),
             const SizedBox(height: 16),
 
-            // Telegram Action Bar
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: _isDispatchingTelegram ? null : _dispatchToTelegram,
-                    icon: _isDispatchingTelegram
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.info),
-                          )
-                        : const Icon(Icons.send_rounded, color: AppColors.info, size: 18),
-                    label: const Text('Dispatch Briefing to Telegram', style: TextStyle(color: AppColors.info)),
-                    style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: AppColors.info.withValues(alpha: 0.4)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox.shrink(),
             const SizedBox(height: 16),
 
             // Briefing Content Card

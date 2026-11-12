@@ -28,6 +28,7 @@ class _JournalScreenState extends State<JournalScreen> {
   }
 
   void _fetchJournal() {
+    ApiService.invalidateTradeJournalCache();
     setState(() {
       _journalFuture = _apiService.getTradeJournal();
     });
