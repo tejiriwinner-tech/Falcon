@@ -571,22 +571,26 @@ class SignalOutcomeResolver:
             # Institutional Round-Trip Protection: Evaluate Breakeven and TP1 Scale-Out BEFORE exit breach
             risk_d, risk_d_prov = self.recover_initial_risk_distance(trade)
 
+            is_strat_024 = (getattr(trade, "strategyId", "") == "strat-024")
+            be_r_mult = 0.65 if is_strat_024 else 1.0
+            r_label = "+0.65R" if is_strat_024 else "+1.0R"
+
             is_buy = direction == "BUY"
-            be_threshold = entry + risk_d if is_buy else entry - risk_d
-            tp1_threshold = entry + (1.0 * risk_d) if is_buy else entry - (1.0 * risk_d)
+            be_threshold = entry + (be_r_mult * risk_d) if is_buy else entry - (be_r_mult * risk_d)
+            tp1_threshold = entry + (be_r_mult * risk_d) if is_buy else entry - (be_r_mult * risk_d)
 
             # Max excursion reached across lifetime of this trade
             max_reach = trade.peakPrice if (is_buy and trade.peakPrice) else (trade.troughPrice if (not is_buy and trade.troughPrice) else current_price)
 
             be_reached = (
-                (trade.mfeR is not None and trade.mfeR >= 1.0)
+                (trade.mfeR is not None and trade.mfeR >= be_r_mult)
                 or "BE_PROTECTED" in (trade.notes or "")
                 or (is_buy and (current_price >= be_threshold or (bid > 0 and bid >= be_threshold) or max_reach >= be_threshold))
                 or (not is_buy and (current_price <= be_threshold or (ask > 0 and ask <= be_threshold) or max_reach <= be_threshold))
             )
 
             tp1_hit = (
-                (trade.mfeR is not None and trade.mfeR >= 1.0)
+                (trade.mfeR is not None and trade.mfeR >= be_r_mult)
                 or "TP1_REACHED" in (trade.notes or "")
                 or "TP1_SCALED_OUT_50" in (trade.notes or "")
                 or (is_buy and (current_price >= tp1_threshold or (bid > 0 and bid >= tp1_threshold) or max_reach >= tp1_threshold))
@@ -594,9 +598,9 @@ class SignalOutcomeResolver:
             )
 
             if be_reached and "BE_PROTECTED" not in (trade.notes or ""):
-                notes_append = " | [BE_PROTECTED: Locked at entry at +1.0R]"
+                notes_append = f" | [BE_PROTECTED: Locked at entry at {r_label}]"
                 if tp1_hit and "TP1" not in (trade.notes or ""):
-                    notes_append += " | [TP1_SCALED_OUT_50: 50% profit banked at +1.0R]"
+                    notes_append += f" | [TP1_SCALED_OUT_50: 50% profit banked at {r_label}]"
                 new_notes = f"{trade.notes or 'Falcon'}{notes_append}"
                 orig_sl = trade.initialStopLoss if getattr(trade, "initialStopLoss", None) is not None else trade.stopLoss
                 if orig_sl is not None and abs(entry - float(orig_sl)) > 1e-6:

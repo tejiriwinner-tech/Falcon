@@ -105,17 +105,51 @@ class OrderFlowEngine:
         self._cot_refreshing: bool = False
         self._cot_lock = threading.Lock()
 
-    def detect_l2_spoofing(self, symbol: str, current_bid_liq: float, current_ask_liq: float) -> Tuple[bool, str]:
+    @staticmethod
+    def _to_notional_usd(symbol: str, liquidity_units: float, spot_price: Optional[float] = None) -> float:
+        """
+        Converts raw OANDA order-book unit liquidity to Notional USD value so Gold
+        (quoted in troy ounces) is evaluated on the exact same institutional dollar threshold
+        as FX pairs (quoted in millions of base currency units).
+        """
+        liq = float(liquidity_units or 0.0)
+        if liq <= 0.0:
+            return 0.0
+        clean = symbol.replace("/", "").replace("_", "").upper()
+        if "XAU" in clean or "GOLD" in clean:
+            px = float(spot_price) if (spot_price and spot_price > 0) else 3850.0
+            return liq * px
+        if clean.startswith("USD"):
+            return liq
+        if clean.endswith("USD") and spot_price and spot_price > 0:
+            return liq * float(spot_price)
+        if clean.startswith("GBP"):
+            return liq * 1.30
+        if clean.startswith("EUR"):
+            return liq * 1.10
+        if clean.startswith("AUD"):
+            return liq * 0.66
+        return liq
+
+    def detect_l2_spoofing(
+        self,
+        symbol: str,
+        current_bid_liq: float,
+        current_ask_liq: float,
+        spot_price: Optional[float] = None,
+    ) -> Tuple[bool, str]:
         """
         Detects manipulative phantom liquidity / order pulling (spoofing):
-        If an institutional wall (> 5,000,000 units) vanishes in < 2 seconds without corresponding executed volume,
-        flag SPOOF_TRAP.
+        Converts raw units into Notional USD and flags SPOOF_TRAP if an institutional
+        wall (>= $4,000,000 USD) vanishes by >60% within 10s without execution.
         """
         now_ts = time.time()
         clean = symbol.replace("/", "").upper()
+        notional_bid = self._to_notional_usd(symbol, current_bid_liq, spot_price=spot_price)
+        notional_ask = self._to_notional_usd(symbol, current_ask_liq, spot_price=spot_price)
         with self._cot_lock:
             history = self._recent_dom_snapshots.setdefault(clean, [])
-            history.append((now_ts, current_bid_liq, current_ask_liq))
+            history.append((now_ts, notional_bid, notional_ask))
             # Keep only last 10 seconds of DOM snapshots
             history = [h for h in history if (now_ts - h[0]) <= 10.0]
             self._recent_dom_snapshots[clean] = history
@@ -123,11 +157,11 @@ class OrderFlowEngine:
             if len(history) >= 2:
                 prev_ts, prev_bid, prev_ask = history[0]
                 # If Bid dropped by > 60% rapidly while price didn't trade into it -> Fake Buy Wall (Spoof Bid to sell)
-                if prev_bid >= 4000000 and current_bid_liq < (prev_bid * 0.40):
-                    return True, "SPOOF_BID_PULLED: Banks flashed and canceled fake buy wall. Trapped buyers at risk."
+                if prev_bid >= 4000000 and notional_bid < (prev_bid * 0.40):
+                    return True, f"SPOOF_BID_PULLED: Banks flashed and canceled ${prev_bid/1e6:.1f}M fake buy wall. Trapped buyers at risk."
                 # If Ask dropped by > 60% rapidly -> Fake Sell Wall (Spoof Ask to buy)
-                if prev_ask >= 4000000 and current_ask_liq < (prev_ask * 0.40):
-                    return True, "SPOOF_ASK_PULLED: Banks flashed and canceled fake sell wall. Short squeeze imminent."
+                if prev_ask >= 4000000 and notional_ask < (prev_ask * 0.40):
+                    return True, f"SPOOF_ASK_PULLED: Banks flashed and canceled ${prev_ask/1e6:.1f}M fake sell wall. Short squeeze imminent."
 
         return False, "NO_SPOOFING_DETECTED"
 
@@ -586,7 +620,7 @@ class OrderFlowEngine:
         # ── 4B. Stage 3: Predictive Institutional Footprint & Intent Engine ──
         spoof_detected, spoof_note = False, ""
         if bid_liquidity is not None and ask_liquidity is not None:
-            spoof_detected, spoof_note = self.detect_l2_spoofing(symbol, bid_liquidity, ask_liquidity)
+            spoof_detected, spoof_note = self.detect_l2_spoofing(symbol, bid_liquidity, ask_liquidity, spot_price=entry_price)
 
         iceberg_detected, absorption_type, absorption_rationale = False, "NONE", ""
         if current_candle is not None and prior_candles:

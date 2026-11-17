@@ -206,6 +206,62 @@ class SignalGenerationEngine:
             return entry_price, None, None
 
     @staticmethod
+    def _detect_single_corridor_double_sweep(
+        symbol: str,
+        candles: List[CandleBar],
+        corridors: List[Any],
+    ) -> bool:
+        """
+        Detects if price sequentially swept BOTH sides (High AND Low) of the latest
+        Asian session corridor across subsequent session bars today (single-corridor
+        stop-hunt whipsaw that latest-close status checks alone miss).
+        """
+        if not candles or not corridors:
+            return False
+        try:
+            from app.schemas.session_breakout import SessionName
+            asian_corr = next(
+                (c for c in corridors if getattr(c, "session_name", None) in (SessionName.ASIAN, "Asian", "ASIAN")),
+                None,
+            )
+            if not asian_corr:
+                return False
+
+            dated_bars: List[Tuple[datetime, CandleBar]] = []
+            for bar in candles:
+                raw_t = getattr(bar, "timestamp", None) or getattr(bar, "time", None)
+                dt: Optional[datetime] = None
+                if isinstance(raw_t, datetime):
+                    dt = raw_t
+                elif isinstance(raw_t, (int, float)):
+                    s = raw_t / 1000.0 if raw_t > 1e11 else raw_t
+                    dt = datetime.fromtimestamp(s, tz=timezone.utc)
+                elif isinstance(raw_t, str):
+                    dt = datetime.fromisoformat(raw_t.replace("Z", "+00:00"))
+                if dt is not None:
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=timezone.utc)
+                    dated_bars.append((dt, bar))
+
+            if not dated_bars:
+                return False
+            asian_dates = [dt.date() for dt, _ in dated_bars if 0 <= dt.hour < 7]
+            if not asian_dates:
+                return False
+            latest_date = max(asian_dates)
+            post_asian = [bar for dt, bar in dated_bars if dt.date() == latest_date and dt.hour >= 7]
+            if not post_asian:
+                return False
+
+            pip_u = 0.1 if ("XAU" in symbol.upper() or "GOLD" in symbol.upper()) else (0.01 if "JPY" in symbol.upper() else 0.0001)
+            tol = 2.0 * pip_u
+            swept_high = any(bar.high > asian_corr.high + tol for bar in post_asian)
+            swept_low = any(bar.low < asian_corr.low - tol for bar in post_asian)
+            return bool(swept_high and swept_low)
+        except Exception:
+            return False
+
+    @staticmethod
     def attach_research_context(
         candidate: SignalCandidate,
         research_context: Optional[ResearchSignalContext] = None,
@@ -986,10 +1042,14 @@ class SignalGenerationEngine:
                     broken_up_v32 = any(c.status == SessionStatus.BROKEN_UP for c in corridors_v32)
                     broken_down_v32 = any(c.status == SessionStatus.BROKEN_DOWN for c in corridors_v32)
                     sw_check = session_breakout_engine.evaluate_sweep_retest(canonical_symbol, direction.value, candles_1h, corridors_v32)
-                    # 0. Universal Double-Break Whipsaw Veto (strat-006 DNA; excludes strat-006 & strat-024):
-                    if sid_val != "strat-024" and broken_up_v32 and broken_down_v32:
+                    single_corr_double_sweep = (
+                        sid_val != "strat-024"
+                        and self._detect_single_corridor_double_sweep(canonical_symbol, candles_1h, corridors_v32)
+                    )
+                    # 0. Universal Double-Break / Single-Corridor Double-Sweep Whipsaw Veto (excludes strat-006 & strat-024):
+                    if sid_val != "strat-024" and ((broken_up_v32 and broken_down_v32) or single_corr_double_sweep):
                         v32_spec_passed = False
-                        v32_spec_desc = "Universal Double-Break Whipsaw Veto (strat-006 DNA): Both session high and low already broken (choppy range)."
+                        v32_spec_desc = "Universal Double-Break Whipsaw Veto (strat-006 DNA): Both session high and low already broken/swept today (choppy range)."
                     # 1. Universal Anti-Wick Fakeout Filter (Transplanted from European Breakout strat-006 100% win rate standard):
                     # NEVER enter on an unconfirmed wick probe. Demands full candle body close outside session corridor or structure.
                     elif sw_check.phase == "SWEEP_PROBE":
