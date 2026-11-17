@@ -136,6 +136,76 @@ class SignalGenerationEngine:
         return (current_price, stop_loss, take_profit)
 
     @staticmethod
+    def _resolve_corridor_retest_and_stop(
+        symbol: str,
+        direction: CandidateDirection,
+        entry_price: float,
+        candles: List[CandleBar],
+        atr_val: Optional[float],
+        min_dist: float,
+        pip_u: float,
+        dec_p: int,
+    ) -> Tuple[float, Optional[float], Optional[str]]:
+        """
+        Extends strat-006 session mechanics (Retest-Price Entry Framing & Opposite-Corridor
+        Structural Stop) to intraday non-breakout strategies while keeping EUR/USD (strat-006)
+        and XAU/USD Velocity Scalp (strat-024) isolated.
+
+        Returns (framed_entry_price, opposite_corridor_sl, note).
+        """
+        if not candles or len(candles) < 4 or direction == CandidateDirection.WAIT:
+            return entry_price, None, None
+
+        try:
+            from app.core.engines.session_breakout_engine import session_breakout_engine
+            from app.schemas.session_breakout import SessionName
+
+            corridors = session_breakout_engine.compute_session_corridors(symbol, candles, allow_benchmark=False)
+            if not corridors:
+                return entry_price, None, None
+
+            target_corr = next(
+                (c for c in corridors if getattr(c, "session_name", None) in (SessionName.ASIAN, "Asian", "ASIAN")),
+                corridors[0],
+            )
+            framed_entry = entry_price
+            note_parts: List[str] = []
+
+            # 1. Retest-Price Entry Framing (avoids chasing spikes; improves R:R)
+            sw_eval = session_breakout_engine.evaluate_sweep_retest(symbol, direction.value, candles, corridors)
+            max_retest_gap = (1.5 * atr_val) if (atr_val and atr_val > 0) else (15.0 * pip_u)
+            if sw_eval.phase != "SWEEP_PROBE" and sw_eval.retest_price is not None:
+                rp = float(sw_eval.retest_price)
+                is_better_pullback = (
+                    (direction == CandidateDirection.BUY and rp < entry_price and (entry_price - rp) <= max_retest_gap)
+                    or (direction == CandidateDirection.SELL and rp > entry_price and (rp - entry_price) <= max_retest_gap)
+                )
+                if is_better_pullback:
+                    framed_entry = round(rp, dec_p)
+                    note_parts.append(f"Retest entry @ {framed_entry:.{dec_p}f}")
+
+            # 2. Opposite-Corridor Structural Stop (2 pips beyond opposite boundary, risk-capped)
+            raw_struct_sl = (
+                round(target_corr.low - 2.0 * pip_u, dec_p)
+                if direction == CandidateDirection.BUY
+                else round(target_corr.high + 2.0 * pip_u, dec_p)
+            )
+            corr_risk = abs(framed_entry - raw_struct_sl)
+            max_cap = max(min_dist * 1.5, (2.5 * atr_val) if (atr_val and atr_val > 0) else (min_dist * 3.0))
+
+            struct_sl: Optional[float] = None
+            if min_dist <= corr_risk <= max_cap:
+                struct_sl = raw_struct_sl
+                note_parts.append(f"Opposite-Corridor SL @ {struct_sl:.{dec_p}f}")
+            elif corr_risk < min_dist:
+                struct_sl = round(framed_entry - min_dist, dec_p) if direction == CandidateDirection.BUY else round(framed_entry + min_dist, dec_p)
+                note_parts.append(f"Corridor-Anchored SL @ {struct_sl:.{dec_p}f}")
+
+            return framed_entry, struct_sl, (" | ".join(note_parts) if note_parts else None)
+        except Exception:
+            return entry_price, None, None
+
+    @staticmethod
     def attach_research_context(
         candidate: SignalCandidate,
         research_context: Optional[ResearchSignalContext] = None,
@@ -677,6 +747,7 @@ class SignalGenerationEngine:
                 ):
                     try:
                         is_gold_scalp_id = (getattr(strategy, "id", "") == "strat-024")
+                        sid_2d = getattr(strategy, "id", "") or ""
                         pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
                         dec_p = 2 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (3 if "JPY" in canonical_symbol else 5)
                         is_bullish = asset_trend == "Bullish"
@@ -685,37 +756,56 @@ class SignalGenerationEngine:
                             is_bullish = candles_1h[-1].close > candles_1h[-10].close
                             is_bearish = candles_1h[-1].close < candles_1h[-10].close
 
+                        chosen_dir: Optional[CandidateDirection] = None
                         if is_bullish and (rsi_val is None or (35.0 <= rsi_val <= 75.0)):
-                            has_sniper_setup = True
-                            direction = CandidateDirection.BUY
-                            pattern_conviction = 0.85
-                            swing_l = min(c.low for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price - 20 * pip_u)
-                            sniper_stop = round(swing_l - 2.0 * pip_u, dec_p)
-                            min_d = 3.50 if is_gold_scalp_id else (14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018)))
-                            if abs(entry_price - sniper_stop) < min_d:
-                                sniper_stop = round(entry_price - min_d, dec_p)
-                            if is_gold_scalp_id and abs(entry_price - sniper_stop) > 7.00:
-                                sniper_stop = round(entry_price - 7.00, dec_p)
-                            rr_target = 1.2 if is_gold_scalp_id else (getattr(strategy, "minimumRiskReward", 2.2) or 2.2)
-                            sniper_target = round(entry_price + abs(entry_price - sniper_stop) * (1.2 if is_gold_scalp_id else min(max(rr_target, 1.2), 1.5)), dec_p)
-                            sniper_trigger_rule = f"Structural {strategy.name} flow confirmed on H1 trend structure (RSI: {rsi_val if rsi_val is not None else 50.0:.1f})"
-                            sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bullish structure confirmed with R:R >= {rr_target:.1f}."
-                            pattern_name = f"{strategy.name} Structure Flow"
+                            chosen_dir = CandidateDirection.BUY
                         elif is_bearish and (rsi_val is None or (25.0 <= rsi_val <= 65.0)):
+                            chosen_dir = CandidateDirection.SELL
+
+                        if chosen_dir is not None:
                             has_sniper_setup = True
-                            direction = CandidateDirection.SELL
+                            direction = chosen_dir
                             pattern_conviction = 0.85
-                            swing_h = max(c.high for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price + 20 * pip_u)
-                            sniper_stop = round(swing_h + 2.0 * pip_u, dec_p)
                             min_d = 3.50 if is_gold_scalp_id else (14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018)))
+
+                            # Local 8-bar swing fallback
+                            if direction == CandidateDirection.BUY:
+                                swing_ref = min(c.low for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price - 20 * pip_u)
+                                local_sl = round(swing_ref - 2.0 * pip_u, dec_p)
+                            else:
+                                swing_ref = max(c.high for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price + 20 * pip_u)
+                                local_sl = round(swing_ref + 2.0 * pip_u, dec_p)
+
+                            # Extend strat-006 Retest-Price Entry Framing & Opposite-Corridor SL (strat-006 and strat-024 untouched)
+                            corridor_sl = None
+                            corridor_note = None
+                            if sid_2d not in ("strat-006", "strat-024"):
+                                framed_px, corridor_sl, corridor_note = self._resolve_corridor_retest_and_stop(
+                                    symbol=canonical_symbol,
+                                    direction=direction,
+                                    entry_price=entry_price,
+                                    candles=candles_1h,
+                                    atr_val=atr_val,
+                                    min_dist=min_d,
+                                    pip_u=pip_u,
+                                    dec_p=dec_p,
+                                )
+                                entry_price = framed_px
+
+                            sniper_stop = corridor_sl if corridor_sl is not None else local_sl
                             if abs(entry_price - sniper_stop) < min_d:
-                                sniper_stop = round(entry_price + min_d, dec_p)
+                                sniper_stop = round(entry_price - min_d, dec_p) if direction == CandidateDirection.BUY else round(entry_price + min_d, dec_p)
                             if is_gold_scalp_id and abs(entry_price - sniper_stop) > 7.00:
-                                sniper_stop = round(entry_price + 7.00, dec_p)
+                                sniper_stop = round(entry_price - 7.00, dec_p) if direction == CandidateDirection.BUY else round(entry_price + 7.00, dec_p)
+
                             rr_target = 1.2 if is_gold_scalp_id else (getattr(strategy, "minimumRiskReward", 2.2) or 2.2)
-                            sniper_target = round(entry_price - abs(entry_price - sniper_stop) * (1.2 if is_gold_scalp_id else min(max(rr_target, 1.2), 1.5)), dec_p)
-                            sniper_trigger_rule = f"Structural {strategy.name} flow confirmed on H1 trend structure (RSI: {rsi_val if rsi_val is not None else 50.0:.1f})"
-                            sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bearish structure confirmed with R:R >= {rr_target:.1f}."
+                            eff_target_mult = 1.2 if is_gold_scalp_id else min(max(rr_target, 1.2), 1.5)
+                            risk_span = abs(entry_price - sniper_stop) * eff_target_mult
+                            sniper_target = round(entry_price + risk_span, dec_p) if direction == CandidateDirection.BUY else round(entry_price - risk_span, dec_p)
+                            bias_label = "Bullish" if direction == CandidateDirection.BUY else "Bearish"
+                            corridor_suffix = f" ({corridor_note})" if corridor_note else ""
+                            sniper_trigger_rule = f"Structural {strategy.name} flow confirmed on H1 trend structure (RSI: {rsi_val if rsi_val is not None else 50.0:.1f}){corridor_suffix}"
+                            sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: {bias_label} structure confirmed with R:R >= {rr_target:.1f}.{corridor_suffix}"
                             pattern_name = f"{strategy.name} Structure Flow"
                     except Exception as ex:
                         logger.warning(f"Trend continuation evaluation error for {canonical_symbol}: {ex}")
@@ -738,6 +828,32 @@ class SignalGenerationEngine:
                         direction = CandidateDirection.SELL
                     else:
                         direction = CandidateDirection.WAIT
+
+            # Universal Retest-Price Entry Framing for remaining intraday setups (strat-006 & strat-024 untouched)
+            _sid_u = getattr(strategy, "id", "") or ""
+            if (
+                not has_sniper_setup
+                and _sid_u not in ("strat-006", "strat-024")
+                and strat_type_val not in ("BREAKOUT", "SESSION_BREAKOUT")
+                and direction != CandidateDirection.WAIT
+                and candles_1h
+                and len(candles_1h) >= 4
+            ):
+                _pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
+                _dec_p = 2 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (3 if "JPY" in canonical_symbol else 5)
+                _min_d = 14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018))
+                entry_price, _corr_sl_u, _ = self._resolve_corridor_retest_and_stop(
+                    symbol=canonical_symbol,
+                    direction=direction,
+                    entry_price=entry_price,
+                    candles=candles_1h,
+                    atr_val=atr_val,
+                    min_dist=_min_d,
+                    pip_u=_pip_u,
+                    dec_p=_dec_p,
+                )
+                if _corr_sl_u is not None and sniper_stop is None:
+                    sniper_stop = _corr_sl_u
 
             # ── 3. Evaluate Strategy Execution Filters ────────────────────────
             # Condition 1: Trend Alignment / Technical Setup
@@ -865,10 +981,18 @@ class SignalGenerationEngine:
             if sid_val != "strat-006" and direction != CandidateDirection.WAIT and candles_1h and len(candles_1h) >= 4:
                 try:
                     from app.core.engines.session_breakout_engine import session_breakout_engine
-                    sw_check = session_breakout_engine.evaluate_sweep_retest(canonical_symbol, direction.value, candles_1h)
+                    from app.schemas.session_breakout import SessionStatus
+                    corridors_v32 = session_breakout_engine.compute_session_corridors(canonical_symbol, candles_1h, allow_benchmark=False)
+                    broken_up_v32 = any(c.status == SessionStatus.BROKEN_UP for c in corridors_v32)
+                    broken_down_v32 = any(c.status == SessionStatus.BROKEN_DOWN for c in corridors_v32)
+                    sw_check = session_breakout_engine.evaluate_sweep_retest(canonical_symbol, direction.value, candles_1h, corridors_v32)
+                    # 0. Universal Double-Break Whipsaw Veto (strat-006 DNA; excludes strat-006 & strat-024):
+                    if sid_val != "strat-024" and broken_up_v32 and broken_down_v32:
+                        v32_spec_passed = False
+                        v32_spec_desc = "Universal Double-Break Whipsaw Veto (strat-006 DNA): Both session high and low already broken (choppy range)."
                     # 1. Universal Anti-Wick Fakeout Filter (Transplanted from European Breakout strat-006 100% win rate standard):
                     # NEVER enter on an unconfirmed wick probe. Demands full candle body close outside session corridor or structure.
-                    if sw_check.phase == "SWEEP_PROBE":
+                    elif sw_check.phase == "SWEEP_PROBE":
                         v32_spec_passed = False
                         v32_spec_desc = f"Universal Anti-Wick Veto (strat-006 DNA): {sw_check.tactical_note}. Price probing wick without candle body close."
                     # 2. AUD/USD Secret Weapon: Gold (XAU/USD) Confluence Gate (strat-017, strat-018, strat-023)
