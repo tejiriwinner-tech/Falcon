@@ -754,7 +754,7 @@ class SignalService:
 
                                 if is_gold:
                                     pip_size = 0.10
-                                    baseline_max = 8.0
+                                    baseline_max = 4.5 if getattr(cand, "strategyId", "") == "strat-024" else 8.0
                                 elif is_jpy:
                                     pip_size = 0.01
                                     baseline_max = 4.5 if "GBP" in clean_sym else 3.0
@@ -805,10 +805,18 @@ class SignalService:
                         entry_hit = False
 
                     # Approved Flagship Filter
-                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 24)})
+                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 25)})
                     if not shield_reason and cand.strategyId and cand.strategyId not in approved_flagships:
                         shield_reason = f"STRATEGY GATE: Live activation restricted to flagship strategies ({', '.join(sorted(approved_flagships))}). Held on Watchlist."
                         entry_hit = False
+
+                    # XAU/USD Velocity Scalp (strat-024) Strict 07:00-13:30 UTC Killzone Promotion Gate
+                    if not shield_reason and getattr(cand, "strategyId", "") == "strat-024":
+                        utc_now_prom = datetime.now(timezone.utc)
+                        utc_mins_prom = utc_now_prom.hour * 60 + utc_now_prom.minute
+                        if not (420 <= utc_mins_prom <= 810):
+                            shield_reason = f"XAU/USD SCALP KILLZONE SHIELD: {utc_now_prom.strftime('%H:%M')} UTC is outside peak 07:00-13:30 UTC window."
+                            entry_hit = False
 
                     # 2. High-Conviction Gate (confidence >= 85%)
                     min_confidence = getattr(settings, "MIN_LIVE_SIGNAL_CONFIDENCE", 80)
@@ -1110,12 +1118,13 @@ class SignalService:
             is_sweep_confirmed=sweep_eval.is_confirmed,
         )
 
-        # Calculate Breakeven targets (1:1 Risk-Reward threshold for risk-free protection)
+        # Calculate Breakeven targets (+0.65R for XAU/USD Velocity Scalp strat-024; +1.0R standard otherwise)
         risk_dist = abs(entry_price - stop_loss)
+        be_r_mult = 0.65 if getattr(candidate, "strategyId", "") == "strat-024" else 1.0
         if direction_val == "BUY":
-            be_trigger = round(entry_price + risk_dist, dec)
+            be_trigger = round(entry_price + (risk_dist * be_r_mult), dec)
         else:
-            be_trigger = round(entry_price - risk_dist, dec)
+            be_trigger = round(entry_price - (risk_dist * be_r_mult), dec)
         be_price = round(entry_price, dec)
 
         # Determine if live market has already achieved Breakeven
@@ -1133,7 +1142,10 @@ class SignalService:
             elif direction_val == "SELL" and current_px <= be_trigger:
                 is_breakeven = True
 
-        be_rule = f"BE Rule: Shift SL to Entry ({be_price}) at {be_trigger} (+1.0R risk-free)."
+        if be_r_mult < 1.0:
+            be_rule = f"BE Rule: Shift SL to Entry ({be_price}) & scale out 50% at {be_trigger} (+{be_r_mult:.2f}R scalp lock)."
+        else:
+            be_rule = f"BE Rule: Shift SL to Entry ({be_price}) at {be_trigger} (+1.0R risk-free)."
 
         # Loss Recovery Metadata
         rec_status = recovery_metrics.recovery_status if recovery_metrics else getattr(candidate, "recoveryStatus", "BASELINE")

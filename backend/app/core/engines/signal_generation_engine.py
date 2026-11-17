@@ -36,6 +36,7 @@ class SignalGenerationEngine:
         pattern_details: Optional[Dict[str, Any]] = None,
         rr: float = 1.5,
         recovery_mult: float = 1.0,
+        is_scalp: bool = False,
     ) -> Tuple[float, float, float]:
         """
         Calculates entry, stopLoss, and takeProfit using calibrated 1.0 * ATR fallback or pattern swing stops.
@@ -45,10 +46,15 @@ class SignalGenerationEngine:
         """
         recovery_mult = 1.0
         raw_symbol = (symbol or "").upper()
-        dec_places = 2 if ("XAU" in raw_symbol or "GOLD" in raw_symbol or current_price > 500) else (3 if "JPY" in raw_symbol else 5)
+        is_gold_sym = ("XAU" in raw_symbol or "GOLD" in raw_symbol)
+        is_gold_scalp = bool(is_scalp and is_gold_sym)
+        dec_places = 2 if (is_gold_sym or current_price > 500) else (3 if "JPY" in raw_symbol else 5)
 
-        # Dynamic ATR-derived fallback stop distance: 1.5 * ATR (calibrated to preserve structural breathing room)
-        if atr is not None and atr > 0:
+        # Dynamic ATR-derived fallback stop distance
+        if is_gold_scalp:
+            raw_scalp = (0.85 * atr * adaptive_mult) if (atr is not None and atr > 0) else 5.00
+            base_stop_dist = round(max(3.50, min(7.00, raw_scalp)), dec_places)
+        elif atr is not None and atr > 0:
             base_stop_dist = round(1.5 * atr * adaptive_mult, dec_places)
         elif current_price > 0:
             base_stop_dist = round(1.5 * (current_price * 0.002) * adaptive_mult, dec_places)
@@ -56,9 +62,8 @@ class SignalGenerationEngine:
             base_stop_dist = 0.0020
 
         # Minimum institutional distance safety bound:
-        # Forex: 10-15 pips minimum (0.0010 for standard majors, 0.15 for JPY)
-        # Gold: $3.00 minimum
-        min_dist = 14.00 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.32 if ("GBP" in raw_symbol and "JPY" in raw_symbol) else (0.25 if "JPY" in raw_symbol else (0.0015 if "AUD" in raw_symbol else 0.0018)))
+        # Gold Scalp: $3.50 minimum (capped at $7.00); Standard Gold Swing: $14.00 minimum
+        min_dist = 3.50 if is_gold_scalp else (14.00 if is_gold_sym else (0.32 if ("GBP" in raw_symbol and "JPY" in raw_symbol) else (0.25 if "JPY" in raw_symbol else (0.0015 if "AUD" in raw_symbol else 0.0018))))
         if base_stop_dist < min_dist:
             base_stop_dist = min_dist
 
@@ -96,20 +101,27 @@ class SignalGenerationEngine:
                     stop_loss = round(sniper_stop + pad, dec_places)
             else:
                 stop_loss = round(sniper_stop, dec_places)
-            
-            # Strict Falcon Risk-to-Reward: 1:1.2 to 1:1.5 Maximum (Quant-Calibrated Sweet Spot)
-            eff_rr = min(max(rr, 1.2), 1.5)
+
+            if is_gold_scalp:
+                eff_risk_check = abs(current_price - stop_loss)
+                if eff_risk_check < 3.50:
+                    stop_loss = round(current_price - 3.50, dec_places) if direction == CandidateDirection.BUY else round(current_price + 3.50, dec_places)
+                elif eff_risk_check > 7.00:
+                    stop_loss = round(current_price - 7.00, dec_places) if direction == CandidateDirection.BUY else round(current_price + 7.00, dec_places)
+
+            # Strict Falcon Risk-to-Reward: 1.2R for Gold Scalp; 1:1.2 to 1:1.5 Maximum otherwise
+            eff_rr = 1.2 if is_gold_scalp else min(max(rr, 1.2), 1.5)
             eff_risk = abs(current_price - stop_loss)
             raw_target_dist = abs((sniper_target or current_price) - current_price)
-            target_dist = min(max(raw_target_dist, eff_risk * eff_rr), eff_risk * 1.5)
+            target_dist = (eff_risk * 1.2) if is_gold_scalp else min(max(raw_target_dist, eff_risk * eff_rr), eff_risk * 1.5)
 
             if direction == CandidateDirection.BUY:
                 take_profit = round(current_price + target_dist, dec_places)
             else:
                 take_profit = round(current_price - target_dist, dec_places)
         else:
-            # Strict Falcon Risk-to-Reward: 1:1.2 to 1:1.5 Maximum (Quant-Calibrated Sweet Spot)
-            eff_rr = min(max(rr, 1.2), 1.5)
+            # Strict Falcon Risk-to-Reward: 1.2R for Gold Scalp; 1:1.2 to 1:1.5 Maximum otherwise
+            eff_rr = 1.2 if is_gold_scalp else min(max(rr, 1.2), 1.5)
             target_dist = base_stop_dist * eff_rr
             if direction == CandidateDirection.BUY:
                 stop_loss = round(current_price - base_stop_dist, dec_places)
@@ -658,12 +670,13 @@ class SignalGenerationEngine:
                     except Exception as ex:
                         logger.warning(f"Bollinger Band mean-reversion evaluation error for {canonical_symbol}: {ex}")
 
-                # 2D. Trend Continuation, Pullback & Momentum Flow Integration (strat-002, strat-004, strat-005, strat-007, strat-010, strat-018)
+                # 2D. Trend Continuation, Pullback & Momentum Flow Integration (strat-002, strat-004, strat-005, strat-007, strat-010, strat-018, strat-024)
                 if not has_sniper_setup and (
                     strat_type_val in ["TREND_CONTINUATION", "PULLBACK", "MOMENTUM", "SWING_STRUCTURE", "PRICE_ACTION"]
-                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-011", "strat-012", "strat-013", "strat-016", "strat-017", "strat-018", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023")
+                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-011", "strat-012", "strat-013", "strat-016", "strat-017", "strat-018", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024")
                 ):
                     try:
+                        is_gold_scalp_id = (getattr(strategy, "id", "") == "strat-024")
                         pip_u = 0.1 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.01 if "JPY" in canonical_symbol else 0.0001)
                         dec_p = 2 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (3 if "JPY" in canonical_symbol else 5)
                         is_bullish = asset_trend == "Bullish"
@@ -678,13 +691,15 @@ class SignalGenerationEngine:
                             pattern_conviction = 0.85
                             swing_l = min(c.low for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price - 20 * pip_u)
                             sniper_stop = round(swing_l - 2.0 * pip_u, dec_p)
-                            min_d = 14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018))
+                            min_d = 3.50 if is_gold_scalp_id else (14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018)))
                             if abs(entry_price - sniper_stop) < min_d:
                                 sniper_stop = round(entry_price - min_d, dec_p)
-                            rr_target = getattr(strategy, "minimumRiskReward", 2.2) or 2.2
-                            sniper_target = round(entry_price + abs(entry_price - sniper_stop) * min(max(rr_target, 1.2), 1.5), dec_p)
+                            if is_gold_scalp_id and abs(entry_price - sniper_stop) > 7.00:
+                                sniper_stop = round(entry_price - 7.00, dec_p)
+                            rr_target = 1.2 if is_gold_scalp_id else (getattr(strategy, "minimumRiskReward", 2.2) or 2.2)
+                            sniper_target = round(entry_price + abs(entry_price - sniper_stop) * (1.2 if is_gold_scalp_id else min(max(rr_target, 1.2), 1.5)), dec_p)
                             sniper_trigger_rule = f"Structural {strategy.name} flow confirmed on H1 trend structure (RSI: {rsi_val if rsi_val is not None else 50.0:.1f})"
-                            sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bullish structure confirmed with R:R >= {max(rr_target, 2.0):.1f}."
+                            sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bullish structure confirmed with R:R >= {rr_target:.1f}."
                             pattern_name = f"{strategy.name} Structure Flow"
                         elif is_bearish and (rsi_val is None or (25.0 <= rsi_val <= 65.0)):
                             has_sniper_setup = True
@@ -692,13 +707,15 @@ class SignalGenerationEngine:
                             pattern_conviction = 0.85
                             swing_h = max(c.high for c in candles_1h[-8:]) if len(candles_1h) >= 8 else (entry_price + 20 * pip_u)
                             sniper_stop = round(swing_h + 2.0 * pip_u, dec_p)
-                            min_d = 14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018))
+                            min_d = 3.50 if is_gold_scalp_id else (14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018)))
                             if abs(entry_price - sniper_stop) < min_d:
                                 sniper_stop = round(entry_price + min_d, dec_p)
-                            rr_target = getattr(strategy, "minimumRiskReward", 2.2) or 2.2
-                            sniper_target = round(entry_price - abs(entry_price - sniper_stop) * min(max(rr_target, 1.2), 1.5), dec_p)
+                            if is_gold_scalp_id and abs(entry_price - sniper_stop) > 7.00:
+                                sniper_stop = round(entry_price + 7.00, dec_p)
+                            rr_target = 1.2 if is_gold_scalp_id else (getattr(strategy, "minimumRiskReward", 2.2) or 2.2)
+                            sniper_target = round(entry_price - abs(entry_price - sniper_stop) * (1.2 if is_gold_scalp_id else min(max(rr_target, 1.2), 1.5)), dec_p)
                             sniper_trigger_rule = f"Structural {strategy.name} flow confirmed on H1 trend structure (RSI: {rsi_val if rsi_val is not None else 50.0:.1f})"
-                            sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bearish structure confirmed with R:R >= {max(rr_target, 2.0):.1f}."
+                            sniper_rationale = f"Institutional trend continuation flow in {canonical_symbol}: Bearish structure confirmed with R:R >= {rr_target:.1f}."
                             pattern_name = f"{strategy.name} Structure Flow"
                     except Exception as ex:
                         logger.warning(f"Trend continuation evaluation error for {canonical_symbol}: {ex}")
@@ -751,7 +768,9 @@ class SignalGenerationEngine:
 
             # Condition 2: Spread Limit (asset-specific with strict unit accounting)
             is_gold_asset = "XAU" in strategy.symbol or "GOLD" in strategy.symbol
-            if is_gold_asset:
+            if getattr(strategy, "id", "") == "strat-024":
+                spread_limit = 0.45  # Tight $0.45 USD scalp spread guard (4.5 pips)
+            elif is_gold_asset:
                 spread_limit = 1.50  # $1.50 USD cash (~0.04% on $4,000 Gold)
             elif "GBP" in strategy.symbol and "JPY" in strategy.symbol:
                 spread_limit = 3.5
@@ -782,9 +801,19 @@ class SignalGenerationEngine:
                 or ("overlap" in sess_low and pref.lower() in ("london", "new york", "ny overlap", "london-ny overlap"))
                 for pref in strategy.preferredSessions
             )
+            session_desc = f"Session '{session}' execution window (preferred: {', '.join(strategy.preferredSessions)})."
+            if getattr(strategy, "id", "") == "strat-024":
+                utc_now = eval_time.astimezone(timezone.utc) if getattr(eval_time, "tzinfo", None) else datetime.now(timezone.utc)
+                utc_mins = utc_now.hour * 60 + utc_now.minute
+                in_killzone = 420 <= utc_mins <= 810  # 07:00 - 13:30 UTC
+                session_passed = session_passed and in_killzone
+                if not in_killzone:
+                    session_desc = f"XAU/USD Scalp Killzone Gate: {utc_now.strftime('%H:%M')} UTC is outside peak 07:00-13:30 UTC window."
+                else:
+                    session_desc = f"XAU/USD Scalp Killzone Confirmed: {utc_now.strftime('%H:%M')} UTC inside 07:00-13:30 UTC window ({session})."
             session_cond = CandidateCondition(
                 title="Session Match",
-                description=f"Session '{session}' execution window (preferred: {', '.join(strategy.preferredSessions)}).",
+                description=session_desc,
                 passed=session_passed
             )
 
@@ -864,6 +893,23 @@ class SignalGenerationEngine:
                                 v32_spec_desc = f"v3.2 Yen-Cross Whipsaw Veto: GBP/USD ({gu_chg:+.2f}%) and USD/JPY ({uj_chg:+.2f}%) diverging."
                             else:
                                 v32_spec_desc = f"v3.2 Yen-Cross Sync Confirmed: GBP/USD ({gu_chg:+.2f}%) & USD/JPY ({uj_chg:+.2f}%) aligned."
+                    # 4. XAU/USD Velocity Scalp (strat-024): Learns from strat-006 body displacement (>=45%) & RVol >= 1.8x
+                    if v32_spec_passed and sid_val == "strat-024":
+                        last_bar = candles_1h[-1]
+                        bar_range = max(last_bar.high - last_bar.low, 1e-9)
+                        body_ratio = abs(last_bar.close - last_bar.open) / bar_range
+                        vols = [float(c.volume or 0.0) for c in candles_1h[-16:-1] if float(c.volume or 0.0) > 0]
+                        avg_vol = (sum(vols) / len(vols)) if vols else 0.0
+                        cur_vol = float(last_bar.volume or 0.0)
+                        rvol = (cur_vol / avg_vol) if avg_vol > 0 else 1.8
+                        if body_ratio < 0.45:
+                            v32_spec_passed = False
+                            v32_spec_desc = f"XAU/USD Scalp Body Veto (strat-006 DNA): Candle body {body_ratio*100:.0f}% < 45% minimum displacement."
+                        elif rvol < 1.8:
+                            v32_spec_passed = False
+                            v32_spec_desc = f"XAU/USD Scalp Volume Veto (strat-006 DNA): RVol {rvol:.2f}x < 1.8x institutional surge."
+                        else:
+                            v32_spec_desc = f"XAU/USD Scalp Confirmed (strat-006 DNA): Body {body_ratio*100:.0f}% >= 45%, RVol {rvol:.2f}x >= 1.8x."
                 except Exception:
                     pass
             v32_spec_cond = CandidateCondition(
@@ -1084,6 +1130,7 @@ class SignalGenerationEngine:
                 pattern_details=pattern_details if (sniper_stop or sniper_target) else None,
                 rr=rr,
                 recovery_mult=recovery_mult,
+                is_scalp=(getattr(strategy, "id", "") == "strat-024"),
             )
             risk_dist = abs(entry_price - stop_loss)
             if risk_dist > 1e-6:
