@@ -893,8 +893,8 @@ class SignalGenerationEngine:
                                 v32_spec_desc = f"v3.2 Yen-Cross Whipsaw Veto: GBP/USD ({gu_chg:+.2f}%) and USD/JPY ({uj_chg:+.2f}%) diverging."
                             else:
                                 v32_spec_desc = f"v3.2 Yen-Cross Sync Confirmed: GBP/USD ({gu_chg:+.2f}%) & USD/JPY ({uj_chg:+.2f}%) aligned."
-                    # 4. XAU/USD Velocity Scalp (strat-024): Learns from strat-006 body displacement (>=45%) & RVol >= 1.8x
-                    if v32_spec_passed and sid_val == "strat-024":
+                    # 4. strat-006 Zero-Loss Body Displacement (>=45%) & RVol >= 1.8x Gate (strat-004, strat-017, strat-019..024)
+                    if v32_spec_passed and sid_val in ("strat-004", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024"):
                         last_bar = candles_1h[-1]
                         bar_range = max(last_bar.high - last_bar.low, 1e-9)
                         body_ratio = abs(last_bar.close - last_bar.open) / bar_range
@@ -904,12 +904,12 @@ class SignalGenerationEngine:
                         rvol = (cur_vol / avg_vol) if avg_vol > 0 else 1.8
                         if body_ratio < 0.45:
                             v32_spec_passed = False
-                            v32_spec_desc = f"XAU/USD Scalp Body Veto (strat-006 DNA): Candle body {body_ratio*100:.0f}% < 45% minimum displacement."
+                            v32_spec_desc = f"{sid_val} Body Veto (strat-006 DNA): Candle body {body_ratio*100:.0f}% < 45% minimum displacement."
                         elif rvol < 1.8:
                             v32_spec_passed = False
-                            v32_spec_desc = f"XAU/USD Scalp Volume Veto (strat-006 DNA): RVol {rvol:.2f}x < 1.8x institutional surge."
+                            v32_spec_desc = f"{sid_val} Volume Veto (strat-006 DNA): RVol {rvol:.2f}x < 1.8x institutional surge."
                         else:
-                            v32_spec_desc = f"XAU/USD Scalp Confirmed (strat-006 DNA): Body {body_ratio*100:.0f}% >= 45%, RVol {rvol:.2f}x >= 1.8x."
+                            v32_spec_desc = f"{v32_spec_desc} | Body {body_ratio*100:.0f}% >= 45%, RVol {rvol:.2f}x >= 1.8x."
                 except Exception:
                     pass
             v32_spec_cond = CandidateCondition(
