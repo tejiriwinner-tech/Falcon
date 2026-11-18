@@ -1632,12 +1632,257 @@ class StrategyEngine:
             latestValidation=_empty_validation()
         )
 
+        # 25. GBP/USD Cable London-NY Velocity Scalp (Anti-Manipulation IFVG + OrderFlow v3.0 + EUR/USD Sync)
+        s25 = StrategyItem(
+            id="strat-025",
+            name="GBP/USD Cable London-NY Velocity Scalp",
+            type=StrategyType.SCALPING,
+            category=StrategyCategory.SCALPING,
+            symbol="GBP/USD",
+            description="Apex institutional GBP/USD scalping engine engineered to outsmart London/NY Cable stop-hunts. Pairs Inversion FVG (IFVG) retail-trap reversals and SMC liquidity sweeps with strat-006 anti-wick DNA, OrderFlowEngine v3.0 spoof/iceberg radar, and mandatory EUR/USD + Inverse DXY cross-asset sync. Operates strictly in 07:00-11:00 & 12:30-15:30 UTC killzones with 8-18 pip stops, 1.25R targets, and +0.65R fast breakeven scale-out.",
+            marketCondition="London/NY Institutional Liquidity Sweeps & Anti-Spoof Velocity",
+            bestSession="London",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.MEDIUM,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Strict 07:00-11:00 & 12:30-15:30 UTC Killzones isolate peak Cable institutional velocity",
+                "EUR/USD European Flow Sync + Inverse DXY vetoes isolated bank stop-hunts on GBP/USD",
+                "Inversion FVG (IFVG) & Liquidity Sweep trap engine flips retail stop-outs into institutional entries",
+                "Tight 8-18 pip scalp risk geometry with quick 1.25R (10-22.5p) TP & +0.65R fast BE + 50% scale-out",
+                "OrderFlowEngine v3.0 blocks L2 DOM spoof walls & opposing dark-pool passive distribution"
+            ],
+            weaknesses=["Strictly inactive outside 07:00-11:00 / 12:30-15:30 UTC or when spread exceeds 1.4 pips"],
+            entryChecklist=[
+                "Time within 07:00-11:00 UTC or 12:30-15:30 UTC Cable killzones",
+                "GBP/USD live spread <= 1.4 pips",
+                "Authentic H1 EMA 50/200 trend + Inverse DXY + EUR/USD European sync aligned",
+                "IFVG retail trap flip, SMC sweep reclaim, or corridor retest with >= 45% body & RVol >= 1.8x",
+                "OrderFlowEngine v3.0 confirms no L2 spoof trap or opposing institutional iceberg absorption"
+            ],
+            exitChecklist=[
+                "Lock Breakeven & bank 50% partial at +0.65R (+0.33R banked on BE reversals)",
+                "Close remaining 50% at 1.25R quick scalp target (10-22.5 pips)"
+            ],
+            idealVolatility="Moderate to High (London Open / NY Overlap)",
+            avoidDuring=["BOE Rate Decision", "UK CPI", "US NFP / CPI", "Spread > 1.4 pips"],
+            confirmationIndicators=["Inversion FVG (IFVG) Engine", "OrderFlowEngine v3.0", "EUR/USD Sync + Inverse DXY", "H1 EMA 50/200"],
+            successConditions=["Cable Killzone Active", "Spread <= 1.4 pips", "Body >= 45% & RVol >= 1.8x", "No Spoof/Divergence Veto"],
+            minimumConfidence=85,
+            minimumRiskReward=1.25,
+            preferredSessions=["London", "London-NY Overlap", "NY Overlap", "New York"],
+            avoidConditions=["Spread > 1.4 pips", "EUR/USD Divergence > 0.15%", "Double-Sweep Whipsaw Day", "Hedge Fund Spoof Trap"],
+            requiredConfirmations=["Cable Killzone (07:00-11:00 / 12:30-15:30 UTC)", "Spread <= 1.4 pips", "Anti-Wick Fakeout Filter (v3.2)", "OrderFlow v3.0 & EUR/USD Sync"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["London Open Velocity", "NY Overlap", "Anti-Trap Scalping"],
+            estimatedHoldingTime="5-45 minutes",
+            maxConsecutiveLosses=2,
+            createdAt=now,
+            updatedAt=now,
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId="strat-024-dna",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Apex FX Velocity Scalp (GBP/USD): IFVG anti-retail trap engine + OrderFlow v3.0 + EUR/USD flow sync + 07:00-11:00 & 12:30-15:30 UTC killzones, 8-18p SL, 1.25R TP, +0.65R fast BE scale-out.",
+            dependencies=["OrderFlowEngine v3.0", "Smart Money IFVG Engine", "Macro Cross-Asset Gate", "Market Session Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 26. GBP/JPY Dragon Anti-Trap Velocity Scalp (Dual Yen-Cross Sync + IFVG + OrderFlow v3.0)
+        s26 = StrategyItem(
+            id="strat-026",
+            name="GBP/JPY Dragon Anti-Trap Velocity Scalp",
+            type=StrategyType.SCALPING,
+            category=StrategyCategory.SCALPING,
+            symbol="GBP/JPY",
+            description="Apex institutional GBP/JPY ('Dragon') anti-manipulation scalping engine. Eliminates synthetic Yen-cross stop-hunts using mandatory Dual Yen-Cross Sync (GBP/USD + USD/JPY), Inversion FVG (IFVG) trap flips, SMC Tokyo/London liquidity sweeps, and OrderFlowEngine v3.0 spoof/iceberg detection. Operates strictly in 00:00-03:30, 07:00-11:00 & 12:30-15:00 UTC killzones with 14-28 pip stops, 1.25R targets, and +0.65R fast breakeven scale-out.",
+            marketCondition="Tokyo Fix / London Open / Overlap High-Beta Dragon Velocity",
+            bestSession="London",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.MEDIUM,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Strict Tokyo Fix (00:00-03:30), London (07:00-11:00) & Overlap (12:30-15:00 UTC) Killzones",
+                "Mandatory Dual Yen-Cross Sync (GBP/USD & USD/JPY) blocks synthetic Dragon whipsaw stop-hunts",
+                "Inversion FVG (IFVG) & Liquidity Sweep engine harvests trapped Dragon breakout traders",
+                "Calibrated 14-28 pip scalp stop with fast 1.25R (17.5-35p) target & +0.65R fast BE + 50% scale-out",
+                "OrderFlowEngine v3.0 blocks L2 DOM spoof walls & opposing passive iceberg absorption"
+            ],
+            weaknesses=["Strictly inactive outside Tokyo/London/Overlap killzones or when spread exceeds 2.4 pips"],
+            entryChecklist=[
+                "Time within 00:00-03:30, 07:00-11:00, or 12:30-15:00 UTC Dragon killzones",
+                "GBP/JPY live spread <= 2.4 pips",
+                "Authentic H1 EMA 50/200 trend + Dual Yen-Cross Sync (GBP/USD & USD/JPY aligned)",
+                "IFVG retail trap flip, SMC sweep reclaim, or corridor retest with >= 45% body & RVol >= 1.8x",
+                "OrderFlowEngine v3.0 confirms no L2 spoof trap or opposing institutional iceberg absorption"
+            ],
+            exitChecklist=[
+                "Lock Breakeven & bank 50% partial at +0.65R (+0.33R banked on BE reversals)",
+                "Close remaining 50% at 1.25R quick Dragon scalp target (17.5-35 pips)"
+            ],
+            idealVolatility="High (Tokyo Fix / London Open / Overlap)",
+            avoidDuring=["BOJ / BOE Rate Decisions", "Unscheduled BOJ Intervention", "Spread > 2.4 pips"],
+            confirmationIndicators=["Inversion FVG (IFVG) Engine", "OrderFlowEngine v3.0", "Dual Yen-Cross Sync (GU+UJ)", "H1 EMA 50/200"],
+            successConditions=["Dragon Killzone Active", "Spread <= 2.4 pips", "Body >= 45% & RVol >= 1.8x", "No Yen-Cross Divergence or Spoof Veto"],
+            minimumConfidence=85,
+            minimumRiskReward=1.25,
+            preferredSessions=["Asian", "Tokyo", "London", "London-NY Overlap", "NY Overlap"],
+            avoidConditions=["Spread > 2.4 pips", "GBP/USD vs USD/JPY Divergence > 0.15%", "Double-Sweep Whipsaw Day", "Hedge Fund Spoof Trap"],
+            requiredConfirmations=["Dragon Killzone (Tokyo/London/Overlap)", "Spread <= 2.4 pips", "Anti-Wick Fakeout Filter (v3.2)", "OrderFlow v3.0 & Dual Yen-Cross Sync"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Tokyo Fix", "London Open Volatility", "Anti-Trap Dragon Scalping"],
+            estimatedHoldingTime="5-40 minutes",
+            maxConsecutiveLosses=2,
+            createdAt=now,
+            updatedAt=now,
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId="strat-024-dna",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Apex FX Velocity Scalp (GBP/JPY): IFVG anti-retail trap engine + OrderFlow v3.0 + Dual Yen-Cross Sync (GU+UJ) + Tokyo/London/Overlap killzones, 14-28p SL, 1.25R TP, +0.65R fast BE scale-out.",
+            dependencies=["OrderFlowEngine v3.0", "Smart Money IFVG Engine", "Macro Cross-Asset Gate", "Market Session Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 27. USD/JPY Ninja Yield-Lock Velocity Scalp (US 10Y Yield + Direct DXY + IFVG + OrderFlow v3.0)
+        s27 = StrategyItem(
+            id="strat-027",
+            name="USD/JPY Ninja Yield-Lock Velocity Scalp",
+            type=StrategyType.SCALPING,
+            category=StrategyCategory.SCALPING,
+            symbol="USD/JPY",
+            description="Apex institutional USD/JPY ('Ninja') yield-driven scalping engine. Exploits Tokyo Gotobi Fix sweeps and NY Open US Treasury Yield waves using Inversion FVG (IFVG) trap flips, SMC sweeps, OrderFlowEngine v3.0 spoof/iceberg radar, and mandatory Direct Synthetic DXY + US 10Y Yield lock. Operates strictly in 00:00-03:30 & 12:30-16:00 UTC killzones with 10-20 pip stops, 1.25R targets, and +0.65R fast breakeven scale-out.",
+            marketCondition="Tokyo Fix & NY Bond-Yield Institutional Velocity",
+            bestSession="London-NY Overlap",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.MEDIUM,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Strict Tokyo Fix (00:00-03:30 UTC) & NY Bond-Yield Open (12:30-16:00 UTC) Killzones",
+                "Mandatory Direct Synthetic DXY + US 10Y Yield Proxy lock prevents counter-yield traps",
+                "Inversion FVG (IFVG) & Liquidity Sweep engine rides sovereign institutional waves",
+                "Tight 10-20 pip scalp stop with quick 1.25R (12.5-25p) target & +0.65R fast BE + 50% scale-out",
+                "OrderFlowEngine v3.0 blocks L2 DOM spoof walls & opposing passive iceberg absorption"
+            ],
+            weaknesses=["Strictly inactive outside 00:00-03:30 / 12:30-16:00 UTC or when spread exceeds 1.3 pips"],
+            entryChecklist=[
+                "Time within 00:00-03:30 UTC or 12:30-16:00 UTC Ninja killzones",
+                "USD/JPY live spread <= 1.3 pips",
+                "Authentic H1 EMA 50/200 trend + Direct DXY & US 10Y Yield proxy aligned",
+                "IFVG retail trap flip, SMC sweep reclaim, or corridor retest with >= 45% body & RVol >= 1.8x",
+                "OrderFlowEngine v3.0 confirms no L2 spoof trap or opposing institutional iceberg absorption"
+            ],
+            exitChecklist=[
+                "Lock Breakeven & bank 50% partial at +0.65R (+0.33R banked on BE reversals)",
+                "Close remaining 50% at 1.25R quick Ninja scalp target (12.5-25 pips)"
+            ],
+            idealVolatility="Moderate to High (Tokyo Fix / NY Bond Open)",
+            avoidDuring=["FOMC / NFP / US CPI", "BOJ Rate Decision / Intervention", "Spread > 1.3 pips"],
+            confirmationIndicators=["Inversion FVG (IFVG) Engine", "OrderFlowEngine v3.0", "US 10Y Yield + Direct DXY Lock", "H1 EMA 50/200"],
+            successConditions=["Ninja Killzone Active", "Spread <= 1.3 pips", "Body >= 45% & RVol >= 1.8x", "No DXY/Yield Divergence or Spoof Veto"],
+            minimumConfidence=85,
+            minimumRiskReward=1.25,
+            preferredSessions=["Asian", "Tokyo", "London-NY Overlap", "NY Overlap", "New York"],
+            avoidConditions=["Spread > 1.3 pips", "Counter-Yield / Counter-DXY Trap", "Double-Sweep Whipsaw Day", "Hedge Fund Spoof Trap"],
+            requiredConfirmations=["Ninja Killzone (00:00-03:30 / 12:30-16:00 UTC)", "Spread <= 1.3 pips", "Anti-Wick Fakeout Filter (v3.2)", "OrderFlow v3.0 & US Yield/DXY Lock"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Tokyo Gotobi Fix", "NY Yield Waves", "Anti-Trap Scalping"],
+            estimatedHoldingTime="5-45 minutes",
+            maxConsecutiveLosses=2,
+            createdAt=now,
+            updatedAt=now,
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId="strat-024-dna",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Apex FX Velocity Scalp (USD/JPY): IFVG anti-retail trap engine + OrderFlow v3.0 + US 10Y Yield/DXY lock + Tokyo Fix & NY Open killzones, 10-20p SL, 1.25R TP, +0.65R fast BE scale-out.",
+            dependencies=["OrderFlowEngine v3.0", "Smart Money IFVG Engine", "Macro Cross-Asset Gate", "Market Session Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 28. AUD/USD Aussie Gold-Locked Velocity Scalp (Gold Lockstep + Inverse DXY + IFVG + OrderFlow v3.0)
+        s28 = StrategyItem(
+            id="strat-028",
+            name="AUD/USD Aussie Gold-Locked Velocity Scalp",
+            type=StrategyType.SCALPING,
+            category=StrategyCategory.SCALPING,
+            symbol="AUD/USD",
+            description="Apex institutional AUD/USD ('Aussie') commodity-locked scalping engine. Exploits Sydney/Tokyo, London Open, and NY Open stop-hunts using Inversion FVG (IFVG) trap flips, SMC liquidity sweeps, OrderFlowEngine v3.0 spoof/iceberg radar, and mandatory Gold (XAU/USD) Commodity Lockstep + Inverse Synthetic DXY confirmation. Operates strictly in 00:00-04:00, 07:00-11:00 & 12:30-15:00 UTC killzones with 7-15 pip stops, 1.25R targets, and +0.65R fast breakeven scale-out.",
+            marketCondition="Pacific / London / NY Commodity-FX Liquidity Velocity",
+            bestSession="Asian",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.MEDIUM,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Strict Pacific (00:00-04:00), London (07:00-11:00) & NY Open (12:30-15:00 UTC) Killzones",
+                "Secret Weapon Gold (XAU/USD) Lockstep + Inverse DXY blocks fake AUD/USD breakouts",
+                "Inversion FVG (IFVG) & Liquidity Sweep engine flips retail traps into high-WR scalps",
+                "Ultra-tight 7-15 pip scalp stop with fast 1.25R (8.75-18.75p) target & +0.65R fast BE + 50% scale-out",
+                "OrderFlowEngine v3.0 blocks L2 DOM spoof walls & opposing passive iceberg absorption"
+            ],
+            weaknesses=["Strictly inactive outside Pacific/London/NY killzones or when spread exceeds 1.2 pips"],
+            entryChecklist=[
+                "Time within 00:00-04:00, 07:00-11:00, or 12:30-15:00 UTC Aussie killzones",
+                "AUD/USD live spread <= 1.2 pips",
+                "Authentic H1 EMA 50/200 trend + Gold (XAU/USD) Lockstep + Inverse DXY aligned",
+                "IFVG retail trap flip, SMC sweep reclaim, or corridor retest with >= 45% body & RVol >= 1.8x",
+                "OrderFlowEngine v3.0 confirms no L2 spoof trap or opposing institutional iceberg absorption"
+            ],
+            exitChecklist=[
+                "Lock Breakeven & bank 50% partial at +0.65R (+0.33R banked on BE reversals)",
+                "Close remaining 50% at 1.25R quick Aussie scalp target (8.75-18.75 pips)"
+            ],
+            idealVolatility="Moderate (Sydney/Tokyo Peak, London Open & NY Open)",
+            avoidDuring=["RBA Rate Statement", "AU Employment / CPI", "US NFP / CPI", "Spread > 1.2 pips"],
+            confirmationIndicators=["Inversion FVG (IFVG) Engine", "OrderFlowEngine v3.0", "Gold (XAU/USD) Lockstep + Inverse DXY", "H1 EMA 50/200"],
+            successConditions=["Aussie Killzone Active", "Spread <= 1.2 pips", "Body >= 45% & RVol >= 1.8x", "No Gold/DXY Divergence or Spoof Veto"],
+            minimumConfidence=85,
+            minimumRiskReward=1.25,
+            preferredSessions=["Asian", "Sydney", "Tokyo", "London", "London-NY Overlap", "NY Overlap"],
+            avoidConditions=["Spread > 1.2 pips", "Gold (XAU/USD) Divergence > 0.15%", "Double-Sweep Whipsaw Day", "Hedge Fund Spoof Trap"],
+            requiredConfirmations=["Aussie Killzone (Pacific/London/NY)", "Spread <= 1.2 pips", "Anti-Wick Fakeout Filter (v3.2)", "OrderFlow v3.0 & Gold/DXY Lock"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Sydney/Tokyo Liquidity", "London Open", "Commodity-FX Anti-Trap Scalping"],
+            estimatedHoldingTime="5-45 minutes",
+            maxConsecutiveLosses=2,
+            createdAt=now,
+            updatedAt=now,
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId="strat-024-dna",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Apex FX Velocity Scalp (AUD/USD): IFVG anti-retail trap engine + OrderFlow v3.0 + Gold (XAU/USD) Lockstep & Inverse DXY + Pacific/London/NY killzones, 7-15p SL, 1.25R TP, +0.65R fast BE scale-out.",
+            dependencies=["OrderFlowEngine v3.0", "Smart Money IFVG Engine", "Macro Cross-Asset Gate", "Market Session Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
         strategies = [
             s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12,
             s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24,
+            s25, s26, s27, s28,
         ]
         for strategy in strategies:
-            default_active_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024"}
+            default_active_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028"}
             strategy.status = StrategyStatus.ACTIVE if strategy.id in default_active_ids else StrategyStatus.INCUBATION
             strategy.readyForExecution = (strategy.status == StrategyStatus.ACTIVE)
             if strategy.minimumRiskReward and strategy.minimumRiskReward > 1.5:
@@ -1668,6 +1913,10 @@ class StrategyEngine:
                     "strat-022": "v3.2 Upgrade: Ignores initial wick fakeouts + requires 10-20p Pre-NY/Tokyo sweep + BOS/FVG or RVol >= 1.8x break-retest aligned with US Yield & DXY.",
                     "strat-023": "v3.2 Upgrade: Ignores initial wick fakeouts + requires 8-15p AUD/USD liquidity sweep + BOS/FVG with mandatory Gold (XAU/USD) & inverse DXY macro lock.",
                     "strat-024": "v3.2 Scalp Standard: Transplanted EUR/USD strat-006 zero-loss anti-fakeout DNA + OrderFlowEngine v3.0 Hedge Fund Trap Shield. Strict 07:00-13:30 UTC Killzone, <= $0.45 spread, $3.50-$7.00 SL, 1.2R quick TP, and +0.65R fast breakeven lock.",
+                    "strat-025": "v3.2 Apex Cable Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + EUR/USD flow sync. Strict 07:00-11:00 & 12:30-15:30 UTC Killzones, <= 1.4p spread, 8-18p SL, 1.25R TP, +0.65R fast BE scale-out.",
+                    "strat-026": "v3.2 Apex Dragon Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + Dual Yen-Cross Sync (GU+UJ). Strict Tokyo/London/Overlap Killzones, <= 2.4p spread, 14-28p SL, 1.25R TP, +0.65R fast BE scale-out.",
+                    "strat-027": "v3.2 Apex Ninja Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + US 10Y Yield/DXY Lock. Strict 00:00-03:30 & 12:30-16:00 UTC Killzones, <= 1.3p spread, 10-20p SL, 1.25R TP, +0.65R fast BE scale-out.",
+                    "strat-028": "v3.2 Apex Aussie Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + Gold (XAU/USD) Lockstep. Strict Pacific/London/NY Killzones, <= 1.2p spread, 7-15p SL, 1.25R TP, +0.65R fast BE scale-out.",
                 }
                 old_ver = strategy.strategyVersion or "1.0"
                 strategy.parentStrategyId = f"{strategy.id}-v{old_ver}"

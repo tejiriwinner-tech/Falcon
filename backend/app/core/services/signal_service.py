@@ -752,9 +752,14 @@ class SignalService:
                                 is_gold = "XAU" in clean_sym
                                 is_jpy = clean_sym.endswith("JPY")
 
+                                from app.core.engines.apex_scalp_config import get_apex_fx_spec
+                                _prom_fx_spec = get_apex_fx_spec(getattr(cand, "strategyId", ""))
                                 if is_gold:
                                     pip_size = 0.10
                                     baseline_max = 4.5 if getattr(cand, "strategyId", "") == "strat-024" else 8.0
+                                elif _prom_fx_spec is not None:
+                                    pip_size = 0.01 if is_jpy else 0.00010
+                                    baseline_max = _prom_fx_spec.max_spread_pips
                                 elif is_jpy:
                                     pip_size = 0.01
                                     baseline_max = 4.5 if "GBP" in clean_sym else 3.0
@@ -805,17 +810,24 @@ class SignalService:
                         entry_hit = False
 
                     # Approved Flagship Filter
-                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 25)})
+                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 29)})
                     if not shield_reason and cand.strategyId and cand.strategyId not in approved_flagships:
                         shield_reason = f"STRATEGY GATE: Live activation restricted to flagship strategies ({', '.join(sorted(approved_flagships))}). Held on Watchlist."
                         entry_hit = False
 
-                    # XAU/USD Velocity Scalp (strat-024) Strict 07:00-13:30 UTC Killzone Promotion Gate
+                    # Velocity Scalp Killzone Promotion Gates (strat-024 Gold & strat-025..028 Apex FX)
                     if not shield_reason and getattr(cand, "strategyId", "") == "strat-024":
                         utc_now_prom = datetime.now(timezone.utc)
                         utc_mins_prom = utc_now_prom.hour * 60 + utc_now_prom.minute
                         if not (420 <= utc_mins_prom <= 810):
                             shield_reason = f"XAU/USD SCALP KILLZONE SHIELD: {utc_now_prom.strftime('%H:%M')} UTC is outside peak 07:00-13:30 UTC window."
+                            entry_hit = False
+                    elif not shield_reason and getattr(cand, "strategyId", "") in ("strat-025", "strat-026", "strat-027", "strat-028"):
+                        from app.core.engines.apex_scalp_config import is_in_apex_killzone
+                        utc_now_prom = datetime.now(timezone.utc)
+                        in_apex_prom, kz_prom_lbl = is_in_apex_killzone(cand.strategyId, utc_now_prom)
+                        if not in_apex_prom:
+                            shield_reason = f"APEX FX SCALP KILLZONE SHIELD ({symbol}): {utc_now_prom.strftime('%H:%M')} UTC is outside peak {kz_prom_lbl} window."
                             entry_hit = False
 
                     # 2. High-Conviction Gate (confidence >= 85%)
@@ -1118,9 +1130,10 @@ class SignalService:
             is_sweep_confirmed=sweep_eval.is_confirmed,
         )
 
-        # Calculate Breakeven targets (+0.65R for XAU/USD Velocity Scalp strat-024; +1.0R standard otherwise)
+        # Calculate Breakeven targets (+0.65R for Velocity Scalpers strat-024..028; +1.0R standard otherwise)
+        from app.core.engines.apex_scalp_config import VELOCITY_SCALP_STRATEGY_IDS
         risk_dist = abs(entry_price - stop_loss)
-        be_r_mult = 0.65 if getattr(candidate, "strategyId", "") == "strat-024" else 1.0
+        be_r_mult = 0.65 if getattr(candidate, "strategyId", "") in VELOCITY_SCALP_STRATEGY_IDS else 1.0
         if direction_val == "BUY":
             be_trigger = round(entry_price + (risk_dist * be_r_mult), dec)
         else:

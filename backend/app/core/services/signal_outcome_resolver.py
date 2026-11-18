@@ -571,9 +571,10 @@ class SignalOutcomeResolver:
             # Institutional Round-Trip Protection: Evaluate Breakeven and TP1 Scale-Out BEFORE exit breach
             risk_d, risk_d_prov = self.recover_initial_risk_distance(trade)
 
-            is_strat_024 = (getattr(trade, "strategyId", "") == "strat-024")
-            be_r_mult = 0.65 if is_strat_024 else 1.0
-            r_label = "+0.65R" if is_strat_024 else "+1.0R"
+            from app.core.engines.apex_scalp_config import VELOCITY_SCALP_STRATEGY_IDS
+            is_velocity_scalp = (getattr(trade, "strategyId", "") in VELOCITY_SCALP_STRATEGY_IDS)
+            be_r_mult = 0.65 if is_velocity_scalp else 1.0
+            r_label = "+0.65R" if is_velocity_scalp else "+1.0R"
 
             is_buy = direction == "BUY"
             be_threshold = entry + (be_r_mult * risk_d) if is_buy else entry - (be_r_mult * risk_d)

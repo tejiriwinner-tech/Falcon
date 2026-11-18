@@ -18,6 +18,12 @@ from app.core.services.market_history_service import market_history_service
 from app.core.providers import provider_manager
 from app.schemas.market_quote import MarketQuote
 from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
+from app.core.engines.apex_scalp_config import (
+    APEX_FX_SCALP_IDS,
+    VELOCITY_SCALP_STRATEGY_IDS,
+    get_apex_fx_spec,
+    is_in_apex_killzone,
+)
 from app.schemas.research_promotion import ResearchSignalContext
 
 
@@ -37,6 +43,7 @@ class SignalGenerationEngine:
         rr: float = 1.5,
         recovery_mult: float = 1.0,
         is_scalp: bool = False,
+        strategy_id: Optional[str] = None,
     ) -> Tuple[float, float, float]:
         """
         Calculates entry, stopLoss, and takeProfit using calibrated 1.0 * ATR fallback or pattern swing stops.
@@ -48,12 +55,16 @@ class SignalGenerationEngine:
         raw_symbol = (symbol or "").upper()
         is_gold_sym = ("XAU" in raw_symbol or "GOLD" in raw_symbol)
         is_gold_scalp = bool(is_scalp and is_gold_sym)
+        fx_scalp_spec = get_apex_fx_spec(strategy_id) if strategy_id else None
         dec_places = 2 if (is_gold_sym or current_price > 500) else (3 if "JPY" in raw_symbol else 5)
 
         # Dynamic ATR-derived fallback stop distance
         if is_gold_scalp:
             raw_scalp = (0.85 * atr * adaptive_mult) if (atr is not None and atr > 0) else 5.00
             base_stop_dist = round(max(3.50, min(7.00, raw_scalp)), dec_places)
+        elif fx_scalp_spec is not None:
+            raw_fx_scalp = (0.75 * atr * adaptive_mult) if (atr is not None and atr > 0) else ((fx_scalp_spec.min_sl_dist + fx_scalp_spec.max_sl_dist) * 0.5)
+            base_stop_dist = round(max(fx_scalp_spec.min_sl_dist, min(fx_scalp_spec.max_sl_dist, raw_fx_scalp)), dec_places)
         elif atr is not None and atr > 0:
             base_stop_dist = round(1.5 * atr * adaptive_mult, dec_places)
         elif current_price > 0:
@@ -62,8 +73,11 @@ class SignalGenerationEngine:
             base_stop_dist = 0.0020
 
         # Minimum institutional distance safety bound:
-        # Gold Scalp: $3.50 minimum (capped at $7.00); Standard Gold Swing: $14.00 minimum
-        min_dist = 3.50 if is_gold_scalp else (14.00 if is_gold_sym else (0.32 if ("GBP" in raw_symbol and "JPY" in raw_symbol) else (0.25 if "JPY" in raw_symbol else (0.0015 if "AUD" in raw_symbol else 0.0018))))
+        # Gold Scalp: $3.50 minimum (capped at $7.00); Apex FX Scalpers: pair-calibrated tight bounds
+        if fx_scalp_spec is not None:
+            min_dist = fx_scalp_spec.min_sl_dist
+        else:
+            min_dist = 3.50 if is_gold_scalp else (14.00 if is_gold_sym else (0.32 if ("GBP" in raw_symbol and "JPY" in raw_symbol) else (0.25 if "JPY" in raw_symbol else (0.0015 if "AUD" in raw_symbol else 0.0018))))
         if base_stop_dist < min_dist:
             base_stop_dist = min_dist
 
@@ -108,20 +122,41 @@ class SignalGenerationEngine:
                     stop_loss = round(current_price - 3.50, dec_places) if direction == CandidateDirection.BUY else round(current_price + 3.50, dec_places)
                 elif eff_risk_check > 7.00:
                     stop_loss = round(current_price - 7.00, dec_places) if direction == CandidateDirection.BUY else round(current_price + 7.00, dec_places)
+            elif fx_scalp_spec is not None:
+                eff_risk_check = abs(current_price - stop_loss)
+                if eff_risk_check < fx_scalp_spec.min_sl_dist:
+                    stop_loss = round(current_price - fx_scalp_spec.min_sl_dist, dec_places) if direction == CandidateDirection.BUY else round(current_price + fx_scalp_spec.min_sl_dist, dec_places)
+                elif eff_risk_check > fx_scalp_spec.max_sl_dist:
+                    stop_loss = round(current_price - fx_scalp_spec.max_sl_dist, dec_places) if direction == CandidateDirection.BUY else round(current_price + fx_scalp_spec.max_sl_dist, dec_places)
 
-            # Strict Falcon Risk-to-Reward: 1.2R for Gold Scalp; 1:1.2 to 1:1.5 Maximum otherwise
-            eff_rr = 1.2 if is_gold_scalp else min(max(rr, 1.2), 1.5)
+            # Strict Falcon Risk-to-Reward: 1.2R for Gold Scalp; 1.25R for Apex FX Scalp; 1:1.2 to 1:1.5 Maximum otherwise
+            if is_gold_scalp:
+                eff_rr = 1.2
+            elif fx_scalp_spec is not None:
+                eff_rr = fx_scalp_spec.rr_target
+            else:
+                eff_rr = min(max(rr, 1.2), 1.5)
             eff_risk = abs(current_price - stop_loss)
             raw_target_dist = abs((sniper_target or current_price) - current_price)
-            target_dist = (eff_risk * 1.2) if is_gold_scalp else min(max(raw_target_dist, eff_risk * eff_rr), eff_risk * 1.5)
+            if is_gold_scalp:
+                target_dist = eff_risk * 1.2
+            elif fx_scalp_spec is not None:
+                target_dist = eff_risk * fx_scalp_spec.rr_target
+            else:
+                target_dist = min(max(raw_target_dist, eff_risk * eff_rr), eff_risk * 1.5)
 
             if direction == CandidateDirection.BUY:
                 take_profit = round(current_price + target_dist, dec_places)
             else:
                 take_profit = round(current_price - target_dist, dec_places)
         else:
-            # Strict Falcon Risk-to-Reward: 1.2R for Gold Scalp; 1:1.2 to 1:1.5 Maximum otherwise
-            eff_rr = 1.2 if is_gold_scalp else min(max(rr, 1.2), 1.5)
+            # Strict Falcon Risk-to-Reward: 1.2R for Gold Scalp; 1.25R for Apex FX Scalp; 1:1.2 to 1:1.5 Maximum otherwise
+            if is_gold_scalp:
+                eff_rr = 1.2
+            elif fx_scalp_spec is not None:
+                eff_rr = fx_scalp_spec.rr_target
+            else:
+                eff_rr = min(max(rr, 1.2), 1.5)
             target_dist = base_stop_dist * eff_rr
             if direction == CandidateDirection.BUY:
                 stop_loss = round(current_price - base_stop_dist, dec_places)
@@ -627,6 +662,7 @@ class SignalGenerationEngine:
                 and getattr(sniper_pattern, "conviction_score", 0.0) >= 0.65
                 and sniper_pattern.pattern_type != PatternType.NO_PATTERN
                 and strat_type_val not in ["BREAKOUT", "SESSION_BREAKOUT", "MEAN_REVERSION"]
+                and getattr(strategy, "id", "") not in APEX_FX_SCALP_IDS
                 and not is_counter_trend_reversal
             ):
                 has_sniper_setup = True
@@ -832,6 +868,127 @@ class SignalGenerationEngine:
                     except Exception as ex:
                         logger.warning(f"Bollinger Band mean-reversion evaluation error for {canonical_symbol}: {ex}")
 
+                # 2E. Apex Institutional Anti-Manipulation FX Velocity Scalp Engine (strat-025..strat-028)
+                # Priority 1: Inversion Fair Value Gap (IFVG) Retail Trap Flip
+                # Priority 2: SMC Liquidity Sweep + 3-Candle FVG Reclaim
+                # Priority 3: H1-Aligned Velocity Flow + Corridor Retest Scalp
+                _apex_spec = get_apex_fx_spec(getattr(strategy, "id", ""))
+                if not has_sniper_setup and _apex_spec is not None and len(candles_1h) >= 5:
+                    try:
+                        from app.core.engines.smart_money_engine import smart_money_engine
+                        pip_u = 0.01 if "JPY" in canonical_symbol else 0.0001
+                        dec_p = 3 if "JPY" in canonical_symbol else 5
+
+                        def _clamp_scalp_sl(raw_sl: float, dir_c: CandidateDirection, px: float) -> float:
+                            dist = abs(px - raw_sl)
+                            dist = max(_apex_spec.min_sl_dist, min(_apex_spec.max_sl_dist, dist))
+                            return round(px - dist, dec_p) if dir_c == CandidateDirection.BUY else round(px + dist, dec_p)
+
+                        # Priority 1: Inversion FVG (IFVG) Anti-Retail Trap Flip
+                        ifvgs = smart_money_engine.detect_inversion_fair_value_gaps(candles_1h, lookback=16)
+                        if ifvgs:
+                            latest_ifvg = ifvgs[-1]
+                            ifvg_dir = CandidateDirection.BUY if latest_ifvg.inversion_direction == "BULLISH" else CandidateDirection.SELL
+                            ifvg_h1_ok = (
+                                (ifvg_dir == CandidateDirection.BUY and htf_macro_trend != "Bearish")
+                                or (ifvg_dir == CandidateDirection.SELL and htf_macro_trend != "Bullish")
+                            )
+                            if ifvg_h1_ok:
+                                has_sniper_setup = True
+                                direction = ifvg_dir
+                                pattern_conviction = 0.90
+                                raw_sl_ifvg = (latest_ifvg.bottom - 2.0 * pip_u) if direction == CandidateDirection.BUY else (latest_ifvg.top + 2.0 * pip_u)
+                                sniper_stop = _clamp_scalp_sl(raw_sl_ifvg, direction, entry_price)
+                                risk_span = abs(entry_price - sniper_stop) * _apex_spec.rr_target
+                                sniper_target = round(entry_price + risk_span, dec_p) if direction == CandidateDirection.BUY else round(entry_price - risk_span, dec_p)
+                                sniper_trigger_rule = (
+                                    f"Inversion FVG (IFVG) Trap Flip @ {latest_ifvg.midpoint:.{dec_p}f} "
+                                    f"(broken {latest_ifvg.original_direction} FVG squeezing trapped retail) aligned with H1 {htf_macro_trend}"
+                                )
+                                sniper_rationale = (
+                                    f"Apex Anti-Manipulation Scalp ({canonical_symbol}): Institutions inverted a {latest_ifvg.original_direction} FVG "
+                                    f"at {latest_ifvg.broken_by_price:.{dec_p}f}; riding the institutional squeeze to {sniper_target:.{dec_p}f} ({_apex_spec.rr_target:.2f}R)."
+                                )
+                                pattern_name = "Inversion FVG (IFVG) Institutional Trap Flip"
+
+                        # Priority 2: SMC Liquidity Sweep + 3-Candle FVG Reclaim
+                        if not has_sniper_setup:
+                            smc_scalp = smart_money_engine.analyze_liquidity_sweep(canonical_symbol, candles_1h)
+                            if smc_scalp.detected and smc_scalp.direction in ("BUY", "SELL"):
+                                smc_dir = CandidateDirection.BUY if smc_scalp.direction == "BUY" else CandidateDirection.SELL
+                                smc_h1_ok = (
+                                    (smc_dir == CandidateDirection.BUY and htf_macro_trend != "Bearish")
+                                    or (smc_dir == CandidateDirection.SELL and htf_macro_trend != "Bullish")
+                                )
+                                if smc_h1_ok:
+                                    has_sniper_setup = True
+                                    direction = smc_dir
+                                    pattern_conviction = 0.89 if smc_scalp.fvg is not None else 0.86
+                                    raw_sl_smc = smc_scalp.stop_loss if smc_scalp.stop_loss else (
+                                        (smc_scalp.sweep_wick_extreme - 2.0 * pip_u) if direction == CandidateDirection.BUY else (smc_scalp.sweep_wick_extreme + 2.0 * pip_u)
+                                    )
+                                    sniper_stop = _clamp_scalp_sl(raw_sl_smc, direction, entry_price)
+                                    risk_span = abs(entry_price - sniper_stop) * _apex_spec.rr_target
+                                    sniper_target = round(entry_price + risk_span, dec_p) if direction == CandidateDirection.BUY else round(entry_price - risk_span, dec_p)
+                                    sniper_trigger_rule = (
+                                        f"SMC {smc_scalp.swept_pool_type} Stop-Hunt Sweep @ {smc_scalp.swept_level:.{dec_p}f} "
+                                        f"+ {'3-Candle FVG Reclaim' if smc_scalp.fvg else 'Displacement Close'} aligned with H1"
+                                    )
+                                    sniper_rationale = (
+                                        f"Apex Stop-Hunt Reversal ({canonical_symbol}): Swept {smc_scalp.swept_pool_type} liquidity pool "
+                                        f"with institutional reclaim targeting {sniper_target:.{dec_p}f} ({_apex_spec.rr_target:.2f}R)."
+                                    )
+                                    pattern_name = f"Apex Liquidity Sweep ({smc_scalp.swept_pool_type}) & FVG Scalp"
+
+                        # Priority 3: H1-Aligned Velocity Flow + Corridor Retest Scalp
+                        if not has_sniper_setup:
+                            is_bull_v = (htf_macro_trend == "Bullish") or (htf_macro_trend == "Neutral" and asset_trend == "Bullish")
+                            is_bear_v = (htf_macro_trend == "Bearish") or (htf_macro_trend == "Neutral" and asset_trend == "Bearish")
+                            if not is_bull_v and not is_bear_v and len(candles_1h) >= 8:
+                                is_bull_v = candles_1h[-1].close > candles_1h[-8].close
+                                is_bear_v = candles_1h[-1].close < candles_1h[-8].close
+
+                            v_dir: Optional[CandidateDirection] = None
+                            if is_bull_v and (rsi_val is None or (38.0 <= rsi_val <= 74.0)):
+                                v_dir = CandidateDirection.BUY
+                            elif is_bear_v and (rsi_val is None or (26.0 <= rsi_val <= 62.0)):
+                                v_dir = CandidateDirection.SELL
+
+                            if v_dir is not None:
+                                has_sniper_setup = True
+                                direction = v_dir
+                                pattern_conviction = 0.86
+                                # Frame entry cleanly via corridor retest if close to boundary
+                                framed_px, _, corr_note = self._resolve_corridor_retest_and_stop(
+                                    symbol=canonical_symbol,
+                                    direction=direction,
+                                    entry_price=entry_price,
+                                    candles=candles_h1 if candles_h1 else candles_1h,
+                                    atr_val=atr_val,
+                                    min_dist=_apex_spec.min_sl_dist,
+                                    pip_u=pip_u,
+                                    dec_p=dec_p,
+                                )
+                                entry_price = framed_px
+                                if direction == CandidateDirection.BUY:
+                                    micro_swing = min(c.low for c in candles_1h[-5:])
+                                    raw_sl_v = micro_swing - 2.0 * pip_u
+                                else:
+                                    micro_swing = max(c.high for c in candles_1h[-5:])
+                                    raw_sl_v = micro_swing + 2.0 * pip_u
+                                sniper_stop = _clamp_scalp_sl(raw_sl_v, direction, entry_price)
+                                risk_span = abs(entry_price - sniper_stop) * _apex_spec.rr_target
+                                sniper_target = round(entry_price + risk_span, dec_p) if direction == CandidateDirection.BUY else round(entry_price - risk_span, dec_p)
+                                c_suffix = f" ({corr_note})" if corr_note else ""
+                                sniper_trigger_rule = f"Apex H1-Aligned Velocity Scalp flow (H1={htf_macro_trend}, RSI={rsi_val if rsi_val is not None else 50.0:.1f}){c_suffix}"
+                                sniper_rationale = (
+                                    f"{_apex_spec.display_name}: H1-aligned institutional velocity scalp targeting {sniper_target:.{dec_p}f} "
+                                    f"({_apex_spec.rr_target:.2f}R, +0.65R fast BE lock){c_suffix}."
+                                )
+                                pattern_name = f"{_apex_spec.display_name} Flow"
+                    except Exception as ex:
+                        logger.warning(f"Apex FX velocity scalp evaluation error for {canonical_symbol}: {ex}")
+
                 # 2D. Trend Continuation, Pullback & Momentum Flow Integration (strat-002, strat-004, strat-005, strat-007, strat-010, strat-018, strat-024)
                 if not has_sniper_setup and (
                     strat_type_val in ["TREND_CONTINUATION", "PULLBACK", "MOMENTUM", "SWING_STRUCTURE", "PRICE_ACTION"]
@@ -989,8 +1146,11 @@ class SignalGenerationEngine:
 
             # Condition 2: Spread Limit (asset-specific with strict unit accounting)
             is_gold_asset = "XAU" in strategy.symbol or "GOLD" in strategy.symbol
+            _spread_spec = get_apex_fx_spec(getattr(strategy, "id", ""))
             if getattr(strategy, "id", "") == "strat-024":
                 spread_limit = 0.45  # Tight $0.45 USD scalp spread guard (4.5 pips)
+            elif _spread_spec is not None:
+                spread_limit = _spread_spec.max_spread_pips
             elif is_gold_asset:
                 spread_limit = 1.50  # $1.50 USD cash (~0.04% on $4,000 Gold)
             elif "GBP" in strategy.symbol and "JPY" in strategy.symbol:
@@ -1026,14 +1186,22 @@ class SignalGenerationEngine:
             utc_now = eval_time.astimezone(timezone.utc) if getattr(eval_time, "tzinfo", None) else datetime.now(timezone.utc)
             utc_mins = utc_now.hour * 60 + utc_now.minute
 
-            if getattr(strategy, "id", "") == "strat-024":
+            _sid_c3 = getattr(strategy, "id", "")
+            if _sid_c3 == "strat-024":
                 in_killzone = 420 <= utc_mins <= 810  # 07:00 - 13:30 UTC
                 session_passed = session_passed and in_killzone
                 if not in_killzone:
                     session_desc = f"XAU/USD Scalp Killzone Gate: {utc_now.strftime('%H:%M')} UTC is outside peak 07:00-13:30 UTC window."
                 else:
                     session_desc = f"XAU/USD Scalp Killzone Confirmed: {utc_now.strftime('%H:%M')} UTC inside 07:00-13:30 UTC window ({session})."
-            elif getattr(strategy, "id", "") == "strat-006":
+            elif _sid_c3 in APEX_FX_SCALP_IDS:
+                in_apex_kz, kz_label = is_in_apex_killzone(_sid_c3, utc_now)
+                session_passed = session_passed and in_apex_kz
+                if not in_apex_kz:
+                    session_desc = f"Apex FX Scalp Killzone Gate ({raw_symbol}): {utc_now.strftime('%H:%M')} UTC is outside peak {kz_label} window."
+                else:
+                    session_desc = f"Apex FX Scalp Killzone Confirmed ({raw_symbol}): {utc_now.strftime('%H:%M')} UTC inside peak {kz_label} window ({session})."
+            elif _sid_c3 == "strat-006":
                 in_euro_killzone = 360 <= utc_mins <= 840  # 06:00 - 14:00 UTC (Frankfurt open through London morning peak)
                 session_passed = session_passed and in_euro_killzone
                 if not in_euro_killzone:
@@ -1118,8 +1286,8 @@ class SignalGenerationEngine:
                     elif sw_check.phase == "SWEEP_PROBE":
                         v32_spec_passed = False
                         v32_spec_desc = f"Universal Anti-Wick Veto (strat-006 DNA): {sw_check.tactical_note}. Price probing wick without candle body close."
-                    # 2. AUD/USD Secret Weapon: Gold (XAU/USD) Confluence Gate (strat-017, strat-018, strat-023)
-                    if v32_spec_passed and sid_val in ("strat-017", "strat-018", "strat-023"):
+                    # 2. AUD/USD Secret Weapon: Gold (XAU/USD) Confluence Gate (strat-017, strat-018, strat-023, strat-028)
+                    if v32_spec_passed and sid_val in ("strat-017", "strat-018", "strat-023", "strat-028"):
                         xau_bars = cached_bars_1h.get("XAUUSD") or []
                         if len(xau_bars) >= 4 and xau_bars[-4].close > 0:
                             xau_chg_pct = ((xau_bars[-1].close - xau_bars[-4].close) / xau_bars[-4].close) * 100.0
@@ -1128,8 +1296,8 @@ class SignalGenerationEngine:
                                 v32_spec_desc = f"v3.2 Gold-Macro Divergence Veto: XAU/USD ({xau_chg_pct:+.2f}%) diverging against {direction.value} AUD/USD."
                             else:
                                 v32_spec_desc = f"v3.2 Secret Weapon Confirmed: Gold (XAU/USD {xau_chg_pct:+.2f}%) & Inverse DXY aligned with {direction.value} AUD/USD."
-                    # 3. GBP/JPY Yen-Cross Synchronization Gate (strat-015, strat-016, strat-021)
-                    if v32_spec_passed and sid_val in ("strat-015", "strat-016", "strat-021"):
+                    # 3. GBP/JPY Yen-Cross Synchronization Gate (strat-015, strat-016, strat-021, strat-026)
+                    if v32_spec_passed and sid_val in ("strat-015", "strat-016", "strat-021", "strat-026"):
                         gu_bars = cached_bars_1h.get("GBPUSD") or []
                         uj_bars = cached_bars_1h.get("USDJPY") or []
                         if len(gu_bars) >= 4 and len(uj_bars) >= 4 and gu_bars[-4].close > 0 and uj_bars[-4].close > 0:
@@ -1140,8 +1308,29 @@ class SignalGenerationEngine:
                                 v32_spec_desc = f"v3.2 Yen-Cross Whipsaw Veto: GBP/USD ({gu_chg:+.2f}%) and USD/JPY ({uj_chg:+.2f}%) diverging."
                             else:
                                 v32_spec_desc = f"v3.2 Yen-Cross Sync Confirmed: GBP/USD ({gu_chg:+.2f}%) & USD/JPY ({uj_chg:+.2f}%) aligned."
-                    # 4. strat-006 Zero-Loss Body Displacement (>=45%) & RVol >= 1.8x Gate (strat-004, strat-017, strat-019..024)
-                    if v32_spec_passed and sid_val in ("strat-004", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024"):
+                    # 3B. GBP/USD Cable European Flow Sync Gate (strat-025): Vetoes isolated Cable stop-hunts when EUR/USD diverges opposite
+                    if v32_spec_passed and sid_val == "strat-025":
+                        eu_bars = cached_bars_1h.get("EURUSD") or []
+                        if len(eu_bars) >= 4 and eu_bars[-4].close > 0:
+                            eu_chg_pct = ((eu_bars[-1].close - eu_bars[-4].close) / eu_bars[-4].close) * 100.0
+                            if (direction == CandidateDirection.BUY and eu_chg_pct < -0.15) or (direction == CandidateDirection.SELL and eu_chg_pct > 0.15):
+                                v32_spec_passed = False
+                                v32_spec_desc = f"Apex Cable Divergence Veto: EUR/USD ({eu_chg_pct:+.2f}%) diverging against {direction.value} GBP/USD (isolated Cable stop-hunt)."
+                            else:
+                                v32_spec_desc = f"Apex Cable European Sync Confirmed: EUR/USD ({eu_chg_pct:+.2f}%) aligned with {direction.value} GBP/USD."
+                    # 3C. USD/JPY Ninja Direct USD & Yield Sync Gate (strat-027): Vetoes USD/JPY opposing broad USD/EUR inverse flow
+                    if v32_spec_passed and sid_val == "strat-027":
+                        eu_bars = cached_bars_1h.get("EURUSD") or []
+                        if len(eu_bars) >= 4 and eu_bars[-4].close > 0:
+                            eu_chg_pct = ((eu_bars[-1].close - eu_bars[-4].close) / eu_bars[-4].close) * 100.0
+                            # USD/JPY BUY expects broad USD strength (EUR/USD not surging > +0.15%); SELL expects broad USD weakness
+                            if (direction == CandidateDirection.BUY and eu_chg_pct > 0.15) or (direction == CandidateDirection.SELL and eu_chg_pct < -0.15):
+                                v32_spec_passed = False
+                                v32_spec_desc = f"Apex Ninja USD-Yield Divergence Veto: EUR/USD ({eu_chg_pct:+.2f}%) contradicts {direction.value} USD/JPY yield flow."
+                            else:
+                                v32_spec_desc = f"Apex Ninja Yield-DXY Lock Confirmed: EUR/USD ({eu_chg_pct:+.2f}%) & DXY ({macro_eval.dxy_bias}) aligned with {direction.value} USD/JPY."
+                    # 4. strat-006 Zero-Loss Body Displacement (>=45%) & RVol >= 1.8x Gate (strat-004, strat-017, strat-019..028)
+                    if v32_spec_passed and sid_val in ("strat-004", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028"):
                         last_bar = candles_1h[-1]
                         bar_range = max(last_bar.high - last_bar.low, 1e-9)
                         body_ratio = abs(last_bar.close - last_bar.open) / bar_range
@@ -1377,7 +1566,8 @@ class SignalGenerationEngine:
                 pattern_details=pattern_details if (sniper_stop or sniper_target) else None,
                 rr=rr,
                 recovery_mult=recovery_mult,
-                is_scalp=(getattr(strategy, "id", "") == "strat-024"),
+                is_scalp=(getattr(strategy, "id", "") in VELOCITY_SCALP_STRATEGY_IDS),
+                strategy_id=getattr(strategy, "id", ""),
             )
             risk_dist = abs(entry_price - stop_loss)
             if risk_dist > 1e-6:
