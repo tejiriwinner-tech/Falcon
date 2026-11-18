@@ -717,7 +717,8 @@ class SignalOutcomeResolver:
             reward_dist = abs(take_profit - entry)
             risk_reward = round(reward_dist / risk_dist, 2) if risk_dist > 1e-6 else (trade.riskReward or 1.0)
 
-            multiplier = 10.0 if "XAU" in symbol else 10000.0
+            sym_up = (symbol or "").upper()
+            multiplier = 10.0 if ("XAU" in sym_up or "GOLD" in sym_up) else (100.0 if "JPY" in sym_up else 10000.0)
             if direction == "BUY":
                 price_delta = exit_price - entry
             else:

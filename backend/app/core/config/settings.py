@@ -45,8 +45,6 @@ class Settings:
     )
     OANDA_AUTO_EXECUTE: bool = os.getenv("OANDA_AUTO_EXECUTE", "False").lower() == "true"
     FALCON_24_5_TRADING: bool = os.getenv("FALCON_24_5_TRADING", "True").lower() == "true"
-    ENABLE_CURRENCY_CLUSTER_GATE: bool = os.getenv("ENABLE_CURRENCY_CLUSTER_GATE", "False").lower() == "true"
-    MAX_CURRENCY_CLUSTER_EXPOSURE: int = int(os.getenv("MAX_CURRENCY_CLUSTER_EXPOSURE", "2"))
 
     # How far ahead the economic calendar is fetched, and how long it is cached
     CALENDAR_LOOKAHEAD_DAYS: int = int(os.getenv("CALENDAR_LOOKAHEAD_DAYS", "7"))

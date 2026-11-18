@@ -396,7 +396,6 @@ class SignalGenerationEngine:
         def _load_bars(sym):
             try:
                 b1h = market_history_service.get_bars(sym, timeframe="1h", limit=120)
-                b1h = market_history_service.get_bars(sym, timeframe="1h", limit=120)
                 try:
                     b15m = market_history_service.get_bars(sym, timeframe="15m", limit=120)
                 except Exception:
@@ -1118,6 +1117,7 @@ class SignalGenerationEngine:
 
             if h1_trend_conflict:
                 trend_passed = False
+                has_sniper_setup = False
                 trend_desc = f"⚠️ Top-Down H1 Alignment Veto: {h1_conflict_reason}"
             elif has_sniper_setup:
                 trend_passed = True
@@ -1144,7 +1144,7 @@ class SignalGenerationEngine:
                 passed=trend_passed
             )
 
-            # Condition 2: Spread Limit (asset-specific with strict unit accounting)
+            # Condition 2: Spread Limit (asset-specific with strict unit accounting: USD for Gold, pips for FX)
             is_gold_asset = "XAU" in strategy.symbol or "GOLD" in strategy.symbol
             _spread_spec = get_apex_fx_spec(getattr(strategy, "id", ""))
             if getattr(strategy, "id", "") == "strat-024":
@@ -1163,11 +1163,29 @@ class SignalGenerationEngine:
                 spread_limit = 2.0
             else:
                 spread_limit = 2.0
-            spread_passed = spread <= spread_limit
+
+            # Normalize raw OANDA ask-bid price delta into pips for FX pairs (Gold remains in USD cash)
+            spread_eval = float(spread or 0.0)
+            if not is_gold_asset and spread_eval > 0.0:
+                is_jpy_sym = "JPY" in canonical_symbol
+                pip_unit_s = 0.01 if is_jpy_sym else 0.0001
+                raw_price_diff = (
+                    abs(float(price_item.ask) - float(price_item.bid))
+                    if (price_item is not None and getattr(price_item, "ask", 0) > 0 and getattr(price_item, "bid", 0) > 0)
+                    else None
+                )
+                is_raw_decimal = (
+                    (raw_price_diff is not None and abs(raw_price_diff - spread_eval) <= (1e-3 if is_jpy_sym else 1e-5))
+                    or (spread_eval < (0.5 if is_jpy_sym else 0.05))
+                )
+                if is_raw_decimal:
+                    spread_eval = round(spread_eval / pip_unit_s, 2)
+
+            spread_passed = spread_eval <= spread_limit
             spread_desc = (
-                f"Current live spread is ${spread:.2f} USD (strategy limit <= ${spread_limit:.2f} USD)."
+                f"Current live spread is ${spread_eval:.2f} USD (strategy limit <= ${spread_limit:.2f} USD)."
                 if is_gold_asset else
-                f"Current live spread is {spread:.2f} pips (strategy limit <= {spread_limit:.1f} pips)."
+                f"Current live spread is {spread_eval:.2f} pips (strategy limit <= {spread_limit:.1f} pips)."
             )
             spread_cond = CandidateCondition(
                 title="Spread Limit",
@@ -1240,11 +1258,6 @@ class SignalGenerationEngine:
             news_cond = CandidateCondition(
                 title="News Safety & Catalyst Alignment",
                 description=news_desc,
-                passed=news_passed
-            )
-            news_cond = CandidateCondition(
-                title="News Safety",
-                description=f"Current news impact level is {news_impact}.",
                 passed=news_passed
             )
 
@@ -1360,8 +1373,8 @@ class SignalGenerationEngine:
                             v32_spec_desc = f"{sid_val} Volume Veto (strat-006 DNA): RVol {rvol:.2f}x < 1.8x institutional surge."
                         else:
                             v32_spec_desc = f"{v32_spec_desc} | Body {body_ratio*100:.0f}% >= 45%, RVol {rvol:.2f}x >= 1.8x."
-                except Exception:
-                    pass
+                except Exception as ex:
+                    logger.warning(f"Condition 6 anti-fakeout gate error for {sid_val} ({canonical_symbol}): {ex}")
             v32_spec_cond = CandidateCondition(
                 title="v3.2 Anti-Fakeout & Specialization Gate",
                 description=v32_spec_desc,
@@ -1375,6 +1388,7 @@ class SignalGenerationEngine:
                 try:
                     from app.core.engines.order_flow_engine import order_flow_engine
                     from app.core.providers.oanda_streaming_service import oanda_streaming_service
+                    tick_d = None
                     live_dom_imb = None
                     if quote_entry and hasattr(quote_entry, "data") and isinstance(quote_entry.data, MarketQuote):
                         live_dom_imb = getattr(quote_entry.data, "domImbalance", None)
@@ -1390,9 +1404,12 @@ class SignalGenerationEngine:
                     prior_c = candles_1h[:-1] if len(candles_1h) >= 2 else []
                     live_bid_liq = getattr(quote_entry.data, "bidLiquidity", None) if (quote_entry and hasattr(quote_entry, "data")) else None
                     live_ask_liq = getattr(quote_entry.data, "askLiquidity", None) if (quote_entry and hasattr(quote_entry, "data")) else None
-                    if live_bid_liq is None and tick_d:
-                        live_bid_liq = tick_d.get("bidLiquidity")
-                        live_ask_liq = tick_d.get("askLiquidity")
+                    if live_bid_liq is None:
+                        if tick_d is None:
+                            tick_d = oanda_streaming_service.get_latest_tick(canonical_symbol)
+                        if tick_d:
+                            live_bid_liq = tick_d.get("bidLiquidity")
+                            live_ask_liq = tick_d.get("askLiquidity")
 
                     s2_eval = order_flow_engine.evaluate_dom_and_absorption(
                         symbol=canonical_symbol,
@@ -1422,8 +1439,8 @@ class SignalGenerationEngine:
 
                     if s2_eval.opposing_liquidity_wall:
                         s2_dom_passed = False
-                except Exception:
-                    pass
+                except Exception as ex:
+                    logger.warning(f"Condition 7 OrderFlowEngine v3.0 evaluation error for {sid_val} ({canonical_symbol}): {ex}")
             s2_flow_cond = CandidateCondition(
                 title="Stage 2 Institutional DOM & COT Flow",
                 description=s2_flow_desc,
@@ -1471,7 +1488,7 @@ class SignalGenerationEngine:
             readiness_session = 30 if session_passed else 10
             if spread_passed:
                 readiness_spread = 30
-            elif spread <= (spread_limit * 1.5):
+            elif spread_eval <= (spread_limit * 1.5):
                 readiness_spread = 18
             else:
                 readiness_spread = 5
@@ -1484,6 +1501,8 @@ class SignalGenerationEngine:
 
             if macro_eval.is_macro_trap:
                 readiness_score = min(readiness_score, 40)
+            elif h1_trend_conflict:
+                readiness_score = min(readiness_score, 55)
             elif is_n_blk or is_counter_news_fade or not v32_spec_passed or not s2_dom_passed:
                 readiness_score = min(readiness_score, 62)
             elif (has_sniper_setup or trend_passed) and spread_passed and news_passed and session_passed and direction != CandidateDirection.WAIT:
@@ -1495,7 +1514,7 @@ class SignalGenerationEngine:
             # Determine Candidate Status
             if macro_eval.is_macro_trap:
                 status = CandidateStatus.REJECTED
-            elif readiness_score >= 85 and direction != CandidateDirection.WAIT and (has_sniper_setup or trend_passed):
+            elif not h1_trend_conflict and readiness_score >= 85 and direction != CandidateDirection.WAIT and (has_sniper_setup or trend_passed):
                 status = CandidateStatus.GENERATED
             elif readiness_score >= 45 and direction != CandidateDirection.WAIT:
                 status = CandidateStatus.WAITING_CONFIRMATION
@@ -1508,6 +1527,12 @@ class SignalGenerationEngine:
                 reasons.append(CandidateReason(
                     title="Macro Cross-Asset Trap Veto",
                     description=macro_eval.rationale,
+                    passed=False,
+                ))
+            elif h1_trend_conflict:
+                reasons.append(CandidateReason(
+                    title="Top-Down H1 Trend Veto",
+                    description=h1_conflict_reason,
                     passed=False,
                 ))
             elif has_sniper_setup:

@@ -850,8 +850,8 @@ class SignalService:
                             shield_reason = f"ANTI-CLUSTER SHIELD: {conf_exp} exposure already held by active {existing_sym}. Held on Watchlist to prevent correlated drawdown."
                             entry_hit = False
 
-                    # 4. Portfolio Heat Cap (Max 1-2 simultaneous active trades, default: 2)
-                    max_active_limit = max(int(getattr(settings, "MAX_SIMULTANEOUS_TRADES", 3) or 3), 11)
+                    # 4. Portfolio Heat Cap (strictly honors configured MAX_SIMULTANEOUS_TRADES)
+                    max_active_limit = int(getattr(settings, "MAX_SIMULTANEOUS_TRADES", 3) or 3)
                     total_current_active = len(open_trades) + len(curated_active)
                     if not shield_reason and entry_hit and total_current_active >= max_active_limit:
                         shield_reason = f"PORTFOLIO HEAT CAP: Maximum {max_active_limit} simultaneous active trades reached ({len(open_trades)} running + {len(curated_active)} new). Held on Watchlist."
@@ -891,6 +891,27 @@ class SignalService:
                     # ONLY create a trade record and send push alert on FIRST activation (never on existing active trades)
                     if not is_already_active or strat_sym_key not in seen_open_syms:
                         try:
+                            from decimal import Decimal
+                            from app.core.engines.market_state_engine import _derive_session
+
+                            actual_session = _derive_session(now)
+                            eff_entry_px = float(cur_px or cand.entryPrice)
+                            eff_sl_px = float(cand.stopLoss)
+                            price_risk_abs = abs(eff_entry_px - eff_sl_px)
+                            eff_lot = max(float(scaled_lot or 0.01), 0.01)
+                            sym_clean_r = symbol.replace("/", "").replace("_", "").upper()
+                            if price_risk_abs > 1e-9:
+                                if "XAU" in sym_clean_r or "GOLD" in sym_clean_r:
+                                    raw_usd_risk = price_risk_abs * 100.0 * eff_lot
+                                elif "JPY" in sym_clean_r:
+                                    jpy_conv = eff_entry_px if sym_clean_r.startswith("USD") else 155.0
+                                    raw_usd_risk = (price_risk_abs / max(jpy_conv, 1.0)) * 100000.0 * eff_lot
+                                else:
+                                    raw_usd_risk = price_risk_abs * 100000.0 * eff_lot
+                                init_monetary_risk = Decimal(str(round(max(raw_usd_risk, 0.01), 2)))
+                            else:
+                                init_monetary_risk = None
+
                             trade_journal_repository.create_trade(
                                 TradeJournalCreate(
                                     signalId=item["signal_id"],
@@ -899,9 +920,11 @@ class SignalService:
                                     direction=direction_str.upper(),
                                     entryPrice=cand.entryPrice,
                                     stopLoss=cand.stopLoss,
+                                    initialStopLoss=cand.stopLoss,
+                                    initialMonetaryRisk=init_monetary_risk,
                                     takeProfit=cand.takeProfit,
                                     timeframe=getattr(cand, "timeframe", None) or "M15",
-                                    marketSession="London" if "London" in (cand.strategyName or "") else "New York",
+                                    marketSession=actual_session,
                                     tradeDate=now,
                                     status="OPEN",
                                     result="OPEN",
