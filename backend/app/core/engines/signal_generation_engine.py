@@ -482,38 +482,75 @@ class SignalGenerationEngine:
             else:
                 asset_trend = "Neutral"
 
-            # ── 2. Candlestick Pattern & Sniper Analysis ──────────────────────
+            # ── 2. Top-Down Multi-Timeframe Architecture (H1 Macro Bias -> M15/M5 Execution) ──
+            raw_bars_h1 = cached_bars_1h.get(canonical_symbol, [])
             strat_tf = (getattr(strategy, "bestTimeframe", "") or "1H").upper()
             if strat_tf in ("M15", "M5", "15M", "5M"):
-                bars_1h = cached_bars_15m.get(canonical_symbol) or cached_bars_1h.get(canonical_symbol, [])
+                raw_bars_exec = cached_bars_15m.get(canonical_symbol) or raw_bars_h1
             else:
-                bars_1h = cached_bars_1h.get(canonical_symbol, [])
-            if rsi_val is None and bars_1h and len(bars_1h) >= 15:
-                from app.core.services.market_history_service import compute_rsi
-                rsi_val = compute_rsi([b.close for b in bars_1h])
-                if asset_trend == "Neutral" and rsi_val is not None:
-                    if rsi_val >= 52.0:
-                        asset_trend = "Bullish"
-                    elif rsi_val <= 48.0:
-                        asset_trend = "Bearish"
+                raw_bars_exec = raw_bars_h1
 
-            candles_1h = [
-                CandleBar(
+            def _to_candle(b):
+                if isinstance(b, CandleBar):
+                    return b
+                bt = getattr(b, "bar_time", getattr(b, "time", None))
+                ts = getattr(b, "timestamp", None)
+                ts_int = int(bt.timestamp()) if (bt is not None and hasattr(bt, "timestamp")) else (int(ts) if ts is not None else None)
+                return CandleBar(
                     open=b.open,
                     high=b.high,
                     low=b.low,
                     close=b.close,
-                    volume=b.volume or 0.0,
-                    timestamp=int(b.bar_time.timestamp()) if hasattr(b.bar_time, "timestamp") else None,
-                    time=b.bar_time,
+                    volume=getattr(b, "volume", 0.0) or 0.0,
+                    timestamp=ts_int,
+                    time=bt,
                 )
-                for b in bars_1h
-            ]
 
-            # Append live bar if available
+            # 1. Authentic H1 Higher-Timeframe Structure & Regimes (120 bars = 5 days)
+            candles_h1 = [_to_candle(b) for b in raw_bars_h1]
+            if candles_h1 and entry_price > 0:
+                last_h1 = candles_h1[-1]
+                candles_h1[-1] = CandleBar(
+                    open=last_h1.open,
+                    high=max(last_h1.high, entry_price),
+                    low=min(last_h1.low, entry_price),
+                    close=entry_price,
+                    volume=last_h1.volume if (last_h1.volume and last_h1.volume > 0) else 100.0,
+                    timestamp=int(started_at.timestamp()),
+                    time=started_at,
+                )
+
+            # Compute authentic H1 EMAs and Key Support/Resistance
+            from app.core.engines.session_breakout_engine import session_breakout_engine
+            ema_20_h1 = None
+            ema_50_h1 = None
+            ema_200_h1 = None
+            key_res_h1 = None
+            key_sup_h1 = None
+            if candles_h1 and len(candles_h1) >= 5:
+                h1_closes = [c.close for c in candles_h1]
+                ema_20_h1 = session_breakout_engine.compute_ema(h1_closes, 20)
+                if len(h1_closes) >= 30:
+                    ema_50_h1 = session_breakout_engine.compute_ema(h1_closes, min(len(h1_closes), 50))
+                if len(h1_closes) >= 50:
+                    ema_200_h1 = session_breakout_engine.compute_ema(h1_closes, min(len(h1_closes), 200))
+                h1_lookback = min(len(candles_h1), 20)
+                key_res_h1 = max(c.high for c in candles_h1[-h1_lookback:])
+                key_sup_h1 = min(c.low for c in candles_h1[-h1_lookback:])
+
+            # Authoritative H1 Macro Trend Direction across all pairs
+            htf_macro_trend = "Neutral"
+            if ema_50_h1 is not None and entry_price > 0:
+                if entry_price > ema_50_h1 and (ema_200_h1 is None or ema_50_h1 >= ema_200_h1):
+                    htf_macro_trend = "Bullish"
+                elif entry_price < ema_50_h1 and (ema_200_h1 is None or ema_50_h1 <= ema_200_h1):
+                    htf_macro_trend = "Bearish"
+
+            # 2. Execution-Timeframe Candles (M15 / M5 or 1H)
+            candles_1h = [_to_candle(b) for b in raw_bars_exec]
             if candles_1h and entry_price > 0:
                 last_c = candles_1h[-1]
-                candles_1h.__setitem__(-1, CandleBar(
+                candles_1h[-1] = CandleBar(
                     open=last_c.open,
                     high=max(last_c.high, entry_price),
                     low=min(last_c.low, entry_price),
@@ -521,24 +558,23 @@ class SignalGenerationEngine:
                     volume=last_c.volume if (last_c.volume and last_c.volume > 0) else 100.0,
                     timestamp=int(started_at.timestamp()),
                     time=started_at,
-                ))
+                )
 
-            ema_20 = None
-            ema_50 = None
-            ema_200 = None
-            key_res = None
-            key_sup = None
-            if candles_1h and len(candles_1h) >= 5:
-                closes = [c.close for c in candles_1h]
-                from app.core.engines.session_breakout_engine import session_breakout_engine
-                ema_20 = session_breakout_engine.compute_ema(closes, 20)
-                if len(closes) >= 30:
-                    ema_50 = session_breakout_engine.compute_ema(closes, min(len(closes), 50))
-                if len(closes) >= 50:
-                    ema_200 = session_breakout_engine.compute_ema(closes, min(len(closes), 200))
-                lookback = min(len(candles_1h), 20)
-                key_res = max(c.high for c in candles_1h[-lookback:])
-                key_sup = min(c.low for c in candles_1h[-lookback:])
+            # Execution RSI
+            if rsi_val is None and raw_bars_exec and len(raw_bars_exec) >= 15:
+                from app.core.services.market_history_service import compute_rsi
+                rsi_val = compute_rsi([b.close for b in raw_bars_exec])
+                if asset_trend == "Neutral" and rsi_val is not None:
+                    if rsi_val >= 52.0:
+                        asset_trend = "Bullish"
+                    elif rsi_val <= 48.0:
+                        asset_trend = "Bearish"
+
+            ema_20 = ema_20_h1
+            ema_50 = ema_50_h1
+            ema_200 = ema_200_h1
+            key_res = key_res_h1
+            key_sup = key_sup_h1
 
             detected_patterns = self.pattern_engine.analyze_patterns(
                 candles_1h=candles_1h,
@@ -549,11 +585,11 @@ class SignalGenerationEngine:
 
             # Compute authentic ATR from indicators or canonical bars
             atr_val = next((ind.value for ind in sym_indicators if ind.name == "ATR"), None)
-            if atr_val is None and len(bars_1h) >= 2:
+            if atr_val is None and len(raw_bars_h1) >= 2:
                 tr_list = []
-                for idx in range(1, len(bars_1h)):
-                    prev_c = bars_1h[idx - 1].close
-                    b = bars_1h[idx]
+                for idx in range(1, len(raw_bars_h1)):
+                    prev_c = raw_bars_h1[idx - 1].close
+                    b = raw_bars_h1[idx]
                     tr = max(b.high - b.low, abs(b.high - prev_c), abs(b.low - prev_c))
                     tr_list.append(tr)
                 recent_tr = tr_list[-14:] if len(tr_list) >= 14 else tr_list
@@ -706,7 +742,7 @@ class SignalGenerationEngine:
                     try:
                         from app.core.engines.session_breakout_engine import session_breakout_engine
                         from app.schemas.session_breakout import SessionName, SessionStatus
-                        corridors = session_breakout_engine.compute_session_corridors(canonical_symbol, candles_1h, allow_benchmark=False)
+                        corridors = session_breakout_engine.compute_session_corridors(canonical_symbol, candles_h1 if candles_h1 else candles_1h, allow_benchmark=False)
                         broken_up = any(c.status == SessionStatus.BROKEN_UP for c in corridors)
                         broken_down = any(c.status == SessionStatus.BROKEN_DOWN for c in corridors)
                         expansions = session_breakout_engine.detect_volume_expansions(canonical_symbol, candles_1h)
@@ -912,8 +948,21 @@ class SignalGenerationEngine:
                     sniper_stop = _corr_sl_u
 
             # ── 3. Evaluate Strategy Execution Filters ────────────────────────
-            # Condition 1: Trend Alignment / Technical Setup
-            if has_sniper_setup:
+            # Condition 1: Trend Alignment & Top-Down H1 Macro Confluence (across all currency pairs)
+            h1_trend_conflict = False
+            h1_conflict_reason = ""
+            if strat_type_val not in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"] and direction != CandidateDirection.WAIT:
+                if direction == CandidateDirection.BUY and htf_macro_trend == "Bearish" and ema_50_h1 is not None and entry_price < ema_50_h1:
+                    h1_trend_conflict = True
+                    h1_conflict_reason = f"H1 Macro Downtrend Veto: BUY signal opposes H1 Bearish regime (entry {entry_price:.5f} < H1 EMA 50 {ema_50_h1:.5f})."
+                elif direction == CandidateDirection.SELL and htf_macro_trend == "Bullish" and ema_50_h1 is not None and entry_price > ema_50_h1:
+                    h1_trend_conflict = True
+                    h1_conflict_reason = f"H1 Macro Uptrend Veto: SELL signal opposes H1 Bullish regime (entry {entry_price:.5f} > H1 EMA 50 {ema_50_h1:.5f})."
+
+            if h1_trend_conflict:
+                trend_passed = False
+                trend_desc = f"⚠️ Top-Down H1 Alignment Veto: {h1_conflict_reason}"
+            elif has_sniper_setup:
                 trend_passed = True
                 trend_desc = f"🎯 Sniper Setup Identified: {pattern_name} with {pattern_conviction*100:.0f}% conviction. {sniper_trigger_rule}"
             elif strat_type_val in ["MEAN_REVERSION", "SUPPORT_RESISTANCE"]:
@@ -974,15 +1023,29 @@ class SignalGenerationEngine:
                 for pref in strategy.preferredSessions
             )
             session_desc = f"Session '{session}' execution window (preferred: {', '.join(strategy.preferredSessions)})."
+            utc_now = eval_time.astimezone(timezone.utc) if getattr(eval_time, "tzinfo", None) else datetime.now(timezone.utc)
+            utc_mins = utc_now.hour * 60 + utc_now.minute
+
             if getattr(strategy, "id", "") == "strat-024":
-                utc_now = eval_time.astimezone(timezone.utc) if getattr(eval_time, "tzinfo", None) else datetime.now(timezone.utc)
-                utc_mins = utc_now.hour * 60 + utc_now.minute
                 in_killzone = 420 <= utc_mins <= 810  # 07:00 - 13:30 UTC
                 session_passed = session_passed and in_killzone
                 if not in_killzone:
                     session_desc = f"XAU/USD Scalp Killzone Gate: {utc_now.strftime('%H:%M')} UTC is outside peak 07:00-13:30 UTC window."
                 else:
                     session_desc = f"XAU/USD Scalp Killzone Confirmed: {utc_now.strftime('%H:%M')} UTC inside 07:00-13:30 UTC window ({session})."
+            elif getattr(strategy, "id", "") == "strat-006":
+                in_euro_killzone = 360 <= utc_mins <= 840  # 06:00 - 14:00 UTC (Frankfurt open through London morning peak)
+                session_passed = session_passed and in_euro_killzone
+                if not in_euro_killzone:
+                    session_desc = f"European Breakout Killzone Gate: {utc_now.strftime('%H:%M')} UTC is outside 06:00-14:00 UTC European morning window."
+                else:
+                    session_desc = f"European Breakout Killzone Confirmed: {utc_now.strftime('%H:%M')} UTC inside 06:00-14:00 UTC European window ({session})."
+
+            # Universal FX Off-Peak Rollover Blackout (16:30-22:00 UTC) across all currency pairs (EUR/USD, GBP/USD, USD/JPY, AUD/USD, GBP/JPY)
+            is_fx_symbol = any(c in canonical_symbol for c in ("EUR", "GBP", "USD", "JPY", "AUD")) and not ("XAU" in canonical_symbol or "GOLD" in canonical_symbol)
+            if is_fx_symbol and (990 <= utc_mins <= 1320):  # 16:30 - 22:00 UTC low-volume spread widening window
+                session_passed = False
+                session_desc = f"Universal FX Off-Peak Rollover Gate: {utc_now.strftime('%H:%M')} UTC is in the 16:30-22:00 UTC low-liquidity rollover window. Entries blocked across all FX pairs."
             session_cond = CandidateCondition(
                 title="Session Match",
                 description=session_desc,
@@ -1038,13 +1101,13 @@ class SignalGenerationEngine:
                 try:
                     from app.core.engines.session_breakout_engine import session_breakout_engine
                     from app.schemas.session_breakout import SessionStatus
-                    corridors_v32 = session_breakout_engine.compute_session_corridors(canonical_symbol, candles_1h, allow_benchmark=False)
+                    corridors_v32 = session_breakout_engine.compute_session_corridors(canonical_symbol, candles_h1 if candles_h1 else candles_1h, allow_benchmark=False)
                     broken_up_v32 = any(c.status == SessionStatus.BROKEN_UP for c in corridors_v32)
                     broken_down_v32 = any(c.status == SessionStatus.BROKEN_DOWN for c in corridors_v32)
                     sw_check = session_breakout_engine.evaluate_sweep_retest(canonical_symbol, direction.value, candles_1h, corridors_v32)
                     single_corr_double_sweep = (
                         sid_val != "strat-024"
-                        and self._detect_single_corridor_double_sweep(canonical_symbol, candles_1h, corridors_v32)
+                        and self._detect_single_corridor_double_sweep(canonical_symbol, candles_h1 if candles_h1 else candles_1h, corridors_v32)
                     )
                     # 0. Universal Double-Break / Single-Corridor Double-Sweep Whipsaw Veto (excludes strat-006 & strat-024):
                     if sid_val != "strat-024" and ((broken_up_v32 and broken_down_v32) or single_corr_double_sweep):
