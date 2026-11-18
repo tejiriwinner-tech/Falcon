@@ -810,20 +810,20 @@ class SignalService:
                         entry_hit = False
 
                     # Approved Flagship Filter
-                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 29)})
+                    approved_flagships = active_strat_ids or getattr(settings, "APPROVED_FLAGSHIP_STRATEGIES", {f"strat-{i:03d}" for i in range(1, 30)})
                     if not shield_reason and cand.strategyId and cand.strategyId not in approved_flagships:
                         shield_reason = f"STRATEGY GATE: Live activation restricted to flagship strategies ({', '.join(sorted(approved_flagships))}). Held on Watchlist."
                         entry_hit = False
 
-                    # Velocity Scalp Killzone Promotion Gates (strat-024 Gold & strat-025..028 Apex FX)
+                    # Velocity Scalp Killzone Promotion Gates (strat-024 Gold & strat-025..029 Apex FX)
+                    from app.core.engines.apex_scalp_config import APEX_FX_SCALP_IDS, is_in_apex_killzone
                     if not shield_reason and getattr(cand, "strategyId", "") == "strat-024":
                         utc_now_prom = datetime.now(timezone.utc)
                         utc_mins_prom = utc_now_prom.hour * 60 + utc_now_prom.minute
                         if not (420 <= utc_mins_prom <= 810):
                             shield_reason = f"XAU/USD SCALP KILLZONE SHIELD: {utc_now_prom.strftime('%H:%M')} UTC is outside peak 07:00-13:30 UTC window."
                             entry_hit = False
-                    elif not shield_reason and getattr(cand, "strategyId", "") in ("strat-025", "strat-026", "strat-027", "strat-028"):
-                        from app.core.engines.apex_scalp_config import is_in_apex_killzone
+                    elif not shield_reason and getattr(cand, "strategyId", "") in APEX_FX_SCALP_IDS:
                         utc_now_prom = datetime.now(timezone.utc)
                         in_apex_prom, kz_prom_lbl = is_in_apex_killzone(cand.strategyId, utc_now_prom)
                         if not in_apex_prom:

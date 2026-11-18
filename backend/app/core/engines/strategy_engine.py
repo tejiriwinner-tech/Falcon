@@ -1876,13 +1876,74 @@ class StrategyEngine:
             latestValidation=_empty_validation()
         )
 
+        # 29. EUR/USD Fiber Frankfurt-NY Velocity Scalp (Dual SMT GBP/USD + Inverse USD/JPY Lock + IFVG + OrderFlow v3.0)
+        s29 = StrategyItem(
+            id="strat-029",
+            name="EUR/USD Fiber Frankfurt-NY Velocity Scalp",
+            type=StrategyType.SCALPING,
+            category=StrategyCategory.SCALPING,
+            symbol="EUR/USD",
+            description="Apex institutional EUR/USD ('Fiber') anti-manipulation scalping engine complementing European Breakout (strat-006). Pairs Inversion FVG (IFVG) retail-trap flips and SMC Frankfurt/London Judas-swing sweeps with OrderFlowEngine v3.0 spoof/iceberg radar and a Dual Fiber SMT & Broad-USD Lock (GBP/USD alignment + Inverse USD/JPY verification). Operates strictly in 06:45-10:30 & 12:30-15:30 UTC killzones with <= 1.0p spread, 7-14p stops, 1.25R targets, and +0.65R fast breakeven scale-out.",
+            marketCondition="Frankfurt/London Open Judas Swing & NY Overlap Fiber Velocity",
+            bestSession="London",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.MEDIUM,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Strict Frankfurt/London (06:45-10:30 UTC) & NY Overlap (12:30-15:30 UTC) Killzones block late-day drift traps",
+                "Dual Fiber SMT & Broad-USD Shield (GBP/USD sync + Inverse USD/JPY) eliminates circular DXY stop-hunts",
+                "Inversion FVG (IFVG) & Liquidity Sweep trap engine flips retail breakout stop-outs into institutional entries",
+                "Ultra-tight 7-14 pip Fiber scalp risk geometry with quick 1.25R (8.75-17.5p) TP & +0.65R fast BE + 50% scale-out",
+                "Ultra-tight <= 1.0 pip spread guard + OrderFlowEngine v3.0 L2 spoof & passive iceberg absorption radar"
+            ],
+            weaknesses=["Strictly inactive outside 06:45-10:30 / 12:30-15:30 UTC or when EUR/USD spread exceeds 1.0 pip"],
+            entryChecklist=[
+                "Time within 06:45-10:30 UTC or 12:30-15:30 UTC Fiber institutional killzones",
+                "EUR/USD live spread <= 1.0 pip",
+                "Authentic H1 EMA 50/200 trend + GBP/USD SMT sync + Inverse USD/JPY broad-USD lock aligned",
+                "IFVG retail trap flip, SMC sweep reclaim, or corridor retest with >= 45% body & RVol >= 1.8x",
+                "OrderFlowEngine v3.0 confirms no L2 spoof trap or opposing institutional iceberg absorption"
+            ],
+            exitChecklist=[
+                "Lock Breakeven & bank 50% partial at +0.65R (+0.33R banked on BE reversals)",
+                "Close remaining 50% at 1.25R quick Fiber scalp target (8.75-17.5 pips)"
+            ],
+            idealVolatility="Moderate to High (Frankfurt / London Open / NY Overlap)",
+            avoidDuring=["ECB Rate Decision", "Eurozone CPI", "US NFP / CPI / FOMC", "Spread > 1.0 pip"],
+            confirmationIndicators=["Inversion FVG (IFVG) Engine", "OrderFlowEngine v3.0", "GBP/USD SMT + Inverse USD/JPY Lock", "H1 EMA 50/200"],
+            successConditions=["Fiber Killzone Active", "Spread <= 1.0 pip", "Body >= 45% & RVol >= 1.8x", "No SMT/Broad-USD Divergence or Spoof Veto"],
+            minimumConfidence=85,
+            minimumRiskReward=1.25,
+            preferredSessions=["Frankfurt", "London", "London-NY Overlap", "NY Overlap", "New York"],
+            avoidConditions=["Spread > 1.0 pip", "GBP/USD SMT Divergence > 0.15%", "USD/JPY Broad-USD Contradiction > 0.20%", "Double-Sweep Whipsaw Day"],
+            requiredConfirmations=["Fiber Killzone (06:45-10:30 / 12:30-15:30 UTC)", "Spread <= 1.0 pip", "Anti-Wick Fakeout Filter (v3.2)", "OrderFlow v3.0 & Dual Fiber SMT/USD Lock"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Frankfurt Open", "London Judas Swing", "NY Overlap Anti-Trap Scalping"],
+            estimatedHoldingTime="5-45 minutes",
+            maxConsecutiveLosses=2,
+            createdAt=now,
+            updatedAt=now,
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId="strat-024-dna",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Apex FX Velocity Scalp (EUR/USD): IFVG anti-retail trap engine + OrderFlow v3.0 + Dual Fiber SMT (GBP/USD) & Inverse USD/JPY Lock + Frankfurt/London & NY Overlap killzones, <= 1.0p spread, 7-14p SL, 1.25R TP, +0.65R fast BE scale-out.",
+            dependencies=["OrderFlowEngine v3.0", "Smart Money IFVG Engine", "Macro Cross-Asset Gate", "Market Session Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
         strategies = [
             s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12,
             s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24,
-            s25, s26, s27, s28,
+            s25, s26, s27, s28, s29,
         ]
         for strategy in strategies:
-            default_active_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028"}
+            default_active_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028", "strat-029"}
             strategy.status = StrategyStatus.ACTIVE if strategy.id in default_active_ids else StrategyStatus.INCUBATION
             strategy.readyForExecution = (strategy.status == StrategyStatus.ACTIVE)
             if strategy.minimumRiskReward and strategy.minimumRiskReward > 1.5:
@@ -1917,6 +1978,7 @@ class StrategyEngine:
                     "strat-026": "v3.2 Apex Dragon Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + Dual Yen-Cross Sync (GU+UJ). Strict Tokyo/London/Overlap Killzones, <= 2.4p spread, 14-28p SL, 1.25R TP, +0.65R fast BE scale-out.",
                     "strat-027": "v3.2 Apex Ninja Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + US 10Y Yield/DXY Lock. Strict 00:00-03:30 & 12:30-16:00 UTC Killzones, <= 1.3p spread, 10-20p SL, 1.25R TP, +0.65R fast BE scale-out.",
                     "strat-028": "v3.2 Apex Aussie Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + Gold (XAU/USD) Lockstep. Strict Pacific/London/NY Killzones, <= 1.2p spread, 7-15p SL, 1.25R TP, +0.65R fast BE scale-out.",
+                    "strat-029": "v3.2 Apex Fiber Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + Dual Fiber SMT (GBP/USD) & Inverse USD/JPY Lock. Strict 06:45-10:30 & 12:30-15:30 UTC Killzones, <= 1.0p spread, 7-14p SL, 1.25R TP, +0.65R fast BE scale-out.",
                 }
                 old_ver = strategy.strategyVersion or "1.0"
                 strategy.parentStrategyId = f"{strategy.id}-v{old_ver}"

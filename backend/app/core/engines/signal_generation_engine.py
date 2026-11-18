@@ -1329,8 +1329,22 @@ class SignalGenerationEngine:
                                 v32_spec_desc = f"Apex Ninja USD-Yield Divergence Veto: EUR/USD ({eu_chg_pct:+.2f}%) contradicts {direction.value} USD/JPY yield flow."
                             else:
                                 v32_spec_desc = f"Apex Ninja Yield-DXY Lock Confirmed: EUR/USD ({eu_chg_pct:+.2f}%) & DXY ({macro_eval.dxy_bias}) aligned with {direction.value} USD/JPY."
-                    # 4. strat-006 Zero-Loss Body Displacement (>=45%) & RVol >= 1.8x Gate (strat-004, strat-017, strat-019..028)
-                    if v32_spec_passed and sid_val in ("strat-004", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028"):
+                    # 3D. EUR/USD Fiber Dual SMT (GBP/USD) & Broad-USD (Inverse USD/JPY) Shield (strat-029)
+                    if v32_spec_passed and sid_val == "strat-029":
+                        gu_bars = cached_bars_1h.get("GBPUSD") or []
+                        uj_bars = cached_bars_1h.get("USDJPY") or []
+                        gu_chg_pct = ((gu_bars[-1].close - gu_bars[-4].close) / gu_bars[-4].close) * 100.0 if (len(gu_bars) >= 4 and gu_bars[-4].close > 0) else 0.0
+                        uj_chg_pct = ((uj_bars[-1].close - uj_bars[-4].close) / uj_bars[-4].close) * 100.0 if (len(uj_bars) >= 4 and uj_bars[-4].close > 0) else 0.0
+                        if (direction == CandidateDirection.BUY and gu_chg_pct < -0.15) or (direction == CandidateDirection.SELL and gu_chg_pct > 0.15):
+                            v32_spec_passed = False
+                            v32_spec_desc = f"Apex Fiber SMT Divergence Veto: GBP/USD ({gu_chg_pct:+.2f}%) diverging against {direction.value} EUR/USD (isolated Fiber stop-hunt)."
+                        elif (direction == CandidateDirection.BUY and uj_chg_pct > 0.20) or (direction == CandidateDirection.SELL and uj_chg_pct < -0.20):
+                            v32_spec_passed = False
+                            v32_spec_desc = f"Apex Fiber Broad-USD Contradiction Veto: USD/JPY ({uj_chg_pct:+.2f}%) broad USD wave opposes {direction.value} EUR/USD."
+                        else:
+                            v32_spec_desc = f"Apex Fiber Dual SMT/USD Lock Confirmed: GBP/USD ({gu_chg_pct:+.2f}%) & USD/JPY ({uj_chg_pct:+.2f}%) aligned with {direction.value} EUR/USD."
+                    # 4. strat-006 Zero-Loss Body Displacement (>=45%) & RVol >= 1.8x Gate (strat-004, strat-017, strat-019..029)
+                    if v32_spec_passed and sid_val in ("strat-004", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028", "strat-029"):
                         last_bar = candles_1h[-1]
                         bar_range = max(last_bar.high - last_bar.low, 1e-9)
                         body_ratio = abs(last_bar.close - last_bar.open) / bar_range

@@ -78,12 +78,13 @@ def _quote(symbol: str, px: float, spread: float = 0.0001) -> MarketQuoteRespons
 
 def test_1_registration_and_isolation():
     strats = {s.id: s for s in strategy_engine.get_strategies()}
-    assert len(strats) >= 28, f"Expected >= 28 strategies, got {len(strats)}"
+    assert len(strats) >= 29, f"Expected >= 29 strategies, got {len(strats)}"
     for sid, expected_sym in [
         ("strat-025", "GBP/USD"),
         ("strat-026", "GBP/JPY"),
         ("strat-027", "USD/JPY"),
         ("strat-028", "AUD/USD"),
+        ("strat-029", "EUR/USD"),
     ]:
         assert sid in strats, f"Missing {sid}"
         s = strats[sid]
@@ -101,7 +102,7 @@ def test_1_registration_and_isolation():
     assert strats["strat-006"].preferredSessions == ["London", "Frankfurt", "London-NY Overlap"]
     assert strats["strat-024"].symbol == "XAU/USD"
     assert strats["strat-024"].minimumRiskReward == 1.2
-    print("Test 1 PASS: All 4 Apex FX Velocity Scalpers registered cleanly; strat-006 & strat-024 isolated!")
+    print("Test 1 PASS: All 5 Apex FX Velocity Scalpers (strat-025..029) registered cleanly; strat-006 & strat-024 isolated!")
 
 
 def test_2_pair_specific_killzones():
@@ -121,7 +122,12 @@ def test_2_pair_specific_killzones():
     assert is_in_apex_killzone("strat-028", datetime(2026, 11, 18, 2, 0, tzinfo=timezone.utc))[0] is True    # Sydney/Tokyo Peak
     assert is_in_apex_killzone("strat-028", datetime(2026, 11, 18, 8, 30, tzinfo=timezone.utc))[0] is True   # London Open
     assert is_in_apex_killzone("strat-028", datetime(2026, 11, 18, 18, 0, tzinfo=timezone.utc))[0] is False  # Rollover dead zone
-    print("Test 2 PASS: All pair-specific institutional killzones verified!")
+
+    assert is_in_apex_killzone("strat-029", datetime(2026, 11, 18, 7, 30, tzinfo=timezone.utc))[0] is True   # Frankfurt/London Open
+    assert is_in_apex_killzone("strat-029", datetime(2026, 11, 18, 13, 30, tzinfo=timezone.utc))[0] is True  # NY Overlap Peak
+    assert is_in_apex_killzone("strat-029", datetime(2026, 11, 18, 5, 30, tzinfo=timezone.utc))[0] is False  # Pre-Frankfurt dead
+    assert is_in_apex_killzone("strat-029", datetime(2026, 11, 18, 16, 38, tzinfo=timezone.utc))[0] is False # Late-NY trap blocked!
+    print("Test 2 PASS: All pair-specific institutional killzones (including strat-029 EUR/USD) verified!")
 
 
 def test_3_calibrated_scalp_stop_geometry_and_rr():
@@ -131,6 +137,7 @@ def test_3_calibrated_scalp_stop_geometry_and_rr():
         ("strat-026", "GBP/JPY", 205.00, 0.60, 0.14, 0.28),
         ("strat-027", "USD/JPY", 155.00, 0.45, 0.10, 0.20),
         ("strat-028", "AUD/USD", 0.6700, 0.0030, 0.0007, 0.0015),
+        ("strat-029", "EUR/USD", 1.1000, 0.0030, 0.0007, 0.0014),
     ]
     for sid, sym, px, atr, min_sl, max_sl in cases:
         ep, sl, tp = engine._calculate_trade_levels(
@@ -225,12 +232,13 @@ def test_5_fast_065r_breakeven_and_scaleout_for_all_apex_fx_scalpers():
         resolver = SignalOutcomeResolver()
         now = datetime.now(timezone.utc)
 
-        # Verify strat-025 (GBP/USD) and strat-028 (AUD/USD) hit +0.65R BE lock & bank +0.33R on reversal
+        # Verify strat-025..029 hit +0.65R BE lock & bank +0.33R on reversal
         for sid, sym, ep, sl, tp, reach_px in [
             ("strat-025", "GBP/USD", 1.3200, 1.3190, 1.32125, 1.32070),  # +0.70R reach
             ("strat-026", "GBP/JPY", 205.00, 204.80, 205.25, 205.14),    # +0.70R reach
             ("strat-027", "USD/JPY", 155.00, 154.85, 155.188, 155.11),   # +0.73R reach
             ("strat-028", "AUD/USD", 0.6700, 0.6690, 0.67125, 0.67070),  # +0.70R reach
+            ("strat-029", "EUR/USD", 1.1000, 1.0990, 1.10125, 1.10070),  # +0.70R reach
         ]:
             trade = trade_journal_repository.create_trade(
                 TradeJournalCreate(
@@ -271,9 +279,73 @@ def test_5_fast_065r_breakeven_and_scaleout_for_all_apex_fx_scalpers():
             assert closed.result == "BREAKEVEN", f"{sid}: expected BREAKEVEN, got {closed.result}"
             assert closed.realizedRMultiple == 0.33, f"{sid}: expected +0.33R banked, got {closed.realizedRMultiple}"
             assert closed.profitLoss == 3.30
-        print("Test 5 PASS: All 4 Apex FX Scalpers (+0.65R BE & 50% scale-out -> +0.33R banked) verified in OutcomeResolver!")
+        print("Test 5 PASS: All 5 Apex FX Scalpers (+0.65R BE & 50% scale-out -> +0.33R banked) verified in OutcomeResolver!")
     finally:
         trade_journal_repository._storage = original_storage
+
+
+def test_6_strat029_fiber_dual_smt_and_broad_usd_vetoes():
+    engine = SignalGenerationEngine()
+    strats = {s.id: s for s in strategy_engine.get_strategies()}
+    t_frankfurt = datetime(2026, 11, 18, 7, 30, 0, tzinfo=timezone.utc)
+
+    # Bullish EUR/USD with Bullish IFVG inversion candle (>=45% body & RVol >= 1.8x)
+    eu_bars = _make_bars(1.0950, +0.0002, count=45, base_vol=500.0, last_vol=500.0)
+    last_px = eu_bars[-1].close
+    base_ts = eu_bars[-1].timestamp
+    eu_bars.append(CandleBar(open=last_px, high=last_px + 0.0002, low=last_px - 0.0002, close=last_px - 0.0001, volume=500, timestamp=base_ts + 3600, time=datetime.fromtimestamp(base_ts + 3600, tz=timezone.utc)))
+    eu_bars.append(CandleBar(open=last_px - 0.0001, high=last_px, low=last_px - 0.0010, close=last_px - 0.0008, volume=600, timestamp=base_ts + 7200, time=datetime.fromtimestamp(base_ts + 7200, tz=timezone.utc)))
+    eu_bars.append(CandleBar(open=last_px - 0.0008, high=last_px - 0.0005, low=last_px - 0.0012, close=last_px - 0.0006, volume=550, timestamp=base_ts + 10800, time=datetime.fromtimestamp(base_ts + 10800, tz=timezone.utc)))
+    eu_bars.append(CandleBar(open=last_px - 0.0006, high=last_px + 0.0012, low=last_px - 0.0007, close=last_px + 0.0010, volume=1500, timestamp=base_ts + 14400, time=datetime.fromtimestamp(base_ts + 14400, tz=timezone.utc)))
+
+    gu_bull = _make_bars(1.3100, +0.0004, count=50)
+    gu_dump = _make_bars(1.3200, -0.0020, count=50)
+    uj_bear = _make_bars(155.00, -0.05, count=50)
+    uj_surge = _make_bars(154.00, +0.25, count=50)
+
+    def _bars_factory(gu_series, uj_series):
+        def _fn(sym, timeframe="1h", limit=120):
+            if sym == "EURUSD":
+                return eu_bars
+            if sym == "GBPUSD":
+                return gu_series
+            if sym == "USDJPY":
+                return uj_series
+            return _make_bars(3850.0 if "XAU" in sym else 0.6700, 0.0, count=50)
+        return _fn
+
+    m_state = MarketState(
+        timestamp=t_frankfurt,
+        session="London",
+        volatility="High",
+        marketSentimentLabel="Bullish",
+        overallMarketConfidence=85,
+        dataAgeSeconds=5,
+        prices={"EURUSD": MarketPrice(symbol="EURUSD", currentPrice=last_px + 0.0010, bid=last_px + 0.0009, ask=last_px + 0.0010, spread=0.6, timestamp=t_frankfurt, provider="oanda")},
+        indicators={},
+        calendar=[],
+    )
+    s29 = strats["strat-029"].model_copy(deep=True)
+    s29.status = StrategyStatus.ACTIVE
+
+    # Case A: GBP/USD bull & USD/JPY bear -> PASS Dual Fiber SMT/USD Lock
+    with patch("app.core.services.market_history_service.market_history_service.get_bars", side_effect=_bars_factory(gu_bull, uj_bear)):
+        c_ok = engine.generate_candidates(market_state=m_state, strategies=[s29], as_of=t_frankfurt)[0]
+    spec_ok = next(c for c in c_ok.conditions if c.title == "v3.2 Anti-Fakeout & Specialization Gate")
+    assert spec_ok.passed is True, f"Expected Fiber Dual Lock PASS, got: {spec_ok.description}"
+
+    # Case B: GBP/USD dumping -> VETO SMT Divergence
+    with patch("app.core.services.market_history_service.market_history_service.get_bars", side_effect=_bars_factory(gu_dump, uj_bear)):
+        c_smt = engine.generate_candidates(market_state=m_state, strategies=[s29], as_of=t_frankfurt)[0]
+    spec_smt = next(c for c in c_smt.conditions if c.title == "v3.2 Anti-Fakeout & Specialization Gate")
+    assert spec_smt.passed is False and "Apex Fiber SMT Divergence Veto" in spec_smt.description
+
+    # Case C: USD/JPY surging (broad USD wave) -> VETO Broad-USD Contradiction
+    with patch("app.core.services.market_history_service.market_history_service.get_bars", side_effect=_bars_factory(gu_bull, uj_surge)):
+        c_usd = engine.generate_candidates(market_state=m_state, strategies=[s29], as_of=t_frankfurt)[0]
+    spec_usd = next(c for c in c_usd.conditions if c.title == "v3.2 Anti-Fakeout & Specialization Gate")
+    assert spec_usd.passed is False and "Apex Fiber Broad-USD Contradiction Veto" in spec_usd.description
+    print("Test 6 PASS: strat-029 EUR/USD Dual Fiber SMT (GBP/USD) & Broad-USD (USD/JPY) vetoes verified!")
 
 
 if __name__ == "__main__":
@@ -282,4 +354,5 @@ if __name__ == "__main__":
     test_3_calibrated_scalp_stop_geometry_and_rr()
     test_4_ifvg_trap_flip_and_cross_asset_divergence_vetoes()
     test_5_fast_065r_breakeven_and_scaleout_for_all_apex_fx_scalpers()
-    print("ALL APEX INSTITUTIONAL FX VELOCITY SCALP TESTS PASSED!")
+    test_6_strat029_fiber_dual_smt_and_broad_usd_vetoes()
+    print("ALL APEX INSTITUTIONAL FX VELOCITY SCALP TESTS (STRAT-025..029) PASSED!")

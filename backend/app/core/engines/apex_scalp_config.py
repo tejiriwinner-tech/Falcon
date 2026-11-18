@@ -38,14 +38,16 @@ VELOCITY_SCALP_STRATEGY_IDS: FrozenSet[str] = frozenset({
     "strat-026",
     "strat-027",
     "strat-028",
+    "strat-029",
 })
 
-# The 4 FX Apex Institutional Velocity Scalpers (strat-024 stays on its dedicated Gold path)
+# The 5 FX Apex Institutional Velocity Scalpers (strat-024 stays on its dedicated Gold path)
 APEX_FX_SCALP_IDS: FrozenSet[str] = frozenset({
     "strat-025",
     "strat-026",
     "strat-027",
     "strat-028",
+    "strat-029",
 })
 
 APEX_FX_SCALP_CONFIG: Dict[str, ApexScalpSpec] = {
@@ -108,6 +110,21 @@ APEX_FX_SCALP_CONFIG: Dict[str, ApexScalpSpec] = {
         rr_target=1.25,
         be_r_mult=0.65,
         macro_shield="GOLD_DXY_LOCK",
+    ),
+    "strat-029": ApexScalpSpec(
+        strategy_id="strat-029",
+        symbol="EUR/USD",
+        canonical_symbol="EURUSD",
+        display_name="EUR/USD Fiber Frankfurt-NY Velocity Scalp",
+        # 06:45-10:30 UTC (Frankfurt/London Open Judas Swing & Repricing) & 12:30-15:30 UTC (NY Open / Overlap Peak)
+        killzones_utc=((405, 630), (750, 930)),
+        killzone_label="06:45-10:30 & 12:30-15:30 UTC",
+        max_spread_pips=1.0,
+        min_sl_dist=0.0007,  # 7 pips
+        max_sl_dist=0.0014,  # 14 pips
+        rr_target=1.25,
+        be_r_mult=0.65,
+        macro_shield="FIBER_SMT_USD_LOCK",
     ),
 }
 
