@@ -25,11 +25,20 @@ class Settings:
     # Application metadata
     PROJECT_NAME: str = "Falcon Intelligence Platform"
     VERSION: str = "4.2.0"
-    ENVIRONMENT: str = "development"
+    ENVIRONMENT: str = os.getenv("ENVIRONMENT", "development")
     API_V1_STR: str = "/api/v1"
 
     # Debug & logging
-    DEBUG_MODE: bool = True
+    DEBUG_MODE: bool = os.getenv("DEBUG_MODE", "True").lower() == "true"
+
+    # DATA PRESERVATION: archived missions & artifacts are never auto-deleted unless explicitly enabled.
+    ENABLE_MISSION_AUTO_PRUNE: bool = os.getenv("ENABLE_MISSION_AUTO_PRUNE", "false").lower() == "true"
+
+    # Capital Guardian daily-loss / max-drawdown circuit breaker (uses DAILY_LOSS_LIMIT_PCT & MAX_DRAWDOWN_PAUSE_PCT)
+    ENABLE_DRAWDOWN_CIRCUIT_BREAKER: bool = os.getenv("ENABLE_DRAWDOWN_CIRCUIT_BREAKER", "true").lower() == "true"
+
+    # Phase 4 API-key enforcement (opt-in until FALCON_API_KEY is rolled out to Fly.io, mobile & MT5)
+    REQUIRE_API_KEY: bool = os.getenv("REQUIRE_API_KEY", "false").lower() == "true"
     
     # Financial Modeling Prep — economic calendar & fallback quotes
     FMP_BASE_URL: str = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com/stable")

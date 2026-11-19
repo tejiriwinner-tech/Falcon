@@ -271,6 +271,10 @@ class FmpProvider(BaseProvider):
     def circuit_breaker_state(self) -> str:
         """Return current circuit breaker state string."""
         with self._cb_lock:
+            if self._cb_state == _CB_OPEN and self._cb_opened_at is not None:
+                elapsed = time.monotonic() - self._cb_opened_at
+                if elapsed >= CIRCUIT_BREAKER_COOLDOWN_SECONDS:
+                    self._cb_state = _CB_HALF_OPEN
             return self._cb_state
 
     def _cb_seconds_until_retry(self) -> Optional[float]:
@@ -296,9 +300,8 @@ class FmpProvider(BaseProvider):
                 self._is_trial_request = False
                 return False
             if self._cb_state == _CB_HALF_OPEN:
-                # Allow exactly one trial; set state back to OPEN to block
-                # concurrent callers until the trial resolves.
-                self._cb_state = _CB_OPEN
+                if self._is_trial_request:
+                    return True
                 self._is_trial_request = True
                 return False  # let this caller through as the trial
             # _CB_OPEN — check cooldown
@@ -309,7 +312,6 @@ class FmpProvider(BaseProvider):
             if elapsed >= CIRCUIT_BREAKER_COOLDOWN_SECONDS:
                 # Cooldown elapsed — grant one trial
                 self._cb_state = _CB_HALF_OPEN
-                self._cb_state = _CB_OPEN   # lock the door for concurrent callers
                 self._is_trial_request = True
                 self._print_event("CircuitBreakerHalfOpen",
                                   "Cooldown elapsed — allowing trial request")
@@ -455,7 +457,22 @@ class FmpProvider(BaseProvider):
             was_trial = self._is_trial_request
             self._is_trial_request = False
 
-            if self._consecutive_failures >= CIRCUIT_BREAKER_FAILURE_THRESHOLD:
+            if was_trial or self._cb_state == _CB_HALF_OPEN:
+                self._cb_state = _CB_OPEN
+                self._cb_opened_at = time.monotonic()
+                self._circuit_open_count += 1
+                if is_429:
+                    reason = "HTTP 429 rate limit"
+                elif is_timeout:
+                    reason = "timeout"
+                else:
+                    reason = "upstream failure"
+                self._print_event(
+                    "CircuitBreakerReopened",
+                    f"Trial request failed — circuit reopened ({reason}). "
+                    f"Cooldown: {CIRCUIT_BREAKER_COOLDOWN_SECONDS}s",
+                )
+            elif self._consecutive_failures >= CIRCUIT_BREAKER_FAILURE_THRESHOLD:
                 if self._cb_state != _CB_OPEN:
                     self._cb_state = _CB_OPEN
                     self._cb_opened_at = time.monotonic()
@@ -470,20 +487,6 @@ class FmpProvider(BaseProvider):
                         "CircuitBreakerOpen",
                         f"Circuit opened after {self._consecutive_failures} consecutive "
                         f"failures ({reason}). Cooldown: {CIRCUIT_BREAKER_COOLDOWN_SECONDS}s",
-                    )
-                elif was_trial:
-                    self._cb_opened_at = time.monotonic()
-                    self._circuit_open_count += 1
-                    if is_429:
-                        reason = "HTTP 429 rate limit"
-                    elif is_timeout:
-                        reason = "timeout"
-                    else:
-                        reason = "upstream failure"
-                    self._print_event(
-                        "CircuitBreakerReopened",
-                        f"Trial request failed — circuit reopened ({reason}). "
-                        f"Cooldown: {CIRCUIT_BREAKER_COOLDOWN_SECONDS}s",
                     )
                 else:
                     self._cb_opened_at = time.monotonic()

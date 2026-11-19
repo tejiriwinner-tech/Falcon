@@ -10,6 +10,7 @@ class DashboardController extends ChangeNotifier {
   String? _error;
   bool _isLoading = true;
   bool _isOffline = false;
+  bool _disposed = false;
   Timer? _timer;
 
   DashboardController({required ApiService apiService}) : _apiService = apiService;
@@ -18,6 +19,11 @@ class DashboardController extends ChangeNotifier {
   String? get error => _error;
   bool get isLoading => _isLoading;
   bool get isOffline => _isOffline;
+
+  void _safeNotify() {
+    if (_disposed) return;
+    notifyListeners();
+  }
 
   void startPolling() {
     _fetchData();
@@ -33,15 +39,15 @@ class DashboardController extends ChangeNotifier {
 
   Future<void> refresh() async {
     _isLoading = true;
-    notifyListeners();
-    await _fetchData();
+    _safeNotify();
+    await _fetchData(forceRefresh: true);
   }
 
-  Future<void> _fetchData() async {
+  Future<void> _fetchData({bool forceRefresh = false}) async {
     try {
       debugPrint("Fetching dashboard data...");
       _isOffline = false;
-      final newData = await _apiService.getDashboard();
+      final newData = await _apiService.getDashboard(forceRefresh: forceRefresh);
       _data = newData;
       _error = null;
       debugPrint("Dashboard data fetched successfully");
@@ -78,12 +84,13 @@ class DashboardController extends ChangeNotifier {
       if (_isLoading) {
         _isLoading = false;
       }
-      notifyListeners();
+      _safeNotify();
     }
   }
 
   @override
   void dispose() {
+    _disposed = true;
     stopPolling();
     super.dispose();
   }

@@ -1,6 +1,7 @@
+from collections import deque
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timezone
-from typing import List, Optional
+from typing import Deque, List, Optional
 from app.core.analytics.canonical_analytics_service import canonical_analytics_service
 from app.core.analytics.execution_divergence_service import execution_divergence_service
 from app.core.analytics.execution_quality_service import execution_quality_service
@@ -39,7 +40,7 @@ from app.schemas.research_promotion import ResearchPromotionResponse
 router = APIRouter(prefix="/analytics", tags=["analytics"])
 
 _analytics_engine = PerformanceAnalyticsEngine()
-_reports_store: List[AnalyticsReport] = []
+_reports_store: Deque[AnalyticsReport] = deque(maxlen=50)
 
 
 @router.get("/canonical", response_model=CanonicalAnalyticsResponse)

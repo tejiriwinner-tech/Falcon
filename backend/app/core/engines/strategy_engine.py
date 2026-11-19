@@ -181,7 +181,7 @@ class StrategyEngine:
         for s in self._strategies:
             if s.id.lower() == sid or s.name.lower() == sid:
                 self.__class__._paused_strategy_ids.add(s.id)
-                self.__class__._status_overrides[s.id.lower()] = StrategyStatus.INCUBATION
+                self.__class__._status_overrides[s.id.lower()] = StrategyStatus.PAUSED
                 self._save_persisted_status()
                 self.invalidate_cache()
                 out = s.model_copy(deep=True)
@@ -225,6 +225,9 @@ class StrategyEngine:
         ]
         for sid in affected:
             self.__class__._paused_strategy_ids.add(sid)
+            self.__class__._status_overrides[sid.lower()] = StrategyStatus.PAUSED
+        self._save_persisted_status()
+        self.invalidate_cache()
         return affected
 
     def resume_symbol(self, symbol: str) -> List[str]:
@@ -239,6 +242,9 @@ class StrategyEngine:
         ]
         for sid in affected:
             self.__class__._paused_strategy_ids.discard(sid)
+            self.__class__._status_overrides[sid.lower()] = StrategyStatus.ACTIVE
+        self._save_persisted_status()
+        self.invalidate_cache()
         return affected
 
     def pause_expansion_strategies(self) -> List[str]:
@@ -246,6 +252,9 @@ class StrategyEngine:
         self.__class__._expansion_paused = True
         for sid in EXPANSION_STRATEGY_IDS:
             self.__class__._paused_strategy_ids.add(sid)
+            self.__class__._status_overrides[sid.lower()] = StrategyStatus.PAUSED
+        self._save_persisted_status()
+        self.invalidate_cache()
         return sorted(EXPANSION_STRATEGY_IDS)
 
     def resume_expansion_strategies(self) -> List[str]:
@@ -253,8 +262,11 @@ class StrategyEngine:
         self.__class__._expansion_paused = False
         for sid in EXPANSION_STRATEGY_IDS:
             self.__class__._paused_strategy_ids.discard(sid)
+            self.__class__._status_overrides[sid.lower()] = StrategyStatus.ACTIVE
         for sym in ("USDJPY", "GBPJPY", "AUDUSD"):
             self.__class__._paused_symbols.discard(sym)
+        self._save_persisted_status()
+        self.invalidate_cache()
         return sorted(EXPANSION_STRATEGY_IDS)
 
     def toggle_strategy_status(self, strategy_id: str) -> Optional[StrategyItem]:

@@ -157,7 +157,12 @@ class LearningInsightEngine:
             counter += 1
 
         # ---- Pattern 3: Repeated WAIT decisions ----
-        wait_decisions = [d for d in all_decisions if "WAIT" in str(d.status).upper() or "WAIT" in str(getattr(d, 'action', '')).upper()]
+        wait_decisions = [
+            d for d in all_decisions
+            if "WAIT" in str(getattr(d, "recommendation", "")).upper()
+            or "WAIT" in str(d.status).upper()
+            or "WAIT" in str(getattr(d, "action", "")).upper()
+        ]
         if not wait_decisions:
             # Fallback: check direction
             wait_decisions = [d for d in all_decisions if "WAIT" in str(getattr(d, 'recommendedAction', '')).upper()]

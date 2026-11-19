@@ -23,6 +23,40 @@ from app.core.services.session_budget_manager import session_budget_manager
 
 OANDA_PROVIDER = "OANDA"
 
+_CANONICAL_TIMEFRAME_MAP = {
+    "1m": "1m",
+    "1min": "1m",
+    "m1": "1m",
+    "5m": "5m",
+    "5min": "5m",
+    "m5": "5m",
+    "15m": "15m",
+    "15min": "15m",
+    "m15": "15m",
+    "30m": "30m",
+    "30min": "30m",
+    "m30": "30m",
+    "1h": "1h",
+    "60min": "1h",
+    "h1": "1h",
+    "2h": "2h",
+    "h2": "2h",
+    "4h": "4h",
+    "h4": "4h",
+    "1d": "1d",
+    "d1": "1d",
+    "daily": "1d",
+    "d": "1d",
+}
+
+
+def _canonical_timeframe(tf: Optional[str]) -> str:
+    if not tf:
+        return "1h"
+    cleaned = tf.strip().lower()
+    return _CANONICAL_TIMEFRAME_MAP.get(cleaned, cleaned)
+
+
 _OANDA_GRANULARITY = {
     "1m": "M1",
     "5m": "M5",
@@ -94,6 +128,7 @@ class MarketHistoryService:
         self._lock = threading.Lock()
         self._memory: Dict[Tuple[str, str, datetime], PriceBar] = {}
         self._last_refresh: Dict[Tuple[str, str], float] = {}
+        self._last_forced_refresh: Dict[str, float] = {}
         self._bars_cache: Dict[Tuple[str, str, int], Tuple[float, List[PriceBar]]] = {}
         self.last_error: Optional[str] = None
 
@@ -102,13 +137,14 @@ class MarketHistoryService:
     # ------------------------------------------------------------------
 
     def _fetch_oanda(self, symbol: str, timeframe: str, limit: int) -> List[PriceBar]:
+        timeframe = _canonical_timeframe(timeframe)
         if not settings.OANDA_API_KEY:
             return []
         try:
             from app.core.providers import _oanda_provider
             if not _oanda_provider.configured:
                 return []
-            granularity = _OANDA_GRANULARITY.get(timeframe.lower(), "H1")
+            granularity = _OANDA_GRANULARITY.get(timeframe, _OANDA_GRANULARITY.get(timeframe.lower(), "H1"))
             candles = _oanda_provider.fetch_candles(symbol, granularity=granularity, count=limit)
         except Exception as exc:
             self.last_error = f"OANDA candles error: {exc}"
@@ -146,11 +182,28 @@ class MarketHistoryService:
         if not bars:
             return 0
         stored_at = datetime.now(timezone.utc)
+        deduped_bars: Dict[Tuple[str, str, datetime], PriceBar] = {}
+        for bar in bars:
+            canon_tf = _canonical_timeframe(bar.timeframe)
+            norm_bar = PriceBar(
+                symbol=bar.symbol,
+                timeframe=canon_tf,
+                bar_time=bar.bar_time,
+                open=bar.open,
+                high=bar.high,
+                low=bar.low,
+                close=bar.close,
+                volume=bar.volume,
+                provider=bar.provider,
+            )
+            deduped_bars[(norm_bar.symbol, norm_bar.timeframe, norm_bar.bar_time)] = norm_bar
+        unique_bars = list(deduped_bars.values())
         if not database_enabled():
             with self._lock:
-                for bar in bars:
-                    self._memory[(bar.symbol, bar.timeframe, bar.bar_time)] = bar
-            return len(bars)
+                for key, bar in deduped_bars.items():
+                    self._memory[key] = bar
+                self._bars_cache.clear()
+            return len(unique_bars)
         rows = [
             {
                 "symbol": bar.symbol,
@@ -164,7 +217,7 @@ class MarketHistoryService:
                 "provider": bar.provider,
                 "stored_at": stored_at,
             }
-            for bar in bars
+            for bar in unique_bars
         ]
         statement = pg_insert(PriceBarRecord).values(rows)
         statement = statement.on_conflict_do_update(
@@ -212,14 +265,25 @@ class MarketHistoryService:
             "4h": 18000,    # 5h
             "1d": 90000,    # 25h
         }
-        threshold = tf_thresholds.get(timeframe.lower(), 600)
+        canon_tf = _canonical_timeframe(timeframe)
+        threshold = tf_thresholds.get(canon_tf, 600)
         return age > threshold
+
+    def _can_force_refresh(self, symbol: str, timeframe: str, cooldown_seconds: float = 30.0) -> bool:
+        key = f"{symbol}:{timeframe}"
+        now_mono = time.monotonic()
+        with self._lock:
+            last_forced = self._last_forced_refresh.get(key)
+            if last_forced is not None and (now_mono - last_forced) < cooldown_seconds:
+                return False
+            self._last_forced_refresh[key] = now_mono
+            return True
 
     def get_bars(self, symbol: str, timeframe: Optional[str] = None, limit: int = 200) -> List[PriceBar]:
         """Returns stored bars oldest-first."""
         canonical_symbol = symbol_mapper.normalize(symbol) or symbol.replace("/", "").replace("_", "").replace("-", "").strip().upper()
         symbol = canonical_symbol
-        timeframe = timeframe or settings.HISTORY_TIMEFRAME
+        timeframe = _canonical_timeframe(timeframe or settings.HISTORY_TIMEFRAME)
         cache_key = (symbol, timeframe, limit)
         now_mono = time.monotonic()
         with self._lock:
@@ -234,17 +298,17 @@ class MarketHistoryService:
                 bars = [
                     bar
                     for (sym, tf, _), bar in self._memory.items()
-                    if sym == symbol and tf == timeframe
+                    if sym == symbol and _canonical_timeframe(tf) == timeframe
                 ]
             result = sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
             is_stale = not result or self._is_candle_stale(result[-1].bar_time, timeframe)
-            if not result or len(result) < min(limit, 20) or is_stale:
+            if (not result or len(result) < min(limit, 20) or is_stale) and self._can_force_refresh(symbol, timeframe):
                 self.refresh_symbol(symbol, timeframe, force=True, bypass_budget=True)
                 with self._lock:
                     bars = [
                         bar
                         for (sym, tf, _), bar in self._memory.items()
-                        if sym == symbol and tf == timeframe
+                        if sym == symbol and _canonical_timeframe(tf) == timeframe
                     ]
                 result = sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
             with self._lock:
@@ -274,7 +338,7 @@ class MarketHistoryService:
             for record in reversed(records)
         ]
         is_stale = not result or self._is_candle_stale(result[-1].bar_time, timeframe)
-        if not result or len(result) < min(limit, 20) or is_stale:
+        if (not result or len(result) < min(limit, 20) or is_stale) and self._can_force_refresh(symbol, timeframe):
             # On-demand backfill/refresh so clients (charting, SMC) always receive full, live candle series
             self.refresh_symbol(symbol, timeframe, force=True, bypass_budget=True)
             if not database_enabled():
@@ -282,7 +346,7 @@ class MarketHistoryService:
                     bars = [
                         bar
                         for (sym, tf, _), bar in self._memory.items()
-                        if sym == symbol and tf == timeframe
+                        if sym == symbol and _canonical_timeframe(tf) == timeframe
                     ]
                 result = sorted(bars, key=lambda bar: bar.bar_time)[-limit:]
             else:
@@ -335,7 +399,7 @@ class MarketHistoryService:
         if not bypass_budget and not session_budget_manager.can_consume_call():
             return 0
 
-        timeframe = timeframe or settings.HISTORY_TIMEFRAME
+        timeframe = _canonical_timeframe(timeframe or settings.HISTORY_TIMEFRAME)
         limit = settings.HISTORY_BAR_LIMIT
         key = (symbol, timeframe)
         with self._lock:

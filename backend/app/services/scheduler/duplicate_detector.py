@@ -57,7 +57,7 @@ class DuplicateDetector:
                 continue
             
             # Check entry price tolerance
-            if not self._is_entry_within_tolerance(new_signal.entryPrice, existing.entryPrice):
+            if not self._is_entry_within_tolerance(new_signal.entryPrice, existing.entryPrice, new_signal.symbol):
                 continue
             
             # Check time window
@@ -74,19 +74,22 @@ class DuplicateDetector:
         
         return False, None
     
-    def _is_entry_within_tolerance(self, new_entry: float, existing_entry: float) -> bool:
+    def _is_entry_within_tolerance(self, new_entry: float, existing_entry: float, symbol: str = "") -> bool:
         """
         Check if entry prices are within the configured tolerance.
         
         Args:
             new_entry: Entry price of new signal
             existing_entry: Entry price of existing signal
+            symbol: Trading symbol for pip size calculation
             
         Returns:
             True if prices are within tolerance
         """
+        sym = (symbol or "").upper()
+        pip_size = 0.01 if "JPY" in sym else (0.10 if ("XAU" in sym or "GOLD" in sym) else 0.0001)
         price_diff = abs(new_entry - existing_entry)
-        return price_diff <= self.entry_tolerance_pips
+        return price_diff <= self.entry_tolerance_pips * pip_size
     
     def _is_within_time_window(self, new_time: datetime, existing_time: datetime) -> bool:
         """

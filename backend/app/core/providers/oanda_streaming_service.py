@@ -46,6 +46,7 @@ class OandaStreamingService:
         self._lock = threading.Lock()
         self._listeners: List[Callable[[str, float, float, float, datetime], None]] = []
         self._last_heartbeat: float = 0.0
+        self._max_backoff: float = 15.0
 
     @property
     def configured(self) -> bool:
@@ -113,10 +114,9 @@ class OandaStreamingService:
                             response.status_code, response.text, backoff
                         )
                         time.sleep(backoff)
-                        backoff = min(backoff * 2.0, 15.0)
+                        backoff = min(backoff * 2.0, self._max_backoff)
                         continue
 
-                    backoff = 1.0  # Reset backoff upon successful connection
                     self._last_heartbeat = time.time()
 
                     for line in response.iter_lines():
@@ -130,11 +130,17 @@ class OandaStreamingService:
                             msg_type = msg.get("type")
 
                             if msg_type == "HEARTBEAT":
+                                backoff = 1.0
                                 self._last_heartbeat = time.time()
                             elif msg_type == "PRICE":
+                                backoff = 1.0
                                 self._process_price_tick(msg)
                         except Exception as parse_err:
                             logger.debug("[OANDA Stream] Line parse error: %s", parse_err)
+
+                    if self._running:
+                        time.sleep(backoff)
+                        backoff = min(backoff * 2.0, self._max_backoff)
 
             except Exception as conn_err:
                 if not self._running:
@@ -144,7 +150,7 @@ class OandaStreamingService:
                     conn_err, backoff
                 )
                 time.sleep(backoff)
-                backoff = min(backoff * 2.0, 15.0)
+                backoff = min(backoff * 2.0, self._max_backoff)
 
     def _process_price_tick(self, msg: Dict[str, Any]) -> None:
         """Process incoming price payload and dispatch to memory cache and listeners."""

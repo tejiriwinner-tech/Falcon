@@ -6,7 +6,7 @@ router = APIRouter()
 _engine = MarketStateEngine()
 
 @router.get("/market-state", response_model=MarketState, tags=["market_state"])
-async def get_market_state():
+def get_market_state():
     """
     Returns the unified MarketState aggregated from all registered providers.
     """

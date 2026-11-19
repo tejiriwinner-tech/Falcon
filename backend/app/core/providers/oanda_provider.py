@@ -162,6 +162,14 @@ class OandaProvider(BaseProvider):
                 return True
             return False
 
+    def _cb_seconds_until_retry(self) -> float:
+        with self._cb_lock:
+            if self._cb_state != _CB_OPEN or self._cb_opened_at is None:
+                return 0.0
+            elapsed = time.monotonic() - self._cb_opened_at
+            remaining = CIRCUIT_BREAKER_COOLDOWN_SECONDS - elapsed
+            return max(0.0, round(remaining, 1))
+
     def _cb_record_success(self) -> None:
         with self._cb_lock:
             self._consecutive_failures = 0
@@ -170,12 +178,14 @@ class OandaProvider(BaseProvider):
                 self._cb_state = _CB_CLOSED
                 self._cb_opened_at = None
 
-    def _cb_record_failure(self, is_429: bool = False) -> None:
+    def _cb_record_failure(self, is_429: bool = False, is_timeout: bool = False) -> None:
         with self._cb_lock:
             self._consecutive_failures += 1
             if is_429:
                 self._last_failure_was_429 = True
-            if self._consecutive_failures >= CIRCUIT_BREAKER_FAILURE_THRESHOLD:
+            elif is_timeout:
+                self._last_failure_was_429 = False
+            if self._consecutive_failures >= CIRCUIT_BREAKER_FAILURE_THRESHOLD or self._cb_state == _CB_HALF_OPEN:
                 self._cb_state = _CB_OPEN
                 self._cb_opened_at = time.monotonic()
                 self._circuit_open_count += 1
@@ -195,7 +205,15 @@ class OandaProvider(BaseProvider):
         return ProviderHealth.HEALTHY
 
     def get_metadata(self) -> ProviderMetadata:
-        st = ProviderStatus.ONLINE if (self.configured and self.circuit_breaker_state == _CB_CLOSED) else ProviderStatus.OFFLINE
+        cb = self.circuit_breaker_state
+        if not self.configured:
+            st = ProviderStatus.OFFLINE
+        elif cb == _CB_CLOSED:
+            st = ProviderStatus.ONLINE
+        elif cb == _CB_HALF_OPEN:
+            st = ProviderStatus.DEGRADED
+        else:
+            st = ProviderStatus.RATE_LIMITED if self._last_failure_was_429 else ProviderStatus.OFFLINE
         return ProviderMetadata(
             providerId=self.PROVIDER_ID,
             providerName=self.PROVIDER_NAME,
@@ -341,8 +359,12 @@ class OandaProvider(BaseProvider):
             norm = symbol_mapper.normalize(inst) or inst.replace("_", "").upper()
 
             # Bid and Ask
-            bid = float(p.get("closeoutBid") or (p.get("bids", [{}])[0].get("price", 0.0)))
-            ask = float(p.get("closeoutAsk") or (p.get("asks", [{}])[0].get("price", 0.0)))
+            bids_raw = p.get("bids") or []
+            asks_raw = p.get("asks") or []
+            first_bid = bids_raw[0].get("price", 0.0) if (bids_raw and isinstance(bids_raw[0], dict)) else 0.0
+            first_ask = asks_raw[0].get("price", 0.0) if (asks_raw and isinstance(asks_raw[0], dict)) else 0.0
+            bid = float(p.get("closeoutBid") or first_bid or 0.0)
+            ask = float(p.get("closeoutAsk") or first_ask or 0.0)
             if bid <= 0.0 or ask <= 0.0:
                 continue
 
@@ -431,10 +453,13 @@ class OandaProvider(BaseProvider):
             "Accept-Datetime-Format": "RFC3339",
         }
 
+        ob_ok = False
+        pb_ok = False
         try:
             ob_url = f"{self._base_url}/v3/instruments/{ticker}/orderBook"
             ob_resp = requests.get(ob_url, headers=headers, timeout=3.0)
             if ob_resp.status_code == 200:
+                ob_ok = True
                 ob_data = ob_resp.json().get("orderBook", {})
                 spot = float(ob_data.get("price", 0.0) or 0.0)
                 buckets = ob_data.get("buckets", []) or []
@@ -467,6 +492,8 @@ class OandaProvider(BaseProvider):
                     result["stopLossClusterAbovePct"] = best_above_pct
                     result["stopLossClusterBelow"] = best_below_price
                     result["stopLossClusterBelowPct"] = best_below_pct
+            elif ob_resp.status_code == 429:
+                self._cb_record_failure(is_429=True)
         except Exception as exc:
             logger.debug("[OANDA] OrderBook fetch skipped for %s: %s", canonical, exc)
 
@@ -474,6 +501,7 @@ class OandaProvider(BaseProvider):
             pb_url = f"{self._base_url}/v3/instruments/{ticker}/positionBook"
             pb_resp = requests.get(pb_url, headers=headers, timeout=3.0)
             if pb_resp.status_code == 200:
+                pb_ok = True
                 pb_data = pb_resp.json().get("positionBook", {})
                 buckets = pb_data.get("buckets", []) or []
                 if buckets:
@@ -488,8 +516,15 @@ class OandaProvider(BaseProvider):
                             result["contrarianBias"] = "BEARISH"
                         elif net_long_pct <= 40.0:
                             result["contrarianBias"] = "BULLISH"
+            elif pb_resp.status_code == 429:
+                self._cb_record_failure(is_429=True)
         except Exception as exc:
             logger.debug("[OANDA] PositionBook fetch skipped for %s: %s", canonical, exc)
+
+        if ob_ok or pb_ok:
+            self._cb_record_success()
+        else:
+            self._cb_record_failure()
 
         with self._cache_lock:
             self._order_book_cache[canonical] = result
@@ -526,6 +561,7 @@ class OandaProvider(BaseProvider):
         try:
             resp = requests.get(url, headers=headers, params=params, timeout=REQUEST_TIMEOUT_SECONDS)
             if resp.status_code == 200:
+                self._cb_record_success()
                 payload = resp.json()
                 raw_candles = payload.get("candles", [])
                 candles: List[Dict[str, Any]] = []
@@ -540,8 +576,16 @@ class OandaProvider(BaseProvider):
                         "volume": int(c.get("volume", 0)),
                     })
                 return candles
+            elif resp.status_code == 429:
+                self._cb_record_failure(is_429=True)
+            else:
+                self._cb_record_failure(is_429=False)
+        except requests.Timeout as exc:
+            logger.warning("[OANDA] Timeout fetching candles for %s: %s", symbol, exc)
+            self._cb_record_failure(is_timeout=True)
         except Exception as exc:
             logger.warning("[OANDA] Failed fetching candles for %s: %s", symbol, exc)
+            self._cb_record_failure(is_429=False)
 
         return None
 

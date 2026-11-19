@@ -49,14 +49,26 @@ class ApiService {
   static const int briefingTimeoutSeconds = 15;
   static const int copilotTimeoutSeconds = 30;
 
-  // Simple in-memory cache to reduce server load
+  // Simple in-memory cache to reduce server load (per-endpoint timestamps)
   static final Map<String, dynamic> _cache = {};
-  static DateTime? _lastCacheTime;
+  static final Map<String, DateTime> _cacheTimestamps = {};
   static const Duration _cacheDuration = Duration(seconds: 60);
 
   // Offline mode cache service
   static final CacheService _cacheService = CacheService();
   static bool _isOfflineMode = false;
+
+  static Map<String, String> _buildHeaders({bool jsonContent = false}) {
+    final headers = <String, String>{};
+    if (jsonContent) {
+      headers['Content-Type'] = 'application/json';
+    }
+    const String apiKey = String.fromEnvironment('FALCON_API_KEY');
+    if (apiKey.isNotEmpty) {
+      headers['X-API-Key'] = apiKey;
+    }
+    return headers;
+  }
 
   static Future<void> initCacheService() async {
     await _cacheService.init();
@@ -71,6 +83,7 @@ class ApiService {
     String endpoint,
     T Function(Map<String, dynamic>) fromJson, {
     int? timeoutSecondsOverride,
+    bool forceRefresh = false,
   }) async {
     final effectiveTimeout = timeoutSecondsOverride ?? timeoutSeconds;
     final url = '$baseUrl$endpoint';
@@ -97,9 +110,10 @@ class ApiService {
     }
     
     // Check cache for dashboard and other slow endpoints
-    final cacheableEndpoints = ['/dashboard', '/signals', '/trade-journal', '/strategies', '/learning-insights'];
-    if (cacheableEndpoints.contains(endpoint) && _cache.containsKey(endpoint)) {
-      final cacheAge = DateTime.now().difference(_lastCacheTime ?? DateTime.now());
+    final cacheableEndpoints = ['/dashboard', '/signals', '/trade-journal', '/strategies', '/learning-insights', '/news'];
+    if (!forceRefresh && cacheableEndpoints.contains(endpoint) && _cache.containsKey(endpoint)) {
+      final lastTime = _cacheTimestamps[endpoint];
+      final cacheAge = lastTime != null ? DateTime.now().difference(lastTime) : _cacheDuration;
       if (cacheAge < _cacheDuration) {
         print("Serving $endpoint from cache (age: ${cacheAge.inSeconds}s)");
         return fromJson(_cache[endpoint] as Map<String, dynamic>);
@@ -109,7 +123,7 @@ class ApiService {
     print("Calling: $url");
     try {
       final response = await http
-          .get(Uri.parse(url))
+          .get(Uri.parse(url), headers: _buildHeaders())
           .timeout(Duration(seconds: effectiveTimeout));
 
       print("Status Code: ${response.statusCode}");
@@ -134,7 +148,7 @@ class ApiService {
         // Also use in-memory cache for consistency
         if (cacheableEndpoints.contains(endpoint)) {
           _cache[endpoint] = data;
-          _lastCacheTime = DateTime.now();
+          _cacheTimestamps[endpoint] = DateTime.now();
         }
         
         return fromJson(data as Map<String, dynamic>);
@@ -156,6 +170,8 @@ class ApiService {
           cachedData = await _cacheService.getCachedSignals();
         } else if (endpoint == '/news') {
           cachedData = await _cacheService.getCachedNews();
+        } else if (_cache.containsKey(endpoint)) {
+          cachedData = _cache[endpoint] as Map<String, dynamic>?;
         }
         
         if (cachedData != null) {
@@ -179,6 +195,8 @@ class ApiService {
           cachedData = await _cacheService.getCachedSignals();
         } else if (endpoint == '/news') {
           cachedData = await _cacheService.getCachedNews();
+        } else if (_cache.containsKey(endpoint)) {
+          cachedData = _cache[endpoint] as Map<String, dynamic>?;
         }
         
         if (cachedData != null) {
@@ -226,7 +244,7 @@ class ApiService {
     print("Calling: $method $url");
     try {
       final uri = Uri.parse(url);
-      final headers = {'Content-Type': 'application/json'};
+      final headers = _buildHeaders(jsonContent: true);
       final encoded = body == null ? null : jsonEncode(body);
       final request = method == 'PATCH'
           ? http.patch(uri, headers: headers, body: encoded)
@@ -260,7 +278,7 @@ class ApiService {
     print("Calling: $url");
     try {
       final response = await http
-          .get(Uri.parse(url))
+          .get(Uri.parse(url), headers: _buildHeaders())
           .timeout(const Duration(seconds: timeoutSeconds));
 
       print("Status Code: ${response.statusCode}");
@@ -304,8 +322,8 @@ class ApiService {
   }
 
 
-  Future<SignalListResponse> getSignals() async {
-    return _get<SignalListResponse>('/signals', SignalListResponse.fromJson);
+  Future<SignalListResponse> getSignals({bool forceRefresh = false}) async {
+    return _get<SignalListResponse>('/signals', SignalListResponse.fromJson, forceRefresh: forceRefresh);
   }
 
 
@@ -314,18 +332,20 @@ class ApiService {
   }
 
 
-  Future<NewsListResponse> getNews() async {
-    return _get<NewsListResponse>('/news', NewsListResponse.fromJson);
+  Future<NewsListResponse> getNews({bool forceRefresh = false}) async {
+    return _get<NewsListResponse>('/news', NewsListResponse.fromJson, forceRefresh: forceRefresh);
   }
 
 
-  Future<TradeJournalListResponse> getTradeJournal() async {
-    return _get<TradeJournalListResponse>('/trade-journal', TradeJournalListResponse.fromJson);
+  Future<TradeJournalListResponse> getTradeJournal({bool forceRefresh = false}) async {
+    return _get<TradeJournalListResponse>('/trade-journal', TradeJournalListResponse.fromJson, forceRefresh: forceRefresh);
   }
 
 
   /// Stores a new journal entry; the server assigns its id and timestamps.
   Future<TradeJournalItem> createTradeJournal(TradeJournalDraft draft) async {
+    _cache.remove('/trade-journal');
+    _cache.remove('/signals');
     return _send<TradeJournalItem>(
       'POST',
       '/trade-journal',
@@ -339,6 +359,8 @@ class ApiService {
     int tradeId,
     TradeJournalClose close,
   ) async {
+    _cache.remove('/trade-journal');
+    _cache.remove('/signals');
     return _send<TradeJournalItem>(
       'PATCH',
       '/trade-journal/$tradeId',
@@ -352,7 +374,7 @@ class ApiService {
     print("Calling: DELETE $url");
     try {
       return await http
-          .delete(Uri.parse(url))
+          .delete(Uri.parse(url), headers: _buildHeaders())
           .timeout(const Duration(seconds: timeoutSeconds));
     } on http.ClientException {
       throw Exception('Network connection failed. Please check your connection to the server.');
@@ -401,8 +423,8 @@ class ApiService {
   }
 
 
-  Future<StrategyListResponse> getStrategies() async {
-    return _get<StrategyListResponse>('/strategies', StrategyListResponse.fromJson);
+  Future<StrategyListResponse> getStrategies({bool forceRefresh = false}) async {
+    return _get<StrategyListResponse>('/strategies', StrategyListResponse.fromJson, forceRefresh: forceRefresh);
   }
 
 
@@ -557,7 +579,8 @@ class ApiService {
 
 
   Future<MarketQuoteResponse> getMarketQuote(String symbol) async {
-    return _get<MarketQuoteResponse>('/market-quotes/$symbol', MarketQuoteResponse.fromJson);
+    final cleanSymbol = symbol.replaceAll('/', '').replaceAll('_', '').replaceAll('-', '').trim().toUpperCase();
+    return _get<MarketQuoteResponse>('/market-quotes/${Uri.encodeComponent(cleanSymbol)}', MarketQuoteResponse.fromJson);
   }
 
   Future<List<MarketQuote>> getWatchlist({List<String>? symbols}) async {
@@ -566,11 +589,12 @@ class ApiService {
   }
 
 
-  Future<DashboardResponse> getDashboard() async {
+  Future<DashboardResponse> getDashboard({bool forceRefresh = false}) async {
     return _get<DashboardResponse>(
       '/dashboard',
       DashboardResponse.fromJson,
       timeoutSecondsOverride: 30,
+      forceRefresh: forceRefresh,
     );
   }
 
@@ -585,11 +609,12 @@ class ApiService {
   /// Flutter must NEVER call TwelveData directly — this is the only market
   /// intelligence entry point.
   Future<Map<String, dynamic>> getLiveIntelligence(String symbol) async {
-    final url = '$baseUrl/live-intelligence/$symbol';
+    final cleanSymbol = symbol.replaceAll('/', '').replaceAll('_', '').replaceAll('-', '').trim().toUpperCase();
+    final url = '$baseUrl/live-intelligence/${Uri.encodeComponent(cleanSymbol)}';
     print('Calling: $url');
     try {
       final response = await http
-          .get(Uri.parse(url))
+          .get(Uri.parse(url), headers: _buildHeaders())
           .timeout(const Duration(seconds: timeoutSeconds));
 
       print('Status Code: ${response.statusCode}');

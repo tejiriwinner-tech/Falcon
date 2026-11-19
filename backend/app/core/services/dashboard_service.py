@@ -441,7 +441,16 @@ class DashboardService:
         successful_m = sum(1 for m in recent_missions if getattr(m, "status", "").upper() == "SUCCESS" and "PARTIAL" not in getattr(m, "status", "").upper())
         partial_m = sum(1 for m in recent_missions if "PARTIAL" in getattr(m, "status", "").upper())
         failed_m = sum(1 for m in recent_missions if getattr(m, "status", "").upper() == "FAILED")
-        durations = [float(getattr(m, "durationMs", 0.0)) for m in recent_missions if getattr(m, "durationMs", None)]
+        durations = [
+            float(
+                getattr(getattr(m, "performance", None), "totalDurationMs", None)
+                or getattr(m, "durationMs", 0.0)
+                or 0.0
+            )
+            for m in recent_missions
+            if getattr(getattr(m, "performance", None), "totalDurationMs", None) is not None
+            or getattr(m, "durationMs", None) is not None
+        ]
         avg_dur = round(sum(durations) / len(durations), 1) if durations else 0.0
         avg_health = 100.0 if not failed_m else round((successful_m / max(len(recent_missions), 1)) * 100.0, 1)
 

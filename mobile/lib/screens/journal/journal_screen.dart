@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/price_formatter.dart';
 import '../../models/strategy_model.dart';
 import '../../models/trade_journal.dart';
 import '../../models/candle_data.dart';
@@ -216,8 +217,8 @@ class _JournalScreenState extends State<JournalScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildValueColumn('Entry', trade.entryPrice.toStringAsFixed(4)),
-              _buildValueColumn('Exit', trade.exitPrice?.toStringAsFixed(4) ?? '-'),
+              _buildValueColumn('Entry', PriceFormatter.format(trade.symbol, trade.entryPrice)),
+              _buildValueColumn('Exit', trade.exitPrice != null ? PriceFormatter.format(trade.symbol, trade.exitPrice!) : '-'),
               _buildValueColumn(
                 'P/L',
                 '${trade.profitLoss >= 0 ? '+' : ''}${trade.profitLoss.toStringAsFixed(2)}',
@@ -392,7 +393,7 @@ class _NewTradeDialogState extends State<_NewTradeDialog> {
         marketSession: _marketSession.text.trim(),
         tradeDate: DateTime.now(),
         riskReward: _riskReward,
-        confidence: int.tryParse(_confidence.text) ?? 0,
+        confidence: (double.tryParse(_confidence.text)?.round() ?? 0).clamp(0, 100),
         reasonForEntry: _reason.text.trim(),
       ),
     );

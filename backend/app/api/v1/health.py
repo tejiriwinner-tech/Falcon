@@ -8,7 +8,7 @@ router = APIRouter()
 health_engine = HealthEngine()
 
 @router.get("/health", response_model=HealthResponse, tags=["health"])
-async def health_check():
+def health_check():
     """
     Health check endpoint returning system status and engine diagnostic details.
     """

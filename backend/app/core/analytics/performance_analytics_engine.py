@@ -256,7 +256,7 @@ class PerformanceAnalyticsEngine:
         avg_mission_dur = round(sum(mission_durations) / len(mission_durations), 1) if mission_durations else 0.0
         avg_stage_dur = round(sum(stage_durations) / len(stage_durations), 1) if stage_durations else 0.0
 
-        pipeline_health = round(sum(m.health.pipelineHealthPercentage for m in missions) / total_missions, 1)
+        pipeline_health = round(sum(m.health.pipelineHealthPercentage for m in missions) / len(missions), 1) if missions else 100.0
 
         highest_dec_conf = max(all_decision_confidences, default=95.0)
         lowest_dec_conf = min(all_decision_confidences, default=70.0)

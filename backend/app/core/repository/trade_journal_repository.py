@@ -108,8 +108,10 @@ class InMemoryTradeJournalStorage:
             return
         try:
             os.makedirs(os.path.dirname(self._persistence_file), exist_ok=True)
-            with open(self._persistence_file, "w", encoding="utf-8") as f:
+            tmp_file = f"{self._persistence_file}.tmp"
+            with open(tmp_file, "w", encoding="utf-8") as f:
                 json.dump([t.model_dump(mode="json") for t in self._trades.values()], f, indent=2)
+            os.replace(tmp_file, self._persistence_file)
         except Exception as ex:
             logger.debug(f"Failed to persist paper journal: {ex}")
 
@@ -149,10 +151,12 @@ class InMemoryTradeJournalStorage:
                 dt = dt.replace(tzinfo=timezone.utc)
             return (dt.timestamp(), t.id or 0)
 
+        with self._lock:
+            snapshot = list(self._trades.values())
         return [
             copy.deepcopy(trade)
             for trade in sorted(
-                self._trades.values(), key=_sort_key, reverse=True
+                snapshot, key=_sort_key, reverse=True
             )
         ]
 
@@ -168,7 +172,9 @@ class InMemoryTradeJournalStorage:
             else (as_of.replace(tzinfo=timezone.utc) if as_of else None)
         )
         eligible: List[TradeJournalItem] = []
-        for t in self._trades.values():
+        with self._lock:
+            snapshot = list(self._trades.values())
+        for t in snapshot:
             if (t.status or "").upper() != "CLOSED":
                 continue
             if t.closeDate is None:
@@ -187,8 +193,9 @@ class InMemoryTradeJournalStorage:
         return sorted(eligible, key=_sort_key, reverse=True)
 
     def get_trade(self, trade_id: int, session: Optional[object] = None) -> Optional[TradeJournalItem]:
-        trade = self._trades.get(trade_id)
-        return copy.deepcopy(trade) if trade else None
+        with self._lock:
+            trade = self._trades.get(trade_id)
+            return copy.deepcopy(trade) if trade else None
 
     def create_trade(self, payload: TradeJournalCreate, session: Optional[object] = None) -> TradeJournalItem:
         now = datetime.now(timezone.utc)
@@ -209,11 +216,12 @@ class InMemoryTradeJournalStorage:
         return copy.deepcopy(item)
 
     def sync_authoritative_item(self, item: TradeJournalItem) -> None:
-        """Store or update an authoritative database record in memory without re-saving outbox."""
+        """Synchronize an authoritative database item into fallback storage."""
         with self._lock:
             self._trades[item.id] = copy.deepcopy(item)
             if item.id >= self._next_id:
                 self._next_id = item.id + 1
+            self._save_to_disk()
 
     def update_trade(
         self, trade_id: int, payload: TradeJournalUpdate, session: Optional[object] = None
@@ -260,14 +268,25 @@ class InMemoryTradeJournalStorage:
             return len(to_del)
 
     def purge_invalid_trades(self) -> int:
+        now = datetime.now(timezone.utc)
+        count = 0
         with self._lock:
-            to_del = [
-                tid for tid, t in self._trades.items()
-                if t.direction.upper() not in ("BUY", "SELL") or t.entryPrice <= 0 or t.stopLoss <= 0 or t.takeProfit <= 0
-            ]
-            for tid in to_del:
-                del self._trades[tid]
-            return len(to_del)
+            for tid, t in list(self._trades.items()):
+                if (t.status or "").upper() in ("OPEN", "PENDING") and (
+                    t.direction.upper() not in ("BUY", "SELL") or t.entryPrice <= 0 or t.stopLoss <= 0 or t.takeProfit <= 0
+                ):
+                    self._trades[tid] = t.model_copy(
+                        update={
+                            "status": "INVALIDATED",
+                            "result": "INVALIDATED",
+                            "closeDate": t.closeDate or now,
+                            "updatedAt": now,
+                        }
+                    )
+                    count += 1
+            if count > 0:
+                self._save_to_disk()
+            return count
 
     def cleanup_stale_open_trades(self, max_age_hours: int = 6) -> int:
         now = datetime.now(timezone.utc)
@@ -292,14 +311,6 @@ class InMemoryTradeJournalStorage:
                     count += 1
         return count
 
-    def sync_authoritative_item(self, item: TradeJournalItem) -> None:
-        """Synchronize an authoritative database item into fallback storage."""
-        with self._lock:
-            self._trades[item.id] = copy.deepcopy(item)
-            if item.id >= self._next_id:
-                self._next_id = item.id + 1
-            self._save_to_disk()
-
 
 class DatabaseTradeJournalStorage:
     """Postgres-backed storage with automatic in-memory fallback for high availability."""
@@ -321,8 +332,10 @@ class DatabaseTradeJournalStorage:
             return
         try:
             os.makedirs(os.path.dirname(self._outbox_file), exist_ok=True)
-            with open(self._outbox_file, "w", encoding="utf-8") as f:
+            tmp_out = f"{self._outbox_file}.tmp"
+            with open(tmp_out, "w", encoding="utf-8") as f:
                 json.dump(sorted(list(self._outbox_pending_ids)), f)
+            os.replace(tmp_out, self._outbox_file)
         except Exception as ex:
             logger.debug(f"Failed to persist outbox state: {ex}")
 
@@ -532,6 +545,9 @@ class DatabaseTradeJournalStorage:
                     session.flush()
                     session.refresh(record)
                     db_item = _to_item(record)
+                    if mem_item.id != db_item.id:
+                        with self._fallback_memory._lock:
+                            self._fallback_memory._trades.pop(mem_item.id, None)
                     self._fallback_memory.sync_authoritative_item(db_item)
                     self._outbox_pending_ids.discard(mem_item.id)
                     self._save_outbox_to_disk()
@@ -542,6 +558,9 @@ class DatabaseTradeJournalStorage:
                     session_ctx.commit()
                     session_ctx.refresh(record)
                     db_item = _to_item(record)
+                    if mem_item.id != db_item.id:
+                        with self._fallback_memory._lock:
+                            self._fallback_memory._trades.pop(mem_item.id, None)
                     self._fallback_memory.sync_authoritative_item(db_item)
                     self._outbox_pending_ids.discard(mem_item.id)
                     self._save_outbox_to_disk()
@@ -619,7 +638,7 @@ class DatabaseTradeJournalStorage:
                     return True
             except Exception as ex:
                 logger.warning(f"Database delete_trade failed: {ex}")
-                return True
+                return False
 
     def clear_history(self) -> int:
         """Delete finished trades only; active (OPEN/PENDING/FILLED) trades are kept."""
@@ -640,15 +659,30 @@ class DatabaseTradeJournalStorage:
 
     def purge_invalid_trades(self) -> int:
         with self._lock:
-            with get_session() as session:
-                count = session.query(TradeJournalRecord).filter(
-                    (TradeJournalRecord.direction.notin_(["BUY", "SELL"]))
-                    | (TradeJournalRecord.entry_price <= 0)
-                    | (TradeJournalRecord.stop_loss <= 0)
-                    | (TradeJournalRecord.take_profit <= 0)
-                ).delete(synchronize_session=False)
-                session.commit()
-                return count
+            mem_count = self._fallback_memory.purge_invalid_trades()
+            try:
+                now = datetime.now(timezone.utc)
+                with get_session() as session:
+                    invalid_recs = session.query(TradeJournalRecord).filter(
+                        TradeJournalRecord.status.in_(["OPEN", "PENDING", "open", "pending"]),
+                        (
+                            (TradeJournalRecord.direction.notin_(["BUY", "SELL"]))
+                            | (TradeJournalRecord.entry_price <= 0)
+                            | (TradeJournalRecord.stop_loss <= 0)
+                            | (TradeJournalRecord.take_profit <= 0)
+                        ),
+                    ).all()
+                    for rec in invalid_recs:
+                        rec.status = "INVALIDATED"
+                        rec.result = "INVALIDATED"
+                        if rec.close_date is None:
+                            rec.close_date = now
+                        rec.updated_at = now
+                    session.commit()
+                    return max(len(invalid_recs), mem_count)
+            except Exception as ex:
+                logger.warning(f"Database purge_invalid_trades failed: {ex}")
+                return mem_count
 
     def cleanup_stale_open_trades(self, max_age_hours: int = 6) -> int:
         with self._lock:
@@ -845,6 +879,9 @@ class TradeJournalRepository:
         )
 
     def __init__(self, storage: Optional[Union[InMemoryTradeJournalStorage, DatabaseTradeJournalStorage]] = None) -> None:
+        if getattr(self, "_initialized", False) and storage is None:
+            return
+        self._initialized = True
         self._cached_trades: Optional[List[TradeJournalItem]] = None
         self._cached_trades_at: float = 0.0
         self._cache_lock = threading.Lock()

@@ -86,11 +86,12 @@ class PositionSizingService:
         if "XAU" in clean_symbol:
             # 1 unit = 1 oz. Loss per unit in USD = stop distance
             loss_per_unit = stop_distance
-            units = int(cash_risk / loss_per_unit)
-            units = max(1, units)
-            lots = (Decimal(units) / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            raw_units = int(cash_risk / loss_per_unit)
+            lots = (Decimal(max(1, raw_units)) / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             lots = max(Decimal("0.01"), lots)
-            return units, lots, cash_risk
+            units = int(lots * Decimal("100"))
+            actual_cash_risk = (Decimal(units) * loss_per_unit).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            return units, lots, actual_cash_risk
 
         # 2. JPY Crosses (USDJPY, GBPJPY, EURJPY)
         if clean_symbol.endswith("JPY"):
@@ -98,29 +99,32 @@ class PositionSizingService:
             rate = usdjpy_rate or (entry_price if clean_symbol == "USDJPY" else Decimal("155.00"))
             loss_per_unit_jpy = stop_distance
             loss_per_unit_usd = loss_per_unit_jpy / rate
-            units = int(cash_risk / loss_per_unit_usd)
-            units = max(1, units)
-            lots = (Decimal(units) / Decimal("100000")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            raw_units = int(cash_risk / loss_per_unit_usd)
+            lots = (Decimal(max(1, raw_units)) / Decimal("100000")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             lots = max(Decimal("0.01"), lots)
-            return units, lots, cash_risk
+            units = int(lots * Decimal("100000"))
+            actual_cash_risk = (Decimal(units) * loss_per_unit_usd).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            return units, lots, actual_cash_risk
 
         # 3. USD-Quoted Majors (EURUSD, GBPUSD, AUDUSD, NZDUSD)
         if clean_symbol.endswith("USD"):
             # Loss per unit is directly in USD
             loss_per_unit = stop_distance
-            units = int(cash_risk / loss_per_unit)
-            units = max(1, units)
-            lots = (Decimal(units) / Decimal("100000")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            raw_units = int(cash_risk / loss_per_unit)
+            lots = (Decimal(max(1, raw_units)) / Decimal("100000")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
             lots = max(Decimal("0.01"), lots)
-            return units, lots, cash_risk
+            units = int(lots * Decimal("100000"))
+            actual_cash_risk = (Decimal(units) * loss_per_unit).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+            return units, lots, actual_cash_risk
 
-        # 4. Default Fallback
-        loss_per_unit = stop_distance
-        units = int(cash_risk / loss_per_unit) if loss_per_unit > 0 else 1
-        units = max(1, units)
-        lots = (Decimal(units) / Decimal("100000")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        # 4. Default Fallback (including USD-base pairs like USDCAD, USDCHF)
+        loss_per_unit = (stop_distance / entry_price) if (clean_symbol.startswith("USD") and entry_price > Decimal("0")) else stop_distance
+        raw_units = int(cash_risk / loss_per_unit) if loss_per_unit > 0 else 1
+        lots = (Decimal(max(1, raw_units)) / Decimal("100000")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
         lots = max(Decimal("0.01"), lots)
-        return units, lots, cash_risk
+        units = int(lots * Decimal("100000"))
+        actual_cash_risk = (Decimal(units) * loss_per_unit).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        return units, lots, actual_cash_risk
 
 
 position_sizing_service = PositionSizingService()

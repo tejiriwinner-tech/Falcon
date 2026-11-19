@@ -169,8 +169,11 @@ class CacheService {
 
   Future<void> clearCache() async {
     await _ensureInitialized();
-    await _prefs!.clear();
-    debugPrint('All cache cleared');
+    final keys = _prefs!.getKeys().where((k) => k.startsWith('cached_')).toList();
+    for (final k in keys) {
+      await _prefs!.remove(k);
+    }
+    debugPrint('All cached_ entries cleared (${keys.length} keys)');
   }
 
   Future<void> clearExpiredCache() async {

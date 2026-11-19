@@ -153,7 +153,7 @@ class StrategyAttributionService:
 
             evaluated_outcomes = wins + losses
             win_rate = round(wins / evaluated_outcomes, 4) if evaluated_outcomes > 0 else 0.0
-            profit_factor = round(gross_profit / gross_loss, 4) if gross_loss > 0 else (round(gross_profit, 4) if gross_profit > 0 else None)
+            profit_factor = round(gross_profit / gross_loss, 4) if gross_loss > 0 else None
             total_r = round(sum(r_multiples), 2)
             avg_r = round(sum(r_multiples) / len(r_multiples), 2) if r_multiples else None
             avg_mfe = round(sum(mfe_list) / len(mfe_list), 4) if mfe_list else None
@@ -188,7 +188,7 @@ class StrategyAttributionService:
         drift_diagnostics: List[StrategyDriftDiagnostic] = []
         strategy_triplets = set((k[0], k[1], k[2]) for k in grouped_trades.keys())
 
-        for sid, sver, rver in sorted(strategy_triplets):
+        for sid, sver, rver in sorted(strategy_triplets, key=lambda t: (t[0] or "", t[1] or "", t[2] or "")):
             paper_trades = grouped_trades.get((sid, sver, rver, ExecutionMode.PAPER.value), [])
             live_trades = grouped_trades.get((sid, sver, rver, ExecutionMode.LIVE.value), [])
 

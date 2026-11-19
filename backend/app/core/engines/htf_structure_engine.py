@@ -132,6 +132,12 @@ class MultiTimeframeStructureEngine:
         and does not enter directly into an unbroken major H4 barrier.
         """
         dir_upper = direction.upper()
+        sym_u = (symbol or "").upper()
+        if pip_size == 0.0001:
+            if "XAU" in sym_u or "GOLD" in sym_u:
+                pip_size = 0.1
+            elif "JPY" in sym_u:
+                pip_size = 0.01
         h4_bars = self.aggregate_h1_to_h4(bars_1h)
 
         if len(h4_bars) < 5:

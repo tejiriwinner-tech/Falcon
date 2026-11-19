@@ -85,7 +85,7 @@ class LiveIntelligenceResponse(BaseModel):
 
 
 @router.get(
-    "/live-intelligence/{symbol}",
+    "/live-intelligence/{symbol:path}",
     response_model=LiveIntelligenceResponse,
     tags=["live_intelligence"],
     summary="Run the full Falcon intelligence pipeline for a single symbol",

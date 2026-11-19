@@ -1,4 +1,5 @@
 import logging
+import os
 logger = logging.getLogger(__name__)
 from datetime import datetime, timezone
 
@@ -6,6 +7,7 @@ from fastapi import APIRouter, HTTPException, Response, status
 
 from decimal import Decimal
 
+from app.core.execution.execution_mode_guard import execution_mode_guard
 from app.core.repository.trade_journal_repository import trade_journal_repository
 from app.core.services.signal_authorization_service import signal_authorization_service
 from app.schemas.capital_guardian import ProposedTradeInput
@@ -19,6 +21,14 @@ from app.schemas.trade_journal import (
 router = APIRouter()
 
 
+def _require_destructive_admin_allowed() -> None:
+    if os.getenv("ALLOW_DESTRUCTIVE_ADMIN_ENDPOINTS", "false").lower() != "true":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Destructive trade journal purge endpoints are disabled to protect historical trade records.",
+        )
+
+
 @router.get("/trade-journal", response_model=TradeJournalListResponse)
 def get_trade_journal():
     """Returns stored journal entries for live trading. Excludes paper/shadow trades."""
@@ -26,10 +36,7 @@ def get_trade_journal():
     # Filter out paper trades so the user journal strictly reflects real executable live positions
     live_trades = [
         t for t in all_trades
-        if (getattr(t, "executionMode", None) or "").upper() != "PAPER"
-        and "[MODE:PAPER]" not in (t.notes or "")
-        and "paper" not in (t.notes or "").lower()
-        and "paper" not in (t.reasonForEntry or "").lower()
+        if not execution_mode_guard.is_paper_record(t)
     ]
     return TradeJournalListResponse(
         trades=live_trades,
@@ -77,7 +84,6 @@ def create_trade_journal(trade: TradeJournalCreate):
                 # User has already entered on MT5; record the trade in the journal with advisory note
                 # so the position is actively tracked and protected rather than rejected.
                 notes_advisory = f"{trade.notes or ''} | [MANUAL_OVERRIDE | GUARDIAN_ADVISORY: {decision.reason}]"
-                trade.notes = notes_advisory.strip(" | ")
                 trade.notes = notes_advisory.strip(" | ")
                 if trade.fillPrice is None:
                     trade.fillPrice = trade.entryPrice
@@ -141,10 +147,13 @@ def update_trade_journal_entry(trade_id: int, update: TradeJournalUpdate):
                 init_risk = getattr(existing, "initialMonetaryRisk", None)
                 if init_risk is not None and float(init_risk) > 0:
                     pnl = update.profitLoss if update.profitLoss is not None else existing.profitLoss
-                    if res == "WIN":
-                        update.realizedRMultiple = round(float(pnl) / float(init_risk), 2)
-                    elif res == "LOSS":
-                        update.realizedRMultiple = -round(abs(float(pnl)) / float(init_risk), 2)
+                    if pnl is not None:
+                        if res == "WIN":
+                            update.realizedRMultiple = round(float(pnl) / float(init_risk), 2)
+                        elif res == "LOSS":
+                            update.realizedRMultiple = -round(abs(float(pnl)) / float(init_risk), 2)
+                        elif res in ("BREAKEVEN", "BE"):
+                            update.realizedRMultiple = 0.0
                     elif res in ("BREAKEVEN", "BE"):
                         update.realizedRMultiple = 0.0
 
@@ -177,6 +186,7 @@ def clear_trade_history():
     Active trades (OPEN / PENDING / FILLED) are kept so they still resolve and
     re-appear in history when they hit TP, SL or breakeven.
     """
+    _require_destructive_admin_allowed()
     deleted = trade_journal_repository.clear_history()
     try:
         from app.core.services.signal_outcome_resolver import signal_outcome_resolver
@@ -193,6 +203,7 @@ def clear_trade_history():
 
 @router.delete("/trade-journal/{trade_id}", status_code=204)
 def delete_trade_journal_entry(trade_id: int):
+    _require_destructive_admin_allowed()
     if not trade_journal_repository.delete_trade(trade_id):
         raise HTTPException(status_code=404, detail=f"Trade '{trade_id}' not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)
@@ -201,13 +212,11 @@ def delete_trade_journal_entry(trade_id: int):
 @router.post("/trade-journal/close-all-paper-trades", status_code=200)
 def close_all_paper_trades():
     """Immediately purge and close all paper / shadow trades from database and memory."""
+    _require_destructive_admin_allowed()
     all_trades = trade_journal_repository.list_trades()
     paper_ids = [
         t.id for t in all_trades
-        if (getattr(t, "executionMode", None) or "").upper() == "PAPER"
-        or "[MODE:PAPER]" in (t.notes or "")
-        or "paper" in (t.notes or "").lower()
-        or "paper" in (t.reasonForEntry or "").lower()
+        if execution_mode_guard.is_paper_record(t)
     ]
     for tid in paper_ids:
         try:
@@ -215,6 +224,7 @@ def close_all_paper_trades():
         except Exception:
             pass
     return {"status": "success", "closed_paper_trades": len(paper_ids)}
+
 
 @router.post("/trade-journal/purge-clean-slate", status_code=200)
 @router.delete("/trade-journal", status_code=200)
@@ -227,6 +237,7 @@ def purge_clean_slate():
     5. Clears mission repository historical candidate artifacts.
     6. Flushes cached signal service response and historical triggered signatures.
     """
+    _require_destructive_admin_allowed()
     trade_journal_repository.clear()
     
     try:
@@ -262,3 +273,7 @@ def purge_clean_slate():
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
+
+def clear_all_trades():
+    """Alias for clean-slate purge gated by ALLOW_DESTRUCTIVE_ADMIN_ENDPOINTS."""
+    return purge_clean_slate()

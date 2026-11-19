@@ -424,7 +424,7 @@ class PaperTradingEngine:
             multiplier = 10.0
         elif "JPY" in symbol:
             monetary_pnl = round(price_delta * 1000.0 / 150.0, 2)
-            multiplier = 10000.0
+            multiplier = 100.0
         else:
             monetary_pnl = round(price_delta * 1000.0, 2)
             multiplier = 10000.0
@@ -442,12 +442,22 @@ class PaperTradingEngine:
         realized_r = None
         initial_risk = getattr(trade, "initialMonetaryRisk", None)
         if initial_risk is not None and float(initial_risk) > 0:
-            if result == "WIN":
-                realized_r = round(float(monetary_pnl) / float(initial_risk), 2)
-            elif result == "LOSS":
-                realized_r = -round(abs(float(monetary_pnl)) / float(initial_risk), 2)
-            elif result in ("BREAKEVEN", "BE"):
-                realized_r = 0.0
+            if risk_dist > 0:
+                if result == "WIN":
+                    realized_r = round(abs(price_delta) / risk_dist, 2)
+                elif result == "LOSS":
+                    realized_r = -round(abs(price_delta) / risk_dist, 2)
+                elif result in ("BREAKEVEN", "BE"):
+                    realized_r = 0.0
+                if realized_r is not None:
+                    monetary_pnl = round(realized_r * float(initial_risk), 2)
+            else:
+                if result == "WIN":
+                    realized_r = round(float(monetary_pnl) / float(initial_risk), 2)
+                elif result == "LOSS":
+                    realized_r = -round(abs(float(monetary_pnl)) / float(initial_risk), 2)
+                elif result in ("BREAKEVEN", "BE"):
+                    realized_r = 0.0
 
         # Phase 5C: Finalize excursion metrics on close
         peak_val, trough_val, final_mfe_r, final_mae_r = (
@@ -556,12 +566,12 @@ class PaperTradingEngine:
         2. Evaluates SL/TP for all OPEN paper trades.
         """
         all_trades = self._journal_repo.list_trades(session=session)
-        symbol = (quote.symbol or "").upper()
+        symbol = (quote.symbol or "").replace("/", "").replace("_", "").upper()
         resolved_trades = []
 
         paper_trades = [
             t for t in all_trades
-            if (t.symbol or "").upper() == symbol
+            if (t.symbol or "").replace("/", "").replace("_", "").upper() == symbol
             and (getattr(t, "executionMode", None) or parse_execution_mode(t.notes)) == ExecutionMode.PAPER.value
             and (t.status or "").upper() in ("PENDING", "OPEN")
             and t.closeDate is None

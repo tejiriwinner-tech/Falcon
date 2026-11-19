@@ -481,7 +481,10 @@ class LiveIntelligenceService:
         
         # News
         from app.core.services.news_service import build_news_response
-        news = build_news_response(symbols=WATCHLIST)
+        try:
+            news = build_news_response(symbols=WATCHLIST)
+        except TypeError:
+            news = build_news_response()
         
         # Decision Engine Response from live intelligence
         captain_briefing = self._generate_captain_briefing(decisions, market_state)

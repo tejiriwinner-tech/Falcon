@@ -559,14 +559,21 @@ class RegimeMemoryEngine:
 
         # Calculate consecutive losses from the most recent closed trade
         consecutive_losses = 0
+        latest_loss_dt: Optional[datetime] = None
         for t in ordered_trades:
             raw_res = str(_extract_val(t, "result", "outcome", "status", default="")).strip().upper()
             pnl = float(_extract_val(t, "profit_loss", "profitLoss", "pnl", default=0.0) or 0.0)
-            if raw_res in ("LOSS", "LOST") or pnl < 0:
+            if raw_res in ("BREAKEVEN", "BE"):
+                continue
+            elif raw_res in ("LOSS", "LOST") or (raw_res not in ("WIN", "WON") and pnl < 0):
                 consecutive_losses += 1
+                if latest_loss_dt is None and has_dates:
+                    t_dt = _get_trade_time(t)
+                    if t_dt > datetime.min.replace(tzinfo=timezone.utc):
+                        latest_loss_dt = t_dt
             elif raw_res in ("WIN", "WON") or pnl > 0:
                 break
-            elif raw_res in ("BREAKEVEN", "BE") or pnl == 0:
+            elif pnl == 0:
                 continue
 
         # Calculate rolling win rate & profit factor
@@ -579,7 +586,11 @@ class RegimeMemoryEngine:
             raw_res = str(_extract_val(t, "result", "outcome", "status", default="")).strip().upper()
             pnl = float(_extract_val(t, "profit_loss", "profitLoss", "pnl", default=0.0) or 0.0)
 
-            if raw_res in ("WIN", "WON") or pnl > 0:
+            if raw_res in ("BREAKEVEN", "BE"):
+                if pnl > 0:
+                    gross_profit += pnl
+                continue
+            elif raw_res in ("WIN", "WON") or pnl > 0:
                 wins += 1
                 if pnl > 0:
                     gross_profit += pnl
@@ -590,6 +601,12 @@ class RegimeMemoryEngine:
 
         decided_trades = wins + losses
         win_rate = (wins / decided_trades) if decided_trades > 0 else 0.0
+        net_pnl = gross_profit - gross_loss
+        now_utc = datetime.now(timezone.utc)
+        quarantine_expired = (
+            latest_loss_dt is not None
+            and (now_utc - latest_loss_dt).total_seconds() > 24 * 3600
+        )
 
         if gross_loss > 0:
             profit_factor = round(gross_profit / gross_loss, 2)
@@ -608,8 +625,8 @@ class RegimeMemoryEngine:
         paper_win_rate = (paper_wins / paper_total) if paper_total > 0 else 0.0
 
         # Classification Logic
-        # Condition A: Quarantine to Paper (with Auto-Recovery check)
-        if (total >= 3 and win_rate < 0.35) or consecutive_losses >= 3:
+        # Condition A: Quarantine to Paper (with Auto-Recovery & 24h expiry check; never quarantine on BEs)
+        if not quarantine_expired and ((decided_trades >= 8 and win_rate < 0.35 and net_pnl < 0) or (consecutive_losses >= 3 and net_pnl <= 0)):
             if paper_total >= 5 and paper_win_rate >= 0.50:
                 status = StrategyHealthStatus.HEALTHY
                 weight = 1.0
@@ -634,7 +651,7 @@ class RegimeMemoryEngine:
                 f"and {profit_factor:.2f} profit factor (>=1.8). Allocation scaled to 1.5x."
             )
         # Condition C: Caution Warning
-        elif consecutive_losses == 2 or (total >= 3 and (win_rate < 0.45 or profit_factor < 1.0)):
+        elif consecutive_losses == 2 or (decided_trades >= 3 and (win_rate < 0.45 or profit_factor < 1.0)):
             status = StrategyHealthStatus.CAUTION
             weight = 0.5
             rationale = (

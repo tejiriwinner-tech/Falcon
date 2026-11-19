@@ -2,6 +2,7 @@ import os
 import json
 import time
 import logging
+import threading
 from typing import Optional, Dict, Any
 
 logger = logging.getLogger("falcon.fcm_service")
@@ -72,6 +73,7 @@ class FCMService:
     def __init__(self) -> None:
         self._ready = initialize_firebase()
         self._dedup_cache: Dict[str, float] = {}
+        self._dedup_lock = threading.Lock()
 
     def send_signal_alert(
         self,
@@ -92,9 +94,20 @@ class FCMService:
 
         # Strict canonical setup deduplication (prevents re-alerting across mission refreshes)
         d = data or {}
+        sym_str = str(d.get("symbol") or "").upper()
+        dir_str = str(d.get("direction") or "")
+        entry_raw = d.get("entry")
+        fallback_sig = ""
+        if sym_str and dir_str and entry_raw is not None:
+            try:
+                e_val = float(entry_raw)
+                fmt = f"{e_val:.2f}" if ("XAU" in sym_str or "GOLD" in sym_str) else (f"{e_val:.3f}" if "JPY" in sym_str else f"{e_val:.5f}")
+                fallback_sig = f"{d.get('symbol')}_{dir_str}_{fmt}"
+            except (TypeError, ValueError):
+                fallback_sig = f"{d.get('symbol')}_{dir_str}_{entry_raw}"
         canonical_key = str(
             d.get("canonical_signature")
-            or (f"{d.get('symbol')}_{d.get('direction')}_{float(d.get('entry', 0)):.2f}" if d.get('symbol') and d.get('direction') and d.get('entry') else "")
+            or fallback_sig
             or d.get("signal_id", "")
             or d.get("trade_id", "")
             or title
@@ -103,11 +116,11 @@ class FCMService:
         now = time.time()
 
         if not is_test and canonical_key:
-            last_sent = self._dedup_cache.get(canonical_key, 0)
-            if (now - last_sent) < 86400:  # 24-hour cooldown per unique trade setup
-                logger.info(f"[FCM] Suppressing duplicate push alert for setup: {canonical_key}")
-                return True
-            self._dedup_cache[canonical_key] = now
+            with self._dedup_lock:
+                last_sent = self._dedup_cache.get(canonical_key, 0)
+                if (now - last_sent) < 86400:  # 24-hour cooldown per unique trade setup
+                    logger.info(f"[FCM] Suppressing duplicate push alert for setup: {canonical_key}")
+                    return True
 
         try:
             from firebase_admin import messaging
@@ -133,6 +146,9 @@ class FCMService:
             )
 
             response = messaging.send(message)
+            if not is_test and canonical_key:
+                with self._dedup_lock:
+                    self._dedup_cache[canonical_key] = now
             logger.info(f"[FCM] Successfully sent push notification to topic '{topic}': {response}")
             return True
         except Exception as e:

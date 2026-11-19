@@ -108,13 +108,26 @@ class OrderExecutionService:
             try:
                 from app.core.providers import _oanda_provider
                 if _oanda_provider and _oanda_provider.configured:
-                    is_gold = "XAU" in item.symbol or "GOLD" in item.symbol
-                    mult = 100 if is_gold else 100000
+                    sym_u = item.symbol.upper()
+                    if "XAU" in sym_u or "GOLD" in sym_u:
+                        mult = 100
+                    elif "XAG" in sym_u:
+                        mult = 5000
+                    elif sym_u in ("NAS100", "US30", "SPX500", "BTCUSD", "ETHUSD"):
+                        mult = 1
+                    else:
+                        mult = 100000
                     units_val = int(round(float(item.lot_size) * mult))
                     if item.action == OrderAction.SELL:
                         units_val = -units_val
 
-                    o_type = "LIMIT" if item.order_type.upper() in ("LIMIT", "PENDING") else "MARKET"
+                    raw_ot = item.order_type.value.upper() if hasattr(item.order_type, "value") else str(item.order_type).upper()
+                    if raw_ot in ("LIMIT", "PENDING"):
+                        o_type = "LIMIT"
+                    elif raw_ot == "STOP":
+                        o_type = "STOP"
+                    else:
+                        o_type = "MARKET"
                     oanda_resp = _oanda_provider.create_order(
                         symbol=item.symbol,
                         units=units_val,
@@ -156,7 +169,8 @@ class OrderExecutionService:
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"⏳ <i>Waiting for MT5 Terminal Execution...</i>"
         )
-        telegram_alert_service.dispatch_raw_message(msg)
+        if hasattr(telegram_alert_service, "dispatch_raw_message"):
+            telegram_alert_service.dispatch_raw_message(msg)
 
         return item
 
@@ -284,11 +298,12 @@ class OrderExecutionService:
             f"💵 <b>Fill Price:</b> <code>{confirm_in.fill_price}</code>\n"
             f"🛑 <b>Stop Loss:</b> <code>{order.stop_loss}</code>\n"
             f"🎯 <b>Take Profit:</b> <code>{order.take_profit}</code>\n"
-            f"⚡ <b>Slippage:</b> {confirm_in.slippage_pips:.1f} pips\n"
+            f"⚡ <b>Slippage:</b> {(confirm_in.slippage_pips or 0.0):.1f} pips\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             f"📈 <i>Logged to Falcon Trade Journal</i>"
         )
-        telegram_alert_service.dispatch_raw_message(msg)
+        if hasattr(telegram_alert_service, "dispatch_raw_message"):
+            telegram_alert_service.dispatch_raw_message(msg)
 
         return order
 
@@ -302,6 +317,46 @@ class OrderExecutionService:
         order.failure_reason = reason
         logger.warning(f"Order {order_id} failed in MT5: {reason}")
 
+        try:
+            from app.schemas.trade_journal import TradeJournalUpdate
+            existing_trades = trade_journal_repository.list_trades()
+            matching_pending = None
+            if order.signal_id is not None:
+                matching_pending = next(
+                    (
+                        t for t in existing_trades
+                        if t.signalId == order.signal_id
+                        and (t.status or "").upper() == "PENDING"
+                        and t.closeDate is None
+                    ),
+                    None,
+                )
+            if matching_pending is None:
+                matching_pending = next(
+                    (
+                        t for t in existing_trades
+                        if t.symbol.upper() == order.symbol.upper()
+                        and t.direction.upper() == order.action.value.upper()
+                        and (t.status or "").upper() == "PENDING"
+                        and t.closeDate is None
+                    ),
+                    None,
+                )
+            if matching_pending is not None:
+                fail_note = f"Order {order_id} failed: {reason}"
+                merged_notes = f"{matching_pending.notes} | {fail_note}" if matching_pending.notes else fail_note
+                trade_journal_repository.update_trade(
+                    matching_pending.id,
+                    TradeJournalUpdate(
+                        status="INVALIDATED",
+                        result="INVALIDATED",
+                        closeDate=datetime.now(timezone.utc),
+                        notes=merged_notes,
+                    ),
+                )
+        except Exception as e:
+            logger.warning(f"Could not update journal entry on failed order {order_id}: {e}")
+
         msg = (
             f"❌ <b>MT5 ORDER FAILED</b>\n"
             f"━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -309,7 +364,8 @@ class OrderExecutionService:
             f"⚠️ <b>Reason:</b> {reason}\n"
             f"🕒 <i>Check MT5 terminal logs</i>"
         )
-        telegram_alert_service.dispatch_raw_message(msg)
+        if hasattr(telegram_alert_service, "dispatch_raw_message"):
+            telegram_alert_service.dispatch_raw_message(msg)
 
         return order
 

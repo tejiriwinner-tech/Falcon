@@ -21,6 +21,7 @@ class LocalCandleAggregator:
 
     TIMEFRAMES = {
         "1m": 60,
+        "5m": 300,
         "15m": 900,
         "1h": 3600,
         "4h": 14400,
@@ -60,6 +61,9 @@ class LocalCandleAggregator:
         period_start_sec = (ts_sec // interval) * interval
         period_start = datetime.fromtimestamp(period_start_sec, tz=timezone.utc)
 
+        if cur is not None and period_start < cur["start_time"]:
+            return
+
         if cur is None or cur["start_time"] < period_start:
             # If previous bar exists, close and push to history
             if cur is not None:
@@ -86,10 +90,10 @@ class LocalCandleAggregator:
                 "low": price,
                 "close": price,
                 "volume": 1,
-                "buy_volume": 1,
+                "buy_volume": 0,
                 "sell_volume": 0,
                 "last_price": price,
-                "delta": 1,
+                "delta": 0,
                 "price_profile": {round(price, 5): 1},
             }
         else:
@@ -103,9 +107,6 @@ class LocalCandleAggregator:
                 cur["buy_volume"] = cur.get("buy_volume", 0) + 1
             elif price < prev_px:
                 cur["sell_volume"] = cur.get("sell_volume", 0) + 1
-            else:
-                # Neutral tick: split evenly or maintain prior bias
-                cur["buy_volume"] = cur.get("buy_volume", 0) + 1
                 
             cur["close"] = price
             cur["last_price"] = price

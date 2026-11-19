@@ -152,6 +152,7 @@ class SignalAuthorizationService:
     def get_paper_cycle(self) -> Optional[CapitalCycleItem]:
         """Resolve the isolated forward paper capital cycle. Returns None if unconfigured/disabled."""
         now_utc = datetime.now(timezone.utc)
+        paper_epoch = datetime(2026, 1, 1, tzinfo=timezone.utc)
         return CapitalCycleItem(
             id=999999,
             cycleId="CYCLE-PAPER-001",
@@ -161,8 +162,8 @@ class SignalAuthorizationService:
             activeTradingCapital=Decimal("10000.00"),
             protectedProfit=Decimal("0.00"),
             status=CapitalCycleStatus.ACTIVE,
-            startedAt=now_utc,
-            createdAt=now_utc,
+            startedAt=paper_epoch,
+            createdAt=paper_epoch,
             updatedAt=now_utc,
         )
 

@@ -87,7 +87,7 @@ class IndicatorService:
             return None
         
         # Determine trend and signal
-        trend, signal, strength = self._analyze_signals(latest_values, candles[-1].close)
+        trend, signal, strength = self._analyze_signals(latest_values, candles_chronological[-1].close)
         
         # Build response
         response = IndicatorResponse(

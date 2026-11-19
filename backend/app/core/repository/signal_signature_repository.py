@@ -267,23 +267,33 @@ class SignalSignatureRepository:
         tol = 2.50 if ("XAU" in sym_clean or "GOLD" in sym_clean or entry_price > 500) else (0.045 if "JPY" in sym_clean else 0.00035)
         terminal_st = {"WON", "LOST", "BREAKEVEN", "EXPIRED", "CLOSED", "INVALIDATED"}
         with self._in_memory._lock:
-            for v in self._in_memory._signatures.values():
-                if (
-                    v.get("symbol") == sym_clean
-                    and v.get("direction") == dir_clean
-                    and (v.get("status") or "").upper() in terminal_st
-                    and abs(float(v.get("entry_price", 0.0)) - float(entry_price)) <= tol
-                ):
-                    return False
-        with self._in_memory._lock:
-            for v in self._in_memory._signatures.values():
-                if (
-                    v.get("symbol") == sym_clean
-                    and v.get("direction") == dir_clean
-                    and (v.get("status") or "").upper() == "ACTIVE"
-                    and abs(float(v.get("entry_price", 0.0)) - float(entry_price)) <= tol
-                ):
-                    return True
+            active_candidates = [
+                v for v in self._in_memory._signatures.values()
+                if v.get("symbol") == sym_clean
+                and v.get("direction") == dir_clean
+                and (v.get("status") or "").upper() == "ACTIVE"
+                and abs(float(v.get("entry_price", 0.0)) - float(entry_price)) <= tol
+            ]
+            if active_candidates:
+                for act_v in active_candidates:
+                    act_up = act_v.get("updated_at") or datetime.min.replace(tzinfo=timezone.utc)
+                    act_sl = float(act_v.get("stop_loss", 0.0))
+                    act_tp = float(act_v.get("take_profit", 0.0))
+                    overridden = False
+                    for term_v in self._in_memory._signatures.values():
+                        if (
+                            term_v.get("symbol") == sym_clean
+                            and term_v.get("direction") == dir_clean
+                            and (term_v.get("status") or "").upper() in terminal_st
+                            and abs(float(term_v.get("entry_price", 0.0)) - float(entry_price)) <= tol
+                            and abs(float(term_v.get("stop_loss", 0.0)) - act_sl) <= tol
+                            and abs(float(term_v.get("take_profit", 0.0)) - act_tp) <= tol
+                            and (term_v.get("updated_at") or datetime.min.replace(tzinfo=timezone.utc)) > act_up
+                        ):
+                            overridden = True
+                            break
+                    if not overridden:
+                        return True
         if database_enabled():
             self._ensure_schema()
             try:
@@ -296,14 +306,27 @@ class SignalSignatureRepository:
                     )
                     for rec in session.execute(stmt).scalars().all():
                         if abs(float(rec.entry_price or 0.0) - float(entry_price)) <= tol:
+                            rec_up = rec.updated_at if (rec.updated_at and rec.updated_at.tzinfo) else ((rec.updated_at.replace(tzinfo=timezone.utc) if rec.updated_at else datetime.min.replace(tzinfo=timezone.utc)))
+                            rec_sl = float(rec.stop_loss or 0.0)
+                            rec_tp = float(rec.take_profit or 0.0)
                             term_stmt = select(SignalSignatureRecord).where(
                                 SignalSignatureRecord.symbol == sym_clean,
                                 SignalSignatureRecord.direction == dir_clean,
                                 SignalSignatureRecord.status.in_(list(terminal_st)),
                             )
-                            if any(abs(float(tr.entry_price or 0.0) - float(entry_price)) <= tol for tr in session.execute(term_stmt).scalars().all()):
-                                return False
-                            return True
+                            overridden_db = False
+                            for tr in session.execute(term_stmt).scalars().all():
+                                tr_up = tr.updated_at if (tr.updated_at and tr.updated_at.tzinfo) else ((tr.updated_at.replace(tzinfo=timezone.utc) if tr.updated_at else datetime.min.replace(tzinfo=timezone.utc)))
+                                if (
+                                    abs(float(tr.entry_price or 0.0) - float(entry_price)) <= tol
+                                    and abs(float(tr.stop_loss or 0.0) - rec_sl) <= tol
+                                    and abs(float(tr.take_profit or 0.0) - rec_tp) <= tol
+                                    and tr_up > rec_up
+                                ):
+                                    overridden_db = True
+                                    break
+                            if not overridden_db:
+                                return True
                 finally:
                     session.close()
             except Exception as ex:
@@ -388,7 +411,8 @@ class SignalSignatureRepository:
         status: str,
     ) -> bool:
         sig_key = format_signature_key(symbol, direction, entry_price, stop_loss, take_profit)
-        self._in_memory.update_status(sig_key, status)
+        updated_mem = self._in_memory.update_status(sig_key, status)
+        self._cached_resolved = None
 
         if database_enabled():
             self._ensure_schema()
@@ -408,7 +432,7 @@ class SignalSignatureRepository:
                     session.close()
             except Exception as ex:
                 logger.warning(f"Database session error on signature update: {ex}")
-        return False
+        return updated_mem
 
     def clear(self) -> None:
         self._in_memory.clear()

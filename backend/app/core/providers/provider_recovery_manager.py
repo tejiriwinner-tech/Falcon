@@ -223,22 +223,27 @@ class ProviderRecoveryManager:
                 continue
 
             state = provider.circuit_breaker_state
-            if state != "OPEN":
+            if state not in ("OPEN", "HALF_OPEN"):
                 continue
 
             # Check if cooldown has expired
             retry_in = provider._cb_seconds_until_retry() if hasattr(provider, '_cb_seconds_until_retry') else None
-            if retry_in is None or retry_in > 0:
+            if state == "OPEN" and (retry_in is None or retry_in > 0):
                 continue  # Cooldown still active
 
             # Cooldown expired — attempt health probe
             self._attempt_health_probe(provider, provider_id, provider_name)
 
     def _attempt_health_probe(self, provider, provider_id: str, provider_name: str) -> None:
-        """Attempt ONE health check on an OPEN provider."""
+        """Attempt ONE health check on an OPEN or HALF_OPEN provider."""
         try:
+            probe_symbol = (
+                "GBPUSD"
+                if (hasattr(provider, "supports_symbol") and provider.supports_symbol("GBPUSD"))
+                else "XAUUSD"
+            )
             # Try to get a dummy quote to test connectivity
-            result = provider.fetch("XAUUSD")
+            result = provider.fetch(probe_symbol)
             if result is not None:
                 # Success — close circuit
                 provider._cb_record_success()

@@ -53,6 +53,12 @@ class IntelligenceData {
     this.reasoning,
   });
 
+  static double? _parseNullableDouble(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString());
+  }
+
   factory IntelligenceData.fromJson(Map<String, dynamic> json) {
     return IntelligenceData(
       symbol: json['symbol'] as String,
@@ -65,8 +71,8 @@ class IntelligenceData {
       marketState: json['marketState'] as String? ?? 'UNKNOWN',
       trend: json['trend'] as String? ?? 'UNKNOWN',
       entry: json['entry']?.toString(),
-      stop: (json['stop'] as num?)?.toDouble(),
-      target: (json['target'] as num?)?.toDouble(),
+      stop: _parseNullableDouble(json['stop']),
+      target: _parseNullableDouble(json['target']),
       reasoning: json['reasoning']?.toString(),
     );
   }

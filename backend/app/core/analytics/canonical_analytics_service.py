@@ -457,8 +457,8 @@ class CanonicalAnalyticsService:
             s_avg_r = round(sum(s_r_list) / len(s_r_list), 4) if s_r_list else None
 
             # Strategy intra-drawdown
-            s_eq = 0.0
-            s_peak = 0.0
+            s_eq = baseline_equity if baseline_equity > 0 else 0.0
+            s_peak = baseline_equity if baseline_equity > 0 else 0.0
             s_max_dd = 0.0
             s_max_dd_pct = None
             s_sorted = sorted(s_trades, key=lambda t: (_as_utc(t.closeDate or t.tradeDate), t.id))

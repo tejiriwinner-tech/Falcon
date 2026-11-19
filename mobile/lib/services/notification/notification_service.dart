@@ -82,7 +82,7 @@ class NotificationService {
       await init();
     }
 
-    const AndroidNotificationDetails androidDetails =
+    final AndroidNotificationDetails androidDetails =
         AndroidNotificationDetails(
       signalChannelId,
       signalChannelName,
@@ -92,7 +92,7 @@ class NotificationService {
       ticker: 'Falcon Trade Signal',
       playSound: true,
       enableVibration: true,
-      styleInformation: BigTextStyleInformation(''),
+      styleInformation: BigTextStyleInformation(body),
     );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
@@ -101,7 +101,7 @@ class NotificationService {
       presentSound: true,
     );
 
-    const NotificationDetails platformDetails = NotificationDetails(
+    final NotificationDetails platformDetails = NotificationDetails(
       android: androidDetails,
       iOS: iosDetails,
     );

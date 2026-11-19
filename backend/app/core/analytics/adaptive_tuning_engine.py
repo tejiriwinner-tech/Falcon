@@ -75,6 +75,9 @@ class AdaptiveRuleTuningEngine:
         return cls._instance
 
     def __init__(self) -> None:
+        if getattr(self, "_initialized", False):
+            return
+        self._initialized = True
         self.version = "3.2.0"
         self._profiles: Dict[str, StrategyTuningProfile] = {}
 
@@ -235,16 +238,30 @@ class AdaptiveRuleTuningEngine:
 
         wins = sum(1 for t in recent if t.result.upper() in ("WIN", "WON"))
         losses = sum(1 for t in recent if t.result.upper() in ("LOSS", "LOST"))
-        win_rate = (wins / (wins + losses)) if (wins + losses) > 0 else 0.5
+        decided_trades = wins + losses
+        win_rate = (wins / decided_trades) if decided_trades > 0 else 0.5
+        net_pnl = sum(float(getattr(t, "profitLoss", 0.0) or 0.0) for t in recent)
+        r_vals = [float(t.realizedRMultiple) for t in recent if getattr(t, "realizedRMultiple", None) is not None]
+        avg_r = (sum(r_vals) / len(r_vals)) if r_vals else (1.0 if net_pnl >= 0 else -1.0)
 
-        # Calculate current consecutive losses (ordered latest first)
+        # Calculate current consecutive losses (ordered latest first) and latest loss age
         consecutive_losses = 0
+        latest_loss_dt: Optional[datetime] = None
         for t in recent:
             res = t.result.upper()
             if res in ("LOSS", "LOST"):
                 consecutive_losses += 1
+                if latest_loss_dt is None:
+                    c_dt = getattr(t, "closeDate", None) or getattr(t, "tradeDate", None)
+                    if c_dt is not None:
+                        latest_loss_dt = c_dt if c_dt.tzinfo else c_dt.replace(tzinfo=timezone.utc)
             elif res in ("WIN", "WON"):
                 break
+
+        quarantine_expired = (
+            latest_loss_dt is not None
+            and (as_of_utc - latest_loss_dt).total_seconds() > 24 * 3600
+        )
 
         # Check if recent losses were wick-driven or counter-trend
         wick_stopouts = sum(
@@ -266,15 +283,15 @@ class AdaptiveRuleTuningEngine:
         tier_grade = "TIER_2_CONSISTENT"
 
         # Tier 1: Flagship (strat-006, strat-014 or Win Rate >= 70% with >= 3 trades)
-        if (strategy_id or "").lower() in ("strat-006", "strat-014") or (win_rate >= 0.70 and total >= 3 and consecutive_losses == 0):
+        if (strategy_id or "").lower() in ("strat-006", "strat-014") or (win_rate >= 0.70 and decided_trades >= 3 and consecutive_losses == 0):
             tier_grade = "TIER_1_FLAGSHIP"
             stop_mult = 1.0
             pullback_mult = 1.0
             status = "OPTIMAL"
             rec_weight = max(rec_weight, 1.25)
             rationale_parts.append(f"Flagship Tier ({win_rate*100:.0f}% win rate): Priority capital allocation (1.25x) active.")
-        # Tier 4: Quarantined Shadow (Win rate < 45% with >= 4 trades OR consecutive losses >= 3)
-        elif (win_rate < 0.45 and total >= 4) or consecutive_losses >= 3:
+        # Tier 4: Quarantined Shadow (requires >= 8 decided W/L trades with negative expectancy OR >= 3 consecutive losses within 24h)
+        elif not quarantine_expired and ((win_rate < 0.45 and decided_trades >= 8 and (avg_r < 0 or net_pnl < 0)) or (consecutive_losses >= 3 and (avg_r < 0 or net_pnl < 0))):
             tier_grade = "TIER_4_QUARANTINED"
             is_quarantined = True
             stop_mult = 1.6
@@ -284,8 +301,8 @@ class AdaptiveRuleTuningEngine:
             rationale_parts.append(
                 f"Autonomous Quarantine: Win rate ({win_rate*100:.1f}%) below 45% benchmark or {consecutive_losses} losses. Quarantined to paper shadow tracking to protect live capital."
             )
-        # Tier 3: Probation (Win rate 45% - 54% or consecutive losses == 2)
-        elif win_rate < 0.55 or consecutive_losses == 2:
+        # Tier 3: Probation (Win rate 45% - 54% with >= 4 decided trades or consecutive losses == 2)
+        elif (decided_trades >= 4 and win_rate < 0.55) or consecutive_losses == 2:
             tier_grade = "TIER_3_PROBATION"
             stop_mult = 1.35
             pullback_mult = 1.20

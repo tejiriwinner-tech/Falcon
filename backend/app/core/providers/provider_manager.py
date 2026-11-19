@@ -145,8 +145,7 @@ class ProviderManager:
             if cached_entry is not None:
                 quote = cached_entry.data
                 if isinstance(quote, MarketQuote):
-                    quote.freshnessSeconds = cached_entry.age_seconds
-                    self._cache.set(symbol=canonical, data=quote, provider_id="oanda", provider_name="OANDA Stream", ttl=30)
+                    quote = quote.model_copy(update={"freshnessSeconds": cached_entry.age_seconds})
                     self._successful_requests += 1
                     elapsed_ms = (time.time() - t_start) * 1000
                     self._warm_request_count += 1
@@ -170,8 +169,9 @@ class ProviderManager:
                 # Emergency fallback to stale cache if network/provider failed
                 stale_entry = self._cache.get(canonical, allow_stale=True)
                 if stale_entry and isinstance(stale_entry.data, MarketQuote):
-                    stale_quote = stale_entry.data
-                    stale_quote.freshnessSeconds = stale_entry.age_seconds
+                    stale_quote = stale_entry.data.model_copy(
+                        update={"freshnessSeconds": stale_entry.age_seconds}
+                    )
                     result = MarketQuoteResponse(quote=stale_quote)
 
             future.set_result(result)
@@ -209,10 +209,10 @@ class ProviderManager:
                                 bid=tick["bid"],
                                 ask=tick["ask"],
                                 spread=tick["spread"],
-                            bidLiquidity=tick.get("bidLiquidity"),
-                            askLiquidity=tick.get("askLiquidity"),
-                            domImbalance=tick.get("domImbalance"),
-                            depthTiers=tick.get("depthTiers"),
+                                bidLiquidity=tick.get("bidLiquidity"),
+                                askLiquidity=tick.get("askLiquidity"),
+                                domImbalance=tick.get("domImbalance"),
+                                depthTiers=tick.get("depthTiers"),
                             ),
                             lastPrice=tick.get("last", tick["bid"]),
                             change=0.0,
@@ -223,10 +223,10 @@ class ProviderManager:
                             quoteStatus=QuoteStatus.LIVE,
                             marketStatus=MarketStatus.OPEN,
                             freshnessSeconds=round(age, 4),
-                        bidLiquidity=tick.get("bidLiquidity"),
-                        askLiquidity=tick.get("askLiquidity"),
-                        domImbalance=tick.get("domImbalance"),
-                        depthTiers=tick.get("depthTiers"),
+                            bidLiquidity=tick.get("bidLiquidity"),
+                            askLiquidity=tick.get("askLiquidity"),
+                            domImbalance=tick.get("domImbalance"),
+                            depthTiers=tick.get("depthTiers"),
                         )
                         self._cache.set(symbol=canonical, data=quote, provider_id="oanda", provider_name="OANDA Stream", ttl=30)
                         results[canonical] = MarketQuoteResponse(quote=quote)
@@ -260,10 +260,10 @@ class ProviderManager:
                             bid=raw_data["bid"],
                             ask=raw_data["ask"],
                             spread=raw_data["spread"],
-                    bidLiquidity=raw_data.get("bidLiquidity"),
-                    askLiquidity=raw_data.get("askLiquidity"),
-                    domImbalance=raw_data.get("domImbalance"),
-                    depthTiers=raw_data.get("depthTiers"),
+                            bidLiquidity=raw_data.get("bidLiquidity"),
+                            askLiquidity=raw_data.get("askLiquidity"),
+                            domImbalance=raw_data.get("domImbalance"),
+                            depthTiers=raw_data.get("depthTiers"),
                         ),
                         lastPrice=raw_data.get("lastPrice", raw_data.get("mid", 0.0)),
                         change=raw_data.get("change", 0.0),
@@ -278,10 +278,10 @@ class ProviderManager:
                         quoteStatus=QuoteStatus.LIVE,
                         marketStatus=MarketStatus.OPEN,
                         freshnessSeconds=freshness,
-                bidLiquidity=raw_data.get("bidLiquidity"),
-                askLiquidity=raw_data.get("askLiquidity"),
-                domImbalance=raw_data.get("domImbalance"),
-                depthTiers=raw_data.get("depthTiers"),
+                        bidLiquidity=raw_data.get("bidLiquidity"),
+                        askLiquidity=raw_data.get("askLiquidity"),
+                        domImbalance=raw_data.get("domImbalance"),
+                        depthTiers=raw_data.get("depthTiers"),
                     )
                     self._cache.set(
                         symbol=c_sym,
@@ -496,13 +496,16 @@ class ProviderManager:
         if resp is None:
             return None
         quote = resp.quote
+        sym_upper = (quote.symbol or "").upper()
+        pip_size = 0.01 if "JPY" in sym_upper else (0.10 if ("XAU" in sym_upper or "GOLD" in sym_upper) else 0.0001)
+        spread_pips = round((quote.bidAsk.spread or 0.0) / pip_size, 2)
         from app.schemas.provider_models import MarketDataSnapshot, MarketQuote as LegacyQuote
         legacy = LegacyQuote(
             symbol=quote.symbol,
             bid=quote.bidAsk.bid,
             ask=quote.bidAsk.ask,
             spread=quote.bidAsk.spread,
-            spreadPips=quote.bidAsk.spread,
+            spreadPips=spread_pips,
             mid=quote.lastPrice,
             timestamp=quote.timestamp,
             providerId=quote.providerId,

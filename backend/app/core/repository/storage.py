@@ -114,11 +114,16 @@ class InMemoryMissionStorage:
             for k in ARTIFACT_MODELS
         }
 
-    def get_all_artifacts_bulk(self, mission_ids: Optional[List[str]] = None) -> Dict[str, Dict[str, List[BaseModel]]]:
+    def get_all_artifacts_bulk(
+        self,
+        mission_ids: Optional[List[str]] = None,
+        artifact_types: Optional[List[str]] = None,
+    ) -> Dict[str, Dict[str, List[BaseModel]]]:
         targets = mission_ids if mission_ids is not None else list(self._artifacts.keys())
+        types_to_include = set(artifact_types) if artifact_types is not None else set(ARTIFACT_MODELS.keys())
         return {
             mid: {
-                k: [copy.deepcopy(a) for a in self._artifacts.get(mid, {}).get(k, [])]
+                k: ([copy.deepcopy(a) for a in self._artifacts.get(mid, {}).get(k, [])] if k in types_to_include else [])
                 for k in ARTIFACT_MODELS
             }
             for mid in targets
@@ -152,10 +157,13 @@ class InMemoryMissionStorage:
     def prune_older_than(self, days: int = 14) -> int:
         now = datetime.now(timezone.utc)
         cutoff = now - timedelta(days=days)
-        to_delete = [
-            mid for mid, m in self._missions.items()
-            if m.timestamp < cutoff
-        ]
+        to_delete = []
+        for mid, m in self._missions.items():
+            m_dt = getattr(m, "completedAt", None) or getattr(m, "startedAt", None)
+            if m_dt is not None:
+                m_dt_utc = m_dt if m_dt.tzinfo else m_dt.replace(tzinfo=timezone.utc)
+                if m_dt_utc < cutoff:
+                    to_delete.append(mid)
         for mid in to_delete:
             self._missions.pop(mid, None)
             self._artifacts.pop(mid, None)

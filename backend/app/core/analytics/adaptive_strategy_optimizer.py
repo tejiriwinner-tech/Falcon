@@ -129,7 +129,7 @@ class AdaptiveStrategyOptimizer:
                     if t.strategyId == strat.id and t.status.upper() == "CLOSED"
                 ]
                 if strat_trades:
-                    strat_wins = sum(1 for t in strat_trades if t.result.upper() == "WIN")
+                    strat_wins = sum(1 for t in strat_trades if t.result.upper() in ("WIN", "WON"))
                     journal_win_rate = (strat_wins / len(strat_trades)) * 100.0
                     # Factor 50% real market execution outcomes + 50% signal pipeline metrics
                     hist_perf = round((journal_win_rate * 0.5) + ((sig_conf_avg * 0.4 + val_avg * 0.3 + dec_avg * 0.3) * 0.5), 1)
@@ -168,7 +168,13 @@ class AdaptiveStrategyOptimizer:
             overall_score = round(max(0.0, min(100.0, weighted)), 1)
 
             # ---- Recommendation ----
-            if overall_score >= 95.0:
+            if missions_exec == 0:
+                rec_type = OptimizationRecommendation.MONITOR
+                rec_priority = OptimizationPriority.LOW
+                rec_reason = "No historical mission candidates recorded yet. Monitoring strategy until execution data accumulates."
+                rec_benefit = "Collect baseline mission telemetry before modifying allocation."
+                rec_confidence = 0.70
+            elif overall_score >= 95.0:
                 rec_type = OptimizationRecommendation.PRIORITIZE
                 rec_priority = OptimizationPriority.HIGH
                 rec_reason = "Exceptional score across all weighted dimensions. Market-compatible and historically consistent."
@@ -208,13 +214,7 @@ class AdaptiveStrategyOptimizer:
                 status = OptimizationStatus.READY
 
             # ---- Trend ----
-            if "London Breakout" in strat.name:
-                trend = OptimizationTrend.IMPROVING
-            elif "London Momentum" in strat.name:
-                trend = OptimizationTrend.DECLINING
-            elif overall_score >= 85.0:
-                trend = OptimizationTrend.STABLE
-            elif overall_score >= 70.0:
+            if missions_exec == 0 or overall_score >= 70.0:
                 trend = OptimizationTrend.STABLE
             else:
                 trend = OptimizationTrend.DECLINING

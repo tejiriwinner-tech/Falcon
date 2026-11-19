@@ -75,7 +75,7 @@ def get_provider_by_id(provider_id: str):
 # Market data endpoints
 # ------------------------------------------------------------------
 
-@router.get("/market-data/{symbol}", response_model=MarketDataSnapshot)
+@router.get("/market-data/{symbol:path}", response_model=MarketDataSnapshot)
 def get_market_data(symbol: str):
     """Return a normalized market snapshot for a symbol or alias."""
     snapshot = provider_manager.get_market_data(symbol)

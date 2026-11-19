@@ -116,7 +116,11 @@ class LearningSchedulerService:
             logger.warning(f"[Stage 4] Strategy optimizer failed: {e}")
 
         # Stage 5: Autonomous Database & Memory Maintenance (Daily / Every 96 cycles)
-        if self._total_cycles % 96 == 0 or self._total_cycles == 1:
+        # DATA PRESERVATION: Archived missions & artifacts are NEVER auto-deleted unless the
+        # operator explicitly opts in via ENABLE_MISSION_AUTO_PRUNE=true (default: False).
+        from app.core.config.settings import settings as _settings
+        auto_prune_enabled = bool(getattr(_settings, "ENABLE_MISSION_AUTO_PRUNE", False))
+        if auto_prune_enabled and (self._total_cycles % 96 == 0 or self._total_cycles == 1):
             try:
                 pruned_count = await asyncio.to_thread(mission_repository.prune_older_than, 14)
                 if pruned_count > 0:

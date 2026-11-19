@@ -45,7 +45,7 @@ class _SignalsScreenState extends State<SignalsScreen> {
 
   Future<void> _refreshSignals() async {
     setState(() {
-      _signalsFuture = _apiService.getSignals();
+      _signalsFuture = _apiService.getSignals(forceRefresh: true);
     });
     await _signalsFuture;
   }
@@ -124,7 +124,11 @@ class _SignalsScreenState extends State<SignalsScreen> {
             );
           } else if (snapshot.hasData) {
             final rawSignals = snapshot.data!.signals;
-            _pinService.updateWithLiveSignals(rawSignals);
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                _pinService.updateWithLiveSignals(rawSignals);
+              }
+            });
 
             // Strict deduplication by uniqueKey (symbol + action + entry + stopLoss)
             final seenKeys = <String>{};

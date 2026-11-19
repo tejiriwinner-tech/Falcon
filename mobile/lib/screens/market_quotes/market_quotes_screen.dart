@@ -8,6 +8,7 @@ import '../../widgets/cards/app_card.dart';
 import '../../widgets/typography/section_title.dart';
 import '../../widgets/loading/placeholder_card.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/price_formatter.dart';
 
 class MarketQuotesScreen extends StatefulWidget {
   const MarketQuotesScreen({super.key});
@@ -20,6 +21,8 @@ class _MarketQuotesScreenState extends State<MarketQuotesScreen> {
   final ApiService _apiService = ApiService();
   late Future<List<MarketQuote>> _watchlistFuture;
   late Future<ProviderListResponse> _providersFuture;
+  List<MarketQuote>? _cachedQuotes;
+  ProviderListResponse? _cachedProviders;
   Timer? _timer;
   DateTime _lastRefresh = DateTime.now();
 
@@ -44,8 +47,18 @@ class _MarketQuotesScreenState extends State<MarketQuotesScreen> {
     setState(() {
       _watchlistFuture = _apiService.getWatchlist(
         symbols: ['XAUUSD', 'GBPUSD', 'EURUSD', 'GBPJPY', 'USDJPY', 'AUDUSD', 'NAS100', 'US30'],
-      );
-      _providersFuture = _apiService.getProviders();
+      ).then((quotes) {
+        if (mounted) {
+          setState(() => _cachedQuotes = quotes);
+        }
+        return quotes;
+      });
+      _providersFuture = _apiService.getProviders().then((providers) {
+        if (mounted) {
+          setState(() => _cachedProviders = providers);
+        }
+        return providers;
+      });
       _lastRefresh = DateTime.now();
     });
   }
@@ -80,10 +93,10 @@ class _MarketQuotesScreenState extends State<MarketQuotesScreen> {
               FutureBuilder<List<MarketQuote>>(
                 future: _watchlistFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  if (snapshot.connectionState == ConnectionState.waiting && _cachedQuotes == null) {
                     return const PlaceholderCard(height: 120);
                   }
-                  final quotes = snapshot.data ?? [];
+                  final quotes = snapshot.data ?? _cachedQuotes ?? [];
                   final avgFreshness = quotes.isNotEmpty
                       ? quotes.map((q) => q.freshnessSeconds).fold(0.0, (a, b) => a + b) / quotes.length
                       : 0.0;
@@ -105,9 +118,9 @@ class _MarketQuotesScreenState extends State<MarketQuotesScreen> {
               FutureBuilder<List<MarketQuote>>(
                 future: _watchlistFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  if (snapshot.connectionState == ConnectionState.waiting && _cachedQuotes == null) {
                     return const PlaceholderCard(height: 300);
-                  } else if (snapshot.hasError) {
+                  } else if (snapshot.hasError && _cachedQuotes == null) {
                     return AppCard(
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
@@ -117,8 +130,8 @@ class _MarketQuotesScreenState extends State<MarketQuotesScreen> {
                         ),
                       ),
                     );
-                  } else if (snapshot.hasData) {
-                    final quotes = snapshot.data!;
+                  } else if (snapshot.hasData || _cachedQuotes != null) {
+                    final quotes = snapshot.data ?? _cachedQuotes!;
                     return ListView.separated(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -141,10 +154,10 @@ class _MarketQuotesScreenState extends State<MarketQuotesScreen> {
               FutureBuilder<ProviderListResponse>(
                 future: _providersFuture,
                 builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
+                  if (snapshot.connectionState == ConnectionState.waiting && _cachedProviders == null) {
                     return const PlaceholderCard(height: 160);
-                  } else if (snapshot.hasData) {
-                    return _buildProviderHealthPanel(snapshot.data!);
+                  } else if (snapshot.hasData || _cachedProviders != null) {
+                    return _buildProviderHealthPanel(snapshot.data ?? _cachedProviders!);
                   }
                   return const SizedBox.shrink();
                 },
@@ -302,11 +315,11 @@ class _MarketQuotesScreenState extends State<MarketQuotesScreen> {
             textBaseline: TextBaseline.alphabetic,
             children: [
               Text(
-                quote.lastPrice.toStringAsFixed(quote.lastPrice > 100 ? 2 : 4),
+                PriceFormatter.format(quote.symbol, quote.lastPrice),
                 style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
               ),
               Text(
-                'Spread: ${quote.bidAsk.spread.toStringAsFixed(4)}',
+                'Spread: ${(quote.bidAsk.spread / PriceFormatter.pipSize(quote.symbol)).toStringAsFixed(1)}p',
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
             ],
@@ -314,8 +327,8 @@ class _MarketQuotesScreenState extends State<MarketQuotesScreen> {
           const SizedBox(height: 12),
           Row(
             children: [
-              _buildPriceCell('Bid', quote.bidAsk.bid.toStringAsFixed(quote.bidAsk.bid > 100 ? 2 : 4)),
-              _buildPriceCell('Ask', quote.bidAsk.ask.toStringAsFixed(quote.bidAsk.ask > 100 ? 2 : 4)),
+              _buildPriceCell('Bid', PriceFormatter.format(quote.symbol, quote.bidAsk.bid)),
+              _buildPriceCell('Ask', PriceFormatter.format(quote.symbol, quote.bidAsk.ask)),
               _buildPriceCell('Status', quote.quoteStatus.name),
               _buildPriceCell('Market', quote.marketStatus.name),
             ],

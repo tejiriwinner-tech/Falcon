@@ -213,6 +213,8 @@ def _confidence_from_status(quote_status: str, base: int = 85) -> int:
         return base
     elif quote_status == "STALE":
         return min(base, 75)
+    elif quote_status == "DELAYED":
+        return 65
     elif quote_status == "EXPIRED":
         return 0
     return 0  # INSUFFICIENT_DATA
@@ -340,12 +342,15 @@ class MarketStateEngine:
                     stored_bars = market_history_service.get_bars(sym, limit=5)
                     if stored_bars:
                         last_bar = stored_bars[-1]
+                        half_spread = 0.15 if ("XAU" in sym or "GOLD" in sym) else (0.01 if "JPY" in sym else 0.0001)
+                        fb_bid = round(last_bar.close - half_spread, 5)
+                        fb_ask = round(last_bar.close + half_spread, 5)
                         prices[sym] = MarketPrice(
                             symbol=sym,
                             currentPrice=last_bar.close,
-                            bid=last_bar.close - (0.0001 if "USD" in sym else 0.5),
-                            ask=last_bar.close + (0.0001 if "USD" in sym else 0.5),
-                            spread=0.2 if "USD" in sym else 1.0,
+                            bid=fb_bid,
+                            ask=fb_ask,
+                            spread=round(fb_ask - fb_bid, 5),
                             timestamp=last_bar.bar_time,
                             provider=last_bar.provider or "Stored History",
                         )
@@ -364,7 +369,7 @@ class MarketStateEngine:
                     quote_status_str = "INSUFFICIENT_DATA"
                     confidence = 50
 
-                market_open = True
+                market_open = "Weekend" not in _derive_session(now)
                 live_spread = 0.3
                 primary_provider_id = "cache_fallback"
                 primary_provider_name = "Falcon Market Cache"

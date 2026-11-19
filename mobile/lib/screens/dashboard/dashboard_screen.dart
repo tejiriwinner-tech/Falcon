@@ -5,6 +5,7 @@ import '../../widgets/typography/section_title.dart';
 import '../../widgets/chips/status_chip.dart';
 import '../../widgets/loading/placeholder_card.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/price_formatter.dart';
 import '../../services/api/api_service.dart';
 import '../../services/theme/theme_service.dart';
 import '../../models/health_status.dart';
@@ -898,8 +899,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
     final isFresh = quote.quoteStatus == QuoteStatus.LIVE || quote.freshnessSeconds < 10;
     final badgeColor = isFresh ? AppColors.success : AppColors.warning;
     final providerShort = quote.providerName.replaceAll(' ', '\n');
-    final midStr = quote.lastPrice.toStringAsFixed(quote.symbol.contains('JPY') ? 3 : 4);
-    final spreadStr = 'Spread: ${quote.bidAsk.spread.toStringAsFixed(1)}p';
+    final midStr = PriceFormatter.format(quote.symbol, quote.lastPrice);
+    final spreadPips = quote.bidAsk.spread / PriceFormatter.pipSize(quote.symbol);
+    final spreadStr = 'Spread: ${spreadPips.toStringAsFixed(1)}p';
     final freshnessLabel = 'Fresh ${quote.freshnessSeconds.toInt()}s';
 
     return InkWell(
@@ -1141,9 +1143,9 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              _buildSignalValue('Entry', signal.entry.toStringAsFixed(4)),
-              _buildSignalValue('TP', signal.takeProfit.toStringAsFixed(4)),
-              _buildSignalValue('SL', signal.stopLoss.toStringAsFixed(4)),
+              _buildSignalValue('Entry', PriceFormatter.format(signal.symbol, signal.entry)),
+              _buildSignalValue('TP', PriceFormatter.format(signal.symbol, signal.takeProfit)),
+              _buildSignalValue('SL', PriceFormatter.format(signal.symbol, signal.stopLoss)),
               _buildSignalValue('Conf.', '${signal.confidence}%'),
             ],
           ),
@@ -1464,10 +1466,10 @@ class _DashboardScreenState extends State<DashboardScreen> with WidgetsBindingOb
   Widget _buildConfidenceGapCard(DecisionEngineResponse data) {
     final current = data.confidenceScore;
     final target = data.minimumConfidence;
-    final gap = data.confidenceGap;
-    final progress = (current / target).clamp(0.0, 1.0);
-    final gapColor = gap >= 0 ? AppColors.success : AppColors.warning;
-    final gapLabel = gap >= 0 ? '+$gap%' : '$gap%';
+    final delta = current - target;
+    final progress = target > 0 ? (current / target).clamp(0.0, 1.0) : 0.0;
+    final gapColor = delta >= 0 ? AppColors.success : AppColors.warning;
+    final gapLabel = delta >= 0 ? '+$delta%' : '$delta%';
 
     return AppCard(
       child: Column(

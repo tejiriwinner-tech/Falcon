@@ -2,6 +2,7 @@
 Falcon Provider Framework — In-Memory Cache
 Stores market data quotes with per-symbol TTL and freshness state tracking.
 """
+import threading
 import time
 from enum import Enum
 from dataclasses import dataclass, field
@@ -80,6 +81,7 @@ class MarketDataCache:
     """In-memory cache with TTL-based freshness tracking and statistics."""
 
     def __init__(self, default_ttl: int = CACHE_TTL_SECONDS):
+        self._lock = threading.RLock()
         self._store: Dict[str, CacheEntry] = {}
         self._default_ttl = default_ttl
         self._hits: int = 0
@@ -94,51 +96,57 @@ class MarketDataCache:
         ttl: Optional[int] = None
     ) -> None:
         """Store quote data for a symbol."""
-        self._store[symbol.upper()] = CacheEntry(
-            symbol=symbol.upper(),
-            data=data,
-            provider_id=provider_id,
-            provider_name=provider_name,
-            stored_at=time.time(),
-            ttl_seconds=ttl if ttl is not None else self._default_ttl,
-        )
+        with self._lock:
+            self._store[symbol.upper()] = CacheEntry(
+                symbol=symbol.upper(),
+                data=data,
+                provider_id=provider_id,
+                provider_name=provider_name,
+                stored_at=time.time(),
+                ttl_seconds=ttl if ttl is not None else self._default_ttl,
+            )
 
     def get(self, symbol: str, allow_stale: bool = False) -> Optional[CacheEntry]:
         """Return CacheEntry if valid (fresh, or stale if allow_stale=True)."""
-        entry = self._store.get(symbol.upper())
-        if entry is None:
-            self._misses += 1
-            return None
+        with self._lock:
+            entry = self._store.get(symbol.upper())
+            if entry is None:
+                self._misses += 1
+                return None
 
-        if not allow_stale and not entry.is_fresh:
-            self._misses += 1
-            return None
+            if not allow_stale and not entry.is_fresh:
+                self._misses += 1
+                return None
 
-        self._hits += 1
-        return entry
+            self._hits += 1
+            return entry
 
     def has(self, symbol: str) -> bool:
         return self.get(symbol) is not None
 
     def invalidate(self, symbol: str) -> None:
-        self._store.pop(symbol.upper(), None)
+        with self._lock:
+            self._store.pop(symbol.upper(), None)
 
     def clear(self) -> None:
-        self._store.clear()
+        with self._lock:
+            self._store.clear()
 
     @property
     def hit_rate(self) -> float:
-        total = self._hits + self._misses
-        return round((self._hits / total * 100) if total > 0 else 0.0, 2)
+        with self._lock:
+            total = self._hits + self._misses
+            return round((self._hits / total * 100) if total > 0 else 0.0, 2)
 
     @property
     def stats(self) -> Dict[str, Any]:
-        return {
-            "size": len(self._store),
-            "hits": self._hits,
-            "misses": self._misses,
-            "hit_rate": self.hit_rate,
-        }
+        with self._lock:
+            return {
+                "size": len(self._store),
+                "hits": self._hits,
+                "misses": self._misses,
+                "hit_rate": self.hit_rate,
+            }
 
 
 # Singleton instance

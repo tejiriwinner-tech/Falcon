@@ -21,13 +21,13 @@ class MarketHistoryAdapter:
 
     # Timeframe mapping: signal pipeline Timeframe enum → price_history string format
     _TIMEFRAME_MAPPING = {
-        Timeframe.M1: "1min",
-        Timeframe.M5: "5min",
-        Timeframe.M15: "15min",
-        Timeframe.M30: "30min",
+        Timeframe.M1: "1m",
+        Timeframe.M5: "5m",
+        Timeframe.M15: "15m",
+        Timeframe.M30: "30m",
         Timeframe.H1: "1h",
         Timeframe.H4: "4h",
-        Timeframe.D1: "daily",
+        Timeframe.D1: "1d",
     }
 
     def __init__(self, db: Session):
@@ -65,10 +65,10 @@ class MarketHistoryAdapter:
         # Get PriceBar objects from price_history
         price_bars = market_history_service.get_bars(symbol, timeframe_str, limit)
 
-        # Convert PriceBar to MarketCandle
+        # Convert PriceBar to MarketCandle (most recent first)
         candles = [
             self._price_bar_to_candle(bar, timeframe)
-            for bar in price_bars
+            for bar in reversed(price_bars)
         ]
 
         return candles
@@ -137,4 +137,6 @@ def get_market_history_adapter(db: Session) -> MarketHistoryAdapter:
     global market_history_adapter
     if market_history_adapter is None:
         market_history_adapter = MarketHistoryAdapter(db)
+    else:
+        market_history_adapter.db = db
     return market_history_adapter

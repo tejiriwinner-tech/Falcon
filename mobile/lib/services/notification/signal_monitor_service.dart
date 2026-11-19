@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/utils/price_formatter.dart';
 import '../../models/signal.dart';
 import '../api/api_service.dart';
 import 'notification_service.dart';
@@ -64,7 +65,7 @@ class SignalMonitorService {
     try {
       if (!_initialized) await init();
 
-      final response = await _apiService.getSignals();
+      final response = await _apiService.getSignals(forceRefresh: true);
       await processSignals(response.signals);
     } catch (e) {
       debugPrint('[SignalMonitorService] Polling error (safe skip): $e');
@@ -80,8 +81,9 @@ class SignalMonitorService {
       final status = signal.status.toUpperCase();
       final analysis = signal.analysis.toUpperCase();
 
-      // Canonical setup key: stable across all mission IDs
-      final entrySig = "${signal.symbol}_${action}_${signal.entry.toStringAsFixed(2)}";
+      // Canonical setup key: stable across all mission IDs (with full asset decimal precision)
+      final formattedEntry = PriceFormatter.format(signal.symbol, signal.entry);
+      final entrySig = "${signal.symbol}_${action}_$formattedEntry";
 
       // 1. Initial Entry Alert for Actionable Trades (fires strictly ONCE per unique setup)
       if ((action == 'BUY' || action == 'SELL') && (status == 'ACTIVE' || status == 'OPEN')) {
@@ -101,7 +103,7 @@ class SignalMonitorService {
           analysis.contains('BE_PROTECTED') ||
           analysis.contains('BREAKEVEN');
 
-      final beSig = "${signal.symbol}_BE_${signal.entry.toStringAsFixed(2)}";
+      final beSig = "${signal.symbol}_BE_$formattedEntry";
       if (isBreakevenStatus && !_breakevenNotifiedSignatures.contains(beSig)) {
         _breakevenNotifiedSignatures.add(beSig);
         hasNew = true;
@@ -117,7 +119,7 @@ class SignalMonitorService {
           analysis.contains('TP1_SCALED_OUT') ||
           analysis.contains('TARGET HIT');
 
-      final tpHitSig = "${signal.symbol}_TP_${signal.entry.toStringAsFixed(2)}";
+      final tpHitSig = "${signal.symbol}_TP_$formattedEntry";
       if (isTargetHit && !_targetHitNotifiedSignatures.contains(tpHitSig)) {
         _targetHitNotifiedSignatures.add(tpHitSig);
         hasNew = true;
@@ -131,14 +133,17 @@ class SignalMonitorService {
     if (hasNew) {
       try {
         final prefs = await SharedPreferences.getInstance();
-        // Persist last 100 notified signatures to prevent SharedPreferences bloat
-        final listToSave = _notifiedSignatures.toList().reversed.take(100).toList();
+        // Persist last 100 notified signatures in chronological order
+        final list = _notifiedSignatures.toList();
+        final listToSave = list.length > 100 ? list.sublist(list.length - 100) : list;
         await prefs.setStringList(_prefKey, listToSave);
 
-        final beListToSave = _breakevenNotifiedSignatures.toList().reversed.take(100).toList();
+        final beList = _breakevenNotifiedSignatures.toList();
+        final beListToSave = beList.length > 100 ? beList.sublist(beList.length - 100) : beList;
         await prefs.setStringList(_prefBeKey, beListToSave);
 
-        final tpListToSave = _targetHitNotifiedSignatures.toList().reversed.take(100).toList();
+        final tpList = _targetHitNotifiedSignatures.toList();
+        final tpListToSave = tpList.length > 100 ? tpList.sublist(tpList.length - 100) : tpList;
         await prefs.setStringList(_prefTpKey, tpListToSave);
       } catch (e) {
         debugPrint('[SignalMonitorService] Failed to persist signal signatures: $e');

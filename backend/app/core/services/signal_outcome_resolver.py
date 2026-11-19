@@ -512,14 +512,21 @@ class SignalOutcomeResolver:
         try:
             sig_resp = signal_service.build_signals(mission_limit=5)
             live_sigs = getattr(sig_resp, "signals", None) or []
-            existing_sig_ids = {t.signalId for t in all_stored_trades if t.signalId is not None}
+            all_stored_trades = trade_journal_repository.list_trades(session=session)
+            existing_sig_ids = {t.signalId for t in all_stored_trades if t.signalId is not None} | {t.id for t in all_stored_trades if t.id is not None}
+            active_sym_dirs = {
+                (t.symbol.replace("/", "").replace("_", "").replace("-", "").upper(), (t.direction or "").upper())
+                for t in all_stored_trades
+                if (t.status or "").upper() in ("OPEN", "PENDING", "FILLED") and t.closeDate is None
+            }
             added_any = False
             for s in live_sigs:
                 s_status = getattr(s, "status", None)
                 is_active_sig = (not isinstance(s_status, str)) or (s_status.upper() == "ACTIVE")
                 s_action = str(getattr(s, "action", "")).upper()
                 s_id = getattr(s, "id", None)
-                if is_active_sig and s_action in ("BUY", "SELL") and s_id not in existing_sig_ids:
+                s_sym_norm = str(getattr(s, "symbol", "") or "").replace("/", "").replace("_", "").replace("-", "").upper()
+                if is_active_sig and s_action in ("BUY", "SELL") and s_id not in existing_sig_ids and (s_sym_norm, s_action) not in active_sym_dirs:
                     s_entry = float(getattr(s, "entry", 0.0) or 0.0)
                     s_sl = float(getattr(s, "stopLoss", 0.0) or 0.0)
                     s_tp = float(getattr(s, "takeProfit", 0.0) or 0.0)
@@ -537,6 +544,7 @@ class SignalOutcomeResolver:
                                 direction=s_action,
                                 entryPrice=s_entry,
                                 stopLoss=s_sl,
+                                initialStopLoss=s_sl,
                                 takeProfit=s_tp,
                                 timeframe=str(getattr(s, "timeframe", None) or "H1"),
                                 marketSession="London",
@@ -550,10 +558,12 @@ class SignalOutcomeResolver:
                                 notes=f"Active signal #{s_id}",
                                 fillPrice=s_entry,
                                 fillTime=s_time,
+                                executionMode="LIVE",
                             ),
                             session=session,
                         )
                         existing_sig_ids.add(s_id)
+                        active_sym_dirs.add((s_sym_norm, s_action))
                         added_any = True
             if added_any:
                 all_stored_trades = trade_journal_repository.list_trades(session=session)
@@ -788,12 +798,14 @@ class SignalOutcomeResolver:
                 be_reached = False
                 tp1_hit = False
             else:
+                eff_bid = bid if (bid and bid > 0) else current_price
+                eff_ask = ask if (ask and ask > 0) else current_price
                 be_reached = (
                     bool(m1_replay["be_triggered"])
                     or (trade.mfeR is not None and trade.mfeR >= be_r_mult)
                     or "BE_PROTECTED" in (trade.notes or "")
-                    or (is_buy and (current_price >= be_threshold or (bid > 0 and bid >= be_threshold) or max_reach >= be_threshold))
-                    or (not is_buy and (current_price <= be_threshold or (ask > 0 and ask <= be_threshold) or max_reach <= be_threshold))
+                    or (is_buy and (eff_bid >= be_threshold or max_reach >= be_threshold))
+                    or (not is_buy and (eff_ask <= be_threshold or max_reach <= be_threshold))
                 )
 
                 tp1_hit = (
@@ -801,8 +813,8 @@ class SignalOutcomeResolver:
                     or (trade.mfeR is not None and trade.mfeR >= be_r_mult)
                     or "TP1_REACHED" in (trade.notes or "")
                     or "TP1_SCALED_OUT_50" in (trade.notes or "")
-                    or (is_buy and (current_price >= tp1_threshold or (bid > 0 and bid >= tp1_threshold) or max_reach >= tp1_threshold))
-                    or (not is_buy and (current_price <= tp1_threshold or (ask > 0 and ask <= tp1_threshold) or max_reach <= tp1_threshold))
+                    or (is_buy and (eff_bid >= tp1_threshold or max_reach >= tp1_threshold))
+                    or (not is_buy and (eff_ask <= tp1_threshold or max_reach <= tp1_threshold))
                 )
 
             if be_reached and "BE_PROTECTED" not in (trade.notes or ""):
@@ -877,17 +889,19 @@ class SignalOutcomeResolver:
             exit_price = current_price
 
             # Priority 1: Chronological M1 intra-poll boundary breach (spread-adjusted & conservative)
+            eff_bid = bid if (bid and bid > 0) else current_price
+            eff_ask = ask if (ask and ask > 0) else current_price
             if m1_replay["replay_result"] is not None:
                 result = m1_replay["replay_result"]
                 exit_price = float(m1_replay["replay_exit_price"] if m1_replay["replay_exit_price"] is not None else current_price)
-            # Priority 2: Evaluate live bid/ask boundary hits
+            # Priority 2: Evaluate live bid/ask boundary hits (BUY exits on bid, SELL exits on ask)
             elif direction == "BUY":
                 # Take profit achieved
-                if current_price >= take_profit or (bid > 0 and bid >= take_profit):
+                if eff_bid >= take_profit:
                     result = "WIN"
                     exit_price = take_profit
                 # Invalidation / Trailed Stop hit
-                elif current_price <= stop_loss or (bid > 0 and bid <= stop_loss):
+                elif eff_bid <= stop_loss:
                     if stop_loss >= entry + (0.5 * risk_d) and "STRUCTURAL_TRAIL_LOCKED" in (trade.notes or ""):
                         result = "WIN"
                         exit_price = stop_loss
@@ -899,11 +913,11 @@ class SignalOutcomeResolver:
                         exit_price = stop_loss
             elif direction == "SELL":
                 # Take profit achieved
-                if current_price <= take_profit or (ask > 0 and ask <= take_profit):
+                if eff_ask <= take_profit:
                     result = "WIN"
                     exit_price = take_profit
                 # Invalidation / Trailed Stop hit
-                elif current_price >= stop_loss or (ask > 0 and ask >= stop_loss):
+                elif eff_ask >= stop_loss:
                     if stop_loss <= entry - (0.5 * risk_d) and "STRUCTURAL_TRAIL_LOCKED" in (trade.notes or ""):
                         result = "WIN"
                         exit_price = stop_loss
@@ -955,9 +969,12 @@ class SignalOutcomeResolver:
                 # If no partial fill confirmed, realized return is exactly 0.00R (no ghost profit).
                 realized_r = round(0.50 * partial_r + 0.50 * 0.0, 2) if has_partial else 0.0
             elif result in ("WIN", "WON"):
-                # If 50% was confirmed banked at partial_r, remainder exits at full target risk_reward.
-                # If no partial fill confirmed, 100% position exits at full target risk_reward.
-                eff_target_r = risk_reward if risk_reward > 0 else 1.5
+                # If 50% was confirmed banked at partial_r, remainder exits at full target risk_reward (or trailed stop R).
+                # If no partial fill confirmed, 100% position exits at full target risk_reward (or trailed stop R).
+                if exit_price == stop_loss and stop_loss != take_profit and risk_dist > 1e-6:
+                    eff_target_r = round(abs(exit_price - entry) / risk_dist, 2)
+                else:
+                    eff_target_r = risk_reward if risk_reward > 0 else 1.5
                 realized_r = round(0.50 * partial_r + 0.50 * eff_target_r, 2) if has_partial else round(eff_target_r, 2)
             elif result in ("LOSS", "LOST"):
                 realized_r = -1.0
@@ -1007,6 +1024,28 @@ class SignalOutcomeResolver:
                 "trough_price": trough_val,
             })
 
+            # Persist closed trade state BEFORE resolve_trade_outcome so quarantine/streak evaluation sees the closed trade
+            pre_diag_update = TradeJournalUpdate(
+                exitPrice=exit_price,
+                closeDate=now,
+                status="CLOSED",
+                result=result,
+                profitLoss=pnl,
+                riskReward=risk_reward,
+                realizedRMultiple=realized_r,
+                peakPrice=peak_val,
+                troughPrice=trough_val,
+                mfeR=final_mfe_r,
+                maeR=final_mae_r,
+                confidence=trade.confidence,
+                notes=f"Auto-resolved by Falcon Outcome Resolver ({trade.notes or 'Falcon'})",
+                executionMode=getattr(trade, "executionMode", None),
+            )
+            try:
+                trade_journal_repository.update_trade(trade.id, pre_diag_update, session=session)
+            except Exception as ex:
+                logger.warning(f"Pre-diagnostic trade update warning for #{trade.id}: {ex}")
+
             diagnostic = self.resolve_trade_outcome(
                 trade=trade_diag_data,
                 market_context=market_context,
@@ -1049,7 +1088,8 @@ class SignalOutcomeResolver:
                 try:
                     from app.core.repository.signal_signature_repository import signal_signature_repository
                     sig_st = "WON" if result in ("WIN", "WON") else ("LOST" if result in ("LOSS", "LOST") else result)
-                    signal_signature_repository.update_status(symbol, direction, entry, stop_loss, take_profit, status=sig_st)
+                    orig_sl = getattr(trade, "initialStopLoss", None) or stop_loss
+                    signal_signature_repository.update_status(symbol, direction, entry, orig_sl, take_profit, status=sig_st)
                 except Exception:
                     pass
                 trade.result = result

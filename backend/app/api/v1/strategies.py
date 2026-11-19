@@ -45,7 +45,7 @@ def resume_strategy(strategy_id: str):
         raise HTTPException(status_code=404, detail="Strategy not found")
     return strategy
 
-@router.post("/strategies/symbol/{symbol}/pause")
+@router.post("/strategies/symbol/{symbol:path}/pause")
 def pause_symbol_strategies(symbol: str) -> Dict[str, Any]:
     """
     Pause all strategies for a symbol (e.g. GBPJPY, AUDUSD, USDJPY).
@@ -58,7 +58,7 @@ def pause_symbol_strategies(symbol: str) -> Dict[str, Any]:
         "state": strategy_engine.get_pause_state(),
     }
 
-@router.post("/strategies/symbol/{symbol}/resume")
+@router.post("/strategies/symbol/{symbol:path}/resume")
 def resume_symbol_strategies(symbol: str) -> Dict[str, Any]:
     """
     Resume all strategies for a symbol.

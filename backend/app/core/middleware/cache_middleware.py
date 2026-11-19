@@ -1,6 +1,6 @@
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 class CacheMiddleware(BaseHTTPMiddleware):
     """Middleware to add caching headers to API responses."""
@@ -19,14 +19,22 @@ class CacheMiddleware(BaseHTTPMiddleware):
     
     async def dispatch(self, request: Request, call_next):
         response = await call_next(request)
-        
-        # Determine cache duration based on endpoint
-        cache_duration = self._get_cache_duration(request.url.path)
+        path = request.url.path
+
+        # Only cache successful GET/HEAD responses and never cache /resolve endpoints
+        if (
+            request.method in ("GET", "HEAD")
+            and 200 <= response.status_code < 300
+            and "/resolve" not in path
+        ):
+            cache_duration = self._get_cache_duration(path)
+        else:
+            cache_duration = 0
         
         if cache_duration > 0:
             # Add cache headers
             response.headers["Cache-Control"] = f"public, max-age={cache_duration}"
-            response.headers["Expires"] = (datetime.utcnow() + timedelta(seconds=cache_duration)).strftime(
+            response.headers["Expires"] = (datetime.now(timezone.utc) + timedelta(seconds=cache_duration)).strftime(
                 "%a, %d %b %Y %H:%M:%S GMT"
             )
         else:
@@ -35,23 +43,13 @@ class CacheMiddleware(BaseHTTPMiddleware):
             response.headers["Pragma"] = "no-cache"
             response.headers["Expires"] = "0"
         
-        # Add ETag for conditional requests
-        if cache_duration > 0:
-            response.headers["ETag"] = self._generate_etag(response)
-        
         return response
     
     def _get_cache_duration(self, path: str) -> int:
         """Get cache duration for a given path."""
+        if "/resolve" in path:
+            return 0
         for endpoint, duration in self.CACHE_DURATIONS.items():
             if endpoint in path:
                 return duration
         return 0  # Default: no caching
-    
-    def _generate_etag(self, response: Response) -> str:
-        """Generate a simple ETag based on response body."""
-        import hashlib
-        body = getattr(response, "body", b"")
-        if body:
-            return hashlib.md5(body).hexdigest()
-        return "0"

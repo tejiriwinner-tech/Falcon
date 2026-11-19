@@ -1,6 +1,6 @@
 // ignore_for_file: constant_identifier_names
 
-enum ProviderStatus { ONLINE, DEGRADED, OFFLINE }
+enum ProviderStatus { ONLINE, DEGRADED, OFFLINE, RATE_LIMITED }
 
 enum ProviderType {
   PRICE,

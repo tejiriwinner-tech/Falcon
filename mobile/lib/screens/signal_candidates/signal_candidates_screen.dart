@@ -5,6 +5,7 @@ import '../../models/signal_candidate.dart';
 import '../../widgets/cards/app_card.dart';
 import '../../widgets/loading/placeholder_card.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/price_formatter.dart';
 
 class SignalCandidatesScreen extends StatefulWidget {
   const SignalCandidatesScreen({super.key});
@@ -492,9 +493,9 @@ class _SignalCandidatesScreenState extends State<SignalCandidatesScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               child: Row(
                 children: [
-                  _buildPriceItem('Entry', cand.entryPrice.toStringAsFixed(cand.entryPrice > 100 ? 2 : 4), AppColors.textSecondary),
-                  _buildPriceItem('SL', cand.stopLoss.toStringAsFixed(cand.stopLoss > 100 ? 2 : 4), AppColors.error),
-                  _buildPriceItem('TP', cand.takeProfit.toStringAsFixed(cand.takeProfit > 100 ? 2 : 4), AppColors.success),
+                  _buildPriceItem('Entry', PriceFormatter.format(cand.symbol, cand.entryPrice), AppColors.textSecondary),
+                  _buildPriceItem('SL', PriceFormatter.format(cand.symbol, cand.stopLoss), AppColors.error),
+                  _buildPriceItem('TP', PriceFormatter.format(cand.symbol, cand.takeProfit), AppColors.success),
                   _buildPriceItem('Risk:Reward', '1:${cand.riskReward.toStringAsFixed(1)}', AppColors.primary),
                 ],
               ),

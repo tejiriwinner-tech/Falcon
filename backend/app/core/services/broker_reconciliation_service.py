@@ -9,6 +9,7 @@ are immediately reflected in Falcon's persistent analytics and learning loops.
 from datetime import datetime, timezone
 from decimal import Decimal
 import logging
+import re
 from typing import Any, Dict, List, Optional
 
 from app.core.providers.oanda_provider import OandaProvider
@@ -71,16 +72,9 @@ class BrokerReconciliationService:
             # Extract broker ticket if present
             notes = getattr(trade, "notes", "") or ""
             broker_ticket = None
-            if "oanda_order:" in notes:
-                try:
-                    broker_ticket = notes.split("oanda_order:")[1].split()[0].strip()
-                except Exception:
-                    pass
-            elif "ticket:" in notes:
-                try:
-                    broker_ticket = notes.split("ticket:")[1].split()[0].strip()
-                except Exception:
-                    pass
+            m_ticket = re.search(r"(?:oanda_order:|ticket[:\s#]+)(\d+)", notes, re.IGNORECASE)
+            if m_ticket:
+                broker_ticket = m_ticket.group(1).strip()
 
             if not broker_ticket:
                 # Fuzzy Reconciliation: Match unticketed active trade by Symbol + Direction + Price proximity
@@ -92,7 +86,7 @@ class BrokerReconciliationService:
                     b_dir = "BUY" if b_units > 0 else "SELL"
                     if b_inst == t_sym and b_dir == t_dir:
                         b_price = float(b_trade.get("price", 0.0))
-                        pip_tol = 0.50 if ("XAU" in t_sym or trade.entryPrice > 100) else 0.0010
+                        pip_tol = 0.50 if "XAU" in t_sym else (0.05 if "JPY" in t_sym else 0.0010)
                         if abs(b_price - float(trade.entryPrice)) <= pip_tol:
                             broker_ticket = b_id
                             # Bind the matched broker ticket into journal record notes
@@ -174,9 +168,11 @@ class BrokerReconciliationService:
                 try:
                     signal_outcome_resolver._conduct_post_mortem_learning(
                         trade=trade,
-                        exit_reason=f"Broker reconciliation ({result})",
-                        market_price=exit_price,
-                        invalidation_boundary=trade.stopLoss,
+                        market_context={
+                            "exit_price": exit_price,
+                            "invalidation_boundary": trade.stopLoss,
+                            "exit_reason": f"Broker reconciliation ({result})",
+                        },
                     )
                 except Exception as ex:
                     logger.debug("Reconciliation post-mortem learning error: %s", ex)

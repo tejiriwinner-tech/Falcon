@@ -1,8 +1,11 @@
 import logging
+import threading
 from datetime import datetime, timezone, timedelta
 from typing import List, Optional, Set, Tuple
 
 logger = logging.getLogger("falcon.signal_service")
+
+_activation_lock = threading.Lock()
 
 import app.core.providers as providers
 from app.core.repository.mission_repository import mission_repository
@@ -138,11 +141,24 @@ class SignalService:
                 if (t.status or "").upper() in ("CLOSED", "EXPIRED", "INVALIDATED")
                 and (t.result or "").upper() in ("WIN", "WON", "LOSS", "LOST", "BREAKEVEN", "BE", "EXPIRED", "INVALIDATED")
             ]
+            def _entry_key_dp(sym_str: str) -> int:
+                s = (sym_str or "").upper()
+                return 2 if ("XAU" in s or "GOLD" in s) else (3 if "JPY" in s else 5)
+
+            recent_resolved_cutoff = now - timedelta(minutes=60)
             resolved_signal_ids: Set[int] = {int(t.signalId) for t in closed_trades_all if getattr(t, "signalId", None) is not None}
-            resolved_entry_keys: Set[Tuple[str, str, float]] = {
-                (t.symbol.replace("/", "").replace("-", "").upper(), t.direction.upper(), round(float(t.entryPrice or 0.0), 3))
-                for t in closed_trades_all
-            }
+            resolved_entry_keys: Set[Tuple[str, str, float]] = set()
+            for t in closed_trades_all:
+                c_dt = getattr(t, "closeDate", None)
+                if c_dt is not None:
+                    c_dt_utc = c_dt if c_dt.tzinfo else c_dt.replace(tzinfo=timezone.utc)
+                    if c_dt_utc >= recent_resolved_cutoff:
+                        t_sym_u = t.symbol.replace("/", "").replace("-", "").upper()
+                        resolved_entry_keys.add((
+                            t_sym_u,
+                            t.direction.upper(),
+                            round(float(t.entryPrice or 0.0), _entry_key_dp(t_sym_u)),
+                        ))
 
             # Active open positions from TradeJournal (only active strategies, clamped to 1:1.2-1:1.5 R:R)
             seen_open_syms: Set[str] = set()
@@ -155,7 +171,6 @@ class SignalService:
                 and (getattr(t, "executionMode", None) or "").upper() != "PAPER"
                 and "[MODE:PAPER]" not in (t.notes or "")
                 and (getattr(t, "signalId", None) not in resolved_signal_ids)
-                and (t.symbol.replace("/", "").replace("-", "").upper(), t.direction.upper(), round(float(t.entryPrice or 0.0), 3)) not in resolved_entry_keys
             ]
             open_trades.sort(key=lambda t: t.tradeDate, reverse=True)
             for ot in open_trades:
@@ -453,7 +468,9 @@ class SignalService:
                         dec = by_candidate.get(candidate.id)
                         is_approved = dec is not None and dec.status == DecisionStatus.APPROVED
                         exec_r = float(getattr(dec.pipelineSummary, "executionReadinessScore", 0.0) if (dec and getattr(dec, "pipelineSummary", None)) else 0.0)
-                        readiness = max(float(getattr(candidate, "readinessScore", 50.0) or 50.0), exec_r)
+                        cand_readiness = float(getattr(candidate, "readinessScore", 50.0) or 50.0)
+                        all_conds_passed = all(c.passed for c in (candidate.conditions or []))
+                        readiness = max(cand_readiness, exec_r) if all_conds_passed else cand_readiness
                         candidate.readinessScore = int(round(readiness))
                         confidence = float(candidate.confidence)
 
@@ -529,7 +546,7 @@ class SignalService:
                     cand.stopLoss,
                     cand.takeProfit,
                 )
-                if sig_key in seen_signatures or item["signal_id"] in resolved_signal_ids or (norm_sym, direction_str.upper(), round(float(cand.entryPrice or 0.0), 3)) in resolved_entry_keys:
+                if sig_key in seen_signatures or item["signal_id"] in resolved_signal_ids or (norm_sym, direction_str.upper(), round(float(cand.entryPrice or 0.0), _entry_key_dp(norm_sym))) in resolved_entry_keys:
                     # Deduplication & Historical Memory: setup was already processed / triggered / completed
                     continue
                 seen_signatures.add(sig_key)
@@ -898,88 +915,92 @@ class SignalService:
                     # ONLY create a trade record and send push alert on FIRST activation (never on existing active trades)
                     if not is_already_active or strat_sym_key not in seen_open_syms:
                         try:
-                            from decimal import Decimal
-                            from app.core.engines.market_state_engine import _derive_session
+                            with _activation_lock:
+                                from decimal import Decimal
+                                from app.core.engines.market_state_engine import _derive_session
 
-                            actual_session = _derive_session(now)
-                            eff_entry_px = float(cur_px or cand.entryPrice)
-                            eff_sl_px = float(cand.stopLoss)
-                            price_risk_abs = abs(eff_entry_px - eff_sl_px)
-                            eff_lot = max(float(scaled_lot or 0.01), 0.01)
-                            sym_clean_r = symbol.replace("/", "").replace("_", "").upper()
-                            if price_risk_abs > 1e-9:
-                                if "XAU" in sym_clean_r or "GOLD" in sym_clean_r:
-                                    raw_usd_risk = price_risk_abs * 100.0 * eff_lot
-                                elif "JPY" in sym_clean_r:
-                                    if sym_clean_r.startswith("USD"):
-                                        jpy_conv = eff_entry_px
+                                actual_session = _derive_session(now)
+                                eff_entry_px = float(cur_px if cur_px is not None else cand.entryPrice)
+                                eff_sl_px = float(cand.stopLoss)
+                                price_risk_abs = abs(eff_entry_px - eff_sl_px)
+                                eff_lot = max(float(scaled_lot or 0.01), 0.01)
+                                sym_clean_r = symbol.replace("/", "").replace("_", "").upper()
+                                if price_risk_abs > 1e-9:
+                                    if "XAU" in sym_clean_r or "GOLD" in sym_clean_r:
+                                        raw_usd_risk = price_risk_abs * 100.0 * eff_lot
+                                    elif "JPY" in sym_clean_r:
+                                        if sym_clean_r.startswith("USD"):
+                                            jpy_conv = eff_entry_px
+                                        else:
+                                            jpy_conv = 155.0
+                                            try:
+                                                pm = getattr(providers, "provider_manager", None)
+                                                uj_q = pm.get_market_quote("USDJPY") if pm else None
+                                                if uj_q and getattr(uj_q, "quote", None) and getattr(uj_q.quote, "lastPrice", 0) > 50:
+                                                    jpy_conv = float(uj_q.quote.lastPrice)
+                                            except Exception:
+                                                pass
+                                        raw_usd_risk = (price_risk_abs / max(jpy_conv, 1.0)) * 100000.0 * eff_lot
                                     else:
-                                        jpy_conv = 155.0
-                                        try:
-                                            uj_q = provider_manager.get_market_quote("USDJPY")
-                                            if uj_q and getattr(uj_q, "quote", None) and getattr(uj_q.quote, "lastPrice", 0) > 50:
-                                                jpy_conv = float(uj_q.quote.lastPrice)
-                                        except Exception:
-                                            pass
-                                    raw_usd_risk = (price_risk_abs / max(jpy_conv, 1.0)) * 100000.0 * eff_lot
+                                        raw_usd_risk = price_risk_abs * 100000.0 * eff_lot
+                                    init_monetary_risk = Decimal(str(round(max(raw_usd_risk, 0.01), 2)))
                                 else:
-                                    raw_usd_risk = price_risk_abs * 100000.0 * eff_lot
-                                init_monetary_risk = Decimal(str(round(max(raw_usd_risk, 0.01), 2)))
-                            else:
-                                init_monetary_risk = None
+                                    init_monetary_risk = None
 
-                            trade_journal_repository.create_trade(
-                                TradeJournalCreate(
-                                    signalId=item["signal_id"],
-                                    strategyId=cand.strategyId or "falcon-opt",
-                                    symbol=symbol,
-                                    direction=direction_str.upper(),
-                                    entryPrice=cand.entryPrice,
-                                    stopLoss=cand.stopLoss,
-                                    initialStopLoss=cand.stopLoss,
-                                    initialMonetaryRisk=init_monetary_risk,
-                                    takeProfit=cand.takeProfit,
-                                    timeframe=getattr(cand, "timeframe", None) or "M15",
-                                    marketSession=actual_session,
-                                    tradeDate=now,
-                                    status="OPEN",
-                                    result="OPEN",
-                                    profitLoss=0.0,
-                                    riskReward=cand.riskReward or 2.0,
-                                    confidence=int(cand.confidence or 80),
-                                    reasonForEntry=f"Falcon Live Entry Verified at {(cur_px or cand.entryPrice):.4f} (Touch within {pip_tolerance:.5f})",
-                                    notes=f"Auto-recorded active trade from signal {item['signal_id']}",
-                                    fillPrice=cur_px or cand.entryPrice,
-                                    fillTime=now,
+                                trade_journal_repository.create_trade(
+                                    TradeJournalCreate(
+                                        signalId=item["signal_id"],
+                                        strategyId=cand.strategyId or "falcon-opt",
+                                        symbol=symbol,
+                                        direction=direction_str.upper(),
+                                        entryPrice=cand.entryPrice,
+                                        stopLoss=cand.stopLoss,
+                                        initialStopLoss=cand.stopLoss,
+                                        initialMonetaryRisk=init_monetary_risk,
+                                        takeProfit=cand.takeProfit,
+                                        timeframe=getattr(cand, "timeframe", None) or "M15",
+                                        marketSession=actual_session,
+                                        tradeDate=now,
+                                        status="OPEN",
+                                        result="OPEN",
+                                        profitLoss=0.0,
+                                        riskReward=cand.riskReward or 2.0,
+                                        confidence=int(cand.confidence or 80),
+                                        reasonForEntry=f"Falcon Live Entry Verified at {eff_entry_px:.4f} (Touch within {pip_tolerance:.5f})",
+                                        notes=f"Auto-recorded active trade from signal {item['signal_id']}",
+                                        fillPrice=eff_entry_px,
+                                        fillTime=now,
+                                        executionMode="LIVE",
+                                    )
                                 )
-                            )
 
-                            # Dispatch authoritative real-time Firebase Push notification (Deduped by canonical setup key)
-                            try:
-                                from app.core.services.fcm_service import fcm_service
-                                dir_str = str(direction_str or "BUY").upper()
-                                clean_sym = symbol.replace("/", "").replace("_", "")
-                                p_entry = f"{cur_px:.2f}" if ("XAU" in clean_sym or cand.entryPrice > 500) else (f"{cur_px:.3f}" if "JPY" in clean_sym else f"{cur_px:.5f}")
-                                p_sl = f"{cand.stopLoss:.2f}" if ("XAU" in clean_sym or cand.entryPrice > 500) else (f"{cand.stopLoss:.3f}" if "JPY" in clean_sym else f"{cand.stopLoss:.5f}")
-                                p_tp = f"{cand.takeProfit:.2f}" if ("XAU" in clean_sym or cand.entryPrice > 500) else (f"{cand.takeProfit:.3f}" if "JPY" in clean_sym else f"{cand.takeProfit:.5f}")
+                                # Dispatch authoritative real-time Firebase Push notification (Deduped by canonical setup key)
+                                try:
+                                    from app.core.services.fcm_service import fcm_service
+                                    dir_str = str(direction_str or "BUY").upper()
+                                    clean_sym = symbol.replace("/", "").replace("_", "")
+                                    eff_px = cur_px if cur_px is not None else cand.entryPrice
+                                    p_entry = f"{eff_px:.2f}" if ("XAU" in clean_sym or cand.entryPrice > 500) else (f"{eff_px:.3f}" if "JPY" in clean_sym else f"{eff_px:.5f}")
+                                    p_sl = f"{cand.stopLoss:.2f}" if ("XAU" in clean_sym or cand.entryPrice > 500) else (f"{cand.stopLoss:.3f}" if "JPY" in clean_sym else f"{cand.stopLoss:.5f}")
+                                    p_tp = f"{cand.takeProfit:.2f}" if ("XAU" in clean_sym or cand.entryPrice > 500) else (f"{cand.takeProfit:.3f}" if "JPY" in clean_sym else f"{cand.takeProfit:.5f}")
 
-                                fcm_service.send_signal_alert(
-                                    title=f"🎯 Falcon Live Signal: {dir_str} {symbol}",
-                                    body=f"Entry: {p_entry} | SL: {p_sl} | TP: {p_tp}. Price touched entry! Execute now on MT5.",
-                                    data={
-                                        "canonical_signature": sig_key,
-                                        "signal_id": str(item.get("signal_id", "")),
-                                        "symbol": str(symbol),
-                                        "direction": str(dir_str),
-                                        "entry": str(cur_px),
-                                        "sl": str(cand.stopLoss),
-                                        "tp": str(cand.takeProfit),
-                                        "status": "ACTIVE",
-                                        "event_type": "SIGNAL_ACTIVE",
-                                    },
-                                )
-                            except Exception as ex:
-                                logger.debug(f"FCM active alert error: {ex}")
+                                    fcm_service.send_signal_alert(
+                                        title=f"🎯 Falcon Live Signal: {dir_str} {symbol}",
+                                        body=f"Entry: {p_entry} | SL: {p_sl} | TP: {p_tp}. Price touched entry! Execute now on MT5.",
+                                        data={
+                                            "canonical_signature": sig_key,
+                                            "signal_id": str(item.get("signal_id", "")),
+                                            "symbol": str(symbol),
+                                            "direction": str(dir_str),
+                                            "entry": str(eff_px),
+                                            "sl": str(cand.stopLoss),
+                                            "tp": str(cand.takeProfit),
+                                            "status": "ACTIVE",
+                                            "event_type": "SIGNAL_ACTIVE",
+                                        },
+                                    )
+                                except Exception as ex:
+                                    logger.debug(f"FCM active alert error: {ex}")
                         except Exception as ex:
                             logger.debug(f"Could not auto-record trade to journal: {ex}")
 

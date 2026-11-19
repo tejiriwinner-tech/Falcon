@@ -34,15 +34,17 @@ def get_engine() -> Engine:
     if _engine is None:
         if not settings.DATABASE_URL:
             raise RuntimeError("DATABASE_URL is not configured")
-        _engine = create_engine(
-            normalize_database_url(settings.DATABASE_URL),
-            echo=settings.DB_ECHO,
-            pool_pre_ping=True,
-            pool_recycle=1800,
-            pool_size=settings.DB_POOL_SIZE,
-            max_overflow=settings.DB_MAX_OVERFLOW,
-            connect_args={"connect_timeout": settings.DB_CONNECT_TIMEOUT},
-        )
+        db_url = normalize_database_url(settings.DATABASE_URL)
+        engine_kwargs = {
+            "echo": settings.DB_ECHO,
+            "pool_pre_ping": True,
+            "pool_recycle": 1800,
+        }
+        if "sqlite" not in db_url.lower():
+            engine_kwargs["pool_size"] = settings.DB_POOL_SIZE
+            engine_kwargs["max_overflow"] = settings.DB_MAX_OVERFLOW
+            engine_kwargs["connect_args"] = {"connect_timeout": settings.DB_CONNECT_TIMEOUT}
+        _engine = create_engine(db_url, **engine_kwargs)
     return _engine
 
 

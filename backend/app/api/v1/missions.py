@@ -41,6 +41,12 @@ def purge_old_missions(keep_latest: int = 10):
     """
     Purges old historical missions and their associated artifacts, keeping only the latest N.
     """
+    from app.core.config import settings
+    if not getattr(settings, "ENABLE_MISSION_AUTO_PRUNE", False):
+        raise HTTPException(
+            status_code=403,
+            detail="Mission pruning is disabled to preserve archived artifacts",
+        )
     deleted = mission_repository.prune_missions(keep_latest=keep_latest)
     return {
         "status": "success",

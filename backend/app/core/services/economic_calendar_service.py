@@ -73,7 +73,7 @@ def _parse_event_time(raw: str) -> Optional[datetime]:
         return None
     try:
         dt = datetime.fromisoformat(raw)
-        return dt.astimezone(timezone.utc)
+        return dt.astimezone(timezone.utc) if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
     except (ValueError, TypeError):
         pass
     for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d"):
@@ -152,17 +152,20 @@ class EconomicCalendarService:
                     except Exception as cache_err:
                         logger.debug("Failed to write Forex Factory disk cache: %s", cache_err)
                     return _normalize(payload)
+            else:
+                logger.warning("[EconomicCalendar] FairEconomy returned HTTP %s. Checking local disk cache.", resp.status_code)
         except Exception as exc:
             logger.warning("[EconomicCalendar] FairEconomy feed unavailable: %s. Checking local disk cache.", exc)
-            if cache_file.exists():
-                try:
-                    cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
-                    if isinstance(cached_data, list) and len(cached_data) > 0:
-                        logger.info("[EconomicCalendar] Loaded %d events from Forex Factory disk cache.", len(cached_data))
-                        self.last_error = None
-                        return _normalize(cached_data)
-                except Exception as cache_read_err:
-                    logger.warning("[EconomicCalendar] Failed to read Forex Factory disk cache: %s", cache_read_err)
+
+        if cache_file.exists():
+            try:
+                cached_data = json.loads(cache_file.read_text(encoding="utf-8"))
+                if isinstance(cached_data, list) and len(cached_data) > 0:
+                    logger.info("[EconomicCalendar] Loaded %d events from Forex Factory disk cache.", len(cached_data))
+                    self.last_error = None
+                    return _normalize(cached_data)
+            except Exception as cache_read_err:
+                logger.warning("[EconomicCalendar] Failed to read Forex Factory disk cache: %s", cache_read_err)
 
         # 2. Fallback: FMP if key is configured
         if settings.FMP_API_KEY:
@@ -182,12 +185,12 @@ class EconomicCalendarService:
                 )
                 response.raise_for_status()
                 payload = response.json()
-                if isinstance(payload, list):
+                if isinstance(payload, list) and len(payload) > 0:
                     self.last_error = None
                     return _normalize(payload)
             except Exception as exc:
                 self.last_error = f"{type(exc).__name__}: {exc}"
-                return []
+                logger.warning("[EconomicCalendar] FMP calendar fallback failed: %s", exc)
 
         # 3. Fallback: Recurring High-Impact Institutional Catalysts
         # Guarantees capital shield has coverage for core weekly risks (FOMC, NFP, CPI, Rates)
@@ -327,6 +330,8 @@ class EconomicCalendarService:
         try:
             events = self._fetch_remote()
             stored = self._store(events)
+            with self._lock:
+                self._cached_events = None
             return stored
         finally:
             with self._lock:
@@ -566,9 +571,16 @@ class EconomicCalendarService:
         conf_mod = -18 if is_counter_fade else (+6 if (favored_dir and prop_dir == favored_dir) else 0)
         stop_mult = 1.35 if imp_label == "High" else 1.20
 
+        if is_counter_fade:
+            detail_msg = f"VETO — Counter-news fade against {favored_dir} post-news impulse"
+        elif favored_dir:
+            detail_msg = f"Aligned with {favored_dir} post-news displacement"
+        else:
+            detail_msg = "Neutral post-news catalyst (no directional surprise/displacement)"
+
         rationale = (
             f"{imp_label}-Impact {ev_ccy} News Catalyst ('{best_post_event.title}', {best_post_mins}m ago): "
-            f"{'Aligned with ' + favored_dir + ' post-news displacement' if not is_counter_fade else 'VETO — Counter-news fade against ' + str(favored_dir) + ' post-news impulse'}."
+            f"{detail_msg}."
         )
         return {
             "in_post_news_window": True,
@@ -585,4 +597,3 @@ class EconomicCalendarService:
 
 
 economic_calendar_service = EconomicCalendarService()
-

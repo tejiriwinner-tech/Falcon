@@ -99,8 +99,8 @@ class SignalGenerationEngine:
                 sniper_target = current_price + (risk_d * rr) if direction == CandidateDirection.BUY else current_price - (risk_d * rr)
 
         if sniper_stop is not None:
-            # Guarantee stop loss respects institutional minimum distance safety
-            actual_risk = abs(current_price - sniper_stop)
+            # Guarantee stop loss respects institutional minimum distance safety (signed check prevents inverted SL)
+            actual_risk = (current_price - sniper_stop) if direction == CandidateDirection.BUY else (sniper_stop - current_price)
             if actual_risk < min_dist:
                 if direction == CandidateDirection.BUY:
                     sniper_stop = current_price - min_dist
@@ -226,11 +226,13 @@ class SignalGenerationEngine:
                 if direction == CandidateDirection.BUY
                 else round(target_corr.high + 2.0 * pip_u, dec_p)
             )
-            corr_risk = abs(framed_entry - raw_struct_sl)
+            corr_risk = (framed_entry - raw_struct_sl) if direction == CandidateDirection.BUY else (raw_struct_sl - framed_entry)
             max_cap = max(min_dist * 1.5, (2.5 * atr_val) if (atr_val and atr_val > 0) else (min_dist * 3.0))
 
             struct_sl: Optional[float] = None
-            if min_dist <= corr_risk <= max_cap:
+            if corr_risk <= 0:
+                struct_sl = None
+            elif min_dist <= corr_risk <= max_cap:
                 struct_sl = raw_struct_sl
                 note_parts.append(f"Opposite-Corridor SL @ {struct_sl:.{dec_p}f}")
             elif corr_risk < min_dist:
@@ -794,7 +796,11 @@ class SignalGenerationEngine:
                                     direction=b_dir_str,
                                     candles=candles_1h,
                                     macro_news_impact=news_impact.upper() if news_impact else None,
-                                    spread_pips=spread,
+                                    spread_pips=(
+                                        round(float(spread or 0.0) / (0.01 if "JPY" in canonical_symbol else 0.0001), 2)
+                                        if (not ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) and float(spread or 0.0) < (0.5 if "JPY" in canonical_symbol else 0.05))
+                                        else float(spread or 0.0)
+                                    ),
                                 )
                                 # Ensure macro flow does not directly contradict breakout
                                 macro_conflicts = (broken_up and conv_obj.htf_trend_bias == "BEARISH") or (broken_down and conv_obj.htf_trend_bias == "BULLISH")
@@ -880,36 +886,42 @@ class SignalGenerationEngine:
                         dec_p = 3 if "JPY" in canonical_symbol else 5
 
                         def _clamp_scalp_sl(raw_sl: float, dir_c: CandidateDirection, px: float) -> float:
-                            dist = abs(px - raw_sl)
-                            dist = max(_apex_spec.min_sl_dist, min(_apex_spec.max_sl_dist, dist))
+                            signed_dist = (px - raw_sl) if dir_c == CandidateDirection.BUY else (raw_sl - px)
+                            dist = max(_apex_spec.min_sl_dist, min(_apex_spec.max_sl_dist, signed_dist))
                             return round(px - dist, dec_p) if dir_c == CandidateDirection.BUY else round(px + dist, dec_p)
 
                         # Priority 1: Inversion FVG (IFVG) Anti-Retail Trap Flip
                         ifvgs = smart_money_engine.detect_inversion_fair_value_gaps(candles_1h, lookback=16)
                         if ifvgs:
-                            latest_ifvg = ifvgs[-1]
-                            ifvg_dir = CandidateDirection.BUY if latest_ifvg.inversion_direction == "BULLISH" else CandidateDirection.SELL
-                            ifvg_h1_ok = (
-                                (ifvg_dir == CandidateDirection.BUY and htf_macro_trend != "Bearish")
-                                or (ifvg_dir == CandidateDirection.SELL and htf_macro_trend != "Bullish")
-                            )
-                            if ifvg_h1_ok:
-                                has_sniper_setup = True
-                                direction = ifvg_dir
-                                pattern_conviction = 0.90
-                                raw_sl_ifvg = (latest_ifvg.bottom - 2.0 * pip_u) if direction == CandidateDirection.BUY else (latest_ifvg.top + 2.0 * pip_u)
-                                sniper_stop = _clamp_scalp_sl(raw_sl_ifvg, direction, entry_price)
-                                risk_span = abs(entry_price - sniper_stop) * _apex_spec.rr_target
-                                sniper_target = round(entry_price + risk_span, dec_p) if direction == CandidateDirection.BUY else round(entry_price - risk_span, dec_p)
-                                sniper_trigger_rule = (
-                                    f"Inversion FVG (IFVG) Trap Flip @ {latest_ifvg.midpoint:.{dec_p}f} "
-                                    f"(broken {latest_ifvg.original_direction} FVG squeezing trapped retail) aligned with H1 {htf_macro_trend}"
+                            fresh_ifvgs = [
+                                g for g in ifvgs
+                                if getattr(g, "inversion_candle_index", len(candles_1h) - 1) >= len(candles_1h) - 4
+                                or (g.bottom - 15.0 * pip_u <= entry_price <= g.top + 15.0 * pip_u)
+                            ]
+                            latest_ifvg = fresh_ifvgs[-1] if fresh_ifvgs else None
+                            if latest_ifvg is not None:
+                                ifvg_dir = CandidateDirection.BUY if latest_ifvg.inversion_direction == "BULLISH" else CandidateDirection.SELL
+                                ifvg_h1_ok = (
+                                    (ifvg_dir == CandidateDirection.BUY and htf_macro_trend != "Bearish")
+                                    or (ifvg_dir == CandidateDirection.SELL and htf_macro_trend != "Bullish")
                                 )
-                                sniper_rationale = (
-                                    f"Apex Anti-Manipulation Scalp ({canonical_symbol}): Institutions inverted a {latest_ifvg.original_direction} FVG "
-                                    f"at {latest_ifvg.broken_by_price:.{dec_p}f}; riding the institutional squeeze to {sniper_target:.{dec_p}f} ({_apex_spec.rr_target:.2f}R)."
-                                )
-                                pattern_name = "Inversion FVG (IFVG) Institutional Trap Flip"
+                                if ifvg_h1_ok:
+                                    has_sniper_setup = True
+                                    direction = ifvg_dir
+                                    pattern_conviction = 0.90
+                                    raw_sl_ifvg = (latest_ifvg.bottom - 2.0 * pip_u) if direction == CandidateDirection.BUY else (latest_ifvg.top + 2.0 * pip_u)
+                                    sniper_stop = _clamp_scalp_sl(raw_sl_ifvg, direction, entry_price)
+                                    risk_span = abs(entry_price - sniper_stop) * _apex_spec.rr_target
+                                    sniper_target = round(entry_price + risk_span, dec_p) if direction == CandidateDirection.BUY else round(entry_price - risk_span, dec_p)
+                                    sniper_trigger_rule = (
+                                        f"Inversion FVG (IFVG) Trap Flip @ {latest_ifvg.midpoint:.{dec_p}f} "
+                                        f"(broken {latest_ifvg.original_direction} FVG squeezing trapped retail) aligned with H1 {htf_macro_trend}"
+                                    )
+                                    sniper_rationale = (
+                                        f"Apex Anti-Manipulation Scalp ({canonical_symbol}): Institutions inverted a {latest_ifvg.original_direction} FVG "
+                                        f"at {latest_ifvg.broken_by_price:.{dec_p}f}; riding the institutional squeeze to {sniper_target:.{dec_p}f} ({_apex_spec.rr_target:.2f}R)."
+                                    )
+                                    pattern_name = "Inversion FVG (IFVG) Institutional Trap Flip"
 
                         # Priority 2: SMC Liquidity Sweep + 3-Candle FVG Reclaim
                         if not has_sniper_setup:
@@ -1650,7 +1662,7 @@ class SignalGenerationEngine:
                 trend=asset_trend,
                 volatility=volatility,
                 session=session,
-                spread=spread,
+                spread=round(spread_eval, 2),
                 newsImpact=news_impact,
                 marketSentiment=market_sentiment,
                 marketConfidence=market_confidence,

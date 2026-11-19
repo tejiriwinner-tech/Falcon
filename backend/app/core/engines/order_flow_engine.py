@@ -205,16 +205,14 @@ class OrderFlowEngine:
 
         # Bullish Passive Absorption: Retail selling soaked up by institutional buy wall / iceberg accumulation
         if is_high_vol and (
-            lower_wick_ratio >= 0.35
-            or (delta < 0 and close_location >= 0.40)
+            (lower_wick_ratio >= 0.35 and close_location >= 0.50)
             or (is_iceberg and (direction == "BUY" or close_location >= 0.50))
         ):
             return True, "PASSIVE_ACCUMULATION", f"🏛️ Institutional Passive Iceberg Accumulation: liquidity absorbed by buy wall. Upward squeeze predicted."
 
         # Bearish Passive Absorption: Retail buying soaked up by institutional sell wall / iceberg distribution
         if is_high_vol and (
-            upper_wick_ratio >= 0.35
-            or (delta > 0 and close_location <= 0.60)
+            (upper_wick_ratio >= 0.35 and close_location <= 0.50)
             or (is_iceberg and (direction == "SELL" or close_location < 0.50))
         ):
             return True, "PASSIVE_DISTRIBUTION", f"🏛️ Institutional Passive Iceberg Distribution: liquidity absorbed by sell wall. Downward dump predicted."

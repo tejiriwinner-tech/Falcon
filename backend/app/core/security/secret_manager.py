@@ -19,6 +19,9 @@ class SecretManager:
         'OANDA_API_KEY',
         'OANDA_ACCOUNT_ID',
         'FMP_API_KEY',
+        'PRIVATE_KEY',
+        'AUTHORIZATION',
+        'BEARER',
     }
     
     @staticmethod
@@ -36,6 +39,20 @@ class SecretManager:
         return os.getenv(key, default)
     
     @staticmethod
+    def _sanitize_list(items: list) -> list:
+        sanitized_list = []
+        for item in items:
+            if isinstance(item, dict):
+                sanitized_list.append(SecretManager.sanitize_dict(item))
+            elif isinstance(item, list):
+                sanitized_list.append(SecretManager._sanitize_list(item))
+            elif isinstance(item, str) and SecretManager._contains_sensitive_data(item):
+                sanitized_list.append("***REDACTED***")
+            else:
+                sanitized_list.append(item)
+        return sanitized_list
+
+    @staticmethod
     def sanitize_dict(data: dict) -> dict:
         """
         Sanitize a dictionary by masking sensitive values.
@@ -52,6 +69,8 @@ class SecretManager:
                 sanitized[key] = "***REDACTED***"
             elif isinstance(value, dict):
                 sanitized[key] = SecretManager.sanitize_dict(value)
+            elif isinstance(value, list):
+                sanitized[key] = SecretManager._sanitize_list(value)
             elif isinstance(value, str) and SecretManager._contains_sensitive_data(value):
                 sanitized[key] = "***REDACTED***"
             else:

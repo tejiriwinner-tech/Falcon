@@ -23,6 +23,19 @@ class RateLimiter:
         
         async with self._lock:
             now = datetime.now()
+            if len(self._requests) > 2000:
+                expired_keys = [
+                    k for k, (_, ws) in self._requests.items()
+                    if (now - ws) > self._window
+                ]
+                for k in expired_keys:
+                    self._requests.pop(k, None)
+                if len(self._requests) > 2000:
+                    # Evict oldest entries if still above cap
+                    oldest = sorted(self._requests.items(), key=lambda item: item[1][1])[:len(self._requests) - 1000]
+                    for k, _ in oldest:
+                        self._requests.pop(k, None)
+
             count, window_start = self._requests[client_ip]
             
             # Reset if window expired
@@ -42,6 +55,10 @@ class RateLimiter:
     
     def _get_client_ip(self, request: Request) -> str:
         """Extract client IP from request."""
+        fly_ip = request.headers.get("Fly-Client-IP")
+        if fly_ip:
+            return fly_ip.strip()
+
         # Check for forwarded headers (proxy/load balancer)
         forwarded = request.headers.get("X-Forwarded-For")
         if forwarded:
@@ -49,7 +66,7 @@ class RateLimiter:
         
         real_ip = request.headers.get("X-Real-IP")
         if real_ip:
-            return real_ip
+            return real_ip.strip()
         
         # Fallback to direct connection
         if request.client:

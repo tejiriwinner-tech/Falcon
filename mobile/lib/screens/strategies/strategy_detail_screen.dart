@@ -288,7 +288,7 @@ class _StrategyDetailScreenState extends State<StrategyDetailScreen> {
                       Row(
                         children: [
                           Text(
-                            isActive ? 'ACTIVE' : 'INCUBATION',
+                            strategy.status.toUpperCase(),
                             style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.bold,
@@ -583,7 +583,7 @@ class _StrategyDetailScreenState extends State<StrategyDetailScreen> {
                 ),
                 alignment: Alignment.centerLeft,
                 child: Container(
-                  width: 60 * (val / 100.0),
+                  width: 60 * (val / 100.0).clamp(0.0, 1.0),
                   height: 4,
                   decoration: BoxDecoration(
                     color: val > 80 ? AppColors.success : AppColors.primary,

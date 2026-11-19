@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/price_formatter.dart';
 import '../../models/candle_data.dart';
 import '../../services/api/api_service.dart';
 import '../../widgets/chart/interactive_trading_chart.dart';
@@ -37,10 +38,36 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
   Timer? _liveQuoteTimer;
   double? _livePrice;
 
+  static String _normalizeTimeframe(String tf) {
+    final clean = tf.trim().toLowerCase();
+    switch (clean) {
+      case 'm5':
+      case '5m':
+        return '5m';
+      case 'm15':
+      case '15m':
+        return '15m';
+      case 'm30':
+      case '30m':
+        return '30m';
+      case 'h1':
+      case '1h':
+        return '1h';
+      case 'h4':
+      case '4h':
+        return '4h';
+      case 'd1':
+      case '1d':
+        return '1d';
+      default:
+        return clean.isEmpty ? '15m' : clean;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    _activeTimeframe = widget.initialTimeframe;
+    _activeTimeframe = _normalizeTimeframe(widget.initialTimeframe);
     _loadChartData();
     // Fast live tick poll (every 3 seconds) for real-time candle breathing & pulsing marker
     _liveQuoteTimer = Timer.periodic(const Duration(seconds: 3), (_) {
@@ -60,6 +87,7 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
   }
 
   Future<void> _loadChartData() async {
+    final requestedTf = _activeTimeframe;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -68,18 +96,18 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
     try {
       final candlesFuture = _apiService.getCandles(
         symbol: widget.symbol,
-        timeframe: _activeTimeframe,
+        timeframe: requestedTf,
         limit: 120,
       );
 
       final sessionFuture = _apiService.getSessionBreakoutStructure(
         symbol: widget.symbol,
-        timeframe: _activeTimeframe,
-      ).catchError((_) => SessionBreakoutStructureData.empty(widget.symbol, _activeTimeframe));
+        timeframe: requestedTf,
+      ).catchError((_) => SessionBreakoutStructureData.empty(widget.symbol, requestedTf));
 
       final results = await Future.wait([candlesFuture, sessionFuture]);
 
-      if (mounted) {
+      if (mounted && _activeTimeframe == requestedTf) {
         setState(() {
           _candles = results[0] as List<CandleData>;
           _sessionStructure = results[1] as SessionBreakoutStructureData;
@@ -87,7 +115,7 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
         });
       }
     } catch (e) {
-      if (mounted) {
+      if (mounted && _activeTimeframe == requestedTf) {
         setState(() {
           _errorMessage = e.toString().replaceAll('Exception: ', '');
           _isLoading = false;
@@ -97,13 +125,14 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
   }
 
   Future<void> _pollLatestCandle() async {
+    final requestedTf = _activeTimeframe;
     try {
       final freshBars = await _apiService.getCandles(
         symbol: widget.symbol,
-        timeframe: _activeTimeframe,
+        timeframe: requestedTf,
         limit: 15,
       );
-      if (freshBars.isNotEmpty && mounted) {
+      if (freshBars.isNotEmpty && mounted && _activeTimeframe == requestedTf) {
         setState(() {
           // Merge latest candles into existing list
           final Map<DateTime, CandleData> map = {for (var c in _candles) c.barTime: c};
@@ -130,7 +159,7 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
   }
 
   int _parseTimeframeMinutes(String tf) {
-    final lower = tf.toLowerCase();
+    final lower = _normalizeTimeframe(tf);
     if (lower.contains('5m')) return 5;
     if (lower.contains('15m')) return 15;
     if (lower.contains('30m')) return 30;
@@ -142,8 +171,8 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
 
   DateTime _normalizeBarBucket(DateTime dt, int minutes) {
     final utc = dt.toUtc();
-    final bucketMinute = (utc.minute ~/ minutes) * minutes;
-    return DateTime.utc(utc.year, utc.month, utc.day, utc.hour, bucketMinute);
+    final bucketMs = (utc.millisecondsSinceEpoch ~/ (minutes * 60000)) * minutes * 60000;
+    return DateTime.fromMillisecondsSinceEpoch(bucketMs, isUtc: true);
   }
 
   void _fuseLivePriceIntoActiveCandle(double price, {DateTime? tickTime}) {
@@ -183,9 +212,10 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
   }
 
   void _onTimeframeChanged(String tf) {
-    if (_activeTimeframe.toLowerCase() == tf.toLowerCase()) return;
+    final normTf = _normalizeTimeframe(tf);
+    if (_activeTimeframe.toLowerCase() == normTf.toLowerCase()) return;
     setState(() {
-      _activeTimeframe = tf;
+      _activeTimeframe = normTf;
     });
     _loadChartData();
   }
@@ -193,10 +223,9 @@ class _TradingChartScreenState extends State<TradingChartScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final isJpy = widget.symbol.contains('JPY');
     final double? latestPrice = _candles.isNotEmpty ? _candles.last.close : null;
     final String priceStr = latestPrice != null
-        ? latestPrice.toStringAsFixed(isJpy ? 3 : 5)
+        ? PriceFormatter.format(widget.symbol, latestPrice)
         : '---';
 
     return Scaffold(

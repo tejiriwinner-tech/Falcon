@@ -54,9 +54,15 @@ class FirebaseNotificationService {
         sound: true,
       );
 
-      // Subscribe to signal broadcasts
-      await messaging.subscribeToTopic(signalTopic);
-      debugPrint('[FirebaseNotificationService] Subscribed to topic: $signalTopic');
+      // Subscribe to signal broadcasts (not supported on web)
+      if (!kIsWeb) {
+        try {
+          await messaging.subscribeToTopic(signalTopic);
+          debugPrint('[FirebaseNotificationService] Subscribed to topic: $signalTopic');
+        } catch (e) {
+          debugPrint('[FirebaseNotificationService] Topic subscription skipped: $e');
+        }
+      }
 
       // Get FCM token for debugging / target alerts
       try {

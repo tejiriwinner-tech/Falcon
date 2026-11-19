@@ -21,7 +21,7 @@ class TestNotificationRequest(BaseModel):
     direction: Optional[str] = "BUY"
 
 @router.get("/status")
-async def get_notification_status() -> Dict[str, Any]:
+def get_notification_status() -> Dict[str, Any]:
     """Check whether Firebase Cloud Messaging (FCM) is initialized and active."""
     return {
         "fcm_ready": fcm_service._ready,
@@ -30,7 +30,7 @@ async def get_notification_status() -> Dict[str, Any]:
     }
 
 @router.post("/test")
-async def test_notification(request: TestNotificationRequest) -> Dict[str, Any]:
+def test_notification(request: TestNotificationRequest) -> Dict[str, Any]:
     """Sends a test high-priority push notification to topic subscribers (even when app is closed)."""
     success = fcm_service.send_signal_alert(
         title=request.title or "Falcon AI Signal Alert",

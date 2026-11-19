@@ -99,15 +99,17 @@ class ExecutionQualityService:
         mfe_price: Optional[float],
         mae_price: Optional[float],
         initial_monetary_risk: Optional[Decimal | float],
+        entry_price: Optional[float] = None,
+        initial_stop_loss: Optional[float] = None,
     ) -> Tuple[Optional[float], Optional[float]]:
         """
         Convert raw price excursions to R-multiples using the authoritative
         initial monetary risk established at authorization and Capital Guardian's
-        contract sizing rules.
+        contract sizing rules, or direct currency-independent price risk distance
+        when entry_price and initial_stop_loss are provided.
 
         Strict Safety:
         - If initial_monetary_risk is None, 0, or negative -> returns (None, None).
-        - If instrument is unsupported or not USD quoted -> fails closed (None, None).
         - Never coerces None to 0.0.
         """
         if mfe_price is None or mae_price is None or initial_monetary_risk is None:
@@ -120,17 +122,24 @@ class ExecutionQualityService:
         except Exception:
             return None, None
 
+        # Currency-independent direct R calculation from initial price risk distance (supports JPY & all pairs)
+        if entry_price is not None and initial_stop_loss is not None:
+            price_risk_dist = abs(float(entry_price) - float(initial_stop_loss))
+            if price_risk_dist > 1e-9:
+                return round(float(mfe_price) / price_risk_dist, 2), round(float(mae_price) / price_risk_dist, 2)
+
         # Resolve authoritative instrument units (based on standard Falcon 0.01 micro lot)
         sym_clean = str(symbol).strip().upper().replace("/", "").replace("_", "")
         inst = self._guardian._registry.get_instrument(sym_clean)
-        if not inst or inst.currency != "USD":
+        if not inst:
             return None, None
 
-        # Established contract sizes for supported Falcon USD instruments
         if "XAU" in sym_clean or "GOLD" in sym_clean:
             units = Decimal("1.0")  # 100 oz/lot * 0.01 lot = 1 oz
         elif sym_clean in ("EURUSD", "GBPUSD", "AUDUSD"):
             units = Decimal("1000.0")  # 100,000 units/lot * 0.01 lot = 1,000 units
+        elif inst.currency == "JPY":
+            units = Decimal("1000.0") / Decimal("155.0")
         else:
             return None, None
 
@@ -192,11 +201,14 @@ class ExecutionQualityService:
             trough_price=new_trough,
         )
 
+        init_sl = getattr(trade, "initialStopLoss", None) or getattr(trade, "stopLoss", None)
         mfe_r, mae_r = self.convert_price_excursion_to_r(
             symbol=trade.symbol,
             mfe_price=mfe_price,
             mae_price=mae_price,
             initial_monetary_risk=trade.initialMonetaryRisk,
+            entry_price=fill_price,
+            initial_stop_loss=init_sl,
         )
 
         return new_peak, new_trough, mfe_r, mae_r
@@ -233,11 +245,14 @@ class ExecutionQualityService:
             trough_price=final_trough,
         )
 
+        init_sl = getattr(trade, "initialStopLoss", None) or getattr(trade, "stopLoss", None)
         mfe_r, mae_r = self.convert_price_excursion_to_r(
             symbol=trade.symbol,
             mfe_price=mfe_price,
             mae_price=mae_price,
             initial_monetary_risk=trade.initialMonetaryRisk,
+            entry_price=fill_price,
+            initial_stop_loss=init_sl,
         )
 
         return final_peak, final_trough, mfe_r, mae_r

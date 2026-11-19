@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/constants/app_colors.dart';
+import '../../core/utils/price_formatter.dart';
 import '../../models/signal.dart';
 import '../../models/trade_journal.dart';
 import '../../models/candle_data.dart';
@@ -29,16 +30,18 @@ class _SignalCardState extends State<SignalCard> {
 
   bool get _isWon => widget.signal.status.toUpperCase() == 'WON' || widget.signal.status.toUpperCase() == 'WIN';
   bool get _isLost => widget.signal.status.toUpperCase() == 'LOST' || widget.signal.status.toUpperCase() == 'LOSS';
-  bool get _isBreakeven => widget.signal.status.toUpperCase() == 'BREAKEVEN' || widget.signal.status.toUpperCase() == 'BE' || widget.signal.isBreakeven || widget.signal.analysis.toUpperCase().contains('BE_PROTECTED');
+  bool get _isBreakevenClosed => widget.signal.status.toUpperCase() == 'BREAKEVEN' || widget.signal.status.toUpperCase() == 'BE';
+  bool get _isBreakeven => _isBreakevenClosed;
   bool get _isExpired => !_isLocallyLive && (widget.signal.status.toUpperCase() == 'EXPIRED' || widget.signal.status.toUpperCase() == 'INVALIDATED');
   bool get _isHold => !_isLocallyLive && (widget.signal.status.toUpperCase() == 'HOLD' || widget.signal.status.toUpperCase() == 'WAITING' || widget.signal.status.toUpperCase() == 'PENDING');
   bool get _isActive => _isLocallyLive || widget.signal.status.toUpperCase() == 'ACTIVE' || widget.signal.status.toUpperCase() == 'OPEN' || widget.signal.status.toUpperCase() == 'FILLED';
+  bool get _isBeProtectedRunning => _isActive && (widget.signal.isBreakeven || widget.signal.isBreakevenProtected || widget.signal.analysis.toUpperCase().contains('BE_PROTECTED'));
   bool get _isBuy => widget.signal.action == 'BUY';
 
   String get _directionBadgeText {
     if (_isWon) return '🏆 TARGET HIT (WON)';
     if (_isLost) return '🛑 STOPPED OUT (LOST)';
-    if (_isBreakeven) return '🛡️ BREAKEVEN (\$0.00)';
+    if (_isBreakevenClosed) return '🛡️ BREAKEVEN (\$0.00)';
     if (_isExpired) return '⏳ EXPIRED (UNTRIGGERED)';
     if (_isActive) return _isBuy ? '🟢 RUNNING (LIVE BUY)' : '🔴 RUNNING (LIVE SELL)';
     return _isBuy ? '⏳ HOLD (BUY)' : '⏳ HOLD (SELL)';
@@ -47,7 +50,7 @@ class _SignalCardState extends State<SignalCard> {
   Color get _directionColor {
     if (_isWon) return AppColors.success;
     if (_isLost) return AppColors.error;
-    if (_isBreakeven) return AppColors.info;
+    if (_isBreakevenClosed) return AppColors.info;
     if (_isExpired) return AppColors.textTertiary;
     if (_isHold) return AppColors.warning;
     if (_isActive) return _isBuy ? AppColors.success : AppColors.error;
@@ -57,7 +60,7 @@ class _SignalCardState extends State<SignalCard> {
   Color get _statusColor {
     if (_isWon) return AppColors.success;
     if (_isLost) return AppColors.error;
-    if (_isBreakeven) return AppColors.info;
+    if (_isBreakevenClosed) return AppColors.info;
     if (_isExpired) return AppColors.textTertiary;
     if (_isHold) return AppColors.warning;
     if (_isActive) return AppColors.success;
@@ -213,7 +216,7 @@ class _SignalCardState extends State<SignalCard> {
               ),
 
             // Breakeven Locked banner
-            if (widget.signal.isBreakeven)
+            if (_isBeProtectedRunning || widget.signal.isBreakeven)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
@@ -307,44 +310,45 @@ class _SignalCardState extends State<SignalCard> {
               ),
             ),
 
-            // Execution Advisory Banner
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(
-                color: _isActive
-                    ? AppColors.success.withValues(alpha: 0.1)
-                    : AppColors.warning.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(
+            // Execution Advisory Banner (only for active or pending watchlist trades)
+            if (!(_isWon || _isLost || _isBreakevenClosed || _isExpired))
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
                   color: _isActive
-                      ? AppColors.success.withValues(alpha: 0.3)
-                      : AppColors.warning.withValues(alpha: 0.3),
-                ),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    _isActive ? Icons.check_circle : Icons.pause_circle_filled,
-                    color: _isActive ? AppColors.success : AppColors.warning,
-                    size: 14,
+                      ? AppColors.success.withValues(alpha: 0.1)
+                      : AppColors.warning.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _isActive
+                        ? AppColors.success.withValues(alpha: 0.3)
+                        : AppColors.warning.withValues(alpha: 0.3),
                   ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      _isActive
-                          ? 'CLEARED BY CAPTAIN: Validated for MT5 entry.'
-                          : 'DECISION: WAIT — Monitoring. DO NOT execute on MT5 yet.',
-                      style: TextStyle(
-                        color: _isActive ? AppColors.success : AppColors.warning,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _isActive ? Icons.check_circle : Icons.pause_circle_filled,
+                      color: _isActive ? AppColors.success : AppColors.warning,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        _isActive
+                            ? 'CLEARED BY CAPTAIN: Validated for MT5 entry.'
+                            : 'DECISION: WAIT — Monitoring. DO NOT execute on MT5 yet.',
+                        style: TextStyle(
+                          color: _isActive ? AppColors.success : AppColors.warning,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
 
             // Institutional Precision & Quant Audit Pill Row
             if (widget.signal.quantGrade != null || widget.signal.estDeltaBadge != null || widget.signal.isBreakevenProtected)
@@ -1030,10 +1034,12 @@ class _SignalCardState extends State<SignalCard> {
 
       await apiService.createTradeJournal(draft);
 
-      // Also pin the signal locally for prominent tracking
-      if (!_pinService.isPinned(widget.signal)) {
-        await _pinService.togglePin(widget.signal);
+      // Also pin the signal locally as ACTIVE for prominent tracking
+      final activeSignal = widget.signal.copyWith(status: 'ACTIVE', isPinned: true);
+      if (_pinService.isPinned(activeSignal)) {
+        await _pinService.togglePin(activeSignal);
       }
+      await _pinService.togglePin(activeSignal);
 
       if (!mounted) return;
       setState(() {
@@ -1098,16 +1104,12 @@ class _SignalCardState extends State<SignalCard> {
     );
   }
 
+  String _formatPrice(double price) {
+    return PriceFormatter.format(widget.signal.symbol, price);
+  }
+
   String _formatPriceNumber(double price) {
-    if (widget.signal.symbol.toUpperCase().contains('XAU') || widget.signal.entry > 100) {
-      return price.toStringAsFixed(2);
-    }
-    final str = price.toString();
-    if (str.contains('.')) {
-      final decimals = str.split('.')[1].length;
-      if (decimals >= 5) return price.toStringAsFixed(5);
-    }
-    return price.toStringAsFixed(4);
+    return _formatPrice(price);
   }
 
   void _copyNumberOnly(String number, String label) {

@@ -110,19 +110,26 @@ class SessionBreakoutEngine:
         ny_all = [(dt, c) for dt, c in dated_candles if 12 <= dt.hour < 16]
 
         asian_candles: List[CandleBar] = []
+        latest_asian_date = None
         if asian_all:
             latest_asian_date = max(dt.date() for dt, _ in asian_all)
             asian_candles = [c for dt, c in asian_all if dt.date() == latest_asian_date]
 
         london_candles: List[CandleBar] = []
         if london_all:
-            latest_london_date = max(dt.date() for dt, _ in london_all)
-            london_candles = [c for dt, c in london_all if dt.date() == latest_london_date]
+            if latest_asian_date is not None:
+                london_candles = [c for dt, c in london_all if dt.date() == latest_asian_date]
+            else:
+                latest_london_date = max(dt.date() for dt, _ in london_all)
+                london_candles = [c for dt, c in london_all if dt.date() == latest_london_date]
 
         ny_candles: List[CandleBar] = []
         if ny_all:
-            latest_ny_date = max(dt.date() for dt, _ in ny_all)
-            ny_candles = [c for dt, c in ny_all if dt.date() == latest_ny_date]
+            if latest_asian_date is not None:
+                ny_candles = [c for dt, c in ny_all if dt.date() == latest_asian_date]
+            else:
+                latest_ny_date = max(dt.date() for dt, _ in ny_all)
+                ny_candles = [c for dt, c in ny_all if dt.date() == latest_ny_date]
 
         corridors: List[SessionRange] = []
 
@@ -410,7 +417,7 @@ class SessionBreakoutEngine:
         """
         dir_upper = direction.upper()
         sym_upper = symbol.upper()
-        dec = 2 if ("XAU" in sym_upper or "GOLD" in sym_upper or entry_price > 100) else 5
+        dec = 2 if ("XAU" in sym_upper or "GOLD" in sym_upper) else (3 if "JPY" in sym_upper else 5)
 
         atr = self.compute_atr(symbol, candles)
         atr_buffer = 1.0 * atr

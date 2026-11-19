@@ -47,7 +47,7 @@ def get_watchlist(
     return quotes
 
 
-@router.get("/{symbol}", response_model=MarketQuoteResponse)
+@router.get("/{symbol:path}", response_model=MarketQuoteResponse)
 def get_market_quote(symbol: str):
     """Return a single MarketQuoteResponse for the given symbol or alias."""
     resp = provider_manager.get_market_quote(symbol)

@@ -63,6 +63,31 @@ _ALIAS_MAP: Dict[str, str] = {
     "eur/gbp":  "EURGBP",
     "eur_gbp":  "EURGBP",
 
+    # USDCHF
+    "usdchf":   "USDCHF",
+    "usd/chf":  "USDCHF",
+    "usd_chf":  "USDCHF",
+
+    # CADJPY
+    "cadjpy":   "CADJPY",
+    "cad/jpy":  "CADJPY",
+    "cad_jpy":  "CADJPY",
+
+    # AUDJPY
+    "audjpy":   "AUDJPY",
+    "aud/jpy":  "AUDJPY",
+    "aud_jpy":  "AUDJPY",
+
+    # CHFJPY
+    "chfjpy":   "CHFJPY",
+    "chf/jpy":  "CHFJPY",
+    "chf_jpy":  "CHFJPY",
+
+    # EURAUD
+    "euraud":   "EURAUD",
+    "eur/aud":  "EURAUD",
+    "eur_aud":  "EURAUD",
+
     # Dow Jones
     "us30":     "US30",
     "dow":      "US30",
@@ -124,6 +149,11 @@ _PROVIDER_SYMBOL_MAP: Dict[str, Dict[str, str]] = {
         "NZDUSD": "NZD_USD",
         "EURJPY": "EUR_JPY",
         "EURGBP": "EUR_GBP",
+        "USDCHF": "USD_CHF",
+        "CADJPY": "CAD_JPY",
+        "AUDJPY": "AUD_JPY",
+        "CHFJPY": "CHF_JPY",
+        "EURAUD": "EUR_AUD",
     },
     "fmp": {
         "GBPUSD": "GBPUSD",

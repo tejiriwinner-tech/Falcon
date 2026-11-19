@@ -179,24 +179,19 @@ class StrategyIntelligenceEngine:
                 health = StrategyHealth.RETIRED
 
             # Determine Trend
-            if "London Breakout" in strat.name:
-                trend = StrategyTrend.IMPROVING
-            elif "London Momentum" in strat.name:
-                trend = StrategyTrend.DECLINING
-            else:
-                if len(dec_conf_list) >= 4:
-                    mid = len(dec_conf_list) // 2
-                    first_half = sum(dec_conf_list[:mid]) / mid
-                    second_half = sum(dec_conf_list[mid:]) / (len(dec_conf_list) - mid)
-                    diff = second_half - first_half
-                    if diff > 1.5:
-                        trend = StrategyTrend.IMPROVING
-                    elif diff < -1.5:
-                        trend = StrategyTrend.DECLINING
-                    else:
-                        trend = StrategyTrend.STABLE
+            if len(dec_conf_list) >= 4:
+                mid = len(dec_conf_list) // 2
+                first_half = sum(dec_conf_list[:mid]) / mid
+                second_half = sum(dec_conf_list[mid:]) / (len(dec_conf_list) - mid)
+                diff = second_half - first_half
+                if diff > 1.5:
+                    trend = StrategyTrend.IMPROVING
+                elif diff < -1.5:
+                    trend = StrategyTrend.DECLINING
                 else:
                     trend = StrategyTrend.STABLE
+            else:
+                trend = StrategyTrend.STABLE
 
             # Signal & Trade Breakdown Counts
             buy_cnt = sum(1 for c in strat_candidates if "BUY" in str(c.direction).upper())

@@ -57,8 +57,9 @@ class Signal {
     this.isBreakevenProtected = false,
   });
 
-  /// Unique setup signature for strict deduplication
-  String get uniqueKey => '${symbol}_${action}_${entry.toStringAsFixed(4)}_${stopLoss.toStringAsFixed(4)}';
+  /// Unique setup signature for strict deduplication (immutable across BE stopLoss shifts)
+  String get uniqueKey =>
+      '${symbol.replaceAll("/", "").replaceAll("_", "").replaceAll("-", "").toUpperCase()}_${action.toUpperCase()}_${entry.toStringAsFixed(4)}_${takeProfit.toStringAsFixed(4)}';
 
   Signal copyWith({
     int? id,

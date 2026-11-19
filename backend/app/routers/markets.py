@@ -26,7 +26,7 @@ _DISPLAY_NAMES = {
 
 
 @router.get("", response_model=MarketListResponse)
-async def get_markets(
+def get_markets(
     symbols: Optional[str] = Query(
         default=None, description="Comma-separated symbols; defaults to the watchlist"
     )

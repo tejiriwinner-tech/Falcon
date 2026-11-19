@@ -127,7 +127,7 @@ class ExitModelEvaluator:
             return {"A": -1.0, "B": -1.0, "D1": -1.0}
 
         # Model A: target 1.5R, SL -1.0R
-        if max_adverse_r >= 1.0 and (max_favorable_r < 1.5 or not same_candle_ambiguity):
+        if max_adverse_r >= 1.0:
             res_a = -1.0
         elif max_favorable_r >= 1.5:
             res_a = 1.5
@@ -136,21 +136,21 @@ class ExitModelEvaluator:
             res_a = max(0.0, max_favorable_r) - max(0.0, max_adverse_r)
 
         # Model B: target 1.0R, SL -1.0R
-        if max_favorable_r >= 1.0:
-            res_b = 1.0
-        elif max_adverse_r >= 1.0:
+        if max_adverse_r >= 1.0:
             res_b = -1.0
+        elif max_favorable_r >= 1.0:
+            res_b = 1.0
         else:
             res_b = max(0.0, max_favorable_r) - max(0.0, max_adverse_r)
 
         # Model D1: 50% at 1.0R, remainder to 1.5R with BE
-        if max_favorable_r >= 1.5:
+        if max_adverse_r >= 1.0:
+            res_d1 = -1.0
+        elif max_favorable_r >= 1.5:
             res_d1 = 0.5 * 1.0 + 0.5 * 1.5  # +1.25R
         elif max_favorable_r >= 1.0:
             # First half banked, second half stopped at BE (0.0R) or floating
             res_d1 = 0.5 * 1.0 + 0.5 * 0.0  # +0.50R
-        elif max_adverse_r >= 1.0:
-            res_d1 = -1.0
         else:
             res_d1 = max(0.0, max_favorable_r) - max(0.0, max_adverse_r)
 

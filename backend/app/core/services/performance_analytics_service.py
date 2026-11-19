@@ -93,7 +93,7 @@ def _equity_curve(
     for day in sorted(totals):
         equity += totals[day]
         peak = max(peak, equity)
-        drawdown = ((peak - equity) / peak * 100) if peak else 0.0
+        drawdown = ((peak - equity) / peak * 100) if peak > 0 else 0.0
         max_drawdown = max(max_drawdown, drawdown)
         curve.append(
             EquityPoint(
@@ -271,7 +271,7 @@ def build_performance_analytics() -> PerformanceAnalyticsResponse:
         netProfit=net_profit,
         maxDrawdown=max_drawdown,
         todaySignals=_today_signals(today),
-        todayOpenTrades=sum(1 for trade in today_trades if not _is_closed(trade)),
+        todayOpenTrades=sum(1 for t in trades if (t.status or "").upper() in ("OPEN", "PENDING", "FILLED", "ACTIVE")),
         todayClosedTrades=len(today_closed),
         todayWins=sum(1 for trade in today_closed if _outcome(trade) == "WIN"),
         todayLosses=sum(1 for trade in today_closed if _outcome(trade) == "LOSS"),

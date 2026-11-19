@@ -28,10 +28,18 @@ class SchedulerConfig:
     DUPLICATE_TIME_WINDOW_MINUTES: int = int(os.getenv("FALCON_DUPLICATE_TIME_WINDOW", "30"))
     
     # Markets to Monitor (6 Core Institutional Assets)
-    MARKETS: List[str] = os.getenv("FALCON_MARKETS", "XAUUSD,GBPUSD,EURUSD,GBPJPY,USDJPY,AUDUSD").split(",")
+    MARKETS: List[str] = [
+        m.strip()
+        for m in os.getenv("FALCON_MARKETS", "XAUUSD,GBPUSD,EURUSD,GBPJPY,USDJPY,AUDUSD").split(",")
+        if m.strip()
+    ]
     
     # Timeframes to Monitor
-    TIMEFRAMES: List[str] = os.getenv("FALCON_TIMEFRAMES", "H4,H1,M15,M5").split(",")
+    TIMEFRAMES: List[str] = [
+        tf.strip()
+        for tf in os.getenv("FALCON_TIMEFRAMES", "H4,H1,M15,M5").split(",")
+        if tf.strip()
+    ]
     
     # Performance Configuration
     MAX_SCAN_TIME_SECONDS: int = int(os.getenv("FALCON_MAX_SCAN_TIME", "5"))

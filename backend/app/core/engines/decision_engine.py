@@ -124,13 +124,14 @@ class DecisionEngine:
                 missionStatus = "PENDING"
             elif (
                 val_status == ValidationStatus.PARTIALLY_PASSED or
+                risk_lvl == RiskLevel.HIGH or
                 (risk_lvl == RiskLevel.MEDIUM and decisionConfidence < 70)
             ):
                 recommendation = DecisionRecommendation.MONITOR
                 status = DecisionStatus.MONITORING
                 priority = DecisionPriority.MEDIUM
                 title = "Monitor Setup Before Execution"
-                description = "Candidate has valid parameters with medium risk or partial validation. Active monitoring required."
+                description = "Candidate has valid parameters with medium/high risk or partial validation. Active monitoring required."
                 expectedHolding = strategy.estimatedHoldingTime if strategy else "2-6 Hours"
                 nextReviewIn = "15 Minutes"
                 missionStatus = "MONITORING"
@@ -138,18 +139,28 @@ class DecisionEngine:
                 # Execution READY, Validation PASSED, Risk LOW or manageable MEDIUM with high confidence
                 # Determine direction from candidate status or type
                 cand_direction = candidate.direction.name if candidate and hasattr(candidate.direction, 'name') else str(cand_status.name if hasattr(cand_status, 'name') else cand_status)
-                if "SELL" in str(cand_direction).upper():
-                    recommendation = DecisionRecommendation.SELL
+                if "WAIT" in str(cand_direction).upper():
+                    recommendation = DecisionRecommendation.WAIT
+                    status = DecisionStatus.MONITORING
+                    priority = DecisionPriority.MEDIUM
+                    title = "Wait for Confirmed Setup"
+                    description = "Candidate direction is WAIT. Active monitoring required until directional trigger confirms."
+                    expectedHolding = strategy.estimatedHoldingTime if strategy else "2-6 Hours"
+                    nextReviewIn = "15 Minutes"
+                    missionStatus = "MONITORING"
                 else:
-                    recommendation = DecisionRecommendation.BUY
+                    if "SELL" in str(cand_direction).upper():
+                        recommendation = DecisionRecommendation.SELL
+                    else:
+                        recommendation = DecisionRecommendation.BUY
 
-                status = DecisionStatus.APPROVED
-                priority = DecisionPriority.HIGH if risk_lvl == RiskLevel.LOW else DecisionPriority.MEDIUM
-                title = f"Approve {recommendation.value} Order Execution"
-                description = f"All 5 pipeline stages passed with high confidence ({decisionConfidence}%). Captain authorizes immediate {recommendation.value} execution."
-                expectedHolding = strategy.estimatedHoldingTime if strategy else "2-6 Hours"
-                nextReviewIn = "Immediate"
-                missionStatus = "READY"
+                    status = DecisionStatus.APPROVED
+                    priority = DecisionPriority.HIGH if risk_lvl == RiskLevel.LOW else DecisionPriority.MEDIUM
+                    title = f"Approve {recommendation.value} Order Execution"
+                    description = f"All 5 pipeline stages passed with high confidence ({decisionConfidence}%). Captain authorizes immediate {recommendation.value} execution."
+                    expectedHolding = strategy.estimatedHoldingTime if strategy else "2-6 Hours"
+                    nextReviewIn = "Immediate"
+                    missionStatus = "READY"
 
             recommendationDetails = DecisionRecommendationDetails(
                 recommendation=recommendation,

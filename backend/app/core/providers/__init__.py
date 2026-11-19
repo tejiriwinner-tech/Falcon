@@ -47,6 +47,10 @@ class _InstrumentedProviderManager(ProviderManager):
     """ProviderManager that records every fetch, cache hit/miss, and failover
     into the ProviderAnalyticsEngine without altering selection logic."""
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._last_cold_ms: float = 0.0
+
     def get_market_quote(self, raw_symbol: str):  # type: ignore[override]
         # Peek at cache before delegating to determine hit/miss for analytics
         canonical = self._mapper.normalize(raw_symbol)
@@ -70,7 +74,7 @@ class _InstrumentedProviderManager(ProviderManager):
                     q = resp.quote
                     provider_analytics.record_fetch(
                         q.providerId, q.providerName, canonical,
-                        success=True, latency_ms=self._last_cold_ms,
+                        success=True, latency_ms=getattr(self, "_last_cold_ms", 0.0),
                     )
                 else:
                     provider_analytics.record_cache_miss("all", "All Providers", canonical)

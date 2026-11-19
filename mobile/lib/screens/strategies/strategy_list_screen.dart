@@ -27,14 +27,14 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
     _fetchStrategies();
   }
 
-  void _fetchStrategies() {
+  void _fetchStrategies({bool forceRefresh = false}) {
     setState(() {
-      _strategiesFuture = _apiService.getStrategies();
+      _strategiesFuture = _apiService.getStrategies(forceRefresh: forceRefresh);
     });
   }
 
   Future<void> _handleRefresh() async {
-    _fetchStrategies();
+    _fetchStrategies(forceRefresh: true);
     try {
       final res = await _strategiesFuture;
       if (mounted) {
@@ -297,7 +297,9 @@ class _StrategyListScreenState extends State<StrategyListScreen> {
       child: AppCard(
         onTap: () async {
           await context.push('/strategies/${strategy.id}');
-          _fetchStrategies();
+          if (mounted) {
+            _handleRefresh();
+          }
         },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

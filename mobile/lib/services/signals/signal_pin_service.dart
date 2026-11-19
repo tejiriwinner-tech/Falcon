@@ -20,13 +20,15 @@ class SignalPinService extends ChangeNotifier {
   List<Signal> get pinnedSignals => _pinnedSignals.values.toList();
   int get pinnedCount => _pinnedKeys.length;
 
+  static String _prefixKey(Signal s) =>
+      '${s.symbol.replaceAll("/", "").replaceAll("_", "").replaceAll("-", "").toUpperCase()}_${s.action.toUpperCase()}_${s.entry.toStringAsFixed(4)}_';
+
   Future<void> init() async {
     if (_initialized) return;
     try {
       _prefs ??= await SharedPreferences.getInstance();
       final keys = _prefs!.getStringList(_prefPinnedKeys) ?? [];
       for (final k in keys) {
-        // Enforce 4-part signature (Symbol_Action_Entry_SL) to prevent collisions
         if (k.split('_').length >= 4) {
           _pinnedKeys.add(k);
         }
@@ -51,25 +53,35 @@ class SignalPinService extends ChangeNotifier {
   }
 
   bool isPinned(Signal signal) {
-    return _pinnedKeys.contains(signal.uniqueKey);
+    if (_pinnedKeys.contains(signal.uniqueKey)) return true;
+    final prefix = _prefixKey(signal);
+    return _pinnedKeys.any((k) => k.startsWith(prefix));
   }
 
   Future<bool> togglePin(Signal signal) async {
     await init();
     final key = signal.uniqueKey;
-    final isCurrentlyPinned = isPinned(signal);
+    final prefix = _prefixKey(signal);
+    final existingKey = _pinnedKeys.contains(key)
+        ? key
+        : _pinnedKeys.cast<String?>().firstWhere(
+              (k) => k != null && k.startsWith(prefix),
+              orElse: () => null,
+            );
 
-    if (isCurrentlyPinned) {
-      _pinnedKeys.remove(key);
-      _pinnedSignals.remove(key);
+    if (existingKey != null) {
+      _pinnedKeys.remove(existingKey);
+      _pinnedSignals.remove(existingKey);
+      await _save();
+      notifyListeners();
+      return false;
     } else {
       _pinnedKeys.add(key);
       _pinnedSignals[key] = signal.copyWith(isPinned: true);
+      await _save();
+      notifyListeners();
+      return true;
     }
-
-    await _save();
-    notifyListeners();
-    return !isCurrentlyPinned;
   }
 
   Future<void> clearAll() async {
@@ -84,16 +96,37 @@ class SignalPinService extends ChangeNotifier {
     bool changed = false;
     for (final live in liveSignals) {
       final key = live.uniqueKey;
-      if (_pinnedSignals.containsKey(key)) {
-        final existing = _pinnedSignals[key]!;
+      final prefix = _prefixKey(live);
+      String? matchedKey = _pinnedSignals.containsKey(key) ? key : null;
+      if (matchedKey == null) {
+        for (final k in _pinnedSignals.keys) {
+          if (k.startsWith(prefix)) {
+            matchedKey = k;
+            break;
+          }
+        }
+      }
+
+      if (matchedKey != null) {
+        final existing = _pinnedSignals[matchedKey]!;
         final exStatus = existing.status.toUpperCase();
         final liveStatus = live.status.toUpperCase();
         if (exStatus == 'ACTIVE' && (liveStatus == 'HOLD' || liveStatus == 'WAITING')) {
           continue;
         }
-        if (existing.status != live.status ||
+        if (matchedKey != key ||
+            existing.status != live.status ||
             existing.analysis != live.analysis ||
-            existing.isBreakeven != live.isBreakeven) {
+            existing.isBreakeven != live.isBreakeven ||
+            existing.isBreakevenProtected != live.isBreakevenProtected ||
+            existing.stopLoss != live.stopLoss ||
+            existing.takeProfit != live.takeProfit ||
+            existing.tacticalAdvice != live.tacticalAdvice) {
+          if (matchedKey != key) {
+            _pinnedKeys.remove(matchedKey);
+            _pinnedSignals.remove(matchedKey);
+            _pinnedKeys.add(key);
+          }
           _pinnedSignals[key] = live.copyWith(isPinned: true);
           changed = true;
         }

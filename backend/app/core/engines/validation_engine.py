@@ -102,11 +102,11 @@ class ValidationEngine:
             if not session_passed:
                 strat = strategy or strategy_map.get(candidate.strategyId)
                 if strat and (
-                    any(pref.lower() in session.lower() for pref in strat.preferredSessions)
-                    or (session in ["London", "New York", "Asian", "Tokyo", "Sydney", "London-NY Overlap"])
+                    not strat.preferredSessions
+                    or any(pref.lower() in session.lower() for pref in strat.preferredSessions)
                 ):
                     session_passed = True
-                elif session in ["London", "New York", "Asian", "Tokyo", "Sydney", "London-NY Overlap"]:
+                elif not strat:
                     session_passed = True
 
             check_session = ValidationCheck(
@@ -121,6 +121,8 @@ class ValidationEngine:
             # 5. Spread Threshold (Weight: 15, Mandatory: Yes)
             # Dynamic asset-aware spread limit (Gold up to 3.5 pips, GBP pairs 2.5, Majors 1.8)
             symbol = getattr(candidate, "symbol", "") or ""
+            if "XAU" not in symbol and "GOLD" not in symbol and 0.0 < spread < 0.5:
+                spread = spread / (0.01 if "JPY" in symbol else 0.0001)
             if "XAU" in symbol or "GOLD" in symbol:
                 max_spread = 8.0
             elif "GBP" in symbol:
@@ -151,8 +153,13 @@ class ValidationEngine:
             )
 
             # 7. Market Sentiment (Weight: 10, Mandatory: No)
-            # Pass if sentiment is Greedy, Bullish, or Neutral
-            sentiment_passed = sentiment in ["Greedy", "Bullish", "Neutral"]
+            # Pass if sentiment supports trade direction
+            cand_dir_sent = getattr(candidate, "direction", None)
+            dir_sent_str = cand_dir_sent.value if hasattr(cand_dir_sent, "value") else str(cand_dir_sent or "")
+            if "SELL" in dir_sent_str.upper():
+                sentiment_passed = sentiment in ["Fear", "Bearish", "Neutral"]
+            else:
+                sentiment_passed = sentiment in ["Greedy", "Bullish", "Neutral"]
             check_sentiment = ValidationCheck(
                 title="Market Sentiment",
                 description=f"Confirms broader market sentiment '{sentiment}' supports trade direction.",

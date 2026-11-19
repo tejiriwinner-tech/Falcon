@@ -26,22 +26,27 @@ def get_api_key(x_api_key: str = Header(None)) -> str:
     Raises:
         HTTPException: 401 Unauthorized if the key is missing or invalid.
     """
-    expected = settings.API_KEY
+    expected = getattr(settings, "FALCON_API_KEY", None) or getattr(settings, "API_KEY", None)
+    require_key = bool(getattr(settings, "REQUIRE_API_KEY", False))
 
-    # If no API key is configured, authentication cannot succeed.
+    # If no API key is configured, allow when REQUIRE_API_KEY is False
     if not expected:
+        if not require_key:
+            return "dev_mode"
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="API key authentication is not configured.",
         )
 
     if not x_api_key:
+        if not require_key:
+            return "dev_mode"
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing API key. Provide it in the X-API-Key header.",
         )
 
-    if not secrets.compare_digest(x_api_key, expected):
+    if not secrets.compare_digest(str(x_api_key), str(expected)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid API key.",

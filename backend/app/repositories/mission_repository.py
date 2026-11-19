@@ -817,6 +817,9 @@ class MissionRepository:
         Returns:
             Number of missions deleted
         """
+        from app.core.config import settings
+        if not getattr(settings, "ENABLE_MISSION_AUTO_PRUNE", False):
+            return 0
         try:
             deleted = self.db.query(MissionRecord)\
                 .filter(MissionRecord.started_at < older_than)\
@@ -861,7 +864,7 @@ class MissionRepository:
             for mission, decision in results:
                 history.append({
                     'missionId': mission.id,
-                    'missionNumber': mission.missionNumber,
+                    'missionNumber': mission.mission_number,
                     'status': mission.status,
                     'startedAt': mission.started_at,
                     'completedAt': mission.completed_at,

@@ -38,7 +38,7 @@ class MissionRecord(Base):
 class MissionArtifactRecord(Base):
     __tablename__ = "mission_artifacts"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     mission_id: Mapped[str] = mapped_column(String(64), nullable=False)
     artifact_type: Mapped[str] = mapped_column(String(32), nullable=False)
     position: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
@@ -136,7 +136,7 @@ class PriceBarRecord(Base):
         ),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     symbol: Mapped[str] = mapped_column(String(32), nullable=False)
     timeframe: Mapped[str] = mapped_column(String(16), nullable=False)
     bar_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
@@ -163,7 +163,7 @@ class EconomicEventRecord(Base):
         ),
     )
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigInteger().with_variant(Integer, "sqlite"), primary_key=True, autoincrement=True)
     event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     currency: Mapped[str] = mapped_column(String(8), nullable=False)
     title: Mapped[str] = mapped_column(String(255), nullable=False)
@@ -237,4 +237,3 @@ class StrategyStatusRecord(Base):
     strategy_id: Mapped[str] = mapped_column(String(64), primary_key=True)
     status: Mapped[str] = mapped_column(String(32), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-

@@ -247,7 +247,25 @@ class CapitalGuardianService:
                 f"Monetary loss cannot be reliably calculated: instrument '{symbol}' is not registered in Falcon"
             )
 
-        # Check quote currency: Falcon account capital is USD
+        # Check quote currency: Falcon account capital is USD (with JPY conversion support)
+        if inst.currency == "JPY":
+            c_size = Decimal(str(getattr(inst, "contract_size", None) or getattr(inst, "contractSize", None) or 100000))
+            lots_jpy = lot_dec if lot_dec is not None else (qty_dec / c_size if qty_dec is not None else Decimal("0.01"))
+            jpy_loss = price_risk * c_size * lots_jpy
+            if sym_clean == "USDJPY" and entry > Decimal("0"):
+                usd_conv = entry
+            else:
+                usd_conv = Decimal("155.0")
+                try:
+                    import app.core.providers as _providers
+                    _pm = getattr(_providers, "provider_manager", None)
+                    _uj = _pm.get_market_quote("USDJPY") if _pm else None
+                    if _uj and getattr(_uj, "quote", None) and getattr(_uj.quote, "lastPrice", 0) > 50:
+                        usd_conv = Decimal(str(_uj.quote.lastPrice))
+                except Exception:
+                    pass
+            return (jpy_loss / usd_conv).quantize(Decimal("0.01"))
+
         if inst.currency != "USD":
             raise ValueError(
                 f"Monetary loss cannot be reliably calculated for instrument '{symbol}': "
@@ -256,6 +274,8 @@ class CapitalGuardianService:
 
         if qty_dec is not None:
             loss = price_risk * qty_dec
+            if sym_clean.startswith("USD") and not ("XAU" in sym_clean or "GOLD" in sym_clean) and entry > Decimal("0"):
+                loss = loss / entry
             return loss.quantize(Decimal("0.01"))
 
         if lot_dec is not None:
@@ -266,6 +286,8 @@ class CapitalGuardianService:
             else:
                 units = lot_dec * Decimal("100000")
             loss = price_risk * units
+            if sym_clean.startswith("USD") and not ("XAU" in sym_clean or "GOLD" in sym_clean) and entry > Decimal("0"):
+                loss = loss / entry
             return loss.quantize(Decimal("0.01"))
 
         raise ValueError("Unable to determine monetary risk from provided parameters")
@@ -276,11 +298,27 @@ class CapitalGuardianService:
     ) -> Decimal:
         """
         Calculate sum of worst-case monetary losses for all provided capital-reserving trades.
-        Fails closed if any trade's loss cannot be reliably calculated.
+        Uses a safe fallback estimate if an individual legacy trade fails conversion so one
+        legacy trade never blocks all symbols.
         """
         total_loss = Decimal("0.00")
         for t in trades:
-            total_loss += self.get_trade_worst_case_loss(t)
+            try:
+                total_loss += self.get_trade_worst_case_loss(t)
+            except Exception as ex:
+                logger.warning("Fallback worst-case loss estimate for trade %s (%s): %s", getattr(t, "id", "?"), getattr(t, "symbol", "?"), ex)
+                try:
+                    p_risk = abs(Decimal(str(t.entryPrice or 0)) - Decimal(str(t.stopLoss or 0)))
+                    s_clean = str(getattr(t, "symbol", "") or "").upper().replace("/", "")
+                    if "XAU" in s_clean or "GOLD" in s_clean:
+                        fb = p_risk * Decimal("1.0")
+                    elif "JPY" in s_clean:
+                        fb = (p_risk * Decimal("1000.0")) / Decimal("155.0")
+                    else:
+                        fb = p_risk * Decimal("1000.0")
+                    total_loss += max(fb.quantize(Decimal("0.01")), Decimal("1.00"))
+                except Exception:
+                    total_loss += Decimal("5.00")
         return total_loss.quantize(Decimal("0.01"))
 
     def get_trade_worst_case_loss(self, t: TradeJournalItem) -> Decimal:
@@ -549,10 +587,13 @@ class CapitalGuardianService:
                 today_closed = self._journal_repo.list_closed_trades_as_of(as_of=now_utc, session=session)
                 today_loss = Decimal("0.00")
                 for t in today_closed:
-                    if t.closeDate and t.closeDate >= start_of_day:
-                        if (t.result or "").upper() in ("LOSS", "LOST"):
-                            pnl = abs(Decimal(str(t.profitLoss or 0.0)))
-                            today_loss += pnl
+                    if t.closeDate:
+                        close_dt = t.closeDate if t.closeDate.tzinfo else t.closeDate.replace(tzinfo=timezone.utc)
+                        if close_dt >= start_of_day and (t.result or "").upper() in ("LOSS", "LOST"):
+                            init_risk = getattr(t, "initialMonetaryRisk", None)
+                            if init_risk is not None and Decimal(str(init_risk)) > Decimal("0.00"):
+                                pnl = abs(Decimal(str(t.profitLoss or 0.0)))
+                                today_loss += pnl
 
                 if today_loss >= max_daily_loss and max_daily_loss > Decimal("0.00"):
                     return CapitalGuardianDecision(

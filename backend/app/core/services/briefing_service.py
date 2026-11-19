@@ -410,11 +410,13 @@ class BriefingService:
                 trade_dt = t.closeDate or t.tradeDate
                 if trade_dt and trade_dt.strftime("%Y-%m-%d") == today_str:
                     today_trades.append(t)
-                elif t.status.upper() in ("CLOSED", "EXPIRED", "INVALIDATED"):
-                    # Include latest resolved trades if today list is empty
-                    today_trades.append(t)
-            # Take last 10
-            today_trades = today_trades[-10:]
+            if not today_trades:
+                today_trades = [
+                    t for t in all_trades
+                    if (t.status or "").upper() in ("CLOSED", "EXPIRED", "INVALIDATED")
+                ]
+            # Take newest 10 (list_trades is sorted newest-first)
+            today_trades = today_trades[:10]
 
         wins = 0
         losses = 0
@@ -433,6 +435,7 @@ class BriefingService:
                 net_pnl += pnl_val
             elif res in ("BREAKEVEN", "BE"):
                 breakevens += 1
+                net_pnl += pnl_val
 
         total_closed = wins + losses + breakevens
         win_rate = (wins / (wins + losses) * 100.0) if (wins + losses) > 0 else (100.0 if wins > 0 else 0.0)
@@ -585,7 +588,7 @@ class BriefingService:
             lines.append(f"• {insight}")
 
         risk = briefing.risk_state or {}
-        mult = risk.get("recovery_multiplier", 1.0)
+        mult = risk.get("profit_recovery_multiplier", risk.get("recovery_multiplier", 1.0))
         status = risk.get("recovery_status", "BASELINE")
         headroom = risk.get("loss_ceiling_headroom", 20.0)
         streak = risk.get("consecutive_losses", 0)

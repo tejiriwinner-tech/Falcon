@@ -131,6 +131,18 @@ class MarketScheduler:
                 # Get existing active signals for duplicate detection
                 existing_signals = self.repository.get_live_signals()
                 
+                # Run expiration check BEFORE limit checks
+                if scheduler_config.AUTO_EXPIRE:
+                    expirable = self.expiration_service.find_expirable_signals(existing_signals)
+                    expired_ids = set()
+                    for signal in expirable:
+                        self.repository.expire_signal(signal.signalId)
+                        self.statistics.record_signal_expired()
+                        expired_ids.add(signal.signalId)
+                    if expired_ids:
+                        existing_signals = [s for s in existing_signals if s.signalId not in expired_ids]
+                    logger.info(f"Expired {len(expirable)} signals")
+                
                 # Check limits before scanning
                 would_exceed, limit_reason = self.duplicate_detector.would_exceed_limits(
                     "ANY", existing_signals
@@ -141,17 +153,16 @@ class MarketScheduler:
                     self.statistics.record_scan_end(scan_start_ms, success=False)
                     return results
                 
-                # Run expiration check
-                if scheduler_config.AUTO_EXPIRE:
-                    expirable = self.expiration_service.find_expirable_signals(existing_signals)
-                    for signal in expirable:
-                        self.repository.expire_signal(signal.signalId)
-                        self.statistics.record_signal_expired()
-                    logger.info(f"Expired {len(expirable)} signals")
-                
                 # Scan each market/timeframe combination
                 from app.core.providers import provider_manager
                 for symbol in scheduler_config.MARKETS:
+                    would_exceed_sym, sym_limit_reason = self.duplicate_detector.would_exceed_limits(
+                        symbol, existing_signals
+                    )
+                    if would_exceed_sym:
+                        logger.info(f"Skipping {symbol}: {sym_limit_reason}")
+                        continue
+
                     # Fetch live quote once per symbol for this scan cycle (cached for all timeframes)
                     symbol_live_price = None
                     try:
@@ -162,6 +173,12 @@ class MarketScheduler:
                         logger.debug(f"Failed to fetch market quote for {symbol}: {q_err}")
 
                     for timeframe in scheduler_config.TIMEFRAMES:
+                        would_exceed_tf, tf_limit_reason = self.duplicate_detector.would_exceed_limits(
+                            symbol, existing_signals
+                        )
+                        if would_exceed_tf:
+                            logger.info(f"Skipping {symbol} {timeframe}: {tf_limit_reason}")
+                            break
                         try:
                             signal_result = self._scan_market_timeframe(
                                 symbol, timeframe, db, existing_signals, live_price=symbol_live_price
@@ -334,6 +351,7 @@ class MarketScheduler:
             saved = self.repository.save_signal(trade_setup)
             
             if saved:
+                existing_signals.append(trade_setup)
                 logger.info(
                     f"Signal approved and saved: {symbol} {timeframe} "
                     f"{trade_setup.signalType} @ {trade_setup.entryPrice}"

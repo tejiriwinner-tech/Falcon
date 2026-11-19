@@ -15,7 +15,11 @@ from app.services.scheduler.learning_scheduler_service import learning_scheduler
 from app.core.services.briefing_service import briefing_service
 from app.core.services.watchlist_poller_service import watchlist_poller_service
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 import logging
+
+# Reference to the background briefing warm-up task (kept to avoid GC)
+_briefing_warm_task = None
 
 # Initialize centralized logging
 setup_logging()
@@ -50,7 +54,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=allow_credentials,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
@@ -115,12 +119,20 @@ async def startup_event():
     except Exception as e:
         logging.getLogger(__name__).warning("OANDA Live Pricing Stream startup error: %s", e)
 
-    # Warm Falcon AI Co-Pilot & scheduled briefings cache
+    # Warm Falcon AI Co-Pilot & scheduled briefings cache (off the event loop so
+    # blocking provider/DB I/O cannot stall startup or Fly health checks)
+    async def _warm_briefing_cache():
+        try:
+            await asyncio.to_thread(briefing_service.warm_cache)
+            logging.getLogger(__name__).info("Falcon Intelligence briefing cache warmed")
+        except Exception as e:
+            logging.getLogger(__name__).warning("Briefing cache warming error: %s", e)
+
     try:
-        briefing_service.warm_cache()
-        logging.getLogger(__name__).info("Falcon Intelligence briefing cache warmed")
+        global _briefing_warm_task
+        _briefing_warm_task = asyncio.create_task(_warm_briefing_cache())
     except Exception as e:
-        logging.getLogger(__name__).warning("Briefing cache warming error: %s", e)
+        logging.getLogger(__name__).warning("Briefing cache warming schedule error: %s", e)
 
 
 @app.on_event("shutdown")
