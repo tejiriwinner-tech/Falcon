@@ -320,12 +320,27 @@ class SignalOutcomeResolver:
         Protected by PostgreSQL advisory lock (8882026) and thread lock for concurrency.
         """
         with self._lock:
+            pre_built_signals = None
+            try:
+                sig_resp = signal_service.build_signals(mission_limit=5)
+                pre_built_signals = getattr(sig_resp, "signals", None) or []
+            except Exception as ex:
+                logger.debug(f"Pre-lock build_signals in resolver skipped: {ex}")
+
             if trade_journal_repository.persistent and database_enabled():
                 with get_session() as session:
                     with session.begin():
                         self._acquire_advisory_lock_if_postgres(session)
-                        return self._execute_resolve_signals(force_simulate=force_simulate, session=session)
-            return self._execute_resolve_signals(force_simulate=force_simulate, session=None)
+                        return self._execute_resolve_signals(
+                            force_simulate=force_simulate,
+                            session=session,
+                            pre_built_signals=pre_built_signals,
+                        )
+            return self._execute_resolve_signals(
+                force_simulate=force_simulate,
+                session=None,
+                pre_built_signals=pre_built_signals,
+            )
 
     def _acquire_advisory_lock_if_postgres(self, session: object) -> None:
         """Acquire PostgreSQL transaction advisory lock if connected to PostgreSQL."""
@@ -494,7 +509,10 @@ class SignalOutcomeResolver:
         return out
 
     def _execute_resolve_signals(
-        self, force_simulate: bool = False, session: Optional[object] = None
+        self,
+        force_simulate: bool = False,
+        session: Optional[object] = None,
+        pre_built_signals: Optional[List[Any]] = None,
     ) -> SignalResolutionSummary:
         now = datetime.now(timezone.utc)
 
@@ -510,8 +528,11 @@ class SignalOutcomeResolver:
 
         # Synchronize any ACTIVE signals from SignalService not yet recorded in TradeJournal
         try:
-            sig_resp = signal_service.build_signals(mission_limit=5)
-            live_sigs = getattr(sig_resp, "signals", None) or []
+            if pre_built_signals is not None:
+                live_sigs = pre_built_signals
+            else:
+                sig_resp = signal_service.build_signals(mission_limit=5)
+                live_sigs = getattr(sig_resp, "signals", None) or []
             all_stored_trades = trade_journal_repository.list_trades(session=session)
             existing_sig_ids = {t.signalId for t in all_stored_trades if t.signalId is not None} | {t.id for t in all_stored_trades if t.id is not None}
             active_sym_dirs = {

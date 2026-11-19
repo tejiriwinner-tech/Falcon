@@ -617,7 +617,11 @@ class SignalService:
                 slip_invalidation = 6.00 if is_gold_sym else (0.200 if is_jpy_sym else 0.00200)
 
                 # Pre-evaluate candidate via in-memory Guardian (Phase 5B read-only pipeline)
-                signal_authorization_service.evaluate_candidate(cand)
+                guardian_dec = signal_authorization_service.evaluate_candidate(
+                    cand,
+                    signal_id=item.get("signal_id"),
+                    lot_size=lot_size,
+                )
 
                 # Check if this setup is ALREADY recorded as ACTIVE in repository or open trades
                 is_already_active = signal_signature_repository.is_active(
@@ -881,6 +885,12 @@ class SignalService:
                         shield_reason = f"PORTFOLIO HEAT CAP: Maximum {max_active_limit} simultaneous active trades reached ({len(open_trades)} running + {len(curated_active)} new). Held on Watchlist."
                         entry_hit = False
 
+                    # 5. Capital Guardian Safety & Drawdown Circuit Breaker Gate
+                    if not shield_reason and entry_hit and guardian_dec is not None and not getattr(guardian_dec, "allowed", True):
+                        g_reason = str(getattr(guardian_dec, "reason", "") or "Rejected by Capital Guardian")
+                        shield_reason = f"CAPITAL GUARDIAN SHIELD: {g_reason}"
+                        entry_hit = False
+
                 # If shield intervened on a pending setup, suppress entry promotion
                 if shield_reason and not is_already_active:
                     entry_hit = False
@@ -892,14 +902,14 @@ class SignalService:
                     continue
                 if is_already_active or (entry_hit and is_approved and is_ready and not shield_reason):
                     open_symbol_dirs[norm_sym] = direction_str.upper()
-                    item["is_guardian_authorized"] = True
+                    item["is_guardian_authorized"] = bool(getattr(guardian_dec, "allowed", True)) if guardian_dec is not None else True
                     for exp in cand_exps:
                         if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")):
                             active_currency_baskets[exp] = f"{active_currency_baskets[exp]},{symbol}" if exp in active_currency_baskets else symbol
 
                     from app.core.services.position_sizing_service import position_sizing_service
                     scaled_lot = position_sizing_service.calculate_portfolio_heat_lot_size(
-                        active_trade_count=len(curated_active) + 1,
+                        active_trade_count=len(open_trades) + len(curated_active) + 1,
                         base_lot_size=lot_size,
                     )
                     item["lot_size"] = scaled_lot
