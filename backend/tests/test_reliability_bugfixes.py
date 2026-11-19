@@ -8,7 +8,7 @@ Automated verification suite for the 6 Core Reliability Bug Fixes:
 6. Auto-recorded live trades compute authentic initialStopLoss, initialMonetaryRisk, & UTC marketSession, and honor settings.MAX_SIMULTANEOUS_TRADES.
 """
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, time as dt_time, timedelta, timezone
 from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
@@ -21,10 +21,12 @@ from app.core.engines.signal_generation_engine import SignalGenerationEngine
 from app.core.engines.strategy_engine import strategy_engine
 from app.core.providers.provider_manager import MarketQuoteResponse
 from app.core.repository.trade_journal_repository import InMemoryTradeJournalStorage, trade_journal_repository
+from app.core.services.market_history_service import PriceBar
+from app.core.services.signal_authorization_service import get_rollover_window_utc
 from app.core.services.signal_outcome_resolver import SignalOutcomeResolver
 from app.schemas.market_quote import BidAsk, MarketQuote, MarketStatus, QuoteStatus
 from app.schemas.market_state import MarketPrice, MarketState
-from app.schemas.signal_candidate import CandidateStatus
+from app.schemas.signal_candidate import CandidateDirection, CandidateStatus
 from app.schemas.strategy import StrategyStatus
 from app.schemas.trade_journal import TradeJournalCreate
 
@@ -274,6 +276,188 @@ def test_6_session_helper_and_settings_clean():
     print("Bug 6 PASS: Authentic UTC session derivation & clean settings verified!")
 
 
+def test_7_strat029_frankfurt_preopen_0645_to_0659_utc():
+    """Edge Case 1: strat-029 MUST pass Session Match at 06:50 UTC even when _derive_session() is 'Tokyo / Asian'."""
+    engine = SignalGenerationEngine()
+    s29 = next(s for s in strategy_engine.get_strategies() if s.id == "strat-029").model_copy(deep=True)
+    s29.status = StrategyStatus.ACTIVE
+    bars = _make_bars(1.0950, +0.0002, count=50)
+
+    t_0650 = datetime(2026, 11, 18, 6, 50, 0, tzinfo=timezone.utc)
+    t_0640 = datetime(2026, 11, 18, 6, 40, 0, tzinfo=timezone.utc)
+
+    for dt_check, expected_pass in [(t_0650, True), (t_0640, False)]:
+        m_state = MarketState(
+            timestamp=dt_check,
+            session="Tokyo / Asian",
+            volatility="Moderate",
+            marketSentimentLabel="Bullish",
+            overallMarketConfidence=85,
+            dataAgeSeconds=5,
+            prices={"EURUSD": MarketPrice(symbol="EURUSD", currentPrice=1.1050, bid=1.10494, ask=1.10500, spread=0.00006, timestamp=dt_check, provider="oanda")},
+            indicators={},
+            calendar=[],
+        )
+        with patch("app.core.services.market_history_service.market_history_service.get_bars", return_value=bars):
+            cand = engine.generate_candidates(market_state=m_state, strategies=[s29], as_of=dt_check)[0]
+        sess_c = next(c for c in cand.conditions if c.title == "Session Match")
+        assert sess_c.passed is expected_pass, f"At {dt_check.strftime('%H:%M')} UTC expected Session Match={expected_pass}, got {sess_c.passed} ({sess_c.description})"
+    print("Polish 1 PASS: strat-029 06:45-06:59 UTC Frankfurt pre-open killzone parity verified!")
+
+
+def test_8_moderate_spread_spike_blocks_generated_and_prints_pips():
+    """Edge Case 2: 1.2x spread spike (1.65p vs 1.4p limit) must cap readiness <= 74, block GENERATED, and print '1.65 pips'."""
+    engine = SignalGenerationEngine()
+    s25 = next(s for s in strategy_engine.get_strategies() if s.id == "strat-025").model_copy(deep=True)
+    s25.status = StrategyStatus.ACTIVE
+    t_lon = datetime(2026, 11, 18, 9, 0, 0, tzinfo=timezone.utc)
+    bars = _make_bars(1.3100, +0.0003, count=50, vol=500.0)
+    cur_px = bars[-1].close
+
+    m_state = MarketState(
+        timestamp=t_lon,
+        session="London",
+        volatility="Moderate",
+        marketSentimentLabel="Bullish",
+        overallMarketConfidence=85,
+        dataAgeSeconds=5,
+        prices={"GBPUSD": MarketPrice(symbol="GBPUSD", currentPrice=cur_px, bid=cur_px - 0.000165, ask=cur_px, spread=0.000165, timestamp=t_lon, provider="oanda")},
+        indicators={},
+        calendar=[],
+    )
+    with patch("app.core.services.market_history_service.market_history_service.get_bars", return_value=bars):
+        cand = engine.generate_candidates(market_state=m_state, strategies=[s25], as_of=t_lon)[0]
+
+    assert cand.readinessScore <= 74, f"Expected readiness <= 74 on 1.65p spread spike, got {cand.readinessScore}"
+    assert cand.status != CandidateStatus.GENERATED, f"Moderate spread spike should not be GENERATED (got {cand.status})"
+    assert any("1.65 pips" in r.description for r in cand.reasons), f"Expected formatted '1.65 pips' in reasons, got: {[r.description for r in cand.reasons]}"
+    print("Polish 2 PASS: Moderate 1.2x spread spike blocked from GENERATED & displays formatted '1.65 pips'!")
+
+
+def test_9_no_double_2pip_buffer_and_dst_rollover():
+    """Edge Case 4A & 4C: Apex FX scalp stops are not double-padded by 2 pips, and rollover is DST-aware."""
+    engine = SignalGenerationEngine()
+    # Pre-buffered swing_low = 1.3188 (exact 12p stop below 1.3200, inside 8-18p band)
+    ep, sl, tp = engine._calculate_trade_levels(
+        direction=CandidateDirection.BUY,
+        current_price=1.32000,
+        atr=0.0020,
+        symbol="GBP/USD",
+        pattern_details={"swing_low": 1.31880},
+        rr=1.25,
+        is_scalp=True,
+        strategy_id="strat-025",
+    )
+    assert sl == 1.31880, f"Expected exact 1.31880 (no double 2-pip padding), got {sl}"
+
+    # DST-aware rollover window
+    winter_start, winter_end = get_rollover_window_utc(datetime(2026, 11, 18, 12, 0, tzinfo=timezone.utc))
+    summer_start, summer_end = get_rollover_window_utc(datetime(2026, 7, 15, 12, 0, tzinfo=timezone.utc))
+    assert (winter_start, winter_end) == (dt_time(21, 50), dt_time(22, 30)), f"Winter EST mismatch: {winter_start}-{winter_end}"
+    assert (summer_start, summer_end) == (dt_time(20, 50), dt_time(21, 30)), f"Summer EDT mismatch: {summer_start}-{summer_end}"
+    print("Polish 4A & 4C PASS: Exact Apex FX stop buffer (no double 2p pad) & DST rollover window verified!")
+
+
+def test_10_m1_replay_catches_missed_intrapoll_be_spike_and_enforces_conservative_ambiguity():
+    """M1 Bar High/Low Replay: catches missed +0.65R spike between polls, ignores pre-entry bars, and enforces conservative same-bar SL."""
+    original_storage = trade_journal_repository._storage
+    try:
+        trade_journal_repository._storage = InMemoryTradeJournalStorage()
+        resolver = SignalOutcomeResolver()
+        t_fill = datetime(2026, 11, 18, 9, 0, 0, tzinfo=timezone.utc)
+
+        # Case A: strat-025 BUY @ 1.3200, SL 1.3190 (10p), TP 1.32125.
+        # Live quote sits back at entry (1.3200), but M1 bar at 09:02 spiked cleanly to 1.32085 (+0.80R after half-spread)!
+        t1 = trade_journal_repository.create_trade(
+            TradeJournalCreate(
+                signalId=77101,
+                strategyId="strat-025",
+                symbol="GBP/USD",
+                direction="BUY",
+                timeframe="M15",
+                marketSession="London",
+                entryPrice=1.32000,
+                stopLoss=1.31900,
+                initialStopLoss=1.31900,
+                initialMonetaryRisk=Decimal("10.00"),
+                takeProfit=1.32125,
+                status="OPEN",
+                tradeDate=t_fill,
+                confidence=88,
+                reasonForEntry="Apex Cable Scalp M1 replay test",
+                notes="M1 replay BE test",
+                fillPrice=1.32000,
+                fillTime=t_fill,
+            )
+        )
+        m1_bars_be = [
+            # Pre-entry bar at 08:58 (MUST BE IGNORED even though it touched TP!)
+            PriceBar("GBPUSD", "1m", t_fill - timedelta(minutes=2), 1.3200, 1.3250, 1.3150, 1.3200, 100.0, "OANDA"),
+            # Post-fill bar at 09:02: spikes cleanly to +0.80R without touching SL -> locks +0.65R BE!
+            PriceBar("GBPUSD", "1m", t_fill + timedelta(minutes=2), 1.3201, 1.32085, 1.32005, 1.3205, 150.0, "OANDA"),
+            # Post-fill bar at 09:03: retraces back to entry -> closes cleanly as BREAKEVEN (+0.33R banked)!
+            PriceBar("GBPUSD", "1m", t_fill + timedelta(minutes=3), 1.3205, 1.3205, 1.31995, 1.3200, 120.0, "OANDA"),
+        ]
+        q_at_entry = MarketQuoteResponse(
+            quote=MarketQuote(
+                symbol="GBP/USD",
+                bidAsk=BidAsk(bid=1.32000, ask=1.32010, spread=0.00010),
+                lastPrice=1.32000,
+                timestamp=t_fill + timedelta(minutes=4),
+                providerId="oanda",
+                providerName="OANDA",
+                quoteStatus=QuoteStatus.LIVE,
+                marketStatus=MarketStatus.OPEN,
+            )
+        )
+        with patch("app.core.services.signal_outcome_resolver.signal_service.build_signals", return_value=MagicMock(signals=[])), \
+             patch("app.core.services.signal_outcome_resolver.provider_manager.get_market_quote", return_value=q_at_entry), \
+             patch.object(resolver, "_fetch_recent_m1_bars", return_value=m1_bars_be):
+            resolver.resolve_signals()
+
+        c1 = trade_journal_repository.get_trade(t1.id)
+        assert c1.status == "CLOSED" and c1.result == "BREAKEVEN", f"Expected BREAKEVEN from M1 BE lock + retrace, got {c1.status}/{c1.result}"
+        assert c1.realizedRMultiple == 0.33 and c1.profitLoss == 3.30, f"Expected +0.33R/$3.30 banked, got {c1.realizedRMultiple}/{c1.profitLoss}"
+
+        # Case B: Conservative Same-Bar Ambiguity — single M1 bar touches BOTH initial SL and TP -> MUST resolve as LOSS!
+        t2 = trade_journal_repository.create_trade(
+            TradeJournalCreate(
+                signalId=77102,
+                strategyId="strat-025",
+                symbol="GBP/USD",
+                direction="BUY",
+                timeframe="M15",
+                marketSession="London",
+                entryPrice=1.32000,
+                stopLoss=1.31900,
+                initialStopLoss=1.31900,
+                initialMonetaryRisk=Decimal("10.00"),
+                takeProfit=1.32125,
+                status="OPEN",
+                tradeDate=t_fill,
+                confidence=88,
+                reasonForEntry="Conservative same-bar test",
+                notes="Ambiguous bar test",
+                fillPrice=1.32000,
+                fillTime=t_fill,
+            )
+        )
+        m1_bars_ambig = [
+            PriceBar("GBPUSD", "1m", t_fill + timedelta(minutes=1), 1.3200, 1.3220, 1.3185, 1.3205, 500.0, "OANDA"),
+        ]
+        with patch("app.core.services.signal_outcome_resolver.signal_service.build_signals", return_value=MagicMock(signals=[])), \
+             patch("app.core.services.signal_outcome_resolver.provider_manager.get_market_quote", return_value=q_at_entry), \
+             patch.object(resolver, "_fetch_recent_m1_bars", return_value=m1_bars_ambig):
+            resolver.resolve_signals()
+
+        c2 = trade_journal_repository.get_trade(t2.id)
+        assert c2.status == "CLOSED" and c2.result == "LOSS", f"Expected conservative LOSS on ambiguous bar, got {c2.status}/{c2.result}"
+        assert c2.realizedRMultiple == -1.0 and c2.profitLoss == -10.0
+        print("M1 Replay PASS: Missed intra-poll +0.65R BE spike caught (+0.33R banked), pre-entry bars ignored, & ambiguous same-bar resolves conservatively as LOSS!")
+    finally:
+        trade_journal_repository._storage = original_storage
+
+
 if __name__ == "__main__":
     test_1_h1_trend_veto_blocks_counter_trend_sniper_setup()
     test_2_orderflow_tick_d_no_unbound_local_error()
@@ -281,4 +465,8 @@ if __name__ == "__main__":
     test_4_jpy_pnl_multiplier_no_100x_inflation()
     test_5_detailed_news_blackout_description_preserved()
     test_6_session_helper_and_settings_clean()
-    print("ALL 6 RELIABILITY BUG-FIX VERIFICATION TESTS PASSED!")
+    test_7_strat029_frankfurt_preopen_0645_to_0659_utc()
+    test_8_moderate_spread_spike_blocks_generated_and_prints_pips()
+    test_9_no_double_2pip_buffer_and_dst_rollover()
+    test_10_m1_replay_catches_missed_intrapoll_be_spike_and_enforces_conservative_ambiguity()
+    print("ALL 10 RELIABILITY, POLISH & M1 REPLAY VERIFICATION TESTS PASSED!")

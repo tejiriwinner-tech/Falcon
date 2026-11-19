@@ -82,7 +82,8 @@ class SignalGenerationEngine:
             base_stop_dist = min_dist
 
         pip_val = 0.1 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.01 if "JPY" in raw_symbol else 0.0001)
-        struct_buf = 2.0 * pip_val
+        # Section 2E already pads Apex FX scalp sniper_stop by 2 pips before clamping; avoid double-padding
+        struct_buf = 0.0 if fx_scalp_spec is not None else (2.0 * pip_val)
 
         sniper_stop = None
         sniper_target = None
@@ -1214,14 +1215,16 @@ class SignalGenerationEngine:
                     session_desc = f"XAU/USD Scalp Killzone Confirmed: {utc_now.strftime('%H:%M')} UTC inside 07:00-13:30 UTC window ({session})."
             elif _sid_c3 in APEX_FX_SCALP_IDS:
                 in_apex_kz, kz_label = is_in_apex_killzone(_sid_c3, utc_now)
-                session_passed = session_passed and in_apex_kz
+                # Authoritative minute-precision UTC killzone (avoids clipping 06:45-06:59 UTC Frankfurt pre-open)
+                session_passed = in_apex_kz
                 if not in_apex_kz:
                     session_desc = f"Apex FX Scalp Killzone Gate ({raw_symbol}): {utc_now.strftime('%H:%M')} UTC is outside peak {kz_label} window."
                 else:
                     session_desc = f"Apex FX Scalp Killzone Confirmed ({raw_symbol}): {utc_now.strftime('%H:%M')} UTC inside peak {kz_label} window ({session})."
             elif _sid_c3 == "strat-006":
                 in_euro_killzone = 360 <= utc_mins <= 840  # 06:00 - 14:00 UTC (Frankfurt open through London morning peak)
-                session_passed = session_passed and in_euro_killzone
+                # Authoritative European UTC killzone (allows full 06:00-06:59 UTC Frankfurt pre-open)
+                session_passed = in_euro_killzone
                 if not in_euro_killzone:
                     session_desc = f"European Breakout Killzone Gate: {utc_now.strftime('%H:%M')} UTC is outside 06:00-14:00 UTC European morning window."
                 else:
@@ -1505,6 +1508,8 @@ class SignalGenerationEngine:
                 readiness_score = min(readiness_score, 55)
             elif is_n_blk or is_counter_news_fade or not v32_spec_passed or not s2_dom_passed:
                 readiness_score = min(readiness_score, 62)
+            elif not spread_passed:
+                readiness_score = min(readiness_score, 74)
             elif (has_sniper_setup or trend_passed) and spread_passed and news_passed and session_passed and direction != CandidateDirection.WAIT:
                 readiness_score = max(readiness_score, 88)
             elif not has_sniper_setup and not trend_passed:
@@ -1514,7 +1519,7 @@ class SignalGenerationEngine:
             # Determine Candidate Status
             if macro_eval.is_macro_trap:
                 status = CandidateStatus.REJECTED
-            elif not h1_trend_conflict and readiness_score >= 85 and direction != CandidateDirection.WAIT and (has_sniper_setup or trend_passed):
+            elif not h1_trend_conflict and spread_passed and readiness_score >= 85 and direction != CandidateDirection.WAIT and (has_sniper_setup or trend_passed):
                 status = CandidateStatus.GENERATED
             elif readiness_score >= 45 and direction != CandidateDirection.WAIT:
                 status = CandidateStatus.WAITING_CONFIRMATION
@@ -1535,7 +1540,7 @@ class SignalGenerationEngine:
                     description=h1_conflict_reason,
                     passed=False,
                 ))
-            elif has_sniper_setup:
+            elif has_sniper_setup and spread_passed:
                 reasons.append(CandidateReason(
                     title=f"Sniper Setup: {pattern_name}",
                     description=f"{sniper_rationale} Trigger Rule: {sniper_trigger_rule}",
@@ -1550,7 +1555,11 @@ class SignalGenerationEngine:
             else:
                 reduct_reasons = []
                 if not spread_passed:
-                    reduct_reasons.append(f"Spread {spread:.2f} pips exceeds threshold of {spread_limit:.1f} pips.")
+                    reduct_reasons.append(
+                        f"Spread ${spread_eval:.2f} USD exceeds threshold of ${spread_limit:.2f} USD."
+                        if is_gold_asset else
+                        f"Spread {spread_eval:.2f} pips exceeds threshold of {spread_limit:.1f} pips."
+                    )
                 if not session_passed:
                     reduct_reasons.append(f"Current session '{session}' is not in optimal volume window.")
                 if not news_passed:

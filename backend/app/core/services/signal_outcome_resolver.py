@@ -340,6 +340,159 @@ class SignalOutcomeResolver:
         except Exception as ex:
             logger.warning(f"Could not acquire PostgreSQL advisory lock in resolver: {ex}")
 
+    def _fetch_recent_m1_bars(self, symbol: str, limit: int = 10) -> List[Any]:
+        """
+        Lightweight recent M1 candle fetch for intra-poll high/low spike replay.
+        Returns [] safely if M1 history is unavailable so live quote resolution never blocks.
+        """
+        try:
+            from app.core.services.market_history_service import market_history_service
+            clean_sym = (symbol or "").replace("/", "").replace("_", "").upper()
+            if not clean_sym:
+                return []
+            return market_history_service.get_bars(clean_sym, timeframe="1m", limit=limit) or []
+        except Exception as ex:
+            logger.debug(f"M1 bar replay fetch skipped for {symbol}: {ex}")
+            return []
+
+    @staticmethod
+    def _replay_m1_bars_for_trade(
+        trade: TradeJournalItem,
+        m1_bars: List[Any],
+        direction: str,
+        entry: float,
+        stop_loss: float,
+        take_profit: float,
+        be_threshold: float,
+        risk_d: float,
+        spread: float,
+        be_already_locked: bool,
+        current_price: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """
+        Chronologically replays post-fill M1 bar high/lows with half-spread bid/ask adjustment
+        and conservative worst-case same-bar tie-breaking:
+        - Strictly ignores any bar with bar_time < fillTime (or tradeDate).
+        - If the SAME M1 bar breaches both stop_loss and take_profit (or un-locked be_threshold),
+          conservative worst-case SL takes precedence (never fabricates optimistic fills).
+        - Captures clean intra-poll +0.65R / +1.0R BE locks and TP hits occurring between polls.
+        """
+        out: Dict[str, Any] = {
+            "best_high": None,
+            "best_low": None,
+            "be_triggered": False,
+            "replay_result": None,
+            "replay_exit_price": None,
+        }
+        if not m1_bars:
+            return out
+
+        trade_start = trade.fillTime or trade.tradeDate
+        if trade_start is None:
+            return out
+        if trade_start.tzinfo is None:
+            trade_start = trade_start.replace(tzinfo=timezone.utc)
+
+        dated_bars: List[Tuple[datetime, Any]] = []
+        for b in m1_bars:
+            bt = getattr(b, "bar_time", None) or getattr(b, "time", None)
+            if bt is None:
+                continue
+            if isinstance(bt, str):
+                try:
+                    bt = datetime.fromisoformat(bt.replace("Z", "+00:00"))
+                except Exception:
+                    continue
+            if not isinstance(bt, datetime):
+                continue
+            if bt.tzinfo is None:
+                bt = bt.replace(tzinfo=timezone.utc)
+            if bt >= trade_start:
+                dated_bars.append((bt, b))
+
+        if not dated_bars:
+            return out
+        dated_bars.sort(key=lambda x: x[0])
+
+        is_buy = direction.upper() == "BUY"
+        half_spread = max(float(spread or 0.0), 0.0) * 0.5
+        cur_sl = float(stop_loss)
+        cur_be = bool(be_already_locked)
+        notes_str = trade.notes or ""
+        best_high: Optional[float] = None
+        best_low: Optional[float] = None
+
+        for _, bar in dated_bars:
+            raw_h = float(getattr(bar, "high", 0.0) or 0.0)
+            raw_l = float(getattr(bar, "low", 0.0) or 0.0)
+            raw_c = float(getattr(bar, "close", 0.0) or 0.0)
+            if raw_h <= 0.0 or raw_l <= 0.0:
+                continue
+            # Quote-coherence sanity guard: skip stale/mismatched bars deviating > 1.5% from live quote
+            if current_price and current_price > 0 and raw_c > 0:
+                if abs(raw_c - current_price) / current_price > 0.015:
+                    continue
+
+            # Mid-candle -> executable Bid (BUY exit) / Ask (SELL exit) conservative adjustment
+            eff_h = (raw_h - half_spread) if is_buy else (raw_h + half_spread)
+            eff_l = (raw_l - half_spread) if is_buy else (raw_l + half_spread)
+
+            best_high = eff_h if (best_high is None or eff_h > best_high) else best_high
+            best_low = eff_l if (best_low is None or eff_l < best_low) else best_low
+
+            if is_buy:
+                hit_sl = eff_l <= cur_sl
+                hit_tp = eff_h >= take_profit
+                hit_be = eff_h >= be_threshold
+                is_trailed_win = (cur_sl >= entry + (0.5 * risk_d)) and ("STRUCTURAL_TRAIL_LOCKED" in notes_str)
+            else:
+                hit_sl = eff_h >= cur_sl
+                hit_tp = eff_l <= take_profit
+                hit_be = eff_l <= be_threshold
+                is_trailed_win = (cur_sl <= entry - (0.5 * risk_d)) and ("STRUCTURAL_TRAIL_LOCKED" in notes_str)
+
+            # Conservative Worst-Case Same-Bar Ambiguity Rule:
+            # If the same 1-minute candle breaches SL AND (TP or un-locked BE), SL wins.
+            if hit_sl and (hit_tp or (hit_be and not cur_be)):
+                if is_trailed_win:
+                    out["replay_result"] = "WIN"
+                    out["replay_exit_price"] = cur_sl
+                elif cur_be or (is_buy and cur_sl >= entry) or (not is_buy and cur_sl <= entry):
+                    out["replay_result"] = "BREAKEVEN"
+                    out["replay_exit_price"] = entry
+                else:
+                    out["replay_result"] = "LOSS"
+                    out["replay_exit_price"] = cur_sl
+                break
+
+            if hit_tp:
+                if not cur_be:
+                    out["be_triggered"] = True
+                out["replay_result"] = "WIN"
+                out["replay_exit_price"] = take_profit
+                break
+
+            if hit_sl:
+                if is_trailed_win:
+                    out["replay_result"] = "WIN"
+                    out["replay_exit_price"] = cur_sl
+                elif cur_be or (is_buy and cur_sl >= entry) or (not is_buy and cur_sl <= entry):
+                    out["replay_result"] = "BREAKEVEN"
+                    out["replay_exit_price"] = entry
+                else:
+                    out["replay_result"] = "LOSS"
+                    out["replay_exit_price"] = cur_sl
+                break
+
+            if hit_be and not cur_be:
+                cur_be = True
+                out["be_triggered"] = True
+                cur_sl = entry
+
+        out["best_high"] = best_high
+        out["best_low"] = best_low
+        return out
+
     def _execute_resolve_signals(
         self, force_simulate: bool = False, session: Optional[object] = None
     ) -> SignalResolutionSummary:
@@ -420,6 +573,7 @@ class SignalOutcomeResolver:
         losses_count = 0
         open_count = 0
         new_outcomes: List[SignalOutcomeItem] = []
+        m1_bars_cache: Dict[str, List[Any]] = {}
 
         # Step 2: Evaluate every active trade
         for trade in active_trades:
@@ -580,23 +734,76 @@ class SignalOutcomeResolver:
             be_threshold = entry + (be_r_mult * risk_d) if is_buy else entry - (be_r_mult * risk_d)
             tp1_threshold = entry + (be_r_mult * risk_d) if is_buy else entry - (be_r_mult * risk_d)
 
+            # Institutional Intra-Poll M1 Bar High/Low Replay (catches fast +0.65R BE / TP spikes between polls)
+            clean_m1_sym = (symbol or "").replace("/", "").replace("_", "").upper()
+            if clean_m1_sym not in m1_bars_cache:
+                m1_bars_cache[clean_m1_sym] = self._fetch_recent_m1_bars(symbol, limit=10)
+            be_prior_locked = (
+                "BE_PROTECTED" in (trade.notes or "")
+                or (is_buy and stop_loss >= entry)
+                or (not is_buy and stop_loss <= entry)
+            )
+            m1_replay = self._replay_m1_bars_for_trade(
+                trade=trade,
+                m1_bars=m1_bars_cache[clean_m1_sym],
+                direction=direction,
+                entry=entry,
+                stop_loss=stop_loss,
+                take_profit=take_profit,
+                be_threshold=be_threshold,
+                risk_d=risk_d,
+                spread=spread,
+                be_already_locked=be_prior_locked,
+                current_price=current_price,
+            )
+
+            # Update open trade excursion from post-fill M1 highs/lows (skip favorable excursion on conservative same-bar LOSS)
+            if (trade.status or "").upper() in ("OPEN", "FILLED") and m1_replay["replay_result"] != "LOSS":
+                from app.core.analytics.execution_quality_service import execution_quality_service
+                excursion_pts = [p for p in (m1_replay["best_high"], m1_replay["best_low"]) if p is not None and p > 0]
+                for ex_px in excursion_pts:
+                    new_pk, new_tr, c_mfe, c_mae = execution_quality_service.update_open_trade_excursion(
+                        trade=trade,
+                        observed_price=ex_px,
+                        observation_time=now,
+                    )
+                    if new_pk != trade.peakPrice or new_tr != trade.troughPrice:
+                        trade.peakPrice = new_pk
+                        trade.troughPrice = new_tr
+                        trade.mfeR = c_mfe
+                        trade.maeR = c_mae
+                        try:
+                            trade_journal_repository.update_trade(
+                                trade.id,
+                                TradeJournalUpdate(peakPrice=new_pk, troughPrice=new_tr, mfeR=c_mfe, maeR=c_mae),
+                                session=session,
+                            )
+                        except Exception as ex:
+                            logger.warning(f"Error updating M1 excursion for trade #{trade.id}: {ex}")
+
             # Max excursion reached across lifetime of this trade
             max_reach = trade.peakPrice if (is_buy and trade.peakPrice) else (trade.troughPrice if (not is_buy and trade.troughPrice) else current_price)
 
-            be_reached = (
-                (trade.mfeR is not None and trade.mfeR >= be_r_mult)
-                or "BE_PROTECTED" in (trade.notes or "")
-                or (is_buy and (current_price >= be_threshold or (bid > 0 and bid >= be_threshold) or max_reach >= be_threshold))
-                or (not is_buy and (current_price <= be_threshold or (ask > 0 and ask <= be_threshold) or max_reach <= be_threshold))
-            )
+            if m1_replay["replay_result"] == "LOSS":
+                be_reached = False
+                tp1_hit = False
+            else:
+                be_reached = (
+                    bool(m1_replay["be_triggered"])
+                    or (trade.mfeR is not None and trade.mfeR >= be_r_mult)
+                    or "BE_PROTECTED" in (trade.notes or "")
+                    or (is_buy and (current_price >= be_threshold or (bid > 0 and bid >= be_threshold) or max_reach >= be_threshold))
+                    or (not is_buy and (current_price <= be_threshold or (ask > 0 and ask <= be_threshold) or max_reach <= be_threshold))
+                )
 
-            tp1_hit = (
-                (trade.mfeR is not None and trade.mfeR >= be_r_mult)
-                or "TP1_REACHED" in (trade.notes or "")
-                or "TP1_SCALED_OUT_50" in (trade.notes or "")
-                or (is_buy and (current_price >= tp1_threshold or (bid > 0 and bid >= tp1_threshold) or max_reach >= tp1_threshold))
-                or (not is_buy and (current_price <= tp1_threshold or (ask > 0 and ask <= tp1_threshold) or max_reach <= tp1_threshold))
-            )
+                tp1_hit = (
+                    bool(m1_replay["be_triggered"])
+                    or (trade.mfeR is not None and trade.mfeR >= be_r_mult)
+                    or "TP1_REACHED" in (trade.notes or "")
+                    or "TP1_SCALED_OUT_50" in (trade.notes or "")
+                    or (is_buy and (current_price >= tp1_threshold or (bid > 0 and bid >= tp1_threshold) or max_reach >= tp1_threshold))
+                    or (not is_buy and (current_price <= tp1_threshold or (ask > 0 and ask <= tp1_threshold) or max_reach <= tp1_threshold))
+                )
 
             if be_reached and "BE_PROTECTED" not in (trade.notes or ""):
                 notes_append = f" | [BE_PROTECTED: Locked at entry at {r_label}]"
@@ -669,8 +876,12 @@ class SignalOutcomeResolver:
             result: Optional[str] = None
             exit_price = current_price
 
-            # Evaluate boundary hits
-            if direction == "BUY":
+            # Priority 1: Chronological M1 intra-poll boundary breach (spread-adjusted & conservative)
+            if m1_replay["replay_result"] is not None:
+                result = m1_replay["replay_result"]
+                exit_price = float(m1_replay["replay_exit_price"] if m1_replay["replay_exit_price"] is not None else current_price)
+            # Priority 2: Evaluate live bid/ask boundary hits
+            elif direction == "BUY":
                 # Take profit achieved
                 if current_price >= take_profit or (bid > 0 and bid >= take_profit):
                     result = "WIN"

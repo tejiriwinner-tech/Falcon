@@ -263,7 +263,8 @@ def test_5_fast_065r_breakeven_and_scaleout_for_all_apex_fx_scalpers():
                 )
             )
             with patch("app.core.services.signal_outcome_resolver.signal_service.build_signals", return_value=MagicMock(signals=[])), \
-                 patch("app.core.services.signal_outcome_resolver.provider_manager.get_market_quote", return_value=_quote(sym, reach_px)):
+                 patch("app.core.services.signal_outcome_resolver.provider_manager.get_market_quote", return_value=_quote(sym, reach_px)), \
+                 patch.object(resolver, "_fetch_recent_m1_bars", return_value=[]):
                 resolver.resolve_signals()
 
             mid = trade_journal_repository.get_trade(trade.id)
@@ -271,7 +272,8 @@ def test_5_fast_065r_breakeven_and_scaleout_for_all_apex_fx_scalpers():
             assert "+0.65R" in (mid.notes or ""), f"{sid}: missing +0.65R BE tag in notes"
 
             with patch("app.core.services.signal_outcome_resolver.signal_service.build_signals", return_value=MagicMock(signals=[])), \
-                 patch("app.core.services.signal_outcome_resolver.provider_manager.get_market_quote", return_value=_quote(sym, ep)):
+                 patch("app.core.services.signal_outcome_resolver.provider_manager.get_market_quote", return_value=_quote(sym, ep)), \
+                 patch.object(resolver, "_fetch_recent_m1_bars", return_value=[]):
                 resolver.resolve_signals()
 
             closed = trade_journal_repository.get_trade(trade.id)

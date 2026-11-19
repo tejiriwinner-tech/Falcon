@@ -688,11 +688,12 @@ class SignalService:
                 # Capital Defense Shield Checks (apply only to pending setups):
                 shield_reason = None
                 if not is_already_active:
-                    # 0. Daily Rollover Blackout (20:50 - 21:30 UTC): Interbank liquidity freeze & spread blowout
+                    # 0. DST-Aware Daily Rollover Blackout (16:50-17:30 NY -> 20:50-21:30 EDT / 21:50-22:30 EST)
+                    from app.core.services.signal_authorization_service import get_rollover_window_utc
                     now_utc_time = now.time()
-                    from datetime import time as dt_time
-                    if dt_time(20, 50) <= now_utc_time <= dt_time(21, 30):
-                        shield_reason = "DAILY ROLLOVER BLACKOUT: 20:50-21:30 UTC interbank liquidity freeze. Entries blocked."
+                    roll_start, roll_end = get_rollover_window_utc(now)
+                    if roll_start <= now_utc_time <= roll_end:
+                        shield_reason = f"DAILY ROLLOVER BLACKOUT: {roll_start.strftime('%H:%M')}-{roll_end.strftime('%H:%M')} UTC interbank liquidity freeze. Entries blocked."
 
                     # 0b. Symbol-Wide Post-Stop Cooldown: Prevents rapid-fire whipsaw & multi-strategy cascades on same asset
                     if not shield_reason:
@@ -829,6 +830,12 @@ class SignalService:
                         if not in_apex_prom:
                             shield_reason = f"APEX FX SCALP KILLZONE SHIELD ({symbol}): {utc_now_prom.strftime('%H:%M')} UTC is outside peak {kz_prom_lbl} window."
                             entry_hit = False
+                    elif not shield_reason and getattr(cand, "strategyId", "") == "strat-006":
+                        utc_now_prom = datetime.now(timezone.utc)
+                        utc_mins_prom = utc_now_prom.hour * 60 + utc_now_prom.minute
+                        if not (360 <= utc_mins_prom <= 840):  # 06:00 - 14:00 UTC European morning window
+                            shield_reason = f"EUROPEAN BREAKOUT KILLZONE SHIELD: {utc_now_prom.strftime('%H:%M')} UTC is outside 06:00-14:00 UTC European window."
+                            entry_hit = False
 
                     # 2. High-Conviction Gate (confidence >= 85%)
                     min_confidence = getattr(settings, "MIN_LIVE_SIGNAL_CONFIDENCE", 80)
@@ -904,7 +911,16 @@ class SignalService:
                                 if "XAU" in sym_clean_r or "GOLD" in sym_clean_r:
                                     raw_usd_risk = price_risk_abs * 100.0 * eff_lot
                                 elif "JPY" in sym_clean_r:
-                                    jpy_conv = eff_entry_px if sym_clean_r.startswith("USD") else 155.0
+                                    if sym_clean_r.startswith("USD"):
+                                        jpy_conv = eff_entry_px
+                                    else:
+                                        jpy_conv = 155.0
+                                        try:
+                                            uj_q = provider_manager.get_market_quote("USDJPY")
+                                            if uj_q and getattr(uj_q, "quote", None) and getattr(uj_q.quote, "lastPrice", 0) > 50:
+                                                jpy_conv = float(uj_q.quote.lastPrice)
+                                        except Exception:
+                                            pass
                                     raw_usd_risk = (price_risk_abs / max(jpy_conv, 1.0)) * 100000.0 * eff_lot
                                 else:
                                     raw_usd_risk = price_risk_abs * 100000.0 * eff_lot
