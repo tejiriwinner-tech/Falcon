@@ -214,6 +214,16 @@ class ExecutionModeGuard:
         """Alias for is_live_authorized."""
         return cls.is_live_authorized()
 
+    @staticmethod
+    def is_paper_record(record_or_item: Any) -> bool:
+        """Delegate to module-level is_paper_record."""
+        return is_paper_record(record_or_item)
+
+    @staticmethod
+    def is_live_record(record_or_item: Any) -> bool:
+        """Delegate to module-level is_live_record."""
+        return is_live_record(record_or_item)
+
     @classmethod
     def is_broker_locked(cls) -> bool:
         """Return True: broker automation is hard-locked / prohibited."""
