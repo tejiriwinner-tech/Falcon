@@ -145,7 +145,16 @@ class Settings:
     ROLLOVER_BLACKOUT_END_UTC: str = os.getenv("ROLLOVER_BLACKOUT_END_UTC", "21:30")
     ANTI_CLUSTER_ENABLED: bool = os.getenv("ANTI_CLUSTER_ENABLED", "True").lower() == "true"
     MIN_LIVE_SIGNAL_CONFIDENCE: int = int(os.getenv("MIN_LIVE_SIGNAL_CONFIDENCE", "80"))
-    APPROVED_FLAGSHIP_STRATEGIES: set = {f"strat-{i:03d}" for i in range(1, 30)}
+    # Streamlined Intraday Focus: 6 Intraday Strategies (1 per pair) + 1 Gold Scalper (strat-024)
+    APPROVED_FLAGSHIP_STRATEGIES: set = {
+        "strat-004",  # GBP/USD London Momentum (Intraday)
+        "strat-006",  # EUR/USD European Breakout (Intraday)
+        "strat-012",  # XAU/USD Institutional Liquidity Sweep & FVG (Intraday)
+        "strat-013",  # USD/JPY Tokyo Fix & Asian Range Sweep (Intraday)
+        "strat-023",  # AUD/USD Liquidity Sweep + Gold/DXY Displacement (Intraday)
+        "strat-024",  # XAU/USD London-NY Velocity Scalp (Scalp - Gold Only)
+        "strat-026",  # GBP/JPY Dragon Anti-Trap Velocity Retest (Intraday)
+    }
 
     # Falcon AI Co-Pilot Intelligence Layer
     GEMINI_API_KEY: Optional[str] = os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")

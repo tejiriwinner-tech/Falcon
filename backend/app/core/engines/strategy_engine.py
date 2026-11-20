@@ -643,7 +643,7 @@ class StrategyEngine:
             id="strat-006",
             name="European Breakout",
             type=StrategyType.BREAKOUT,
-            category=StrategyCategory.SCALPING,
+            category=StrategyCategory.INTRADAY,
             symbol="EUR/USD",
             description="Breakouts of early Frankfurt ranges.",
             marketCondition="Trending",
@@ -1705,14 +1705,14 @@ class StrategyEngine:
             latestValidation=_empty_validation()
         )
 
-        # 26. GBP/JPY Dragon Anti-Trap Velocity Scalp (Dual Yen-Cross Sync + IFVG + OrderFlow v3.0)
+        # 26. GBP/JPY Dragon Anti-Trap Velocity Retest (Dual Yen-Cross Sync + IFVG + OrderFlow v3.0)
         s26 = StrategyItem(
             id="strat-026",
-            name="GBP/JPY Dragon Anti-Trap Velocity Scalp",
-            type=StrategyType.SCALPING,
-            category=StrategyCategory.SCALPING,
+            name="GBP/JPY Dragon Anti-Trap Velocity Retest",
+            type=StrategyType.BREAKOUT,
+            category=StrategyCategory.INTRADAY,
             symbol="GBP/JPY",
-            description="Apex institutional GBP/JPY ('Dragon') anti-manipulation scalping engine. Eliminates synthetic Yen-cross stop-hunts using mandatory Dual Yen-Cross Sync (GBP/USD + USD/JPY), Inversion FVG (IFVG) trap flips, SMC Tokyo/London liquidity sweeps, and OrderFlowEngine v3.0 spoof/iceberg detection. Operates strictly in 00:00-03:30, 07:00-11:00 & 12:30-15:00 UTC killzones with 14-28 pip stops, 1.25R targets, and +0.65R fast breakeven scale-out.",
+            description="Apex institutional GBP/JPY ('Dragon') anti-manipulation intraday engine. Eliminates synthetic Yen-cross stop-hunts using mandatory Dual Yen-Cross Sync (GBP/USD + USD/JPY), Inversion FVG (IFVG) trap flips, SMC Tokyo/London liquidity sweeps, and OrderFlowEngine v3.0 spoof/iceberg detection. Operates strictly in 00:00-03:30, 07:00-11:00 & 12:30-15:00 UTC killzones with 14-28 pip stops, 1.25R targets, and +0.65R fast breakeven scale-out.",
             marketCondition="Tokyo Fix / London Open / Overlap High-Beta Dragon Velocity",
             bestSession="London",
             bestTimeframe="M15",
@@ -1954,9 +1954,18 @@ class StrategyEngine:
             s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24,
             s25, s26, s27, s28, s29,
         ]
+        # Pure Intraday + Gold Dual-Engine Roster: Exactly 7 active strategies (6 Intraday + 1 Gold Scalper)
+        default_active_ids = {
+            "strat-004",  # GBP/USD London Momentum (Intraday)
+            "strat-006",  # EUR/USD European Breakout (Intraday Flagship)
+            "strat-012",  # XAU/USD Institutional Liquidity Sweep & FVG (Intraday)
+            "strat-013",  # USD/JPY Tokyo Fix & Asian Range Sweep (Intraday)
+            "strat-023",  # AUD/USD Liquidity Sweep + Gold/DXY Displacement (Intraday)
+            "strat-024",  # XAU/USD London-NY Velocity Scalp (Scalp - Gold Only)
+            "strat-026",  # GBP/JPY Dragon Anti-Trap Velocity Retest (Intraday)
+        }
         for strategy in strategies:
-            default_active_ids = {"strat-004", "strat-007", "strat-012", "strat-013", "strat-016", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028", "strat-029"}
-            strategy.status = StrategyStatus.ACTIVE if strategy.id in default_active_ids else StrategyStatus.INCUBATION
+            strategy.status = StrategyStatus.ACTIVE if strategy.id in default_active_ids else StrategyStatus.DEPRECATED
             strategy.readyForExecution = (strategy.status == StrategyStatus.ACTIVE)
             if strategy.minimumRiskReward and strategy.minimumRiskReward > 1.5:
                 strategy.minimumRiskReward = 1.5

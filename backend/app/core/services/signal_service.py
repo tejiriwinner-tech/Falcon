@@ -837,6 +837,22 @@ class SignalService:
                         shield_reason = f"STRATEGY GATE: Live activation restricted to flagship strategies ({', '.join(sorted(approved_flagships))}). Held on Watchlist."
                         entry_hit = False
 
+                    # Gold Dual-Engine Mutual Conflict Shield: strat-012 (Intraday) & strat-024 (Scalp) must never oppose
+                    if not shield_reason and is_gold_sym and getattr(cand, "strategyId", "") in ("strat-012", "strat-024"):
+                        partner_id = "strat-024" if getattr(cand, "strategyId", "") == "strat-012" else "strat-012"
+                        opposing_dir = "SELL" if direction_str.upper() == "BUY" else "BUY"
+                        # Check if partner strategy has an active or triggered signal in the opposing direction
+                        has_gold_conflict = any(
+                            s.symbol.replace("/", "").replace("_", "").upper() == norm_sym
+                            and getattr(s, "strategyId", "") == partner_id
+                            and getattr(s, "direction", "").upper() == opposing_dir
+                            and getattr(s, "status", "").upper() in ("ACTIVE", "TRIGGERED", "PENDING", "OPEN")
+                            for s in signals
+                        )
+                        if has_gold_conflict:
+                            shield_reason = f"CONCURRENT GOLD CONFLICT VETO: Opposing {opposing_dir} position/signal already active on {partner_id}. Coordinated Gold execution defended."
+                            entry_hit = False
+
                     # Velocity Scalp Killzone Promotion Gates (strat-024 Gold & strat-025..029 Apex FX)
                     from app.core.engines.apex_scalp_config import APEX_FX_SCALP_IDS, is_in_apex_killzone
                     if not shield_reason and getattr(cand, "strategyId", "") == "strat-024":
