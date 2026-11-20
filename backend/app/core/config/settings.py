@@ -84,11 +84,11 @@ class Settings:
     MAX_SIMULTANEOUS_TRADES: int = int(os.getenv("MAX_SIMULTANEOUS_TRADES", "3"))
     MAX_ENTERTAINING_LOSS: Decimal = Decimal(os.getenv("MAX_ENTERTAINING_LOSS", "999999.00"))
 
-    # Percentage-based risk management (replaces fixed $ ceilings; scales with equity)
-    RISK_PER_TRADE_PCT: float = float(os.getenv("RISK_PER_TRADE_PCT", "1.0"))        # % of equity risked per trade
-    DAILY_LOSS_LIMIT_PCT: float = float(os.getenv("DAILY_LOSS_LIMIT_PCT", "3.0"))    # stop opening trades for the UTC day
-    MAX_DRAWDOWN_PAUSE_PCT: float = float(os.getenv("MAX_DRAWDOWN_PAUSE_PCT", "10.0"))  # pause new trades from equity peak
-    MAX_OPEN_RISK_PCT: float = float(os.getenv("MAX_OPEN_RISK_PCT", "5.0"))          # total risk across open trades
+    # Percentage-based risk management (calibrated for $30-$50 micro accounts)
+    RISK_PER_TRADE_PCT: float = float(os.getenv("RISK_PER_TRADE_PCT", "3.0"))        # % of equity risked per trade (~$1.20 on $40)
+    DAILY_LOSS_LIMIT_PCT: float = float(os.getenv("DAILY_LOSS_LIMIT_PCT", "10.0"))   # stop opening trades for the UTC day (~$4.00 on $40)
+    MAX_DRAWDOWN_PAUSE_PCT: float = float(os.getenv("MAX_DRAWDOWN_PAUSE_PCT", "20.0"))  # pause new trades from equity peak
+    MAX_OPEN_RISK_PCT: float = float(os.getenv("MAX_OPEN_RISK_PCT", "10.0"))          # total risk across open trades
 
     # Currency cluster correlation firewall & aggregate risk cap (Cluster Risk Cap)
     ENABLE_CURRENCY_CLUSTER_GATE: bool = os.getenv("ENABLE_CURRENCY_CLUSTER_GATE", "false").lower() == "true"

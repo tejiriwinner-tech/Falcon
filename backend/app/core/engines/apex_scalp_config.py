@@ -70,11 +70,11 @@ APEX_FX_SCALP_CONFIG: Dict[str, ApexScalpSpec] = {
         strategy_id="strat-026",
         symbol="GBP/JPY",
         canonical_symbol="GBPJPY",
-        display_name="GBP/JPY Dragon Anti-Trap Velocity Scalp",
+        display_name="GBP/JPY Dragon Anti-Trap Velocity Retest",
         # 00:00-03:30 UTC (Tokyo Fix) & 07:00-11:00 UTC (London Open) & 12:30-15:00 UTC (Overlap)
         killzones_utc=((0, 210), (420, 660), (750, 900)),
         killzone_label="00:00-03:30, 07:00-11:00 & 12:30-15:00 UTC",
-        max_spread_pips=2.4,
+        max_spread_pips=3.5,  # Upgraded from 2.4 to 3.5 pips for Dragon intraday volatility
         min_sl_dist=0.14,  # 14 pips
         max_sl_dist=0.28,  # 28 pips
         rr_target=1.25,

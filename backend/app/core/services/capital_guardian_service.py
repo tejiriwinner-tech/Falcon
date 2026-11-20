@@ -578,28 +578,36 @@ class CapitalGuardianService:
         circuit_breaker_enabled = getattr(settings, "ENABLE_DRAWDOWN_CIRCUIT_BREAKER", False)
         if circuit_breaker_enabled:
             try:
-                # 1. Daily Loss Limit (% of active capital lost today)
-                daily_limit_pct = Decimal(str(getattr(settings, "DAILY_LOSS_LIMIT_PCT", 3.0)))
-                max_daily_loss = (active_capital * daily_limit_pct) / Decimal("100.00")
+                # 1. Net Daily Loss Limit (% of active capital lost today, with minimum $3.00 floor for micro accounts)
+                daily_limit_pct = Decimal(str(getattr(settings, "DAILY_LOSS_LIMIT_PCT", 10.0)))
+                raw_daily_cap = (active_capital * daily_limit_pct) / Decimal("100.00")
+                max_daily_loss = max(raw_daily_cap, Decimal("3.00"))  # Ensure at least $3.00 loss floor so 1 micro stop does not trip system
                 
                 now_utc = datetime.now(timezone.utc)
                 start_of_day = now_utc.replace(hour=0, minute=0, second=0, microsecond=0)
                 today_closed = self._journal_repo.list_closed_trades_as_of(as_of=now_utc, session=session)
-                today_loss = Decimal("0.00")
+                
+                # Compute NET daily loss (Gross Losses minus Realized Wins)
+                today_gross_losses = Decimal("0.00")
+                today_gross_wins = Decimal("0.00")
                 for t in today_closed:
                     if t.closeDate:
                         close_dt = t.closeDate if t.closeDate.tzinfo else t.closeDate.replace(tzinfo=timezone.utc)
-                        if close_dt >= start_of_day and (t.result or "").upper() in ("LOSS", "LOST"):
-                            init_risk = getattr(t, "initialMonetaryRisk", None)
-                            if init_risk is not None and Decimal(str(init_risk)) > Decimal("0.00"):
-                                pnl = abs(Decimal(str(t.profitLoss or 0.0)))
-                                today_loss += pnl
+                        if close_dt >= start_of_day:
+                            res = (t.result or "").upper()
+                            pnl = Decimal(str(t.profitLoss or 0.0))
+                            if res in ("LOSS", "LOST") or pnl < Decimal("0.00"):
+                                today_gross_losses += abs(pnl)
+                            elif res in ("WIN", "WON") or pnl > Decimal("0.00"):
+                                today_gross_wins += pnl
 
-                if today_loss >= max_daily_loss and max_daily_loss > Decimal("0.00"):
+                net_daily_loss = max(Decimal("0.00"), today_gross_losses - today_gross_wins)
+
+                if net_daily_loss >= max_daily_loss and max_daily_loss > Decimal("0.00"):
                     return CapitalGuardianDecision(
                         allowed=False,
                         reason=(
-                            f"Daily loss limit reached (${today_loss:.2f} >= ${max_daily_loss:.2f}, {daily_limit_pct}% of capital). "
+                            f"Daily net loss limit reached (${net_daily_loss:.2f} >= ${max_daily_loss:.2f}, {daily_limit_pct}% of capital). "
                             f"Trading paused for remaining UTC day to preserve capital."
                         ),
                         state=GuardianState.HALTED,
