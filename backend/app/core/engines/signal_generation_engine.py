@@ -1390,6 +1390,8 @@ class SignalGenerationEngine:
                             v32_spec_desc = f"{v32_spec_desc} | Body {body_ratio*100:.0f}% >= 45%, RVol {rvol:.2f}x >= 1.8x."
                 except Exception as ex:
                     logger.warning(f"Condition 6 anti-fakeout gate error for {sid_val} ({canonical_symbol}): {ex}")
+                    v32_spec_passed = False
+                    v32_spec_desc = f"Anti-fakeout engine verification unavailable (fail-closed): {ex}"
             v32_spec_cond = CandidateCondition(
                 title="v3.2 Anti-Fakeout & Specialization Gate",
                 description=v32_spec_desc,
@@ -1456,6 +1458,8 @@ class SignalGenerationEngine:
                         s2_dom_passed = False
                 except Exception as ex:
                     logger.warning(f"Condition 7 OrderFlowEngine v3.0 evaluation error for {sid_val} ({canonical_symbol}): {ex}")
+                    s2_dom_passed = False
+                    s2_flow_desc = f"OrderFlowEngine v3.0 verification unavailable (fail-closed): {ex}"
             s2_flow_cond = CandidateCondition(
                 title="Stage 2 Institutional DOM & COT Flow",
                 description=s2_flow_desc,
@@ -1514,24 +1518,26 @@ class SignalGenerationEngine:
 
             readiness_score = readiness_session + readiness_spread + readiness_news + readiness_vol + readiness_fresh
 
+            all_engines_passed = all(c.passed for c in conditions)
+
             if macro_eval.is_macro_trap:
                 readiness_score = min(readiness_score, 40)
             elif h1_trend_conflict:
                 readiness_score = min(readiness_score, 55)
             elif is_n_blk or is_counter_news_fade or not v32_spec_passed or not s2_dom_passed:
                 readiness_score = min(readiness_score, 62)
-            elif not spread_passed:
+            elif not spread_passed or not all_engines_passed:
                 readiness_score = min(readiness_score, 74)
-            elif (has_sniper_setup or trend_passed) and spread_passed and news_passed and session_passed and direction != CandidateDirection.WAIT:
+            elif (has_sniper_setup or (sid_val == "strat-006" and trend_passed)) and all_engines_passed and direction != CandidateDirection.WAIT:
                 readiness_score = max(readiness_score, 88)
-            elif not has_sniper_setup and not trend_passed:
+            elif not has_sniper_setup:
                 # Without an authentic confirmed technical setup, cap readiness so it cannot prematurely trigger a live position
                 readiness_score = min(readiness_score, 78)
 
-            # Determine Candidate Status
+            # Determine Candidate Status (Unanimous Cross-Engine Consensus Required)
             if macro_eval.is_macro_trap:
                 status = CandidateStatus.REJECTED
-            elif not h1_trend_conflict and spread_passed and readiness_score >= 85 and direction != CandidateDirection.WAIT and (has_sniper_setup or trend_passed):
+            elif all_engines_passed and not h1_trend_conflict and spread_passed and readiness_score >= 85 and direction != CandidateDirection.WAIT and (has_sniper_setup or (sid_val == "strat-006" and trend_passed)):
                 status = CandidateStatus.GENERATED
             elif readiness_score >= 45 and direction != CandidateDirection.WAIT:
                 status = CandidateStatus.WAITING_CONFIRMATION

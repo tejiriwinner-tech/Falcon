@@ -874,8 +874,27 @@ class SignalService:
                             shield_reason = f"EUROPEAN BREAKOUT KILLZONE SHIELD: {utc_now_prom.strftime('%H:%M')} UTC is outside 06:00-14:00 UTC European window."
                             entry_hit = False
 
-                    # 2. High-Conviction Gate (confidence >= 85%)
-                    min_confidence = getattr(settings, "MIN_LIVE_SIGNAL_CONFIDENCE", 80)
+                    # 1b. Unanimous Cross-Engine Consensus Gate (Zero-Conflict Validation)
+                    if not shield_reason:
+                        failed_engines = [
+                            getattr(c, "title", "Engine Check")
+                            for c in (getattr(cand, "conditions", None) or [])
+                            if not getattr(c, "passed", True)
+                        ]
+                        failed_reasons = [
+                            getattr(r, "title", "Conflict")
+                            for r in (getattr(cand, "reasons", None) or [])
+                            if getattr(r, "passed", True) is False
+                        ]
+                        if failed_engines:
+                            shield_reason = f"CROSS-ENGINE CONSENSUS VETO: Conflicting/unverified engine checks ({', '.join(failed_engines)}). Signal held until all engines agree."
+                            entry_hit = False
+                        elif failed_reasons:
+                            shield_reason = f"CROSS-ENGINE CONFLICT VETO: Setup has unresolved veto ({', '.join(failed_reasons)}). Signal held on Watchlist."
+                            entry_hit = False
+
+                    # 2. High-Conviction Gate (natural institutional standard)
+                    min_confidence = getattr(settings, "MIN_LIVE_SIGNAL_CONFIDENCE", 85)
                     cand_conf = getattr(cand, "confidence", 80)
                     if not shield_reason and cand_conf < min_confidence:
                         shield_reason = f"CONVICTION GATE: Requires >= {min_confidence}% confidence for live execution (current: {cand_conf}%). Held on Watchlist."

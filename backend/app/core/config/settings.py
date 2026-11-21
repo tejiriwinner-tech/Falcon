@@ -144,7 +144,7 @@ class Settings:
     ROLLOVER_BLACKOUT_START_UTC: str = os.getenv("ROLLOVER_BLACKOUT_START_UTC", "20:50")
     ROLLOVER_BLACKOUT_END_UTC: str = os.getenv("ROLLOVER_BLACKOUT_END_UTC", "21:30")
     ANTI_CLUSTER_ENABLED: bool = os.getenv("ANTI_CLUSTER_ENABLED", "True").lower() == "true"
-    MIN_LIVE_SIGNAL_CONFIDENCE: int = int(os.getenv("MIN_LIVE_SIGNAL_CONFIDENCE", "80"))
+    MIN_LIVE_SIGNAL_CONFIDENCE: int = int(os.getenv("MIN_LIVE_SIGNAL_CONFIDENCE", "85"))
     # Streamlined Intraday Focus: 6 Intraday Strategies (1 per pair) + 1 Gold Scalper (strat-024)
     APPROVED_FLAGSHIP_STRATEGIES: set = {
         "strat-004",  # GBP/USD London Momentum (Intraday)
