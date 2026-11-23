@@ -43,8 +43,8 @@ class _SignalCardState extends State<SignalCard> {
     if (_isLost) return '🛑 STOPPED OUT (LOST)';
     if (_isBreakevenClosed) return '🛡️ BREAKEVEN (\$0.00)';
     if (_isExpired) return '⏳ EXPIRED (UNTRIGGERED)';
-    if (_isActive) return _isBuy ? '🟢 RUNNING (LIVE BUY)' : '🔴 RUNNING (LIVE SELL)';
-    return _isBuy ? '⏳ HOLD (BUY)' : '⏳ HOLD (SELL)';
+    if (_isActive) return _isBuy ? '🟢 ACTIVE BUY — ENTER NOW' : '🔴 ACTIVE SELL — ENTER NOW';
+    return _isBuy ? '⚠️ WATCHLIST BUY (DO NOT ENTER YET)' : '⚠️ WATCHLIST SELL (DO NOT ENTER YET)';
   }
 
   Color get _directionColor {
@@ -103,12 +103,71 @@ class _SignalCardState extends State<SignalCard> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (!_isActive && !_isWon && !_isLost && !_isBreakevenClosed && !_isExpired) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.warning),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'WATCHLIST SETUP ONLY\nDO NOT ENTER ON MT5 YET.\nWait for status to become ACTIVE before executing.',
+                            style: TextStyle(
+                              color: AppColors.warning,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ] else if (_isActive) ...[
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: AppColors.success.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.success),
+                    ),
+                    child: const Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Icon(Icons.check_circle_outline, color: AppColors.success, size: 20),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'ACTIVE MARKET EXECUTION\nENTER ON MT5 NOW.\nStop Loss includes retail broker spread buffer.',
+                            style: TextStyle(
+                              color: AppColors.success,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 11,
+                              height: 1.3,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 Text('Status: ${widget.signal.status}'),
                 Text('Entry: ${widget.signal.entry}'),
                 Text('Take Profit: ${widget.signal.takeProfit}'),
-                Text('Stop Loss: ${widget.signal.stopLoss}'),
+                Text('Stop Loss: ${widget.signal.stopLoss} (Spread-Buffered)'),
                 if (widget.signal.breakevenTrigger != null)
-                  Text('BE Target: ${widget.signal.breakevenTrigger} (Move SL to ${widget.signal.breakevenPrice ?? widget.signal.entry} for Risk-Free)'),
+                  Text('BE Target: ${widget.signal.breakevenTrigger} (+0.65R Fast Breakeven Lock)'),
                 if (widget.signal.riskReward != null)
                   Text('R:R Ratio: 1:${widget.signal.riskReward!.toStringAsFixed(1)}'),
                 if (widget.signal.setupPattern != null)
@@ -337,8 +396,8 @@ class _SignalCardState extends State<SignalCard> {
                     Expanded(
                       child: Text(
                         _isActive
-                            ? 'CLEARED BY CAPTAIN: Validated for MT5 entry.'
-                            : 'DECISION: WAIT — Monitoring. DO NOT execute on MT5 yet.',
+                            ? '🟢 ACTIVE IN EXECUTION: Validated for MT5 entry (Spread buffer included in SL).'
+                            : '⚠️ WATCHLIST SETUP: Awaiting entry trigger. DO NOT enter on MT5 yet.',
                         style: TextStyle(
                           color: _isActive ? AppColors.success : AppColors.warning,
                           fontSize: 11,

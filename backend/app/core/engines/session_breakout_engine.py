@@ -20,6 +20,7 @@ from dataclasses import dataclass
 import math
 from typing import Any, Dict, List, Optional, Tuple, Union
 
+from app.core.config.settings import settings
 from app.core.engines.candlestick_pattern_engine import CandleBar
 from app.schemas.session_breakout import (
     CompositeConvictionScore,
@@ -420,7 +421,13 @@ class SessionBreakoutEngine:
         dec = 2 if ("XAU" in sym_upper or "GOLD" in sym_upper) else (3 if "JPY" in sym_upper else 5)
 
         atr = self.compute_atr(symbol, candles)
-        atr_buffer = 1.0 * atr
+        pip_val = 0.1 if ("XAU" in sym_upper or "GOLD" in sym_upper) else (0.01 if "JPY" in sym_upper else 0.0001)
+        broker_spread_buf = (
+            getattr(settings, "RETAIL_GOLD_SPREAD_BUFFER", 0.35)
+            if ("XAU" in sym_upper or "GOLD" in sym_upper)
+            else (getattr(settings, "RETAIL_BROKER_SPREAD_BUFFER_PIPS", 1.8) * pip_val)
+        )
+        atr_buffer = (1.0 * atr) + broker_spread_buf
 
         if dir_upper == "BUY":
             if structure_sl is not None and structure_sl < entry_price:

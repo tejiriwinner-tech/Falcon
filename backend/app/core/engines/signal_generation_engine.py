@@ -18,6 +18,7 @@ from app.core.services.market_history_service import market_history_service
 from app.core.providers import provider_manager
 from app.schemas.market_quote import MarketQuote
 from app.core.analytics.adaptive_tuning_engine import adaptive_tuning_engine
+from app.core.config.settings import settings
 from app.core.engines.apex_scalp_config import (
     APEX_FX_SCALP_IDS,
     VELOCITY_SCALP_STRATEGY_IDS,
@@ -82,6 +83,12 @@ class SignalGenerationEngine:
             base_stop_dist = min_dist
 
         pip_val = 0.1 if ("XAU" in raw_symbol or "GOLD" in raw_symbol) else (0.01 if "JPY" in raw_symbol else 0.0001)
+        # Retail broker spread buffer: gives MT5 standard/micro spreads breathing room vs raw interbank feeds
+        broker_spread_buf = (
+            getattr(settings, "RETAIL_GOLD_SPREAD_BUFFER", 0.35)
+            if is_gold_sym
+            else (getattr(settings, "RETAIL_BROKER_SPREAD_BUFFER_PIPS", 1.8) * pip_val)
+        )
         # Section 2E already pads Apex FX scalp sniper_stop by 2 pips before clamping; avoid double-padding
         struct_buf = 0.0 if fx_scalp_spec is not None else (2.0 * pip_val)
 
@@ -130,6 +137,12 @@ class SignalGenerationEngine:
                 elif eff_risk_check > fx_scalp_spec.max_sl_dist:
                     stop_loss = round(current_price - fx_scalp_spec.max_sl_dist, dec_places) if direction == CandidateDirection.BUY else round(current_price + fx_scalp_spec.max_sl_dist, dec_places)
 
+            # Apply Retail Broker Spread Buffer (breathing room for MT5 broker spread markups)
+            if direction == CandidateDirection.BUY:
+                stop_loss = round(stop_loss - broker_spread_buf, dec_places)
+            else:
+                stop_loss = round(stop_loss + broker_spread_buf, dec_places)
+
             # Strict Falcon Risk-to-Reward: 1.2R for Gold Scalp; 1.25R for Apex FX Scalp; 1:1.2 to 1:1.5 Maximum otherwise
             if is_gold_scalp:
                 eff_rr = 1.2
@@ -158,15 +171,16 @@ class SignalGenerationEngine:
                 eff_rr = fx_scalp_spec.rr_target
             else:
                 eff_rr = min(max(rr, 1.2), 1.5)
-            target_dist = base_stop_dist * eff_rr
+            buffered_stop_dist = base_stop_dist + broker_spread_buf
+            target_dist = buffered_stop_dist * eff_rr
             if direction == CandidateDirection.BUY:
-                stop_loss = round(current_price - base_stop_dist, dec_places)
+                stop_loss = round(current_price - buffered_stop_dist, dec_places)
                 take_profit = round(current_price + target_dist, dec_places)
             elif direction == CandidateDirection.SELL:
-                stop_loss = round(current_price + base_stop_dist, dec_places)
+                stop_loss = round(current_price + buffered_stop_dist, dec_places)
                 take_profit = round(current_price - target_dist, dec_places)
             else:
-                stop_loss = round(current_price - base_stop_dist, dec_places)
+                stop_loss = round(current_price - buffered_stop_dist, dec_places)
                 take_profit = round(current_price + target_dist, dec_places)
 
         return (current_price, stop_loss, take_profit)
@@ -220,11 +234,16 @@ class SignalGenerationEngine:
                     framed_entry = round(rp, dec_p)
                     note_parts.append(f"Retest entry @ {framed_entry:.{dec_p}f}")
 
-            # 2. Opposite-Corridor Structural Stop (2 pips beyond opposite boundary, risk-capped)
+            # 2. Opposite-Corridor Structural Stop (2 pips beyond opposite boundary + retail broker spread buffer)
+            broker_spread_buf = (
+                getattr(settings, "RETAIL_GOLD_SPREAD_BUFFER", 0.35)
+                if ("XAU" in symbol.upper() or "GOLD" in symbol.upper())
+                else (getattr(settings, "RETAIL_BROKER_SPREAD_BUFFER_PIPS", 1.8) * pip_u)
+            )
             raw_struct_sl = (
-                round(target_corr.low - 2.0 * pip_u, dec_p)
+                round(target_corr.low - (2.0 * pip_u + broker_spread_buf), dec_p)
                 if direction == CandidateDirection.BUY
-                else round(target_corr.high + 2.0 * pip_u, dec_p)
+                else round(target_corr.high + (2.0 * pip_u + broker_spread_buf), dec_p)
             )
             corr_risk = (framed_entry - raw_struct_sl) if direction == CandidateDirection.BUY else (raw_struct_sl - framed_entry)
             max_cap = max(min_dist * 1.5, (2.5 * atr_val) if (atr_val and atr_val > 0) else (min_dist * 3.0))

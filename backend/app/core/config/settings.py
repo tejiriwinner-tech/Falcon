@@ -95,6 +95,10 @@ class Settings:
     MAX_CURRENCY_CLUSTER_EXPOSURE: int = int(os.getenv("MAX_CURRENCY_CLUSTER_EXPOSURE", "1"))
     MAX_CURRENCY_CLUSTER_RISK_PCT: float = float(os.getenv("MAX_CURRENCY_CLUSTER_RISK_PCT", "2.0"))
 
+    # Retail Broker Spread Buffer (Breathing room for MT5 standard/micro spreads vs raw interbank feeds)
+    RETAIL_BROKER_SPREAD_BUFFER_PIPS: float = float(os.getenv("RETAIL_BROKER_SPREAD_BUFFER_PIPS", "1.8"))
+    RETAIL_GOLD_SPREAD_BUFFER: float = float(os.getenv("RETAIL_GOLD_SPREAD_BUFFER", "0.35"))
+
     # Strategy auto-disable: pause a strategy whose rolling expectancy turns negative
     STRATEGY_AUTODISABLE_ENABLED: bool = os.getenv("STRATEGY_AUTODISABLE_ENABLED", "true").lower() == "true"
     STRATEGY_AUTODISABLE_WINDOW: int = int(os.getenv("STRATEGY_AUTODISABLE_WINDOW", "30"))

@@ -1239,10 +1239,9 @@ class SignalService:
             is_sweep_confirmed=sweep_eval.is_confirmed,
         )
 
-        # Calculate Breakeven targets (+0.65R for Velocity Scalpers strat-024..028; +1.0R standard otherwise)
-        from app.core.engines.apex_scalp_config import VELOCITY_SCALP_STRATEGY_IDS
+        # Calculate Breakeven targets (Universal +0.65R across all 7 active strategies)
         risk_dist = abs(entry_price - stop_loss)
-        be_r_mult = 0.65 if getattr(candidate, "strategyId", "") in VELOCITY_SCALP_STRATEGY_IDS else 1.0
+        be_r_mult = 0.65  # Universal +0.65R fast breakeven protection prevents winning trades from reversing
         if direction_val == "BUY":
             be_trigger = round(entry_price + (risk_dist * be_r_mult), dec)
         else:
@@ -1264,10 +1263,7 @@ class SignalService:
             elif direction_val == "SELL" and current_px <= be_trigger:
                 is_breakeven = True
 
-        if be_r_mult < 1.0:
-            be_rule = f"BE Rule: Shift SL to Entry ({be_price}) & scale out 50% at {be_trigger} (+{be_r_mult:.2f}R scalp lock)."
-        else:
-            be_rule = f"BE Rule: Shift SL to Entry ({be_price}) at {be_trigger} (+1.0R risk-free)."
+        be_rule = f"BE Rule: Shift SL to Entry ({be_price}) & lock breakeven at {be_trigger} (+{be_r_mult:.2f}R fast risk-free defense)."
 
         # Loss Recovery Metadata
         rec_status = recovery_metrics.recovery_status if recovery_metrics else getattr(candidate, "recoveryStatus", "BASELINE")
@@ -1290,12 +1286,12 @@ class SignalService:
         targets_str = f"TP1: {tp1:.4f} (50% Bank @ 1.0R) | TP2: {tp2:.4f} (Runner @ 1.5R) | Macro Bias: {htf_bias}"
 
         if status == "ACTIVE":
-            trigger_rule = f"[MARKET EXECUTION - ENTER NOW] [ACTIVE IN POSITION] Price touched entry at {entry_price:.4f}. {targets_str}."
+            trigger_rule = f"[ACTIVE SIGNAL - ENTER ON MT5 NOW] Price touched entry at {entry_price:.4f}. {targets_str}."
             be_status_text = " [🛡️ BREAKEVEN LOCKED]" if is_breakeven else ""
             analysis = (
-                f"🎯 SNIPER SIGNAL ACTIVE [{setup_pattern}]{rec_badge}{be_status_text}: "
+                f"🟢 SNIPER SIGNAL ACTIVE [ENTER ON MT5 NOW] [{setup_pattern}]{rec_badge}{be_status_text}: "
                 f"{trigger_rule} "
-                f"Entry: {entry_price} | SL: {stop_loss} | "
+                f"Entry: {entry_price} | SL: {stop_loss} (Retail Spread Buffered) | "
                 f"TP: {take_profit} (1:{candidate.riskReward:.1f} R:R). "
                 f"{be_rule} "
                 f"{ai_reflection}"
@@ -1305,19 +1301,19 @@ class SignalService:
             spread_val = f"Live Spread: {candidate.marketSnapshot.spread:.2f} pips." if candidate.marketSnapshot and candidate.marketSnapshot.spread else ""
             guard_text = f"Capital Guardian: {guardian_reason}. " if guardian_reason else ""
             analysis = (
-                f"⏳ WATCHLIST WAITING [{setup_pattern}]: "
-                f"{guard_text}{spread_val}"
+                f"⚠️ WATCHLIST SETUP [DO NOT ENTER ON MT5 YET] [{setup_pattern}]: "
+                f"{guard_text}{spread_val} "
                 f"Awaiting Capital Guardian clearance and entry trigger. {targets_str}. "
-                f"Do not enter MT5 order until status turns ACTIVE."
+                f"STATUS IS NOT ACTIVE. DO NOT ENTER ON MT5 UNTIL STATUS TURNS ACTIVE."
             )
         elif status == "HOLD":
             spread_val = f"Live Spread: {candidate.marketSnapshot.spread:.2f} pips." if candidate.marketSnapshot and candidate.marketSnapshot.spread else ""
             analysis = (
-                f"⏳ WATCHLIST HOLD [{setup_pattern}]: "
+                f"⚠️ WATCHLIST SETUP [DO NOT ENTER ON MT5 YET] [{setup_pattern}]: "
                 f"Awaiting market entry touch at {entry_price:.4f}. Current market: {current_px:.4f}. "
                 f"SL: {stop_loss:.4f} | TP: {take_profit:.4f} (1:{candidate.riskReward:.1f} R:R). "
-                f"{targets_str}. {spread_val}"
-                f"Valid for 1h on watchlist. Do not enter MT5 order until status turns ACTIVE."
+                f"{targets_str}. {spread_val} "
+                f"Valid for 1h on watchlist. DO NOT ENTER ON MT5 UNTIL STATUS TURNS ACTIVE."
             )
         elif status == "EXPIRED":
             analysis = (
