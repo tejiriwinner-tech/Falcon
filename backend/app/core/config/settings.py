@@ -40,9 +40,9 @@ class Settings:
     # Phase 4 API-key enforcement (opt-in until FALCON_API_KEY is rolled out to Fly.io, mobile & MT5)
     REQUIRE_API_KEY: bool = os.getenv("REQUIRE_API_KEY", "false").lower() == "true"
     
-    # Financial Modeling Prep — economic calendar & fallback quotes
-    FMP_BASE_URL: str = os.getenv("FMP_BASE_URL", "https://financialmodelingprep.com/stable")
-    FMP_API_KEY: Optional[str] = os.getenv("FMP_API_KEY")
+    # Financial Modeling Prep — permanently removed (OANDA is sole live market provider)
+    FMP_BASE_URL: str = ""
+    FMP_API_KEY: Optional[str] = None
 
     # OANDA v20 Configuration (Priority 1 Live Broker Feed)
     OANDA_API_KEY: Optional[str] = os.getenv("OANDA_API_KEY")

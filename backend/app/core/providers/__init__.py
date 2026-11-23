@@ -2,9 +2,8 @@
 Falcon Provider Framework — __init__.py
 Auto-wires the provider framework on first import.
 
-Falcon operates on:
-1. OANDA (Primary broker provider for all Forex and Gold)
-2. FMP (Financial Modeling Prep fallback and market context)
+Falcon operates exclusively on:
+1. OANDA (Primary & sole live broker provider for all Forex and Gold)
 Mock provider is strictly opt-in via ENABLE_MOCK_PROVIDER.
 """
 from app.core.config import settings
@@ -12,30 +11,22 @@ from app.core.providers.cache import market_cache
 from app.core.providers.symbol_mapper import symbol_mapper
 from app.core.providers.provider_registry import provider_registry
 from app.core.providers.provider_manager import ProviderManager
-from app.core.providers.fmp_provider import FmpProvider
 from app.core.providers.oanda_provider import OandaProvider
 from app.core.providers.mock_price_provider import FalconMockPriceProvider
 from app.core.providers.provider_analytics import provider_analytics
 
 # ── Instantiate providers ──────────────────────────────────────────────────────
 _oanda_provider = OandaProvider()
-_fmp_provider = FmpProvider()
 
 # ── Register providers in priority order ──────────────────────────────────────
-# OANDA is Priority 1 broker provider for all Forex and Gold.
-# FMP serves as fallback.
-if _oanda_provider.configured:
-    provider_registry.register(_oanda_provider, priority=1)
-    provider_registry.register(_fmp_provider, priority=2)
-else:
-    provider_registry.register(_fmp_provider, priority=1)
-    provider_registry.register(_oanda_provider, priority=2)
+# OANDA is the sole live broker provider for all Forex and Gold.
+provider_registry.register(_oanda_provider, priority=1)
 
 # The synthetic price provider is opt-in: with ENABLE_MOCK_PROVIDER unset the
 # pipeline reports missing data instead of serving fabricated quotes.
 if settings.ENABLE_MOCK_PROVIDER:
     _mock_provider = FalconMockPriceProvider()
-    provider_registry.register(_mock_provider, priority=3)
+    provider_registry.register(_mock_provider, priority=2)
 
 # ── Wire analytics — register all providers ───────────────────────────────────
 for _p in provider_registry.all_providers():
