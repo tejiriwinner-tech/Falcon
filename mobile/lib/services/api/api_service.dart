@@ -43,7 +43,7 @@ class ApiService {
     }
 
     // Production 24/7 Fly.io Cloud Backend
-    return 'https://falcon-api-tejiri.fly.dev/api/v1';
+    return 'https://falcon-api-enoch.fly.dev/api/v1';
   }
   static const int timeoutSeconds = 30; // Resilient cloud cold-start & network buffer (30s)
   static const int briefingTimeoutSeconds = 15;

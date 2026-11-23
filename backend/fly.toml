@@ -1,5 +1,5 @@
 # fly.toml app configuration file for Falcon
-app = "falcon-api-tejiri"
+app = "falcon-api-enoch"
 primary_region = "lhr"
 
 [build]
