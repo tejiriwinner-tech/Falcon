@@ -1949,12 +1949,8 @@ class StrategyEngine:
             latestValidation=_empty_validation()
         )
 
-        strategies = [
-            s1, s2, s3, s4, s5, s6, s7, s8, s9, s10, s11, s12,
-            s13, s14, s15, s16, s17, s18, s19, s20, s21, s22, s23, s24,
-            s25, s26, s27, s28, s29,
-        ]
-        # Pure Intraday + Gold Dual-Engine Roster: Exactly 7 active strategies (6 Intraday + 1 Gold Scalper)
+        # Pure Intraday + Gold Dual-Engine Roster: Strictly 7 active strategies (all 22 inactive strategies removed)
+        strategies = [s4, s6, s12, s13, s23, s24, s26]
         default_active_ids = {
             "strat-004",  # GBP/USD London Momentum (Intraday)
             "strat-006",  # EUR/USD European Breakout (Intraday Flagship)
