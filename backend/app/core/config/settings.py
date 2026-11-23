@@ -91,8 +91,8 @@ class Settings:
     MAX_OPEN_RISK_PCT: float = float(os.getenv("MAX_OPEN_RISK_PCT", "10.0"))          # total risk across open trades
 
     # Currency cluster correlation firewall & aggregate risk cap (Cluster Risk Cap)
-    ENABLE_CURRENCY_CLUSTER_GATE: bool = os.getenv("ENABLE_CURRENCY_CLUSTER_GATE", "false").lower() == "true"
-    MAX_CURRENCY_CLUSTER_EXPOSURE: int = int(os.getenv("MAX_CURRENCY_CLUSTER_EXPOSURE", "2"))
+    ENABLE_CURRENCY_CLUSTER_GATE: bool = os.getenv("ENABLE_CURRENCY_CLUSTER_GATE", "true").lower() == "true"
+    MAX_CURRENCY_CLUSTER_EXPOSURE: int = int(os.getenv("MAX_CURRENCY_CLUSTER_EXPOSURE", "1"))
     MAX_CURRENCY_CLUSTER_RISK_PCT: float = float(os.getenv("MAX_CURRENCY_CLUSTER_RISK_PCT", "2.0"))
 
     # Strategy auto-disable: pause a strategy whose rolling expectancy turns negative

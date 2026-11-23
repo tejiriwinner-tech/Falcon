@@ -758,8 +758,9 @@ class SignalOutcomeResolver:
 
             from app.core.engines.apex_scalp_config import VELOCITY_SCALP_STRATEGY_IDS
             is_velocity_scalp = (getattr(trade, "strategyId", "") in VELOCITY_SCALP_STRATEGY_IDS)
-            be_r_mult = 0.65 if is_velocity_scalp else 1.0
-            r_label = "+0.65R" if is_velocity_scalp else "+1.0R"
+            # Universal +0.65R Breakeven Protection across all 7 strategies (prevents +0.80R winners reversing into full -1.0R SL)
+            be_r_mult = 0.65
+            r_label = "+0.65R"
 
             is_buy = direction == "BUY"
             be_threshold = entry + (be_r_mult * risk_d) if is_buy else entry - (be_r_mult * risk_d)

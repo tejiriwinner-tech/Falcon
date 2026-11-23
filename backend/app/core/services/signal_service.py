@@ -716,6 +716,10 @@ class SignalService:
                     if roll_start <= now_utc_time <= roll_end:
                         shield_reason = f"DAILY ROLLOVER BLACKOUT: {roll_start.strftime('%H:%M')}-{roll_end.strftime('%H:%M')} UTC interbank liquidity freeze. Entries blocked."
 
+                    # 0a. Monday Opening Blackout (00:00 - 07:30 UTC): Blocks thin weekend-open & 07:00 Frankfurt Judas sweeps
+                    if not shield_reason and now.weekday() == 0 and (now.hour * 60 + now.minute) < 450:
+                        shield_reason = f"MONDAY OPENING BLACKOUT: {now.strftime('%H:%M')} UTC is before 07:30 UTC Monday liquidity stabilization. Entries blocked."
+
                     # 0b. Symbol-Wide Post-Stop Cooldown: Prevents rapid-fire whipsaw & multi-strategy cascades on same asset
                     if not shield_reason:
                         try:

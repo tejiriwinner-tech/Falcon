@@ -1371,8 +1371,8 @@ class SignalGenerationEngine:
                             v32_spec_desc = f"Apex Fiber Broad-USD Contradiction Veto: USD/JPY ({uj_chg_pct:+.2f}%) broad USD wave opposes {direction.value} EUR/USD."
                         else:
                             v32_spec_desc = f"Apex Fiber Dual SMT/USD Lock Confirmed: GBP/USD ({gu_chg_pct:+.2f}%) & USD/JPY ({uj_chg_pct:+.2f}%) aligned with {direction.value} EUR/USD."
-                    # 4. strat-006 Zero-Loss Body Displacement (>=45%) & RVol >= 1.8x Gate (strat-004, strat-017, strat-019..029)
-                    if v32_spec_passed and sid_val in ("strat-004", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028", "strat-029"):
+                    # 4. strat-006 Zero-Loss Body Displacement (>=45%) & RVol >= 1.8x Gate (all active strategies including strat-006)
+                    if v32_spec_passed and sid_val in ("strat-004", "strat-006", "strat-012", "strat-013", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028", "strat-029"):
                         last_bar = candles_1h[-1]
                         bar_range = max(last_bar.high - last_bar.low, 1e-9)
                         body_ratio = abs(last_bar.close - last_bar.open) / bar_range
@@ -1401,7 +1401,7 @@ class SignalGenerationEngine:
             s2_dom_passed = True
             s2_conviction_delta = 0
             s2_flow_desc = "Stage 2 Institutional Order Flow & COT neutral."
-            if sid_val != "strat-006" and direction != CandidateDirection.WAIT:
+            if direction != CandidateDirection.WAIT:
                 try:
                     from app.core.engines.order_flow_engine import order_flow_engine
                     from app.core.providers.oanda_streaming_service import oanda_streaming_service
@@ -1465,7 +1465,7 @@ class SignalGenerationEngine:
                 description=s2_flow_desc,
                 passed=s2_dom_passed,
             )
-            conditions = [trend_cond, session_cond, spread_cond, news_cond, macro_cond] if sid_val == "strat-006" else [trend_cond, session_cond, spread_cond, news_cond, macro_cond, v32_spec_cond, s2_flow_cond]
+            conditions = [trend_cond, session_cond, spread_cond, news_cond, macro_cond, v32_spec_cond, s2_flow_cond]
 
             # ── 4. Calculate Confidence Breakdown & Final Conviction ──────────
             # Realistic institutional scoring: max confidence bounded at 88% to avoid artificial certainty
@@ -1528,7 +1528,7 @@ class SignalGenerationEngine:
                 readiness_score = min(readiness_score, 62)
             elif not spread_passed or not all_engines_passed:
                 readiness_score = min(readiness_score, 74)
-            elif (has_sniper_setup or (sid_val == "strat-006" and trend_passed)) and all_engines_passed and direction != CandidateDirection.WAIT:
+            elif has_sniper_setup and all_engines_passed and direction != CandidateDirection.WAIT:
                 readiness_score = max(readiness_score, 88)
             elif not has_sniper_setup:
                 # Without an authentic confirmed technical setup, cap readiness so it cannot prematurely trigger a live position
@@ -1537,7 +1537,7 @@ class SignalGenerationEngine:
             # Determine Candidate Status (Unanimous Cross-Engine Consensus Required)
             if macro_eval.is_macro_trap:
                 status = CandidateStatus.REJECTED
-            elif all_engines_passed and not h1_trend_conflict and spread_passed and readiness_score >= 85 and direction != CandidateDirection.WAIT and (has_sniper_setup or (sid_val == "strat-006" and trend_passed)):
+            elif all_engines_passed and not h1_trend_conflict and spread_passed and readiness_score >= 85 and direction != CandidateDirection.WAIT and has_sniper_setup:
                 status = CandidateStatus.GENERATED
             elif readiness_score >= 45 and direction != CandidateDirection.WAIT:
                 status = CandidateStatus.WAITING_CONFIRMATION
