@@ -1949,8 +1949,131 @@ class StrategyEngine:
             latestValidation=_empty_validation()
         )
 
-        # Pure Intraday + Gold Dual-Engine Roster: Strictly 7 active strategies (all 22 inactive strategies removed)
-        strategies = [s4, s6, s12, s13, s23, s24, s26]
+        # 30. NZD/USD Pacific Range Sweep & Sister-SMT Momentum
+        s30 = StrategyItem(
+            id="strat-030",
+            name="NZD/USD Pacific Range Sweep & Sister-SMT Momentum",
+            type=StrategyType.BREAKOUT,
+            category=StrategyCategory.INTRADAY,
+            symbol="NZD/USD",
+            description="Institutional NZD/USD ('Kiwi') Pacific liquidity sweep and sister-SMT momentum engine. Harvests liquidity traps formed during the tight Asian Pacific consolidation range (06:00-10:30 & 12:30-15:30 UTC killzones). Enforces mandatory Sister-Currency (AUD/USD) SMT divergence verification, inverse DXY macro lock, 3-candle FVG displacement, 8-16 pip stops, 1.25R-1.35R targets, and universal +0.65R fast breakeven protection.",
+            marketCondition="Asian Pacific Range Sweep / European Transition & NY Overlap",
+            bestSession="London",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.MEDIUM,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Strict Asian-to-London (06:00-10:30 UTC) & NY Overlap (12:30-15:30 UTC) Killzones",
+                "AUD/USD Sister-Currency SMT Divergence Gate eliminates isolated Kiwi traps",
+                "Inversion FVG & Pacific Range Reclaim with >= 45% body displacement & RVol >= 1.5x",
+                "Calibrated 8-16 pip stop with +1.8 pip retail buffer, 1.25R-1.35R target & +0.65R breakeven lock",
+                "Inverse DXY Macro Alignment prevents counter-dollar liquidity traps"
+            ],
+            weaknesses=["Strictly inactive outside 06:00-10:30 & 12:30-15:30 UTC, Monday Asian open, or when spread > 2.0 pips"],
+            entryChecklist=[
+                "Time within 06:00-10:30 UTC or 12:30-15:30 UTC Kiwi killzones",
+                "NZD/USD live spread <= 2.0 pips",
+                "Sweep of Asian/PDH/PDL range followed by confirmed M15 candle close back inside range",
+                "Displacement with >= 45% body ratio and RVol >= 1.5x printing 3-candle FVG",
+                "AUD/USD Sister-SMT alignment confirms commodity-currency institutional flow",
+                "Inverse DXY alignment confirms broad US Dollar trend consistency"
+            ],
+            exitChecklist=[
+                "Universal Fast Breakeven Lock at +0.65R excursion",
+                "Take Profit at 1.25R - 1.35R (12-22 pips)"
+            ],
+            idealVolatility="Moderate to High (Asian Close / European Open / NY Overlap)",
+            avoidDuring=["RBNZ Rate Decisions", "US NFP / FOMC / CPI", "Spread > 2.0 pips", "Monday Asian Open (<07:30 UTC)"],
+            confirmationIndicators=["Pacific Range Sweep Engine", "AUD/USD SMT Gate", "Inverse DXY Lock", "H1 EMA 50/200"],
+            successConditions=["Kiwi Killzone Active", "Spread <= 2.0 pips", "Body >= 45% & RVol >= 1.5x", "AUD/USD SMT Alignment Pass"],
+            minimumConfidence=85,
+            minimumRiskReward=1.25,
+            preferredSessions=["London", "London-NY Overlap", "NY Overlap"],
+            avoidConditions=["Spread > 2.0 pips", "AUD/USD SMT Divergence > 0.15%", "Monday Asian Open", "Double-Sweep Whipsaw"],
+            requiredConfirmations=["Kiwi Killzone (06:00-10:30 / 12:30-15:30 UTC)", "Spread <= 2.0 pips", "Anti-Wick Fakeout Filter (v3.2)", "AUD/USD SMT & DXY Lock"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Pacific Range Sweep", "European Transition", "Anti-Trap Momentum"],
+            estimatedHoldingTime="10-60 minutes",
+            maxConsecutiveLosses=2,
+            createdAt=now,
+            updatedAt=now,
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId="strat-006-dna",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Apex FX Pacific Sweep (NZD/USD): Asian range sweep + AUD/USD SMT gate + Inverse DXY lock + 06:00-10:30 & 12:30-15:30 UTC killzones, 8-16p SL, 1.25R-1.35R TP, +0.65R fast BE scale-out.",
+            dependencies=["Smart Money Sweep Engine", "Sister SMT Gate", "Macro Cross-Asset Gate", "Market Session Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # 31. EUR/JPY Frankfurt Judas Sweep & Dual-Cross Momentum
+        s31 = StrategyItem(
+            id="strat-031",
+            name="EUR/JPY Frankfurt Judas Sweep & Dual-Cross Momentum",
+            type=StrategyType.BREAKOUT,
+            category=StrategyCategory.INTRADAY,
+            symbol="EUR/JPY",
+            description="Institutional EUR/JPY ('Eura-Yen') session breakout and dual-cross momentum engine. Exploits the London open Judas swing fakeout against the early Frankfurt 06:00 UTC corridor (06:45-11:30 & 12:30-16:00 UTC killzones). Enforces mandatory Dual Cross-Asset Sync (EUR/USD + USD/JPY net flow), Inversion FVG retest, anti-wick candle close verification, 12-22 pip stops, 1.30R-1.50R targets, and universal +0.65R fast breakeven protection.",
+            marketCondition="Frankfurt Judas Swing Reversal & London-NY Overlap Yen Momentum",
+            bestSession="London",
+            bestTimeframe="M15",
+            riskLevel=RiskLevel.MEDIUM,
+            status=StrategyStatus.ACTIVE,
+            health=StrategyHealth.EXCELLENT,
+            performance=EMPTY_PERFORMANCE.model_copy(),
+            strengths=[
+                "Strict Frankfurt/London Open (06:45-11:30 UTC) & NY Overlap (12:30-16:00 UTC) Killzones",
+                "Frankfurt Judas Swing (8-18 pip fakeout) reversal harvests trapped early breakout retail traders",
+                "Mandatory Dual Cross-Asset Sync (EUR/USD + USD/JPY) ensures true institutional net flow without cross-currency drag",
+                "Inversion FVG boundary retest with >= 45% candle body & RVol >= 1.8x",
+                "Calibrated 12-22 pip stop with +2.5 pip retail buffer, 1.30R-1.50R target & +0.65R breakeven lock"
+            ],
+            weaknesses=["Strictly inactive outside Frankfurt/London/NY killzones, post-16:00 UTC, or when spread > 2.0 pips"],
+            entryChecklist=[
+                "Time within 06:45-11:30 UTC or 12:30-16:00 UTC Eura-Yen killzones",
+                "EUR/JPY live spread <= 2.0 pips",
+                "Frankfurt Judas swing (8-18p) rejected with confirmed M15 candle close back inside corridor",
+                "Displacement with >= 45% body ratio and RVol >= 1.8x retesting IFVG boundary",
+                "Dual Cross-Asset Sync: EUR/USD and USD/JPY both confirm aligned net directional flow"
+            ],
+            exitChecklist=[
+                "Universal Fast Breakeven Lock at +0.65R excursion",
+                "Take Profit at 1.30R - 1.50R (18-35 pips)"
+            ],
+            idealVolatility="High (Frankfurt / London Open / Overlap)",
+            avoidDuring=["ECB / BOJ Rate Decisions", "Unscheduled BOJ Intervention", "Spread > 2.0 pips", "Post-16:00 UTC"],
+            confirmationIndicators=["Frankfurt Judas Sweep Engine", "Dual Cross-Asset Sync (EU+UJ)", "IFVG Retest Engine", "H1 EMA 20/50"],
+            successConditions=["Eura-Yen Killzone Active", "Spread <= 2.0 pips", "Body >= 45% & RVol >= 1.8x", "Dual Cross-Asset Sync Pass"],
+            minimumConfidence=85,
+            minimumRiskReward=1.30,
+            preferredSessions=["Frankfurt", "London", "London-NY Overlap", "NY Overlap"],
+            avoidConditions=["Spread > 2.0 pips", "EUR/USD vs USD/JPY Divergence > 0.15%", "Double-Sweep Whipsaw Day"],
+            requiredConfirmations=["Eura-Yen Killzone (06:45-11:30 / 12:30-16:00 UTC)", "Spread <= 2.0 pips", "Anti-Wick Fakeout Filter (v3.2)", "Dual Cross Sync (EUR/USD + USD/JPY)"],
+            grade="A+",
+            lastUsed=now,
+            marketCompatibility=["Frankfurt Open", "London Judas Swing", "Anti-Trap Yen Momentum"],
+            estimatedHoldingTime="10-60 minutes",
+            maxConsecutiveLosses=2,
+            createdAt=now,
+            updatedAt=now,
+            lastReviewedAt=now,
+            strategyVersion="1.0",
+            parentStrategyId="strat-006-dna",
+            createdBy="Falcon AI",
+            readyForExecution=True,
+            reviewNotes="Apex FX Judas Reversal (EUR/JPY): Frankfurt Judas swing + Dual Cross Sync (EU+UJ) + IFVG retest + Frankfurt/London & Overlap killzones, 12-22p SL, 1.30R-1.50R TP, +0.65R fast BE scale-out.",
+            dependencies=["Frankfurt Judas Engine", "Dual Cross-Asset Gate", "Smart Money IFVG Engine", "Market Session Engine"],
+            strategyScore=_empty_score(),
+            latestValidation=_empty_validation()
+        )
+
+        # Pure Intraday + Gold Multi-Engine Roster: Strictly 9 active strategies
+        strategies = [s4, s6, s12, s13, s23, s24, s26, s30, s31]
         default_active_ids = {
             "strat-004",  # GBP/USD London Momentum (Intraday)
             "strat-006",  # EUR/USD European Breakout (Intraday Flagship)
@@ -1959,6 +2082,8 @@ class StrategyEngine:
             "strat-023",  # AUD/USD Liquidity Sweep + Gold/DXY Displacement (Intraday)
             "strat-024",  # XAU/USD London-NY Velocity Scalp (Scalp - Gold Only)
             "strat-026",  # GBP/JPY Dragon Anti-Trap Velocity Retest (Intraday)
+            "strat-030",  # NZD/USD Pacific Range Sweep & Sister-SMT Momentum (Intraday)
+            "strat-031",  # EUR/JPY Frankfurt Judas Sweep & Dual-Cross Momentum (Intraday)
         }
         for strategy in strategies:
             strategy.status = StrategyStatus.ACTIVE if strategy.id in default_active_ids else StrategyStatus.DEPRECATED
@@ -1996,6 +2121,8 @@ class StrategyEngine:
                     "strat-027": "v3.2 Apex Ninja Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + US 10Y Yield/DXY Lock. Strict 00:00-03:30 & 12:30-16:00 UTC Killzones, <= 1.3p spread, 10-20p SL, 1.25R TP, +0.65R fast BE scale-out.",
                     "strat-028": "v3.2 Apex Aussie Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + Gold (XAU/USD) Lockstep. Strict Pacific/London/NY Killzones, <= 1.2p spread, 7-15p SL, 1.25R TP, +0.65R fast BE scale-out.",
                     "strat-029": "v3.2 Apex Fiber Scalp: IFVG anti-retail trap flip + OrderFlowEngine v3.0 + Dual Fiber SMT (GBP/USD) & Inverse USD/JPY Lock. Strict 06:45-10:30 & 12:30-15:30 UTC Killzones, <= 1.0p spread, 7-14p SL, 1.25R TP, +0.65R fast BE scale-out.",
+                    "strat-030": "v3.2 Kiwi Pacific Sweep: Asian range sweep + AUD/USD Sister-SMT divergence gate + Inverse DXY lock + 06:00-10:30 & 12:30-15:30 UTC Killzones, <= 2.0p spread, 8-16p SL, 1.25R-1.35R TP, +0.65R fast BE scale-out.",
+                    "strat-031": "v3.2 Eura-Yen Judas Reversal: Frankfurt Judas swing fakeout + Dual Cross Sync (EUR/USD & USD/JPY) + IFVG retest + 06:45-11:30 & 12:30-16:00 UTC Killzones, <= 2.0p spread, 12-22p SL, 1.30R-1.50R TP, +0.65R fast BE scale-out.",
                 }
                 old_ver = strategy.strategyVersion or "1.0"
                 strategy.parentStrategyId = f"{strategy.id}-v{old_ver}"

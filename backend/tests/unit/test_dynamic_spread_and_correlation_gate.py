@@ -30,7 +30,10 @@ def mock_cycle():
     )
 
 
-def test_currency_cluster_gate_permits_two_trades(mock_cycle):
+def test_currency_cluster_gate_permits_two_trades(mock_cycle, monkeypatch):
+    from app.core.config import settings
+    monkeypatch.setattr(settings, "ENABLE_CURRENCY_CLUSTER_GATE", True)
+    monkeypatch.setattr(settings, "MAX_CURRENCY_CLUSTER_EXPOSURE", 2)
     # Setup: 1 existing BUY on EURUSD (short USD)
     existing_trade = MagicMock(spec=TradeJournalItem)
     existing_trade.symbol = "EURUSD"

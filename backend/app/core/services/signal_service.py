@@ -909,7 +909,7 @@ class SignalService:
                         cluster_conflict = None
                         for exp in cand_exps:
                             max_cluster_exp = int(getattr(settings, "MAX_CURRENCY_CLUSTER_EXPOSURE", 2) or 2) if getattr(settings, "ENABLE_CURRENCY_CLUSTER_GATE", False) else 8
-                            if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD")) and len([s for s in active_currency_baskets.get(exp, "").split(",") if s]) >= max_cluster_exp:
+                            if any(c in exp for c in ("USD", "JPY", "EUR", "GBP", "AUD", "NZD")) and len([s for s in active_currency_baskets.get(exp, "").split(",") if s]) >= max_cluster_exp:
                                 cluster_conflict = (exp, active_currency_baskets[exp])
                                 break
                         if cluster_conflict:

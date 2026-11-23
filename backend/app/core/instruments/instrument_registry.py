@@ -349,6 +349,46 @@ def _populate_registry() -> CanonicalInstrumentRegistry:
             lastUpdatedAt=datetime.now(timezone.utc),
         ),
 
+        # NZDUSD - New Zealand Dollar / US Dollar
+        InstrumentMetadata(
+            canonicalSymbol="NZDUSD",
+            instrumentType=InstrumentType.FOREX,
+            assetClass=AssetClass.CURRENCIES,
+            exchange=Exchange.FOREX_OTC,
+            currency="USD",
+            pipSize=0.0001,
+            precision=4,
+            displayName="NZD/USD",
+            description="New Zealand dollar / US dollar currency pair",
+            providerMappings={
+                "oanda": "NZD_USD",
+                "mock_price": "NZDUSD",
+            },
+            expectedInstrumentTypes=[InstrumentType.FOREX],
+            addedAt=datetime.now(timezone.utc),
+            lastUpdatedAt=datetime.now(timezone.utc),
+        ),
+
+        # EURJPY - Euro / Japanese Yen
+        InstrumentMetadata(
+            canonicalSymbol="EURJPY",
+            instrumentType=InstrumentType.FOREX,
+            assetClass=AssetClass.CURRENCIES,
+            exchange=Exchange.FOREX_OTC,
+            currency="JPY",
+            pipSize=0.01,
+            precision=3,
+            displayName="EUR/JPY",
+            description="Euro / Japanese yen currency pair",
+            providerMappings={
+                "oanda": "EUR_JPY",
+                "mock_price": "EURJPY",
+            },
+            expectedInstrumentTypes=[InstrumentType.FOREX],
+            addedAt=datetime.now(timezone.utc),
+            lastUpdatedAt=datetime.now(timezone.utc),
+        ),
+
         # NAS100 - NASDAQ-100 Index
         InstrumentMetadata(
             canonicalSymbol="NAS100",

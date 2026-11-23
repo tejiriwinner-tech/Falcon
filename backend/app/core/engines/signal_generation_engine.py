@@ -728,8 +728,8 @@ class SignalGenerationEngine:
                     except Exception as ex:
                         logger.warning(f"Smart Money sweep evaluation error for {canonical_symbol}: {ex}")
 
-                # 2A. GBP/JPY London Open Liquidity Sweep (10-25 pips) + BOS/FVG Momentum Displacement (strat-021)
-                if not has_sniper_setup and getattr(strategy, "id", "") in ("strat-021", "strat-022", "strat-023") and len(candles_1h) >= 6:
+                # 2A. Session Liquidity Sweep (Asian/Frankfurt Range) + BOS/FVG Momentum Displacement (strat-021, strat-022, strat-023, strat-030, strat-031)
+                if not has_sniper_setup and getattr(strategy, "id", "") in ("strat-021", "strat-022", "strat-023", "strat-030", "strat-031") and len(candles_1h) >= 6:
                     try:
                         pip_u = 0.01 if "JPY" in canonical_symbol else 0.0001
                         dec_p = 3 if "JPY" in canonical_symbol else 5
@@ -751,9 +751,27 @@ class SignalGenerationEngine:
                             swept_down_pips = (asian_low - sweep_low) / pip_u
                             swept_up_pips = (sweep_high - asian_high) / pip_u
 
-                            min_sweep_pips = 6.0 if getattr(strategy, "id", "") == "strat-023" else 8.0
-                            min_risk_u = 0.0015 if getattr(strategy, "id", "") == "strat-023" else 0.20
-                            min_impulse_u = 0.0022 if getattr(strategy, "id", "") == "strat-023" else (0.28 if getattr(strategy, "id", "") == "strat-022" else 0.40)
+                            sid_2a = getattr(strategy, "id", "")
+                            if sid_2a == "strat-030":
+                                min_sweep_pips = 5.0
+                                min_risk_u = 0.0008
+                                min_impulse_u = 0.0011
+                                rr_mult = 1.30
+                            elif sid_2a == "strat-031":
+                                min_sweep_pips = 8.0
+                                min_risk_u = 0.12
+                                min_impulse_u = 0.16
+                                rr_mult = 1.35
+                            elif sid_2a == "strat-023":
+                                min_sweep_pips = 6.0
+                                min_risk_u = 0.0015
+                                min_impulse_u = 0.0022
+                                rr_mult = 1.40
+                            else:
+                                min_sweep_pips = 8.0
+                                min_risk_u = 0.20
+                                min_impulse_u = (0.28 if sid_2a == "strat-022" else 0.40)
+                                rr_mult = 1.40
 
                             if swept_down_pips >= min_sweep_pips and last_bar.close > asian_low and asset_trend != "Bearish":
                                 has_sniper_setup = True
@@ -762,7 +780,7 @@ class SignalGenerationEngine:
                                 sniper_stop = round(sweep_low - 3.0 * pip_u, dec_p)
                                 risk_dist = max(abs(entry_price - sniper_stop), min_risk_u)
                                 sniper_stop = round(entry_price - risk_dist, dec_p)
-                                impulse_dist = max(risk_dist * 1.40, min_impulse_u)
+                                impulse_dist = max(risk_dist * rr_mult, min_impulse_u)
                                 sniper_target = round(entry_price + impulse_dist, dec_p)
                                 sniper_trigger_rule = (
                                     f"Session Low ({asian_low:.{dec_p}f}) swept by {swept_down_pips:.1f} pips "
@@ -780,7 +798,7 @@ class SignalGenerationEngine:
                                 sniper_stop = round(sweep_high + 3.0 * pip_u, dec_p)
                                 risk_dist = max(abs(entry_price - sniper_stop), min_risk_u)
                                 sniper_stop = round(entry_price + risk_dist, dec_p)
-                                impulse_dist = max(risk_dist * 1.40, min_impulse_u)
+                                impulse_dist = max(risk_dist * rr_mult, min_impulse_u)
                                 sniper_target = round(entry_price - impulse_dist, dec_p)
                                 sniper_trigger_rule = (
                                     f"Session High ({asian_high:.{dec_p}f}) swept by {swept_up_pips:.1f} pips "
@@ -1020,10 +1038,10 @@ class SignalGenerationEngine:
                     except Exception as ex:
                         logger.warning(f"Apex FX velocity scalp evaluation error for {canonical_symbol}: {ex}")
 
-                # 2D. Trend Continuation, Pullback & Momentum Flow Integration (strat-002, strat-004, strat-005, strat-007, strat-010, strat-018, strat-024)
+                # 2D. Trend Continuation, Pullback & Momentum Flow Integration (strat-002, strat-004, strat-005, strat-007, strat-010, strat-018, strat-024, strat-026, strat-030, strat-031)
                 if not has_sniper_setup and (
                     strat_type_val in ["TREND_CONTINUATION", "PULLBACK", "MOMENTUM", "SWING_STRUCTURE", "PRICE_ACTION"]
-                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-011", "strat-012", "strat-013", "strat-016", "strat-017", "strat-018", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024")
+                    or getattr(strategy, "id", "") in ("strat-002", "strat-004", "strat-005", "strat-007", "strat-010", "strat-011", "strat-012", "strat-013", "strat-016", "strat-017", "strat-018", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-026", "strat-030", "strat-031")
                 ):
                     try:
                         is_gold_scalp_id = (getattr(strategy, "id", "") == "strat-024")
@@ -1046,7 +1064,7 @@ class SignalGenerationEngine:
                             has_sniper_setup = True
                             direction = chosen_dir
                             pattern_conviction = 0.85
-                            min_d = 3.50 if is_gold_scalp_id else (14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else 0.0018)))
+                            min_d = 3.50 if is_gold_scalp_id else (14.00 if ("XAU" in canonical_symbol or "GOLD" in canonical_symbol) else (0.32 if ("GBP" in canonical_symbol and "JPY" in canonical_symbol) else (0.15 if ("EUR" in canonical_symbol and "JPY" in canonical_symbol) else (0.25 if "JPY" in canonical_symbol else (0.0010 if "NZD" in canonical_symbol else 0.0018)))))
 
                             # Local 8-bar swing fallback
                             if direction == CandidateDirection.BUY:
@@ -1390,8 +1408,33 @@ class SignalGenerationEngine:
                             v32_spec_desc = f"Apex Fiber Broad-USD Contradiction Veto: USD/JPY ({uj_chg_pct:+.2f}%) broad USD wave opposes {direction.value} EUR/USD."
                         else:
                             v32_spec_desc = f"Apex Fiber Dual SMT/USD Lock Confirmed: GBP/USD ({gu_chg_pct:+.2f}%) & USD/JPY ({uj_chg_pct:+.2f}%) aligned with {direction.value} EUR/USD."
+                    # 3E. NZD/USD Pacific Range Sister SMT (AUD/USD) Gate (strat-030): Vetoes isolated Kiwi fakeouts when AUD diverges
+                    if v32_spec_passed and sid_val == "strat-030":
+                        aud_bars = cached_bars_1h.get("AUDUSD") or []
+                        if len(aud_bars) >= 4 and aud_bars[-4].close > 0:
+                            aud_chg_pct = ((aud_bars[-1].close - aud_bars[-4].close) / aud_bars[-4].close) * 100.0
+                            if (direction == CandidateDirection.BUY and aud_chg_pct < -0.15) or (direction == CandidateDirection.SELL and aud_chg_pct > 0.15):
+                                v32_spec_passed = False
+                                v32_spec_desc = f"Apex Kiwi SMT Divergence Veto: Sister AUD/USD ({aud_chg_pct:+.2f}%) diverging against {direction.value} NZD/USD (isolated Kiwi trap)."
+                            else:
+                                v32_spec_desc = f"Apex Kiwi SMT Lock Confirmed: Sister AUD/USD ({aud_chg_pct:+.2f}%) aligned with {direction.value} NZD/USD."
+                    # 3F. EUR/JPY Dual Cross-Asset Sync (EUR/USD + USD/JPY) Gate (strat-031): Ensures EUR/JPY synthetic momentum alignment
+                    if v32_spec_passed and sid_val == "strat-031":
+                        eu_bars = cached_bars_1h.get("EURUSD") or []
+                        uj_bars = cached_bars_1h.get("USDJPY") or []
+                        if len(eu_bars) >= 4 and len(uj_bars) >= 4 and eu_bars[-4].close > 0 and uj_bars[-4].close > 0:
+                            eu_chg_pct = ((eu_bars[-1].close - eu_bars[-4].close) / eu_bars[-4].close) * 100.0
+                            uj_chg_pct = ((uj_bars[-1].close - uj_bars[-4].close) / uj_bars[-4].close) * 100.0
+                            if (eu_chg_pct > 0.15 and uj_chg_pct < -0.15) or (eu_chg_pct < -0.15 and uj_chg_pct > 0.15):
+                                v32_spec_passed = False
+                                v32_spec_desc = f"v3.2 EUR/JPY Dual-Cross Whipsaw Veto: EUR/USD ({eu_chg_pct:+.2f}%) and USD/JPY ({uj_chg_pct:+.2f}%) diverging."
+                            elif (direction == CandidateDirection.BUY and (eu_chg_pct < -0.20 or uj_chg_pct < -0.20)) or (direction == CandidateDirection.SELL and (eu_chg_pct > 0.20 or uj_chg_pct > 0.20)):
+                                v32_spec_passed = False
+                                v32_spec_desc = f"v3.2 EUR/JPY Dual-Cross Drag Veto: Components EUR/USD ({eu_chg_pct:+.2f}%) / USD/JPY ({uj_chg_pct:+.2f}%) opposing {direction.value}."
+                            else:
+                                v32_spec_desc = f"v3.2 Dual Cross Sync Confirmed: EUR/USD ({eu_chg_pct:+.2f}%) & USD/JPY ({uj_chg_pct:+.2f}%) aligned with {direction.value} EUR/JPY."
                     # 4. strat-006 Zero-Loss Body Displacement (>=45%) & RVol >= 1.8x Gate (all active strategies including strat-006)
-                    if v32_spec_passed and sid_val in ("strat-004", "strat-006", "strat-012", "strat-013", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028", "strat-029"):
+                    if v32_spec_passed and sid_val in ("strat-004", "strat-006", "strat-012", "strat-013", "strat-017", "strat-019", "strat-020", "strat-021", "strat-022", "strat-023", "strat-024", "strat-025", "strat-026", "strat-027", "strat-028", "strat-029", "strat-030", "strat-031"):
                         last_bar = candles_1h[-1]
                         bar_range = max(last_bar.high - last_bar.low, 1e-9)
                         body_ratio = abs(last_bar.close - last_bar.open) / bar_range
